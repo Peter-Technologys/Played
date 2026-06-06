@@ -34,8 +34,9 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          # Use latest stable Flutter — flutter-version omitted intentionally
-          # as subosito/flutter-action@v2 does not accept 'stable' as a version number
+          # flutter-version-file reads the SDK constraint from pubspec.yaml
+          # and resolves the latest matching stable release automatically
+          flutter-version-file: pubspec.yaml
           channel: 'stable'
           cache: true  # Cache Flutter SDK between runs
 
@@ -61,6 +62,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: pubspec.yaml
           channel: 'stable'
           cache: true
 
@@ -80,6 +82,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: pubspec.yaml
           channel: 'stable'
           cache: true
 
@@ -112,6 +115,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: pubspec.yaml
           channel: 'stable'
           cache: true
 
@@ -143,6 +147,7 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
+          flutter-version-file: pubspec.yaml
           channel: 'stable'
           cache: true
 
