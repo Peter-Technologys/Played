@@ -5,7 +5,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../audio_player_screen.dart';
+import 'audio_player_screen.dart';
 
 // ── Provider ───────────────────────────────────────────────
 
@@ -36,7 +36,7 @@ class MiniPlayer extends ConsumerWidget {
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: AppColors.accent.withOpacity(0.12),
+              color: AppColors.accent.withValues(alpha: 0.12),
               blurRadius: 20,
               offset: const Offset(0, 4),
             ),

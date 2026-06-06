@@ -54,12 +54,12 @@ class UsageStatsDashboard extends ConsumerWidget {
         decoration: BoxDecoration(
           gradient: LinearGradient(
             colors: [
-              AppColors.accent.withOpacity(0.08),
-              AppColors.accentViolet.withOpacity(0.08),
+              AppColors.accent.withValues(alpha: 0.08),
+              AppColors.accentViolet.withValues(alpha: 0.08),
             ],
           ),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: AppColors.accent.withOpacity(0.2)),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

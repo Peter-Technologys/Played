@@ -448,11 +448,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     icon: Icons.share_rounded,
                     label: 'Share',
                     // Share the media file using the system share sheet
-                    onTap: () => SharePlus.instance.share(
-                      ShareParams(
-                        files: [XFile(widget.mediaItem.filePath)],
-                        text: widget.mediaItem.title,
-                      ),
+                    onTap: () => SharePlus.shareXFiles(
+                      [XFile(widget.mediaItem.filePath)],
+                      text: widget.mediaItem.title,
                     ),
                   ),
                 ],

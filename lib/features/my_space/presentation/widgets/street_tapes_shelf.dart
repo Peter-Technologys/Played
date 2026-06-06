@@ -76,7 +76,7 @@ class _TapeRow extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.accentViolet.withOpacity(0.15),
+              color: AppColors.accentViolet.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(10),
             ),
             child: const Icon(
