@@ -205,7 +205,7 @@ class _Tab extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             boxShadow: isActive
                 ? [BoxShadow(
-                    color: AppColors.accent.withOpacity(0.3),
+                    color: AppColors.accent.withValues(alpha: 0.3),
                     blurRadius: 10, spreadRadius: 1)]
                 : null,
           ),
@@ -260,7 +260,7 @@ class _FilePicker extends ConsumerWidget {
               height: 40,
               decoration: BoxDecoration(
                 color: hasFile
-                    ? AppColors.accent.withOpacity(0.15)
+                    ? AppColors.accent.withValues(alpha: 0.15)
                     : AppColors.border,
                 borderRadius: BorderRadius.circular(10),
               ),
@@ -367,7 +367,7 @@ class _KaraokePanel extends ConsumerWidget {
               activeTrackColor: AppColors.accent,
               inactiveTrackColor: AppColors.border,
               thumbColor: AppColors.accent,
-              overlayColor: AppColors.accent.withOpacity(0.15),
+              overlayColor: AppColors.accent.withValues(alpha: 0.15),
               thumbShape:
                   const RoundSliderThumbShape(enabledThumbRadius: 10),
             ),
@@ -716,7 +716,7 @@ class _ActionButton extends StatelessWidget {
           border: enabled ? null : Border.all(color: AppColors.border),
           boxShadow: enabled
               ? [BoxShadow(
-                  color: AppColors.accent.withOpacity(0.35),
+                  color: AppColors.accent.withValues(alpha: 0.35),
                   blurRadius: 16,
                   offset: const Offset(0, 4))]
               : null,

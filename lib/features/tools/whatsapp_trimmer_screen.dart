@@ -2,11 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/services/ffmpeg_service.dart';
 
 // ── WhatsApp Trimmer Screen ─────────────────────────────────────
 
@@ -139,7 +137,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 8, vertical: 4),
                     decoration: BoxDecoration(
-                      color: AppColors.accent.withOpacity(0.15),
+                      color: AppColors.accent.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: const Text('30s',
@@ -180,10 +178,10 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(14),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                      color: AppColors.success.withOpacity(0.3)),
+                      color: AppColors.success.withValues(alpha: 0.3)),
                 ),
                 child: const Row(
                   children: [

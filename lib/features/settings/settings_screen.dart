@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
-import '../settings_provider.dart';
+import 'settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
@@ -251,7 +251,7 @@ class SettingsScreen extends ConsumerWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.15),
+                    color: AppColors.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: const Icon(Icons.play_circle_filled_rounded,
@@ -294,12 +294,11 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Rate Played',
             subtitle: 'Leave a review on the Play Store',
             color: AppColors.warning,
-            onTap: () async {
+            onTap: () {
               HapticFeedback.lightImpact();
-              // PeterSmart Technologies — update once published to Play Store
               final uri = Uri.parse(
                   'https://play.google.com/store/apps/details?id=com.petersmart.played');
-              if (await canLaunchUrl(uri)) launchUrl(uri);
+              canLaunchUrl(uri).then((ok) { if (ok) launchUrl(uri); });
             },
           ),
           _ActionTile(
@@ -307,12 +306,11 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Send Feedback',
             subtitle: 'Report a bug or suggest a feature',
             color: AppColors.accent,
-            onTap: () async {
+            onTap: () {
               HapticFeedback.lightImpact();
-              // Routes to support@petersmartlink.com — the main customer support inbox
               final uri = Uri.parse(
                   'mailto:support@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
-              if (await canLaunchUrl(uri)) launchUrl(uri);
+              canLaunchUrl(uri).then((ok) { if (ok) launchUrl(uri); });
             },
           ),
           _ActionTile(
@@ -320,11 +318,10 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Privacy Policy',
             subtitle: 'How we handle your data',
             color: AppColors.textSecondary,
-            onTap: () async {
+            onTap: () {
               HapticFeedback.lightImpact();
-              // PeterSmart Technologies privacy policy
               final uri = Uri.parse('https://petersmartlink.com/privacy');
-              if (await canLaunchUrl(uri)) launchUrl(uri);
+              canLaunchUrl(uri).then((ok) { if (ok) launchUrl(uri); });
             },
           ),
 
@@ -416,7 +413,7 @@ class _ToggleTile extends StatelessWidget {
               HapticFeedback.selectionClick();
               onChanged(v);
             },
-            activeColor: AppColors.accent,
+            activeThumbColor: AppColors.accent,
           ),
         ],
       ),
@@ -491,7 +488,7 @@ class _SliderTile extends StatelessWidget {
               activeTrackColor: AppColors.accent,
               inactiveTrackColor: AppColors.border,
               thumbColor: AppColors.accent,
-              overlayColor: AppColors.accent.withOpacity(0.12),
+              overlayColor: AppColors.accent.withValues(alpha: 0.12),
               thumbShape:
                   const RoundSliderThumbShape(enabledThumbRadius: 7),
             ),

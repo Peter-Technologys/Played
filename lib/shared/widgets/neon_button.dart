@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../app/theme/app_colors.dart';
 
 /// Reusable neon gradient button used across all screens.
