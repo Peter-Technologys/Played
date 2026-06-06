@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
@@ -15,7 +16,9 @@ import 'file_info_sheet.dart';
 import 'equalizer_screen.dart';
 import 'widgets/sleep_timer.dart';
 
-// ── State ──────────────────────────────────────────────────
+// ── State ──────────────────────────────────────────────────────
+
+enum RepeatState { off, one, all }
 
 class AudioPlayerState {
   final bool isPlaying;
@@ -24,6 +27,8 @@ class AudioPlayerState {
   final double speed;
   final bool isLoading;
   final bool isFavorite;
+  final bool isShuffle;
+  final RepeatState repeat;
 
   const AudioPlayerState({
     this.isPlaying = false,
@@ -32,24 +37,24 @@ class AudioPlayerState {
     this.speed = 1.0,
     this.isLoading = true,
     this.isFavorite = false,
+    this.isShuffle = false,
+    this.repeat = RepeatState.off,
   });
 
   AudioPlayerState copyWith({
-    bool? isPlaying,
-    Duration? position,
-    Duration? duration,
-    double? speed,
-    bool? isLoading,
-    bool? isFavorite,
-  }) =>
-      AudioPlayerState(
-        isPlaying: isPlaying ?? this.isPlaying,
-        position: position ?? this.position,
-        duration: duration ?? this.duration,
-        speed: speed ?? this.speed,
-        isLoading: isLoading ?? this.isLoading,
-        isFavorite: isFavorite ?? this.isFavorite,
-      );
+    bool? isPlaying, Duration? position, Duration? duration,
+    double? speed, bool? isLoading, bool? isFavorite,
+    bool? isShuffle, RepeatState? repeat,
+  }) => AudioPlayerState(
+    isPlaying: isPlaying ?? this.isPlaying,
+    position: position ?? this.position,
+    duration: duration ?? this.duration,
+    speed: speed ?? this.speed,
+    isLoading: isLoading ?? this.isLoading,
+    isFavorite: isFavorite ?? this.isFavorite,
+    isShuffle: isShuffle ?? this.isShuffle,
+    repeat: repeat ?? this.repeat,
+  );
 }
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
@@ -63,8 +68,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
             s.processingState == ProcessingState.buffering,
       );
     });
-    _player.positionStream
-        .listen((p) => state = state.copyWith(position: p));
+    _player.positionStream.listen((p) => state = state.copyWith(position: p));
     _player.durationStream.listen((d) {
       if (d != null) state = state.copyWith(duration: d);
     });
@@ -79,28 +83,26 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     await _player.play();
   }
 
-  void togglePlay() =>
-      _player.playing ? _player.pause() : _player.play();
+  void togglePlay() => _player.playing ? _player.pause() : _player.play();
+  void pause()      => _player.pause();
   Future<void> seek(Duration p) => _player.seek(p);
   Future<void> skipForward() =>
       _player.seek(state.position + const Duration(seconds: 10));
   Future<void> skipBack() =>
       _player.seek(state.position - const Duration(seconds: 10));
-  void setSpeed(double s) {
-    _player.setSpeed(s);
-    state = state.copyWith(speed: s);
+  void setSpeed(double s) { _player.setSpeed(s); state = state.copyWith(speed: s); }
+  void toggleFavorite() => state = state.copyWith(isFavorite: !state.isFavorite);
+  void toggleShuffle()  => state = state.copyWith(isShuffle: !state.isShuffle);
+  void cycleRepeat() {
+    final next = RepeatState.values[
+        (state.repeat.index + 1) % RepeatState.values.length];
+    state = state.copyWith(repeat: next);
   }
-  void toggleFavorite() =>
-      state = state.copyWith(isFavorite: !state.isFavorite);
-  void savePosition(String mediaId) =>
-      PlayedDatabase.instance.saveSeekPosition(mediaId, state.position);
-  void pause() => _player.pause();
+  void savePosition(String id) =>
+      PlayedDatabase.instance.saveSeekPosition(id, state.position);
 
   @override
-  void dispose() {
-    _player.dispose();
-    super.dispose();
-  }
+  void dispose() { _player.dispose(); super.dispose(); }
 }
 
 final audioPlayerProvider =
@@ -108,19 +110,19 @@ final audioPlayerProvider =
   (ref) => AudioPlayerNotifier(),
 );
 
-// ── Screen ──────────────────────────────────────────────────
+// ── Screen ─────────────────────────────────────────────────────
 
 class AudioPlayerScreen extends ConsumerStatefulWidget {
   final MediaItem mediaItem;
   const AudioPlayerScreen({super.key, required this.mediaItem});
 
   @override
-  ConsumerState<AudioPlayerScreen> createState() =>
-      _AudioPlayerScreenState();
+  ConsumerState<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
 }
 
 class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     with WidgetsBindingObserver {
+
   @override
   void initState() {
     super.initState();
@@ -133,21 +135,57 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused) {
-      ref
-          .read(audioPlayerProvider.notifier)
-          .savePosition(widget.mediaItem.id);
-    }
+    if (s == AppLifecycleState.paused)
+      ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
   }
 
   @override
   void dispose() {
-    ref
-        .read(audioPlayerProvider.notifier)
-        .savePosition(widget.mediaItem.id);
+    ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
+
+  // ── Sheet helpers ──────────────────────────────────────────
+
+  void _showQueue() => showModalBottomSheet(
+    context: context, backgroundColor: AppColors.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (_) => const QueueScreen(),
+  );
+
+  void _showLyrics(Duration pos) => showModalBottomSheet(
+    context: context, backgroundColor: AppColors.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (_) => LyricsSheet(item: widget.mediaItem, position: pos),
+  );
+
+  void _showFileInfo() => showModalBottomSheet(
+    context: context, backgroundColor: AppColors.surface,
+    isScrollControlled: true,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (_) => FileInfoSheet(item: widget.mediaItem),
+  );
+
+  void _showOptions() => showModalBottomSheet(
+    context: context, backgroundColor: AppColors.surface,
+    shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    builder: (_) => _OptionsSheet(
+      mediaItem: widget.mediaItem,
+      onFileInfo:        () { Navigator.pop(context); _showFileInfo(); },
+      onOpenInStudio:    () { Navigator.pop(context); context.push('/studio'); },
+      onTrimForWhatsApp: () {
+        Navigator.pop(context);
+        context.push('/tools/whatsapp', extra: widget.mediaItem);
+      },
+    ),
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -159,52 +197,42 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
         child: Column(
           children: [
 
-            // ── Top bar ─────────────────────────────────────
+            // ── Top bar ──────────────────────────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(
-                  horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(
-                        Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textPrimary,
-                        size: 30),
+                    icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.textPrimary, size: 30),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
-                  const Text(
-                    'NOW PLAYING',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.5,
-                      fontFamily: 'SpaceGrotesk',
-                    ),
-                  ),
+                  const Text('NOW PLAYING',
+                      style: TextStyle(
+                        fontSize: 11, fontWeight: FontWeight.w600,
+                        color: AppColors.textSecondary,
+                        letterSpacing: 1.5, fontFamily: 'SpaceGrotesk',
+                      )),
                   const Spacer(),
-                  // Sleep timer
                   SleepTimerButton(
-                    onExpire: () => ref
-                        .read(audioPlayerProvider.notifier)
-                        .pause(),
+                    onExpire: () =>
+                        ref.read(audioPlayerProvider.notifier).pause(),
                   ),
                   const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.more_vert_rounded,
                         color: AppColors.textSecondary, size: 22),
-                    onPressed: () => _showOptions(context),
+                    onPressed: _showOptions,
                   ),
                 ],
               ),
             ),
 
-            // ── Album art ───────────────────────────────────
+            // ── Album art ────────────────────────────────────
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 36, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 8),
                 child: _AlbumArt(
                   albumArtPath: widget.mediaItem.albumArtPath,
                   isPlaying: ps.isPlaying,
@@ -212,9 +240,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
 
-            // ── Track info + favourite ───────────────────────
+            // ── Track info + favourite ────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -223,34 +251,25 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          widget.mediaItem.title,
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'SpaceGrotesk',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(widget.mediaItem.title,
+                            style: const TextStyle(
+                              fontSize: 20, fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'SpaceGrotesk',
+                            ),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
-                        Text(
-                          widget.mediaItem.artist ?? 'Unknown Artist',
-                          style: const TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                              fontFamily: 'SpaceGrotesk'),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(widget.mediaItem.artist ?? 'Unknown Artist',
+                            style: const TextStyle(
+                                fontSize: 13, color: AppColors.textSecondary,
+                                fontFamily: 'SpaceGrotesk'),
+                            maxLines: 1, overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   ),
                   GestureDetector(
-                    onTap: () => ref
-                        .read(audioPlayerProvider.notifier)
-                        .toggleFavorite(),
+                    onTap: () =>
+                        ref.read(audioPlayerProvider.notifier).toggleFavorite(),
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
                       child: Icon(
@@ -271,7 +290,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
             const SizedBox(height: 20),
 
-            // ── Seek bar ────────────────────────────────────
+            // ── Seek bar ─────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _SeekBar(
@@ -282,96 +301,157 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               ),
             ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
 
-            // ── Controls ─────────────────────────────────────
+            // ── Shuffle / Speed / Repeat row ──────────────────
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: _Controls(
-                isPlaying: ps.isPlaying,
-                isLoading: ps.isLoading,
-                speed: ps.speed,
-                onTogglePlay: () =>
-                    ref.read(audioPlayerProvider.notifier).togglePlay(),
-                onSkipBack: () =>
-                    ref.read(audioPlayerProvider.notifier).skipBack(),
-                onSkipForward: () =>
-                    ref.read(audioPlayerProvider.notifier).skipForward(),
-                onSpeedChange: (s) =>
-                    ref.read(audioPlayerProvider.notifier).setSpeed(s),
-                onQueue: () => _showQueue(context),
-                onLyrics: () => _showLyrics(context, ps.position),
-                onEqualizer: () => context.push('/player/equalizer'),
+              padding: const EdgeInsets.symmetric(horizontal: 28),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  _ToggleIconBtn(
+                    icon: Icons.shuffle_rounded,
+                    active: ps.isShuffle,
+                    onTap: () =>
+                        ref.read(audioPlayerProvider.notifier).toggleShuffle(),
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+                      final idx = speeds.indexOf(ps.speed);
+                      ref.read(audioPlayerProvider.notifier)
+                          .setSpeed(speeds[(idx + 1) % speeds.length]);
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.surface,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Text('${ps.speed}x',
+                          style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w700,
+                            color: AppColors.accent,
+                            fontFamily: 'SpaceGrotesk',
+                          )),
+                    ),
+                  ),
+                  _RepeatBtn(
+                    repeat: ps.repeat,
+                    onTap: () =>
+                        ref.read(audioPlayerProvider.notifier).cycleRepeat(),
+                  ),
+                ],
               ),
             ),
 
-            const SizedBox(height: 28),
+            const SizedBox(height: 12),
+
+            // ── Main transport ────────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.skip_previous_rounded,
+                        color: AppColors.textPrimary, size: 34),
+                    onPressed: () {},
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.replay_10_rounded,
+                        color: AppColors.textPrimary, size: 34),
+                    onPressed: () =>
+                        ref.read(audioPlayerProvider.notifier).skipBack(),
+                  ),
+                  GestureDetector(
+                    onTap: () =>
+                        ref.read(audioPlayerProvider.notifier).togglePlay(),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      width: 72, height: 72,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.accent,
+                        boxShadow: [
+                          BoxShadow(
+                            color: AppColors.accent.withOpacity(0.45),
+                            blurRadius: 24, spreadRadius: 2,
+                          ),
+                        ],
+                      ),
+                      child: ps.isLoading
+                          ? const Padding(
+                              padding: EdgeInsets.all(20),
+                              child: CircularProgressIndicator(
+                                  color: Colors.black, strokeWidth: 2))
+                          : Icon(
+                              ps.isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.black, size: 38,
+                            ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.forward_10_rounded,
+                        color: AppColors.textPrimary, size: 34),
+                    onPressed: () =>
+                        ref.read(audioPlayerProvider.notifier).skipForward(),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.skip_next_rounded,
+                        color: AppColors.textPrimary, size: 34),
+                    onPressed: () {},
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // ── Secondary actions ─────────────────────────────
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _SecondaryBtn(
+                    icon: Icons.lyrics_rounded,
+                    label: 'Lyrics',
+                    onTap: () => _showLyrics(ps.position),
+                  ),
+                  _SecondaryBtn(
+                    icon: Icons.equalizer_rounded,
+                    label: 'EQ',
+                    onTap: () => context.push('/player/equalizer'),
+                  ),
+                  _SecondaryBtn(
+                    icon: Icons.queue_music_rounded,
+                    label: 'Queue',
+                    onTap: _showQueue,
+                  ),
+                  _SecondaryBtn(
+                    icon: Icons.share_rounded,
+                    label: 'Share',
+                    onTap: () => HapticFeedback.lightImpact(),
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(height: 24),
           ],
         ),
       ),
     );
   }
-
-  void _showOptions(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _OptionsSheet(
-        mediaItem: widget.mediaItem,
-        onFileInfo: () {
-          Navigator.pop(context);
-          showModalBottomSheet(
-            context: context,
-            backgroundColor: AppColors.surface,
-            isScrollControlled: true,
-            shape: const RoundedRectangleBorder(
-                borderRadius:
-                    BorderRadius.vertical(top: Radius.circular(24))),
-            builder: (_) => FileInfoSheet(item: widget.mediaItem),
-          );
-        },
-        onOpenInStudio: () {
-          Navigator.pop(context);
-          context.push('/studio');
-        },
-        onTrimForWhatsApp: () {
-          Navigator.pop(context);
-          context.push('/tools/whatsapp', extra: widget.mediaItem);
-        },
-      ),
-    );
-  }
-
-  void _showQueue(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => const QueueScreen(),
-    );
-  }
-
-  void _showLyrics(BuildContext context, Duration position) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius:
-              BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => LyricsSheet(
-          item: widget.mediaItem, position: position),
-    );
-  }
 }
 
-// ── Album Art ─────────────────────────────────────────────
+// ── Album Art ──────────────────────────────────────────────────
 
 class _AlbumArt extends StatelessWidget {
   final String? albumArtPath;
@@ -389,8 +469,7 @@ class _AlbumArt extends StatelessWidget {
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent
-                .withOpacity(isPlaying ? 0.35 : 0.1),
+            color: AppColors.accent.withOpacity(isPlaying ? 0.35 : 0.1),
             blurRadius: isPlaying ? 48 : 16,
             spreadRadius: isPlaying ? 6 : 0,
           ),
@@ -413,24 +492,20 @@ class _AlbumArt extends StatelessWidget {
   }
 }
 
-// ── Seek Bar ───────────────────────────────────────────────
+// ── Seek Bar ───────────────────────────────────────────────────
 
 class _SeekBar extends StatelessWidget {
   final Duration position;
   final Duration duration;
   final ValueChanged<Duration> onSeek;
   const _SeekBar(
-      {required this.position,
-      required this.duration,
-      required this.onSeek});
+      {required this.position, required this.duration, required this.onSeek});
 
   @override
   Widget build(BuildContext context) {
     final progress = duration.inMilliseconds > 0
-        ? (position.inMilliseconds / duration.inMilliseconds)
-            .clamp(0.0, 1.0)
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
-
     return Column(
       children: [
         SliderTheme(
@@ -440,14 +515,12 @@ class _SeekBar extends StatelessWidget {
             inactiveTrackColor: AppColors.border,
             thumbColor: AppColors.accent,
             overlayColor: AppColors.accent.withOpacity(0.15),
-            thumbShape:
-                const RoundSliderThumbShape(enabledThumbRadius: 8),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
           child: Slider(
             value: progress,
-            onChanged: (v) => onSeek(Duration(
-                milliseconds:
-                    (v * duration.inMilliseconds).toInt())),
+            onChanged: (v) => onSeek(
+                Duration(milliseconds: (v * duration.inMilliseconds).toInt())),
           ),
         ),
         Padding(
@@ -457,12 +530,10 @@ class _SeekBar extends StatelessWidget {
             children: [
               Text(DurationFormatter.format(position),
                   style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary)),
+                      fontSize: 12, color: AppColors.textSecondary)),
               Text(DurationFormatter.format(duration),
                   style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary)),
+                      fontSize: 12, color: AppColors.textSecondary)),
             ],
           ),
         ),
@@ -471,147 +542,49 @@ class _SeekBar extends StatelessWidget {
   }
 }
 
-// ── Controls ───────────────────────────────────────────────
+// ── Toggle Icon Button ─────────────────────────────────────────
 
-class _Controls extends StatelessWidget {
-  final bool isPlaying;
-  final bool isLoading;
-  final double speed;
-  final VoidCallback onTogglePlay;
-  final VoidCallback onSkipBack;
-  final VoidCallback onSkipForward;
-  final ValueChanged<double> onSpeedChange;
-  final VoidCallback onQueue;
-  final VoidCallback onLyrics;
-  final VoidCallback onEqualizer;
-
-  const _Controls({
-    required this.isPlaying,
-    required this.isLoading,
-    required this.speed,
-    required this.onTogglePlay,
-    required this.onSkipBack,
-    required this.onSkipForward,
-    required this.onSpeedChange,
-    required this.onQueue,
-    required this.onLyrics,
-    required this.onEqualizer,
-  });
+class _ToggleIconBtn extends StatelessWidget {
+  final IconData icon;
+  final bool active;
+  final VoidCallback onTap;
+  const _ToggleIconBtn(
+      {required this.icon, required this.active, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
-        // Main transport row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            // Speed chip
-            GestureDetector(
-              onTap: () {
-                const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-                final idx = speeds.indexOf(speed);
-                onSpeedChange(speeds[(idx + 1) % speeds.length]);
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.surface,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.border),
-                ),
-                child: Text(
-                  '${speed}x',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.accent,
-                    fontFamily: 'SpaceGrotesk',
-                  ),
-                ),
-              ),
-            ),
-
-            // Skip back 10s
-            IconButton(
-              icon: const Icon(Icons.replay_10_rounded,
-                  color: AppColors.textPrimary, size: 34),
-              onPressed: onSkipBack,
-            ),
-
-            // Play / Pause
-            GestureDetector(
-              onTap: onTogglePlay,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.accent,
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.accent.withOpacity(0.45),
-                      blurRadius: 24,
-                      spreadRadius: 2,
-                    ),
-                  ],
-                ),
-                child: isLoading
-                    ? const Padding(
-                        padding: EdgeInsets.all(20),
-                        child: CircularProgressIndicator(
-                            color: Colors.black, strokeWidth: 2))
-                    : Icon(
-                        isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.play_arrow_rounded,
-                        color: Colors.black,
-                        size: 38,
-                      ),
-              ),
-            ),
-
-            // Skip forward 10s
-            IconButton(
-              icon: const Icon(Icons.forward_10_rounded,
-                  color: AppColors.textPrimary, size: 34),
-              onPressed: onSkipForward,
-            ),
-
-            // Queue
-            IconButton(
-              icon: const Icon(Icons.queue_music_rounded,
-                  color: AppColors.textSecondary, size: 26),
-              onPressed: onQueue,
-            ),
-          ],
-        ),
-
-        const SizedBox(height: 12),
-
-        // Secondary actions row
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            _SecondaryBtn(
-              icon: Icons.lyrics_rounded,
-              label: 'Lyrics',
-              onTap: onLyrics,
-            ),
-            _SecondaryBtn(
-              icon: Icons.equalizer_rounded,
-              label: 'EQ',
-              onTap: onEqualizer,
-            ),
-          ],
-        ),
-      ],
+    return GestureDetector(
+      onTap: () { HapticFeedback.selectionClick(); onTap(); },
+      child: Icon(icon,
+          color: active ? AppColors.accent : AppColors.textSecondary,
+          size: 24),
     );
   }
 }
+
+// ── Repeat Button ──────────────────────────────────────────────
+
+class _RepeatBtn extends StatelessWidget {
+  final RepeatState repeat;
+  final VoidCallback onTap;
+  const _RepeatBtn({required this.repeat, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = repeat == RepeatState.one
+        ? Icons.repeat_one_rounded
+        : Icons.repeat_rounded;
+    final active = repeat != RepeatState.off;
+    return GestureDetector(
+      onTap: () { HapticFeedback.selectionClick(); onTap(); },
+      child: Icon(icon,
+          color: active ? AppColors.accent : AppColors.textSecondary,
+          size: 24),
+    );
+  }
+}
+
+// ── Secondary Button ───────────────────────────────────────────
 
 class _SecondaryBtn extends StatelessWidget {
   final IconData icon;
@@ -624,43 +597,37 @@ class _SecondaryBtn extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        padding:
-            const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: AppColors.textSecondary, size: 16),
-            const SizedBox(width: 6),
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontFamily: 'SpaceGrotesk',
-                fontWeight: FontWeight.w600,
-              ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.border),
             ),
-          ],
-        ),
+            child: Icon(icon, color: AppColors.textSecondary, size: 20),
+          ),
+          const SizedBox(height: 4),
+          Text(label,
+              style: const TextStyle(
+                fontSize: 10, color: AppColors.textSecondary,
+                fontFamily: 'SpaceGrotesk', fontWeight: FontWeight.w500,
+              )),
+        ],
       ),
     );
   }
 }
 
-// ── Options Sheet ───────────────────────────────────────────
+// ── Options Sheet ──────────────────────────────────────────────
 
 class _OptionsSheet extends StatelessWidget {
   final MediaItem mediaItem;
   final VoidCallback onFileInfo;
   final VoidCallback onOpenInStudio;
   final VoidCallback onTrimForWhatsApp;
-
   const _OptionsSheet({
     required this.mediaItem,
     required this.onFileInfo,
@@ -671,18 +638,14 @@ class _OptionsSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final options = [
-      _Opt(Icons.playlist_add_rounded, 'Add to Playlist',
-          AppColors.accent, null),
-      _Opt(Icons.lock_rounded, 'Move to Vault',
-          AppColors.accentViolet, null),
-      _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop',
-          AppColors.accent, null),
-      _Opt(Icons.graphic_eq_rounded, 'Open in Studio',
-          AppColors.accentViolet, onOpenInStudio),
-      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',
-          AppColors.accent, onTrimForWhatsApp),
-      _Opt(Icons.info_outline_rounded, 'File Info',
-          AppColors.textSecondary, onFileInfo),
+      _Opt(Icons.playlist_add_rounded,   'Add to Playlist',     AppColors.accent,        null),
+      _Opt(Icons.lock_rounded,           'Move to Vault',       AppColors.accentViolet,  null),
+      _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop',  AppColors.accent,        null),
+      _Opt(Icons.graphic_eq_rounded,     'Open in Studio',      AppColors.accentViolet,  onOpenInStudio),
+      _Opt(Icons.phone_android_rounded,  'Trim for WhatsApp',   AppColors.accent,        onTrimForWhatsApp),
+      _Opt(Icons.download_rounded,       'Extract Audio (MP3)', AppColors.accent,        null),
+      _Opt(Icons.cast_rounded,           'Cast to Device',      AppColors.textSecondary, null),
+      _Opt(Icons.info_outline_rounded,   'File Info',           AppColors.textSecondary, onFileInfo),
     ];
 
     return Padding(
@@ -692,24 +655,20 @@ class _OptionsSheet extends StatelessWidget {
         children: [
           Center(
             child: Container(
-              width: 40,
-              height: 4,
+              width: 40, height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2)),
             ),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 48, height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(12)),
                 child: const Icon(Icons.music_note_rounded,
                     color: AppColors.accent, size: 24),
               ),
@@ -718,23 +677,16 @@ class _OptionsSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      mediaItem.title,
-                      style: const TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'SpaceGrotesk',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    Text(
-                      mediaItem.formattedSize,
-                      style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary),
-                    ),
+                    Text(mediaItem.title,
+                        style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                          fontFamily: 'SpaceGrotesk',
+                        ),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                    Text(mediaItem.formattedSize,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary)),
                   ],
                 ),
               ),
@@ -745,31 +697,23 @@ class _OptionsSheet extends StatelessWidget {
           const SizedBox(height: 8),
           ...options.map((o) => ListTile(
                 leading: Container(
-                  width: 36,
-                  height: 36,
+                  width: 36, height: 36,
                   decoration: BoxDecoration(
                     color: o.color.withOpacity(0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(o.icon, color: o.color, size: 18),
                 ),
-                title: Text(
-                  o.label,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                    fontFamily: 'SpaceGrotesk',
-                  ),
-                ),
+                title: Text(o.label,
+                    style: const TextStyle(
+                      fontSize: 14, color: AppColors.textPrimary,
+                      fontFamily: 'SpaceGrotesk',
+                    )),
                 onTap: () {
-                  if (o.onTap != null) {
-                    o.onTap!();
-                  } else {
-                    Navigator.pop(context);
-                  }
+                  if (o.onTap != null) { o.onTap!(); }
+                  else { Navigator.pop(context); }
                 },
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 0),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                 dense: true,
               )),
         ],
