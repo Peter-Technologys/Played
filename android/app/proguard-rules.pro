@@ -1,0 +1,6 @@
+-keep class io.flutter.** { *; }
+-keep class com.arthenica.** { *; }
+-keep class org.videolan.** { *; }
+-keep class com.google.android.gms.nearby.** { *; }
+-dontwarn io.flutter.**
+-dontwarn com.arthenica.**
