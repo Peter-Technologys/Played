@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/vault_item.dart';
-
-// ── Providers ──────────────────────────────────────────────
+import '../../../core/services/vault_service.dart';
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
 
@@ -15,8 +15,7 @@ class VaultLockScreen extends ConsumerStatefulWidget {
   const VaultLockScreen({super.key});
 
   @override
-  ConsumerState<VaultLockScreen> createState() =>
-      _VaultLockScreenState();
+  ConsumerState<VaultLockScreen> createState() => _VaultLockScreenState();
 }
 
 class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
@@ -27,36 +26,21 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
   @override
   void initState() {
     super.initState();
-    // Auto-trigger biometric on screen open
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _authenticate());
+    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
   }
 
   Future<void> _authenticate() async {
-    setState(() {
-      _isAuthenticating = true;
-      _errorMessage = null;
-    });
-
+    setState(() { _isAuthenticating = true; _errorMessage = null; });
     try {
       final canCheck = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
-
-      if (!canCheck && !isSupported) {
-        // Fallback to PIN
-        _showPinDialog();
-        return;
-      }
-
-      final authenticated = await _auth.authenticate(
+      if (!canCheck && !isSupported) { _showPinDialog(); return; }
+      final ok = await _auth.authenticate(
         localizedReason: 'Unlock your Private Vault',
         options: const AuthenticationOptions(
-          biometricOnly: false,
-          stickyAuth: true,
-        ),
+            biometricOnly: false, stickyAuth: true),
       );
-
-      if (authenticated) {
+      if (ok) {
         ref.read(vaultUnlockedProvider.notifier).state = true;
       } else {
         setState(() => _errorMessage = 'Authentication failed. Try again.');
@@ -69,125 +53,152 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
   }
 
   void _showPinDialog() {
-    // PIN fallback dialog
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => _PinDialog(
-        onSuccess: () {
-          ref.read(vaultUnlockedProvider.notifier).state = true;
-        },
-      ),
+          onSuccess: () =>
+              ref.read(vaultUnlockedProvider.notifier).state = true),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final isUnlocked = ref.watch(vaultUnlockedProvider);
-
-    if (isUnlocked) {
-      return const VaultGalleryScreen();
-    }
+    if (ref.watch(vaultUnlockedProvider)) return const VaultGalleryScreen();
 
     return Scaffold(
       backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.textPrimary),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        elevation: 0,
+      ),
       body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Lock icon
-            Container(
-              width: 96,
-              height: 96,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: AppColors.surface,
-                border: Border.all(
-                    color: AppColors.accentViolet, width: 2),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accentViolet.withOpacity(0.3),
-                    blurRadius: 24,
-                    spreadRadius: 4,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Lock icon with glow
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.surface,
+                  border: Border.all(color: AppColors.accentViolet, width: 2),
+                  boxShadow: [
+                    BoxShadow(
+                        color: AppColors.accentViolet.withOpacity(0.35),
+                        blurRadius: 32,
+                        spreadRadius: 4)
+                  ],
+                ),
+                child: const Icon(Icons.lock_rounded,
+                    color: AppColors.accentViolet, size: 44),
+              ).animate().scale(
+                    begin: const Offset(0.8, 0.8),
+                    end: const Offset(1, 1),
+                    duration: 500.ms,
+                    curve: Curves.elasticOut,
+                  ),
+
+              const SizedBox(height: 28),
+
+              const Text('Private Vault',
+                  style: TextStyle(
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'SpaceGrotesk',
+                  )).animate().fadeIn(delay: 200.ms),
+
+              const SizedBox(height: 8),
+
+              const Text(
+                'Your private media is encrypted.\nAuthenticate to access.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    height: 1.6),
+              ).animate().fadeIn(delay: 300.ms),
+
+              const SizedBox(height: 40),
+
+              if (_isAuthenticating)
+                const CircularProgressIndicator(
+                    color: AppColors.accentViolet)
+              else
+                GestureDetector(
+                  onTap: _authenticate,
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    decoration: BoxDecoration(
+                      color: AppColors.accentViolet,
+                      borderRadius: BorderRadius.circular(16),
+                      boxShadow: [
+                        BoxShadow(
+                            color: AppColors.accentViolet.withOpacity(0.4),
+                            blurRadius: 20,
+                            offset: const Offset(0, 4))
+                      ],
+                    ),
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.fingerprint_rounded,
+                            color: Colors.white, size: 24),
+                        SizedBox(width: 10),
+                        Text('Unlock with Biometrics',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              fontFamily: 'SpaceGrotesk',
+                            )),
+                      ],
+                    ),
+                  ),
+                ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
+
+              const SizedBox(height: 16),
+
+              // PIN fallback
+              TextButton(
+                onPressed: _showPinDialog,
+                child: const Text('Use PIN instead',
+                    style: TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 13,
+                        fontFamily: 'SpaceGrotesk')),
+              ),
+
+              if (_errorMessage != null) ...
+                [
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                          color: AppColors.error.withOpacity(0.3)),
+                    ),
+                    child: Text(_errorMessage!,
+                        style: const TextStyle(
+                            color: AppColors.error, fontSize: 12),
+                        textAlign: TextAlign.center),
                   ),
                 ],
-              ),
-              child: const Icon(
-                Icons.lock_rounded,
-                color: AppColors.accentViolet,
-                size: 40,
-              ),
-            ),
-            const SizedBox(height: 24),
-            const Text(
-              'Private Vault',
-              style: TextStyle(
-                fontSize: 24,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                fontFamily: 'SpaceGrotesk',
-              ),
-            ),
-            const SizedBox(height: 8),
-            const Text(
-              'Your private media is locked.\nAuthenticate to access.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.5,
-              ),
-            ),
-            const SizedBox(height: 40),
-            if (_isAuthenticating)
-              const CircularProgressIndicator(
-                  color: AppColors.accentViolet)
-            else
-              GestureDetector(
-                onTap: _authenticate,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 32, vertical: 16),
-                  decoration: BoxDecoration(
-                    color: AppColors.accentViolet,
-                    borderRadius: BorderRadius.circular(16),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accentViolet.withOpacity(0.4),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.fingerprint_rounded,
-                          color: Colors.white, size: 22),
-                      SizedBox(width: 10),
-                      Text(
-                        'Unlock with Biometrics',
-                        style: TextStyle(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          fontFamily: 'SpaceGrotesk',
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            if (_errorMessage != null) ...
-              [
-                const SizedBox(height: 16),
-                Text(
-                  _errorMessage!,
-                  style: const TextStyle(
-                      color: Colors.redAccent, fontSize: 12),
-                ),
-              ],
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -207,7 +218,7 @@ class _PinDialog extends StatefulWidget {
 class _PinDialogState extends State<_PinDialog> {
   final _controller = TextEditingController();
   bool _error = false;
-  static const String _pin = '1234'; // Replace with secure storage
+  static const String _pin = '1234';
 
   void _verify() {
     if (_controller.text == _pin) {
@@ -220,43 +231,40 @@ class _PinDialogState extends State<_PinDialog> {
   }
 
   @override
+  void dispose() { _controller.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext context) {
     return AlertDialog(
       backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Enter PIN',
           style: TextStyle(
-              color: AppColors.textPrimary,
-              fontFamily: 'SpaceGrotesk')),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          TextField(
-            controller: _controller,
-            obscureText: true,
-            keyboardType: TextInputType.number,
-            maxLength: 6,
-            style: const TextStyle(color: AppColors.textPrimary),
-            decoration: InputDecoration(
-              hintText: 'Enter your PIN',
-              hintStyle:
-                  const TextStyle(color: AppColors.textSecondary),
-              errorText: _error ? 'Incorrect PIN' : null,
-              enabledBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.border),
-              ),
-              focusedBorder: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(12),
-                borderSide:
-                    const BorderSide(color: AppColors.accentViolet),
-              ),
-            ),
-            onSubmitted: (_) => _verify(),
-          ),
-        ],
+              color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk')),
+      content: TextField(
+        controller: _controller,
+        obscureText: true,
+        keyboardType: TextInputType.number,
+        maxLength: 6,
+        autofocus: true,
+        style: const TextStyle(color: AppColors.textPrimary),
+        decoration: InputDecoration(
+          hintText: 'Enter your PIN',
+          hintStyle: const TextStyle(color: AppColors.textSecondary),
+          counterText: '',
+          errorText: _error ? 'Incorrect PIN' : null,
+          enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.border)),
+          focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide:
+                  const BorderSide(color: AppColors.accentViolet)),
+          errorBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.error)),
+        ),
+        onSubmitted: (_) => _verify(),
       ),
       actions: [
         TextButton(
@@ -279,32 +287,44 @@ class _PinDialogState extends State<_PinDialog> {
   }
 }
 
-// ── Vault Gallery Screen ──────────────────────────────────────
+// ── Vault Gallery ────────────────────────────────────────────
 
 class VaultGalleryScreen extends StatefulWidget {
   const VaultGalleryScreen({super.key});
 
   @override
-  State<VaultGalleryScreen> createState() =>
-      _VaultGalleryScreenState();
+  State<VaultGalleryScreen> createState() => _VaultGalleryScreenState();
 }
 
 class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
   List<VaultItem> _items = [];
   bool _loading = true;
+  int? _vaultSizeBytes;
 
   @override
   void initState() {
     super.initState();
-    _loadItems();
+    _load();
   }
 
-  Future<void> _loadItems() async {
+  Future<void> _load() async {
     final items = await PlayedDatabase.instance.getAllVaultItems();
+    final size = await VaultService.instance.getVaultSize();
     setState(() {
       _items = items;
+      _vaultSizeBytes = size;
       _loading = false;
     });
+  }
+
+  String _formatSize(int bytes) {
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
+  Future<void> _removeItem(VaultItem item) async {
+    await VaultService.instance.unlockItem(item.mediaId);
+    await _load();
   }
 
   @override
@@ -313,35 +333,80 @@ class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.background,
-        title: const Text(
-          'Private Vault',
-          style: TextStyle(
-            fontFamily: 'SpaceGrotesk',
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-          ),
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.textPrimary),
+          onPressed: () => Navigator.of(context).pop(),
         ),
-        leading: const Icon(Icons.lock_rounded,
-            color: AppColors.accentViolet),
+        title: const Text('Private Vault',
+            style: TextStyle(
+              fontFamily: 'SpaceGrotesk',
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              fontSize: 18,
+            )),
+        actions: [
+          if (_vaultSizeBytes != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 16),
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentViolet.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _formatSize(_vaultSizeBytes!),
+                    style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.accentViolet,
+                        fontWeight: FontWeight.w600,
+                        fontFamily: 'SpaceGrotesk'),
+                  ),
+                ),
+              ),
+            ),
+        ],
       ),
       body: _loading
           ? const Center(
               child: CircularProgressIndicator(
                   color: AppColors.accentViolet))
           : _items.isEmpty
-              ? const Center(
+              ? Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.lock_open_rounded,
-                          color: AppColors.textSecondary, size: 48),
-                      SizedBox(height: 16),
-                      Text(
-                        'Your vault is empty.',
+                      Container(
+                        width: 80,
+                        height: 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.surface,
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(Icons.lock_open_rounded,
+                            color: AppColors.textSecondary, size: 36),
+                      ),
+                      const SizedBox(height: 20),
+                      const Text('Vault is empty',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'SpaceGrotesk',
+                          )),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Long-press any file and tap\n"Move to Vault" to protect it.',
+                        textAlign: TextAlign.center,
                         style: TextStyle(
+                            fontSize: 13,
                             color: AppColors.textSecondary,
-                            fontSize: 14,
-                            fontFamily: 'SpaceGrotesk'),
+                            height: 1.5),
                       ),
                     ],
                   ),
@@ -353,22 +418,26 @@ class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 0.85,
+                    childAspectRatio: 0.82,
                   ),
                   itemCount: _items.length,
-                  itemBuilder: (context, i) =>
-                      _VaultItemCard(item: _items[i]),
+                  itemBuilder: (context, i) => _VaultCard(
+                    item: _items[i],
+                    onRemove: () => _removeItem(_items[i]),
+                  ),
                 ),
     );
   }
 }
 
-class _VaultItemCard extends StatelessWidget {
+class _VaultCard extends StatelessWidget {
   final VaultItem item;
-  const _VaultItemCard({required this.item});
+  final VoidCallback onRemove;
+  const _VaultCard({required this.item, required this.onRemove});
 
   @override
   Widget build(BuildContext context) {
+    final isVideo = item.mediaType == 'video';
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -376,34 +445,64 @@ class _VaultItemCard extends StatelessWidget {
         border: Border.all(color: AppColors.border),
       ),
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            item.mediaType == 'video'
-                ? Icons.video_file_rounded
-                : Icons.audio_file_rounded,
-            color: AppColors.accentViolet,
-            size: 40,
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            child: Text(
-              item.originalPath.split('/').last,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontFamily: 'SpaceGrotesk',
+          // Thumbnail area
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet.withOpacity(0.08),
+                borderRadius: const BorderRadius.vertical(
+                    top: Radius.circular(16)),
               ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-              textAlign: TextAlign.center,
+              child: Center(
+                child: Icon(
+                  isVideo
+                      ? Icons.video_file_rounded
+                      : Icons.audio_file_rounded,
+                  color: AppColors.accentViolet,
+                  size: 44,
+                ),
+              ),
             ),
           ),
-          const SizedBox(height: 4),
-          const Icon(Icons.lock_rounded,
-              color: AppColors.textSecondary, size: 14),
+          // Info
+          Padding(
+            padding: const EdgeInsets.all(10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  item.originalPath.split('/').last,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'SpaceGrotesk',
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 6),
+                Row(
+                  children: [
+                    const Icon(Icons.lock_rounded,
+                        color: AppColors.accentViolet, size: 12),
+                    const SizedBox(width: 4),
+                    const Text('Encrypted',
+                        style: TextStyle(
+                            fontSize: 10,
+                            color: AppColors.accentViolet)),
+                    const Spacer(),
+                    GestureDetector(
+                      onTap: onRemove,
+                      child: const Icon(Icons.lock_open_rounded,
+                          color: AppColors.textSecondary, size: 16),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
       ),
     );
