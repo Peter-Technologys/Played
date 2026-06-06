@@ -272,10 +272,16 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Version 1.0.0 · Built for East Africa',
+                      'Version 1.0.0 · PeterSmart Technologies',
                       style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary),
+                    ),
+                    Text(
+                      'Mbirizi, Lwengo District, Uganda',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textMuted),
                     ),
                   ],
                 ),
@@ -290,9 +296,9 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.warning,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // Update with your actual Play Store package ID
+              // PeterSmart Technologies — update once published to Play Store
               final uri = Uri.parse(
-                  'https://play.google.com/store/apps/details?id=com.played.app');
+                  'https://play.google.com/store/apps/details?id=com.petersmart.played');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
@@ -303,9 +309,9 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.accent,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // Update with your support email address
+              // Routes to support@petersmartlink.com — the main customer support inbox
               final uri = Uri.parse(
-                  'mailto:support@played.app?subject=Feedback%20-%20Played%20App');
+                  'mailto:support@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
@@ -316,8 +322,8 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.textSecondary,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // Update with your actual privacy policy URL
-              final uri = Uri.parse('https://played.app/privacy');
+              // PeterSmart Technologies privacy policy
+              final uri = Uri.parse('https://petersmartlink.com/privacy');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
