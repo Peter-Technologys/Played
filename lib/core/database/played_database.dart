@@ -8,6 +8,7 @@ import '../models/playlist.dart';
 import '../models/stem_cache.dart';
 import '../models/vault_item.dart';
 import 'hive_boxes.dart';
+import 'duration_adapter.dart';
 
 /// Central database service for PLAYED.
 /// Manages playlists, playback history, shelf caches,
@@ -33,7 +34,8 @@ class PlayedDatabase {
 
     await Hive.initFlutter();
 
-    // Register adapters
+    // Register adapters — Duration must be registered before MediaItem
+    if (!Hive.isAdapterRegistered(10)) Hive.registerAdapter(DurationAdapter());
     if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(MediaItemAdapter());
     if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(PlaylistAdapter());
     if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(StemCacheAdapter());

@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Placeholder vector icon for PLAYED -->
+<!-- Replace with your actual branded icon before release -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+  <!-- Outer circle -->
+  <path
+      android:fillColor="#00D4FF"
+      android:pathData="M54,54m-40,0a40,40 0,1 1,80 0a40,40 0,1 1,-80 0"/>
+
+  <!-- Play triangle -->
+  <path
+      android:fillColor="#080B12"
+      android:pathData="M44,38 L44,70 L72,54 Z"/>
+
+</vector>

@@ -49,7 +49,8 @@
     <application
         android:label="PLAYED"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher"
+        android:icon="@drawable/ic_launcher_foreground"
+        android:roundIcon="@drawable/ic_launcher_foreground"
         android:requestLegacyExternalStorage="true"
         android:allowBackup="false"
         android:hardwareAccelerated="true">

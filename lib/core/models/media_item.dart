@@ -63,6 +63,39 @@ class MediaItem extends HiveObject {
   /// Returns the underlying [File] object for this media item.
   File get file => File(filePath);
 
+  /// Returns a copy of this item with the given fields replaced.
+  MediaItem copyWith({
+    String? id,
+    String? title,
+    String? fileName,
+    String? filePath,
+    bool? isVideo,
+    Duration? duration,
+    DateTime? lastPlayedAt,
+    DateTime? addedAt,
+    int? fileSizeBytes,
+    String? thumbnailPath,
+    String? albumArtPath,
+    String? artist,
+    String? album,
+  }) {
+    return MediaItem(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      fileName: fileName ?? this.fileName,
+      filePath: filePath ?? this.filePath,
+      isVideo: isVideo ?? this.isVideo,
+      duration: duration ?? this.duration,
+      lastPlayedAt: lastPlayedAt ?? this.lastPlayedAt,
+      addedAt: addedAt ?? this.addedAt,
+      fileSizeBytes: fileSizeBytes ?? this.fileSizeBytes,
+      thumbnailPath: thumbnailPath ?? this.thumbnailPath,
+      albumArtPath: albumArtPath ?? this.albumArtPath,
+      artist: artist ?? this.artist,
+      album: album ?? this.album,
+    );
+  }
+
   String get formattedSize {
     if (fileSizeBytes < 1024 * 1024) {
       return '${(fileSizeBytes / 1024).toStringAsFixed(1)} KB';
