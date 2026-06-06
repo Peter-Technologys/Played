@@ -102,7 +102,7 @@ class _PlayerControlsState extends State<PlayerControls> {
               trailing: Switch(
                 value: _subtitlesOn,
                 onChanged: (_) { Navigator.pop(context); _toggleSubtitles(); },
-                activeColor: AppColors.accent,
+                activeThumbColor: AppColors.accent,
               ),
             ),
             _VideoOption(
@@ -273,7 +273,7 @@ class _PlayerControlsState extends State<PlayerControls> {
                     activeTrackColor: AppColors.accent,
                     inactiveTrackColor: Colors.white24,
                     thumbColor: AppColors.accent,
-                    overlayColor: AppColors.accent.withOpacity(0.2),
+                    overlayColor: AppColors.accent.withValues(alpha: 0.2),
                     thumbShape:
                         const RoundSliderThumbShape(enabledThumbRadius: 7),
                   ),

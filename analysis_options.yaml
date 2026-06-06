@@ -13,7 +13,8 @@ linter:
     avoid_print: true
     use_super_parameters: false
 
-    # Safety
+# Disable prefer_const_literals_to_create_immutables too
+    prefer_const_literals_to_create_immutables: false
     avoid_dynamic_calls: false
     cancel_subscriptions: true
     close_sinks: true

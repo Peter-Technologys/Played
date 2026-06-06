@@ -212,7 +212,7 @@ class QueueScreen extends ConsumerWidget {
                           height: 40,
                           decoration: BoxDecoration(
                             color: isCurrent
-                                ? AppColors.accent.withOpacity(0.15)
+                                ? AppColors.accent.withValues(alpha: 0.15)
                                 : AppColors.border,
                             borderRadius: BorderRadius.circular(10),
                           ),

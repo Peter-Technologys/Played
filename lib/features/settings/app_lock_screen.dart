@@ -69,8 +69,8 @@ class _AppLockScreenState extends State<AppLockScreen> {
         options: const AuthenticationOptions(
             biometricOnly: false, stickyAuth: true),
       );
-      if (ok) widget.onUnlocked();
-      else setState(() => _error = 'Authentication failed.');
+      if (ok) { widget.onUnlocked(); }
+      else { setState(() => _error = 'Authentication failed.'); }
     } catch (_) {
       setState(() => _showPin = true);
     } finally {
