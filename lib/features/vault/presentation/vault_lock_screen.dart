@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'package:async/async.dart' show unawaited;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,7 +58,11 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
     try {
       final canCheck = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
-      if (!canCheck && !isSupported) { unawaited(_showPinDialog()); return; }
+      if (!canCheck && !isSupported) {
+        // ignore: unawaited_futures
+        _showPinDialog();
+        return;
+      }
       final ok = await _auth.authenticate(
         localizedReason: 'Unlock your Private Vault',
         options: const AuthenticationOptions(
@@ -126,7 +129,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                   border: Border.all(color: AppColors.accentViolet, width: 2),
                   boxShadow: [
                     BoxShadow(
-                        color: AppColors.accentViolet.withOpacity(0.35),
+                        color: AppColors.accentViolet.withValues(alpha: 0.35),
                         blurRadius: 32,
                         spreadRadius: 4)
                   ],
@@ -177,7 +180,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: [
                         BoxShadow(
-                            color: AppColors.accentViolet.withOpacity(0.4),
+                            color: AppColors.accentViolet.withValues(alpha: 0.4),
                             blurRadius: 20,
                             offset: const Offset(0, 4))
                       ],
@@ -219,10 +222,10 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                     padding: const EdgeInsets.symmetric(
                         horizontal: 16, vertical: 10),
                     decoration: BoxDecoration(
-                      color: AppColors.error.withOpacity(0.1),
+                      color: AppColors.error.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                          color: AppColors.error.withOpacity(0.3)),
+                          color: AppColors.error.withValues(alpha: 0.3)),
                     ),
                     child: Text(_errorMessage!,
                         style: const TextStyle(
@@ -501,7 +504,7 @@ class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 10, vertical: 4),
                   decoration: BoxDecoration(
-                    color: AppColors.accentViolet.withOpacity(0.15),
+                    color: AppColors.accentViolet.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
@@ -596,7 +599,7 @@ class _VaultCard extends StatelessWidget {
           Expanded(
             child: Container(
               decoration: BoxDecoration(
-                color: AppColors.accentViolet.withOpacity(0.08),
+                color: AppColors.accentViolet.withValues(alpha: 0.08),
                 borderRadius: const BorderRadius.vertical(
                     top: Radius.circular(16)),
               ),

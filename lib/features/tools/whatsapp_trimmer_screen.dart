@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/ffmpeg_service.dart';
 
@@ -239,7 +240,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                   boxShadow: status != TrimStatus.trimming
                       ? [
                           BoxShadow(
-                            color: AppColors.accent.withOpacity(0.35),
+                            color: AppColors.accent.withValues(alpha: 0.35),
                             blurRadius: 16,
                             offset: const Offset(0, 4),
                           )
