@@ -59,6 +59,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
       final canCheck = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
       if (!canCheck && !isSupported) {
+        if (!mounted) return;
         showDialog(
           context: context,
           barrierDismissible: false,
