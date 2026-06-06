@@ -309,9 +309,9 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.accent,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // PeterSmart Technologies support — hello@petersmartlink.com
+              // Routes to support@petersmartlink.com — the main customer support inbox
               final uri = Uri.parse(
-                  'mailto:hello@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
+                  'mailto:support@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
