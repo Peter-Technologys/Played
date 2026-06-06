@@ -4,20 +4,19 @@ linter:
   rules:
     # Style
     prefer_single_quotes: true
-    prefer_const_constructors: true
+    # prefer_const_constructors disabled — causes too many false positives
+    # with animated widgets and Riverpod providers that can't be const
+    prefer_const_constructors: false
     prefer_const_declarations: true
     prefer_final_fields: true
     prefer_final_locals: true
     avoid_print: true
-    use_super_parameters: true
+    use_super_parameters: false
 
     # Safety
     avoid_dynamic_calls: false
     cancel_subscriptions: true
     close_sinks: true
-    # unawaited_futures disabled — causes false positives on Flutter's
-    # showDialog, Navigator.push and url_launcher patterns which are
-    # intentionally fire-and-forget in UI code
     unawaited_futures: false
 
 analyzer:

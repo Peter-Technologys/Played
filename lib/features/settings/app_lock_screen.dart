@@ -120,7 +120,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                   border: Border.all(color: AppColors.accent, width: 2),
                   boxShadow: [
                     BoxShadow(
-                        color: AppColors.accent.withOpacity(0.3),
+                        color: AppColors.accent.withValues(alpha: 0.3),
                         blurRadius: 24,
                         spreadRadius: 4)
                   ],
