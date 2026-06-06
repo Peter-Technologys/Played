@@ -277,6 +277,12 @@ class SettingsScreen extends ConsumerWidget {
                           fontSize: 11,
                           color: AppColors.textSecondary),
                     ),
+                    Text(
+                      'Mbirizi, Lwengo District, Uganda',
+                      style: TextStyle(
+                          fontSize: 10,
+                          color: AppColors.textMuted),
+                    ),
                   ],
                 ),
               ],
@@ -290,10 +296,9 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.warning,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // PeterSmart Technologies Play Store listing
-              // Update the package ID once published to Play Store
+              // PeterSmart Technologies — update once published to Play Store
               final uri = Uri.parse(
-                  'https://play.google.com/store/apps/details?id=com.played.app');
+                  'https://play.google.com/store/apps/details?id=com.petersmart.played');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
@@ -304,9 +309,9 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.accent,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // PeterSmart Technologies support email
+              // PeterSmart Technologies support — hello@petersmartlink.com
               final uri = Uri.parse(
-                  'mailto:support@petersmartlink.com?subject=Feedback%20-%20Played%20App');
+                  'mailto:hello@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
