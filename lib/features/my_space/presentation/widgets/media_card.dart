@@ -1,8 +1,11 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
+import '../providers/my_space_provider.dart';
+import '../../player/presentation/queue_screen.dart';
 
 /// Modern glassmorphism media card with gradient overlay and
 /// animated press feedback. Used across all shelves and the grid.
@@ -44,9 +47,24 @@ class _MediaCardState extends State<MediaCard>
 
     return GestureDetector(
       onTapDown: (_) => _press.forward(),
-      onTapUp: (_) {
+      onTapUp: (details) {
         _press.reverse();
-        final route = isVideo ? '/player/video' : '/player/audio';
+        // Add all items from My Space to the queue, start from this item
+        final ref = ProviderScope.containerOf(context);
+        final bundleAsync = ref.read(mySpaceProvider);
+        bundleAsync.whenData((bundle) {
+          final allItems = [
+            ...bundle.recentTimeline,
+            ...bundle.cinemaShelf,
+            ...bundle.streetTapesShelf,
+          ];
+          final startIndex = allItems.indexWhere((e) => e.id == widget.item.id);
+          ref.read(queueProvider.notifier).setQueue(
+            allItems,
+            startIndex: startIndex < 0 ? 0 : startIndex,
+          );
+        });
+        final route = widget.item.isVideo ? '/player/video' : '/player/audio';
         context.push(route, extra: widget.item);
       },
       onTapCancel: () => _press.reverse(),
