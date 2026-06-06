@@ -83,6 +83,9 @@ flutter:
     - assets/icons/
     - assets/animations/
     - assets/fonts/
+    - assets/fonts/README.md
+    - assets/icons/README.md
+    - assets/animations/README.md
   fonts:
     - family: SpaceGrotesk
       fonts:
