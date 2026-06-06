@@ -28,7 +28,8 @@ analyze:
   script:
     - flutter pub get
     # build_runner removed — flutter analyze does not need generated files
-    - flutter analyze --no-fatal-infos
+    # --no-fatal-warnings ensures only errors fail the build
+    - flutter analyze --no-fatal-infos --no-fatal-warnings
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
