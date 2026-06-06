@@ -1,0 +1,182 @@
+# ─────────────────────────────────────────────────────────────
+# Played — GitHub Actions Workflow
+# Mirrors the GitLab CI pipeline for GitHub-hosted runners.
+# ─────────────────────────────────────────────────────────────
+
+name: Build & Test
+
+on:
+  # Run on all pull requests
+  pull_request:
+    branches:
+      - main
+  # Run on pushes to main and version tags
+  push:
+    branches:
+      - main
+    tags:
+      - 'v*'
+
+# Cancel in-progress runs on the same branch to save runner minutes
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+
+  # ── Validate ────────────────────────────────────────────────
+  analyze:
+    name: Flutter Analyze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true  # Cache Flutter SDK between runs
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Analyze
+        run: flutter analyze --no-fatal-infos
+
+  format_check:
+    name: Dart Format Check
+    runs-on: ubuntu-latest
+    # Non-blocking — matches allow_failure: true in GitLab CI
+    continue-on-error: true
+    # Only run on pull requests
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Check formatting
+        run: dart format --set-exit-if-changed lib/
+
+  # ── Test ────────────────────────────────────────────────────
+  unit_test:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Run tests with coverage
+        run: flutter test --coverage
+
+      - name: Upload coverage report
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage/
+          retention-days: 7
+
+  # ── Build ────────────────────────────────────────────────────
+  build_apk_debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+    # Only run on pull requests
+    if: github.event_name == 'pull_request'
+    needs: [analyze, unit_test]  # Wait for validate and test to pass
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      - name: Build debug APK
+        run: flutter build apk --debug
+
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-debug
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 3
+
+  build_apk_release:
+    name: Build Signed Release APK
+    runs-on: ubuntu-latest
+    # Only run on pushes to main or version tags
+    if: github.event_name == 'push'
+    needs: [analyze, unit_test]  # Wait for validate and test to pass
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 'stable'
+          channel: 'stable'
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: flutter pub run build_runner build --delete-conflicting-outputs
+
+      # Decode the Base64 keystore secret into a temporary file.
+      # The file is removed after the build so it never ends up in artifacts.
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+
+      - name: Build signed release APK
+        env:
+          # Credentials are read by android/app/build.gradle signingConfigs.release
+          KEYSTORE_PATH: keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build apk --release --split-per-abi
+
+      # Remove keystore immediately after build — never store in artifacts
+      - name: Remove keystore
+        if: always()
+        run: rm -f android/app/keystore.jks
+
+      - name: Upload release APKs
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: build/app/outputs/flutter-apk/
+          retention-days: 30
