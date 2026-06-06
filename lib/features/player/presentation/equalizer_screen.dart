@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../app/theme/app_colors.dart';// ── Provider ───────────────────────────────────────────────
+import '../../../app/theme/app_colors.dart';
 
-class EqBand {
+// ── Provider ───────────────────────────────────────────────class EqBand {
   final String label;
   final double gain; // -12 to +12 dB
   const EqBand({required this.label, required this.gain});

@@ -4,7 +4,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 
-// ── Provider ───────────────────────────────────────────────final sleepTimerProvider =
+// ── Provider ───────────────────────────────────────────────
+
+final sleepTimerProvider =
     StateNotifierProvider<SleepTimerNotifier, SleepTimerState>(
   (_) => SleepTimerNotifier(),
 );

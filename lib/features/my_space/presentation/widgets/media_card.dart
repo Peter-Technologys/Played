@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 import '../providers/my_space_provider.dart';
-import '../../player/presentation/queue_screen.dart';/// Modern glassmorphism media card with gradient overlay and
+import '../../player/presentation/queue_screen.dart';
+
+/// Modern glassmorphism media card with gradient overlay and
 /// animated press feedback. Used across all shelves and the grid.
 class MediaCard extends StatefulWidget {
   final MediaItem item;

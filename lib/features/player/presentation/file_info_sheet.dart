@@ -2,9 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/models/media_item.dart';
-
-// ── File Info Sheet ─────────────────────────────────────────────
+import '../../../core/models/media_item.dart';// ── File Info Sheet ─────────────────────────────────────────────
 
 class FileInfoSheet extends StatelessWidget {
   final MediaItem item;
