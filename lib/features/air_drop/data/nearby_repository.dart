@@ -1,4 +1,3 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import '../../../core/models/media_item.dart';
 
@@ -29,7 +28,7 @@ class NearbyRepository {
   Future<void> startDiscovery({
     required void Function(String id, String name, String serviceId)
         onEndpointFound,
-    required void Function(String id) onEndpointLost,
+    required void Function(String? id) onEndpointLost,
   }) async {
     await Nearby().startDiscovery(
       _userName,

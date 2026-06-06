@@ -53,7 +53,7 @@ class MediaScannerService {
           final title = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
 
           final item = MediaItem(
-            id: uuid.v5(Uuid.dns, entity.path),
+            id: uuid.v5(Uuid.NAMESPACE_URL, entity.path),
             title: title,
             fileName: fileName,
             filePath: entity.path,
