@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/services.dart';
+import 'dart:async' show unawaited;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -200,9 +201,10 @@ class SettingsScreen extends ConsumerWidget {
               );
               if (confirm == true) {
                 await PlayedDatabase.instance.clearHistory();
-                if (context.mounted) ScaffoldMessenger.of(context)
-                    .showSnackBar(const SnackBar(
-                        content: Text('Playback history cleared')));
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Playback history cleared')));
+                }
               }
             },
           ),
@@ -214,9 +216,10 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () async {
               HapticFeedback.mediumImpact();
               await PlayedDatabase.instance.invalidateShelfCache();
-              if (context.mounted) ScaffoldMessenger.of(context)
-                  .showSnackBar(const SnackBar(
-                      content: Text('Stem cache cleared')));
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Stem cache cleared')));
+              }
             },
           ),
           const SizedBox(height: 24),
@@ -298,7 +301,7 @@ class SettingsScreen extends ConsumerWidget {
               HapticFeedback.lightImpact();
               final uri = Uri.parse(
                   'https://play.google.com/store/apps/details?id=com.petersmart.played');
-              canLaunchUrl(uri).then((ok) { if (ok) launchUrl(uri); });
+              unawaited(canLaunchUrl(uri).then((ok) { if (ok) unawaited(launchUrl(uri)); }));
             },
           ),
           _ActionTile(
@@ -310,7 +313,7 @@ class SettingsScreen extends ConsumerWidget {
               HapticFeedback.lightImpact();
               final uri = Uri.parse(
                   'mailto:support@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
-              canLaunchUrl(uri).then((ok) { if (ok) launchUrl(uri); });
+              unawaited(canLaunchUrl(uri).then((ok) { if (ok) unawaited(launchUrl(uri)); }));
             },
           ),
           _ActionTile(
@@ -321,7 +324,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () {
               HapticFeedback.lightImpact();
               final uri = Uri.parse('https://petersmartlink.com/privacy');
-              canLaunchUrl(uri).then((ok) { if (ok) launchUrl(uri); });
+              unawaited(canLaunchUrl(uri).then((ok) { if (ok) unawaited(launchUrl(uri)); }));
             },
           ),
 
