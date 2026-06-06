@@ -272,7 +272,7 @@ class SettingsScreen extends ConsumerWidget {
                       ),
                     ),
                     Text(
-                      'Version 1.0.0 · Built for East Africa',
+                      'Version 1.0.0 · PeterSmart Technologies',
                       style: TextStyle(
                           fontSize: 11,
                           color: AppColors.textSecondary),
@@ -290,7 +290,8 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.warning,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // Update with your actual Play Store package ID
+              // PeterSmart Technologies Play Store listing
+              // Update the package ID once published to Play Store
               final uri = Uri.parse(
                   'https://play.google.com/store/apps/details?id=com.played.app');
               if (await canLaunchUrl(uri)) launchUrl(uri);
@@ -303,9 +304,9 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.accent,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // Update with your support email address
+              // PeterSmart Technologies support email
               final uri = Uri.parse(
-                  'mailto:support@played.app?subject=Feedback%20-%20Played%20App');
+                  'mailto:support@petersmartlink.com?subject=Feedback%20-%20Played%20App');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
@@ -316,8 +317,8 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.textSecondary,
             onTap: () async {
               HapticFeedback.lightImpact();
-              // Update with your actual privacy policy URL
-              final uri = Uri.parse('https://played.app/privacy');
+              // PeterSmart Technologies privacy policy
+              final uri = Uri.parse('https://petersmartlink.com/privacy');
               if (await canLaunchUrl(uri)) launchUrl(uri);
             },
           ),
