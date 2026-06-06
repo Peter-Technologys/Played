@@ -6,9 +6,12 @@ import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
+import '../../../core/services/vault_service.dart';
+import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/utils/duration_formatter.dart';
 import 'queue_screen.dart';
 import 'lyrics_screen.dart';
@@ -405,7 +408,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: const Icon(Icons.skip_next_rounded,
                         color: AppColors.textPrimary, size: 34),
-                    onPressed: () {},
+                    // Navigate to next track in queue
+                    onPressed: () {
+                      ref.read(queueProvider.notifier).next();
+                      final next = ref.read(queueProvider).current;
+                      if (next != null) {
+                        ref.read(audioPlayerProvider.notifier).load(next);
+                      }
+                    },
                   ),
                 ],
               ),
@@ -437,7 +447,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   _SecondaryBtn(
                     icon: Icons.share_rounded,
                     label: 'Share',
-                    onTap: () => HapticFeedback.lightImpact(),
+                    // Share the media file using the system share sheet
+                    onTap: () => SharePlus.instance.share(
+                      ShareParams(
+                        files: [XFile(widget.mediaItem.filePath)],
+                        text: widget.mediaItem.title,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -623,7 +639,9 @@ class _SecondaryBtn extends StatelessWidget {
 
 // ── Options Sheet ──────────────────────────────────────────────
 
-class _OptionsSheet extends StatelessWidget {
+// _OptionsSheet is a ConsumerWidget so it can access queueProvider
+// and VaultService for 'Add to Playlist' and 'Move to Vault' actions.
+class _OptionsSheet extends ConsumerWidget {
   final MediaItem mediaItem;
   final VoidCallback onFileInfo;
   final VoidCallback onOpenInStudio;
@@ -636,16 +654,45 @@ class _OptionsSheet extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final options = [
-      _Opt(Icons.playlist_add_rounded,   'Add to Playlist',     AppColors.accent,        null),
-      _Opt(Icons.lock_rounded,           'Move to Vault',       AppColors.accentViolet,  null),
-      _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop',  AppColors.accent,        null),
-      _Opt(Icons.graphic_eq_rounded,     'Open in Studio',      AppColors.accentViolet,  onOpenInStudio),
-      _Opt(Icons.phone_android_rounded,  'Trim for WhatsApp',   AppColors.accent,        onTrimForWhatsApp),
-      _Opt(Icons.download_rounded,       'Extract Audio (MP3)', AppColors.accent,        null),
-      _Opt(Icons.cast_rounded,           'Cast to Device',      AppColors.textSecondary, null),
-      _Opt(Icons.info_outline_rounded,   'File Info',           AppColors.textSecondary, onFileInfo),
+      // Add to queue (full playlist UI can be extended later)
+      _Opt(Icons.playlist_add_rounded, 'Add to Playlist', AppColors.accent, () {
+        ref.read(queueProvider.notifier).addToQueue(mediaItem);
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Added to queue')));
+      }),
+      // Move file into AES-256 encrypted vault
+      _Opt(Icons.lock_rounded, 'Move to Vault', AppColors.accentViolet, () async {
+        Navigator.pop(context);
+        await VaultService.instance.lockItem(mediaItem);
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Moved to Vault')));
+      }),
+      // Air-Drop sharing — guide user to Air-Drop tab
+      _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop', AppColors.accent, () {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Open the Air-Drop tab to share')));
+      }),
+      _Opt(Icons.graphic_eq_rounded,    'Open in Studio',      AppColors.accentViolet, onOpenInStudio),
+      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent,       onTrimForWhatsApp),
+      // Extract audio track using FFmpeg
+      _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
+        Navigator.pop(context);
+        await FfmpegService.instance.extractAudio(
+            videoPath: mediaItem.filePath, onProgress: (_) {});
+        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Audio extracted to Downloads')));
+      }),
+      // Cast — stub, requires Chromecast SDK integration
+      _Opt(Icons.cast_rounded, 'Cast to Device', AppColors.textSecondary, () {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Cast coming soon')));
+      }),
+      _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
     ];
 
     return Padding(
