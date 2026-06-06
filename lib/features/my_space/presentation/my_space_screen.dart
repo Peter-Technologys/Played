@@ -2,22 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/models/media_item.dart';
 import '../../../core/utils/shelf_sorter.dart';
-import '../../../core/database/played_database.dart';
-import '../../../core/services/media_scanner_service.dart';
+import 'providers/my_space_provider.dart';
 import 'widgets/media_card.dart';
 import 'widgets/cinema_shelf.dart';
 import 'widgets/street_tapes_shelf.dart';
 import 'widgets/recently_played_timeline.dart';
-
-// ── Provider ──────────────────────────────────────────────────
-
-final mySpaceProvider =
-    FutureProvider<ShelfBundle>((ref) async {
-  final items = await MediaScannerService.instance.scanAll();
-  return ShelfSorter.buildAllShelves(items);
-});
 
 // ── Screen ────────────────────────────────────────────────────
 
@@ -33,7 +23,7 @@ class MySpaceScreen extends ConsumerWidget {
       body: SafeArea(
         child: bundleAsync.when(
           loading: () => const _ScanningLoader(),
-          error: (e, _) => _ErrorView(message: e.toString()),
+          error: (e, st) => _ErrorView(message: e.toString()),
           data: (bundle) => _SpaceContent(bundle: bundle),
         ),
       ),

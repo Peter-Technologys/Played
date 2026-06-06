@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 
@@ -16,7 +17,9 @@ class MediaCard extends StatelessWidget {
 
     return GestureDetector(
       onTap: () {
-        // Navigate to player — handled by router
+        final route =
+            item.isVideo ? '/player/video' : '/player/audio';
+        context.push(route, extra: item);
       },
       child: Container(
         width: width,

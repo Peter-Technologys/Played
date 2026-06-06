@@ -5,6 +5,7 @@ import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/studio/presentation/studio_screen.dart';
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
+import '../features/player/presentation/audio_player_screen.dart';
 import '../core/models/media_item.dart';
 
 class AppRouter {
@@ -36,10 +37,17 @@ class AppRouter {
         builder: (_, __) => const VaultLockScreen(),
       ),
       GoRoute(
-        path: '/player',
+        path: '/player/video',
         builder: (context, state) {
           final item = state.extra as MediaItem;
           return VideoPlayerScreen(mediaItem: item);
+        },
+      ),
+      GoRoute(
+        path: '/player/audio',
+        builder: (context, state) {
+          final item = state.extra as MediaItem;
+          return AudioPlayerScreen(mediaItem: item);
         },
       ),
     ],
