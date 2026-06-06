@@ -3,9 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/models/media_item.dart';
-
-// ── Queue Provider ─────────────────────────────────────────────
+import '../../../core/models/media_item.dart';// ── Queue Provider ─────────────────────────────────────────────
 
 class QueueState {
   final List<MediaItem> items;
