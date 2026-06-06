@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:hive/hive.dart';
 
 part 'media_item.g.dart';
@@ -60,9 +61,7 @@ class MediaItem extends HiveObject {
   });
 
   /// Returns the underlying [File] object for this media item.
-  // ignore: avoid_slow_async_io
-  dynamic get file => throw UnimplementedError(
-      'Import dart:io and return File(filePath)');
+  File get file => File(filePath);
 
   String get formattedSize {
     if (fileSizeBytes < 1024 * 1024) {
