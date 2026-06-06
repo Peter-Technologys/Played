@@ -25,6 +25,8 @@ concurrency:
 # Opt into Node.js 24 now to avoid deprecation warnings (Node.js 20 removed Sep 2026)
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  # Suppress verbose pub dependency resolution output
+  PUB_ENVIRONMENT: bot.github
 
 jobs:
 
@@ -38,19 +40,22 @@ jobs:
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
-          # '3.x' resolves to the latest stable Flutter 3 release
-          # flutter-version-file is not used because pubspec.yaml only
-          # specifies an SDK range (>=3.0.0 <4.0.0), not a pinned version
           flutter-version: '3.x'
           channel: 'stable'
-          cache: true  # Cache Flutter SDK between runs
+          cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Run code generation
-        run: flutter pub run build_runner build --delete-conflicting-outputs
-
+      # build_runner removed — flutter analyze does not need generated files
+      # removing it saves ~45s and prevents timeout cancellations
       - name: Analyze
         run: flutter analyze --no-fatal-infos
 
@@ -71,6 +76,13 @@ jobs:
           channel: 'stable'
           cache: true
 
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
+
       - name: Install dependencies
         run: flutter pub get
 
@@ -90,6 +102,13 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
           cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
 
       - name: Install dependencies
         run: flutter pub get
@@ -113,7 +132,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only run on pull requests
     if: github.event_name == 'pull_request'
-    needs: [analyze, unit_test]  # Wait for validate and test to pass
+    needs: [analyze, unit_test]
     steps:
       - uses: actions/checkout@v4
 
@@ -123,6 +142,13 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
           cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
 
       - name: Install dependencies
         run: flutter pub get
@@ -145,7 +171,7 @@ jobs:
     runs-on: ubuntu-latest
     # Only run on pushes to main or version tags
     if: github.event_name == 'push'
-    needs: [analyze, unit_test]  # Wait for validate and test to pass
+    needs: [analyze, unit_test]
     steps:
       - uses: actions/checkout@v4
 
@@ -155,6 +181,13 @@ jobs:
           flutter-version: '3.x'
           channel: 'stable'
           cache: true
+
+      - name: Cache pub packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
 
       - name: Install dependencies
         run: flutter pub get
@@ -169,7 +202,6 @@ jobs:
 
       - name: Build signed release APK
         env:
-          # Credentials are read by android/app/build.gradle signingConfigs.release
           KEYSTORE_PATH: keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}

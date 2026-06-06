@@ -8,6 +8,8 @@ variables:
   FLUTTER_VERSION: "stable"
   ANDROID_COMPILE_SDK: "34"
   ANDROID_BUILD_TOOLS: "34.0.0"
+  # Suppress verbose pub dependency resolution output
+  PUB_ENVIRONMENT: "bot.github"
 
 stages:
   - validate
@@ -15,17 +17,17 @@ stages:
   - build
 
 cache:
-  key: "$CI_COMMIT_REF_SLUG"
+  key: "pub-$CI_COMMIT_REF_SLUG"
   paths:
     - .pub-cache/
     - .dart_tool/
 
-# ── Validate ──────────────────────────────────────────────────
+# ── Validate ──────────────────────────────────────────────
 analyze:
   stage: validate
   script:
     - flutter pub get
-    - flutter pub run build_runner build --delete-conflicting-outputs
+    # build_runner removed — flutter analyze does not need generated files
     - flutter analyze --no-fatal-infos
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -38,9 +40,10 @@ format_check:
     - dart format --set-exit-if-changed lib/
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+  # allow_failure: true so formatting issues don't block MR pipelines
   allow_failure: true
 
-# ── Test ──────────────────────────────────────────────────────
+# ── Test ────────────────────────────────────────────────────
 unit_test:
   stage: test
   script:
@@ -60,7 +63,7 @@ unit_test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# ── Build ─────────────────────────────────────────────────────
+# ── Build ────────────────────────────────────────────────────
 build_apk_debug:
   stage: build
   script:
