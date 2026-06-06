@@ -5,7 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 
-// ── Queue Provider ─────────────────────────────────────────────class QueueState {
+// ── Queue Provider ─────────────────────────────────────────────
+
+class QueueState {
   final List<MediaItem> items;
   final int currentIndex;
   final bool shuffle;

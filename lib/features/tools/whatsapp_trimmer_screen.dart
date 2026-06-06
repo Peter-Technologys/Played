@@ -115,7 +115,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Clip: \${_fmt(Duration(seconds: start.toInt()))} → \${_fmt(Duration(seconds: end.toInt()))}',
+                    'Clip: ${_fmt(Duration(seconds: start.toInt()))} → ${_fmt(Duration(seconds: end.toInt()))}',
                     style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textPrimary,
@@ -235,7 +235,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
   String _fmt(Duration d) {
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '\$m:\$s';
+    return '$m:$s';
   }
 }
 
@@ -259,7 +259,7 @@ class _RangeLabel extends StatelessWidget {
               letterSpacing: 0.8,
               fontFamily: 'SpaceGrotesk',
             )),
-        Text('\$m:\$s',
+        Text('$m:$s',
             style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.accent,
