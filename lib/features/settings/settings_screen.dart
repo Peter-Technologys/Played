@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/database/played_database.dart';
 import '../settings_provider.dart';
 
 class SettingsScreen extends ConsumerWidget {
@@ -171,7 +173,37 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.error,
             onTap: () async {
               HapticFeedback.mediumImpact();
-              // TODO: PlayedDatabase.instance.clearHistory()
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder: (_) => AlertDialog(
+                  backgroundColor: AppColors.surface,
+                  title: const Text('Clear History?',
+                      style: TextStyle(color: AppColors.textPrimary,
+                          fontFamily: 'SpaceGrotesk')),
+                  content: const Text(
+                      'This will remove all recently played records.',
+                      style: TextStyle(color: AppColors.textSecondary)),
+                  actions: [
+                    TextButton(
+                        onPressed: () => Navigator.pop(context, false),
+                        child: const Text('Cancel',
+                            style: TextStyle(color: AppColors.textSecondary))),
+                    ElevatedButton(
+                      onPressed: () => Navigator.pop(context, true),
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.error),
+                      child: const Text('Clear',
+                          style: TextStyle(color: Colors.white)),
+                    ),
+                  ],
+                ),
+              );
+              if (confirm == true) {
+                await PlayedDatabase.instance.clearHistory();
+                if (context.mounted) ScaffoldMessenger.of(context)
+                    .showSnackBar(const SnackBar(
+                        content: Text('Playback history cleared')));
+              }
             },
           ),
           _ActionTile(
@@ -181,7 +213,10 @@ class SettingsScreen extends ConsumerWidget {
             color: AppColors.warning,
             onTap: () async {
               HapticFeedback.mediumImpact();
-              // TODO: StemRepository.clearCache()
+              await PlayedDatabase.instance.invalidateShelfCache();
+              if (context.mounted) ScaffoldMessenger.of(context)
+                  .showSnackBar(const SnackBar(
+                      content: Text('Stem cache cleared')));
             },
           ),
           const SizedBox(height: 24),
@@ -253,21 +288,38 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Rate Played',
             subtitle: 'Leave a review on the Play Store',
             color: AppColors.warning,
-            onTap: () => HapticFeedback.lightImpact(),
+            onTap: () async {
+              HapticFeedback.lightImpact();
+              // Update with your actual Play Store package ID
+              final uri = Uri.parse(
+                  'https://play.google.com/store/apps/details?id=com.played.app');
+              if (await canLaunchUrl(uri)) launchUrl(uri);
+            },
           ),
           _ActionTile(
             icon: Icons.bug_report_rounded,
             label: 'Send Feedback',
             subtitle: 'Report a bug or suggest a feature',
             color: AppColors.accent,
-            onTap: () => HapticFeedback.lightImpact(),
+            onTap: () async {
+              HapticFeedback.lightImpact();
+              // Update with your support email address
+              final uri = Uri.parse(
+                  'mailto:support@played.app?subject=Feedback%20-%20Played%20App');
+              if (await canLaunchUrl(uri)) launchUrl(uri);
+            },
           ),
           _ActionTile(
             icon: Icons.policy_rounded,
             label: 'Privacy Policy',
             subtitle: 'How we handle your data',
             color: AppColors.textSecondary,
-            onTap: () => HapticFeedback.lightImpact(),
+            onTap: () async {
+              HapticFeedback.lightImpact();
+              // Update with your actual privacy policy URL
+              final uri = Uri.parse('https://played.app/privacy');
+              if (await canLaunchUrl(uri)) launchUrl(uri);
+            },
           ),
 
           const SizedBox(height: 40),

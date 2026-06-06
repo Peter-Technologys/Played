@@ -67,6 +67,11 @@ dependencies:
   freezed_annotation: ^2.4.1
   json_annotation: ^4.8.1
 
+  # Sharing, URL launching, and PIN storage (wired up in audio player and settings)
+  share_plus: ^10.0.0
+  url_launcher: ^6.3.0
+  shared_preferences: ^2.3.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter

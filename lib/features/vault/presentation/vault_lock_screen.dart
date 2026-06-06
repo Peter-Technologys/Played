@@ -1,11 +1,35 @@
+import 'dart:convert';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/vault_item.dart';
 import '../../../core/services/vault_service.dart';
+
+// ── PIN helpers: stored as SHA-256 hash in SharedPreferences ──
+const _kPinKey = 'vault_pin_hash';
+
+Future<bool> _hasPinSet() async {
+  final prefs = await SharedPreferences.getInstance();
+  return prefs.containsKey(_kPinKey);
+}
+
+Future<bool> _verifyPin(String pin) async {
+  final prefs = await SharedPreferences.getInstance();
+  final stored = prefs.getString(_kPinKey);
+  final hash = sha256.convert(utf8.encode(pin)).toString();
+  return stored == hash;
+}
+
+Future<void> _savePin(String pin) async {
+  final prefs = await SharedPreferences.getInstance();
+  final hash = sha256.convert(utf8.encode(pin)).toString();
+  await prefs.setString(_kPinKey, hash);
+}
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
 
@@ -52,13 +76,21 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
     }
   }
 
-  void _showPinDialog() {
+  // Shows PIN dialog — first launch prompts user to create a PIN,
+  // subsequent launches verify against the stored SHA-256 hash.
+  Future<void> _showPinDialog() async {
+    final pinSet = await _hasPinSet();
+    if (!mounted) return;
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _PinDialog(
-          onSuccess: () =>
-              ref.read(vaultUnlockedProvider.notifier).state = true),
+      builder: (_) => pinSet
+          ? _PinDialog(
+              onSuccess: () =>
+                  ref.read(vaultUnlockedProvider.notifier).state = true)
+          : _SetPinDialog(
+              onSuccess: () =>
+                  ref.read(vaultUnlockedProvider.notifier).state = true),
     );
   }
 
@@ -207,6 +239,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
 
 // ── PIN Dialog ───────────────────────────────────────────────
 
+// ── Enter PIN dialog (verifies against stored SHA-256 hash) ────────
 class _PinDialog extends StatefulWidget {
   final VoidCallback onSuccess;
   const _PinDialog({required this.onSuccess});
@@ -218,10 +251,14 @@ class _PinDialog extends StatefulWidget {
 class _PinDialogState extends State<_PinDialog> {
   final _controller = TextEditingController();
   bool _error = false;
-  static const String _pin = '1234';
+  bool _loading = false;
 
-  void _verify() {
-    if (_controller.text == _pin) {
+  Future<void> _verify() async {
+    setState(() { _loading = true; _error = false; });
+    final ok = await _verifyPin(_controller.text);
+    if (!mounted) return;
+    setState(() => _loading = false);
+    if (ok) {
       Navigator.of(context).pop();
       widget.onSuccess();
     } else {
@@ -258,8 +295,7 @@ class _PinDialogState extends State<_PinDialog> {
               borderSide: const BorderSide(color: AppColors.border)),
           focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide:
-                  const BorderSide(color: AppColors.accentViolet)),
+              borderSide: const BorderSide(color: AppColors.accentViolet)),
           errorBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
               borderSide: const BorderSide(color: AppColors.error)),
@@ -273,16 +309,125 @@ class _PinDialogState extends State<_PinDialog> {
               style: TextStyle(color: AppColors.textSecondary)),
         ),
         ElevatedButton(
-          onPressed: _verify,
+          onPressed: _loading ? null : _verify,
           style: ElevatedButton.styleFrom(
             backgroundColor: AppColors.accentViolet,
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10)),
           ),
-          child: const Text('Unlock',
+          child: _loading
+              ? const SizedBox(width: 16, height: 16,
+                  child: CircularProgressIndicator(
+                      color: Colors.white, strokeWidth: 2))
+              : const Text('Unlock', style: TextStyle(color: Colors.white)),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Set PIN dialog (shown on first vault access) ──────────────────
+class _SetPinDialog extends StatefulWidget {
+  final VoidCallback onSuccess;
+  const _SetPinDialog({required this.onSuccess});
+
+  @override
+  State<_SetPinDialog> createState() => _SetPinDialogState();
+}
+
+class _SetPinDialogState extends State<_SetPinDialog> {
+  final _pin1 = TextEditingController();
+  final _pin2 = TextEditingController();
+  String? _error;
+
+  Future<void> _save() async {
+    if (_pin1.text.length < 4) {
+      setState(() => _error = 'PIN must be at least 4 digits');
+      return;
+    }
+    if (_pin1.text != _pin2.text) {
+      setState(() => _error = 'PINs do not match');
+      _pin2.clear();
+      return;
+    }
+    await _savePin(_pin1.text);
+    if (!mounted) return;
+    Navigator.of(context).pop();
+    widget.onSuccess();
+  }
+
+  @override
+  void dispose() { _pin1.dispose(); _pin2.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppColors.surface,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      title: const Text('Create Vault PIN',
+          style: TextStyle(
+              color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk')),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Text('Set a PIN to protect your Private Vault.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+          const SizedBox(height: 16),
+          _PinField(controller: _pin1, hint: 'New PIN (4–6 digits)'),
+          const SizedBox(height: 12),
+          _PinField(controller: _pin2, hint: 'Confirm PIN'),
+          if (_error != null) ...[  
+            const SizedBox(height: 8),
+            Text(_error!, style: const TextStyle(
+                color: AppColors.error, fontSize: 12)),
+          ],
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel',
+              style: TextStyle(color: AppColors.textSecondary)),
+        ),
+        ElevatedButton(
+          onPressed: _save,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.accentViolet,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10)),
+          ),
+          child: const Text('Save PIN',
               style: TextStyle(color: Colors.white)),
         ),
       ],
+    );
+  }
+}
+
+class _PinField extends StatelessWidget {
+  final TextEditingController controller;
+  final String hint;
+  const _PinField({required this.controller, required this.hint});
+
+  @override
+  Widget build(BuildContext context) {
+    return TextField(
+      controller: controller,
+      obscureText: true,
+      keyboardType: TextInputType.number,
+      maxLength: 6,
+      style: const TextStyle(color: AppColors.textPrimary),
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: const TextStyle(color: AppColors.textSecondary),
+        counterText: '',
+        enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.border)),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: AppColors.accentViolet)),
+      ),
     );
   }
 }
