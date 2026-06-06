@@ -74,12 +74,24 @@ build_apk_debug:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
+# Signed release APK — runs on main branch pushes and version tags.
+# Requires the following CI/CD Variables (Settings → CI/CD → Variables):
+#   KEYSTORE_BASE64  — Base64-encoded .jks keystore file (masked, protected)
+#   STORE_PASSWORD   — Keystore password (masked, protected)
+#   KEY_ALIAS        — Key alias inside the keystore (masked, protected)
+#   KEY_PASSWORD     — Key password (masked, protected)
 build_apk_release:
   stage: build
   script:
     - flutter pub get
     - flutter pub run build_runner build --delete-conflicting-outputs
+    # Decode the Base64 keystore from CI variable into a file the build can use
+    - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+    # Pass signing credentials via env vars (read by build.gradle signingConfigs.release)
+    - export KEYSTORE_PATH="keystore.jks"
     - flutter build apk --release --split-per-abi
+    # Remove keystore file so it is never included in artifacts
+    - rm -f android/app/keystore.jks
   artifacts:
     paths:
       - build/app/outputs/flutter-apk/
