@@ -14,12 +14,10 @@ class AppTheme {
         primary: AppColors.accent,
         secondary: AppColors.accentViolet,
         surface: AppColors.surface,
-        // background removed — deprecated after v3.18, use surface instead
         error: AppColors.error,
         onPrimary: Colors.black,
         onSecondary: Colors.white,
         onSurface: AppColors.textPrimary,
-        // onBackground removed — deprecated after v3.18, use onSurface instead
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
@@ -52,13 +50,16 @@ class AppTheme {
         space: 0,
       ),
       cardTheme: CardThemeData(
-        color: AppColors.surface,
+        color: AppColors.surfaceElevated,
         elevation: 0,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(20),
           side: const BorderSide(color: AppColors.border),
         ),
       ),
+      // Ripple effect matches the dark theme
+      splashColor: AppColors.accent.withValues(alpha: 0.06),
+      highlightColor: AppColors.accent.withValues(alpha: 0.04),
     );
   }
 }
