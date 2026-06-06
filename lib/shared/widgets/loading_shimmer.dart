@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shimmer/shimmer.dart';
-import '../app/theme/app_colors.dart';
+import '../../app/theme/app_colors.dart';
 
 /// Shimmer skeleton loader for media cards while scanning.
 class LoadingShimmer extends StatelessWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../app/theme/app_colors.dart';
+import '../../app/theme/app_colors.dart';
 
 /// Reusable neon gradient button used across all screens.
 class NeonButton extends StatelessWidget {
@@ -53,7 +53,7 @@ class NeonButton extends StatelessWidget {
           boxShadow: enabled && !outlined
               ? [
                   BoxShadow(
-                    color: activeColor.withOpacity(0.35),
+                    color: activeColor.withValues(alpha: 0.35),
                     blurRadius: 16,
                     offset: const Offset(0, 4),
                   )

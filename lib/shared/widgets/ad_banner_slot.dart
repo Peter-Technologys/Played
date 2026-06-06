@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../app/theme/app_colors.dart';
+import '../../app/theme/app_colors.dart';
 
 /// Non-blocking banner ad slot. Renders a clean placeholder area.
 /// Replace [adWidget] with a real AdWidget from google_mobile_ads.
