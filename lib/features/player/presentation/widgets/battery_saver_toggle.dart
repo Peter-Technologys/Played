@@ -1,4 +1,3 @@
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -19,12 +18,9 @@ class BatterySaverToggle extends StatelessWidget {
       onTap: () => onToggle(!isActive),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 250),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.accent.withValues(alpha: 0.15)
-              : Colors.black54,
+          color: isActive ? AppColors.accent.withValues(alpha: 0.15) : Colors.black54,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isActive ? AppColors.accent : Colors.white24,
@@ -35,9 +31,7 @@ class BatterySaverToggle extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
-              isActive
-                  ? Icons.battery_saver_rounded
-                  : Icons.battery_full_rounded,
+              isActive ? Icons.battery_saver_rounded : Icons.battery_full_rounded,
               color: isActive ? AppColors.accent : Colors.white54,
               size: 16,
             ),

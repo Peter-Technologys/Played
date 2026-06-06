@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
@@ -56,8 +55,7 @@ class QueueNotifier extends StateNotifier<QueueState> {
   void next() {
     if (state.items.isEmpty) return;
     final next = state.shuffle
-        ? (state.currentIndex +
-                1 +
+        ? (state.currentIndex + 1 +
                 (state.items.length - 1) *
                     (DateTime.now().millisecond % state.items.length)) %
             state.items.length
@@ -67,21 +65,18 @@ class QueueNotifier extends StateNotifier<QueueState> {
 
   void previous() {
     if (state.items.isEmpty) return;
-    final prev = (state.currentIndex - 1 + state.items.length) %
-        state.items.length;
+    final prev =
+        (state.currentIndex - 1 + state.items.length) % state.items.length;
     state = state.copyWith(currentIndex: prev);
   }
 
-  void toggleShuffle() =>
-      state = state.copyWith(shuffle: !state.shuffle);
+  void toggleShuffle() => state = state.copyWith(shuffle: !state.shuffle);
 
   void clear() => state = const QueueState();
 }
 
 final queueProvider =
-    StateNotifierProvider<QueueNotifier, QueueState>(
-  (_) => QueueNotifier(),
-);
+    StateNotifierProvider<QueueNotifier, QueueState>((_) => QueueNotifier());
 
 // ── Queue Screen ───────────────────────────────────────────────
 
@@ -100,7 +95,6 @@ class QueueScreen extends ConsumerWidget {
       ),
       child: Column(
         children: [
-          // Handle
           const SizedBox(height: 12),
           Center(
             child: Container(
@@ -112,8 +106,6 @@ class QueueScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 16),
-
-          // Header
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -127,8 +119,7 @@ class QueueScreen extends ConsumerWidget {
                     )),
                 const SizedBox(width: 8),
                 Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
@@ -142,7 +133,6 @@ class QueueScreen extends ConsumerWidget {
                       )),
                 ),
                 const Spacer(),
-                // Shuffle toggle
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.selectionClick();
@@ -150,14 +140,11 @@ class QueueScreen extends ConsumerWidget {
                   },
                   child: Icon(
                     Icons.shuffle_rounded,
-                    color: queue.shuffle
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
+                    color: queue.shuffle ? AppColors.accent : AppColors.textSecondary,
                     size: 22,
                   ),
                 ),
                 const SizedBox(width: 16),
-                // Clear
                 GestureDetector(
                   onTap: () {
                     HapticFeedback.mediumImpact();
@@ -172,11 +159,8 @@ class QueueScreen extends ConsumerWidget {
               ],
             ),
           ),
-
           const SizedBox(height: 12),
           const Divider(color: AppColors.border, height: 1),
-
-          // Queue list
           Expanded(
             child: queue.items.isEmpty
                 ? const Center(
@@ -198,9 +182,7 @@ class QueueScreen extends ConsumerWidget {
                     itemCount: queue.items.length,
                     onReorderItem: (old, newIdx) {
                       HapticFeedback.mediumImpact();
-                      ref
-                          .read(queueProvider.notifier)
-                          .reorder(old, newIdx);
+                      ref.read(queueProvider.notifier).reorder(old, newIdx);
                     },
                     itemBuilder: (context, i) {
                       final item = queue.items[i];
@@ -244,18 +226,17 @@ class QueueScreen extends ConsumerWidget {
                         subtitle: Text(
                           item.artist ?? item.formattedDuration,
                           style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary),
+                              fontSize: 11, color: AppColors.textSecondary),
                         ),
                         trailing: GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            ref
-                                .read(queueProvider.notifier)
-                                .removeAt(i);
+                            ref.read(queueProvider.notifier).removeAt(i);
                           },
-                          child: const Icon(Icons.remove_circle_outline_rounded,
-                              color: AppColors.textSecondary, size: 20),
+                          child: const Icon(
+                              Icons.remove_circle_outline_rounded,
+                              color: AppColors.textSecondary,
+                              size: 20),
                         ),
                       );
                     },

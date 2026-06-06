@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import '../../../app/theme/app_colors.dart';/// 3-screen onboarding shown only on first launch.
+import '../../../app/theme/app_colors.dart';
+
+/// 3-screen onboarding shown only on first launch.
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onDone;
   const OnboardingScreen({super.key, required this.onDone});
@@ -46,7 +47,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   void _next() {
-    HapticFeedback.lightImpact();
     if (_page < _pages.length - 1) {
       _controller.nextPage(
         duration: const Duration(milliseconds: 350),
@@ -64,7 +64,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
-            // Skip
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
@@ -75,8 +74,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         fontFamily: 'SpaceGrotesk')),
               ),
             ),
-
-            // Pages
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -86,8 +83,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _PageView(page: _pages[i], index: i),
               ),
             ),
-
-            // Dots
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -98,18 +93,13 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: i == _page ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: i == _page
-                        ? _pages[_page].color
-                        : AppColors.border,
+                    color: i == _page ? _pages[_page].color : AppColors.border,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
             ),
-
             const SizedBox(height: 32),
-
-            // Next / Get Started
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: GestureDetector(
@@ -120,15 +110,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   height: 56,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
-                      colors: [
-                        _pages[_page].color,
-                        AppColors.accentViolet,
-                      ],
+                      colors: [_pages[_page].color, AppColors.accentViolet],
                     ),
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: _pages[_page].color.withOpacity(0.35),
+                        color: _pages[_page].color.withValues(alpha: 0.35),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),
@@ -136,9 +123,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    _page == _pages.length - 1
-                        ? 'Get Started'
-                        : 'Next',
+                    _page == _pages.length - 1 ? 'Get Started' : 'Next',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
@@ -149,7 +134,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 ),
               ),
             ),
-
             const SizedBox(height: 32),
           ],
         ),
@@ -170,26 +154,23 @@ class _PageView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Emoji illustration
           Container(
             width: 140,
             height: 140,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: page.color.withOpacity(0.1),
-              border: Border.all(
-                  color: page.color.withOpacity(0.3), width: 2),
+              color: page.color.withValues(alpha: 0.1),
+              border: Border.all(color: page.color.withValues(alpha: 0.3), width: 2),
               boxShadow: [
                 BoxShadow(
-                  color: page.color.withOpacity(0.2),
+                  color: page.color.withValues(alpha: 0.2),
                   blurRadius: 40,
                   spreadRadius: 8,
                 ),
               ],
             ),
             child: Center(
-              child: Text(page.emoji,
-                  style: const TextStyle(fontSize: 64)),
+              child: Text(page.emoji, style: const TextStyle(fontSize: 64)),
             ),
           )
               .animate()
@@ -200,9 +181,7 @@ class _PageView extends StatelessWidget {
                 curve: Curves.elasticOut,
               )
               .fadeIn(duration: 300.ms),
-
           const SizedBox(height: 40),
-
           Text(page.title,
               style: TextStyle(
                 fontSize: 30,
@@ -213,9 +192,7 @@ class _PageView extends StatelessWidget {
               .animate()
               .fadeIn(duration: 400.ms, delay: 150.ms)
               .slideY(begin: 0.1),
-
           const SizedBox(height: 16),
-
           Text(
             page.subtitle,
             textAlign: TextAlign.center,

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -41,7 +40,7 @@ class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
   void cancel() => state = const SleepTimerState(isActive: false);
 }
 
-// ── Sleep Timer Button ─────────────────────────────────────────
+// ── Sleep Timer Button ─────────────────────────────────────────────
 
 class SleepTimerButton extends ConsumerWidget {
   final VoidCallback onExpire;
@@ -69,9 +68,7 @@ class SleepTimerButton extends ConsumerWidget {
               : Colors.transparent,
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: timer.isActive
-                ? AppColors.accentViolet
-                : AppColors.border,
+            color: timer.isActive ? AppColors.accentViolet : AppColors.border,
           ),
         ),
         child: Row(
@@ -118,7 +115,6 @@ class SleepTimerButton extends ConsumerWidget {
       const Duration(minutes: 45),
       const Duration(hours: 1),
     ];
-
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
@@ -149,27 +145,21 @@ class SleepTimerButton extends ConsumerWidget {
                 )),
             const SizedBox(height: 4),
             const Text('Audio fades out smoothly when timer ends.',
-                style: TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
+                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             const SizedBox(height: 20),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: options.map((d) {
-                final label = d.inHours >= 1
-                    ? '${d.inHours}h'
-                    : '${d.inMinutes}m';
+                final label = d.inHours >= 1 ? '${d.inHours}h' : '${d.inMinutes}m';
                 return GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
                     HapticFeedback.mediumImpact();
-                    ref
-                        .read(sleepTimerProvider.notifier)
-                        .start(d, onExpire);
+                    ref.read(sleepTimerProvider.notifier).start(d, onExpire);
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.background,
                       borderRadius: BorderRadius.circular(12),

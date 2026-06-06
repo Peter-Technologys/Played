@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 
-// ── Provider ───────────────────────────────────────────────class EqBand {
+// ── Provider ───────────────────────────────────────────────
+
+class EqBand {
   final String label;
-  final double gain; // -12 to +12 dB
+  final double gain;
   const EqBand({required this.label, required this.gain});
   EqBand copyWith({double? gain}) =>
       EqBand(label: label, gain: gain ?? this.gain);
@@ -34,12 +35,12 @@ class EqNotifier extends StateNotifier<EqState> {
         ));
 
   static const Map<String, List<double>> _presets = {
-    'Flat':         [0, 0, 0, 0, 0],
-    'Bass Boost':   [8, 5, 0, -2, -3],
-    'Vocal Clarity':[0, -2, 4, 5, 3],
-    'Night Mode':   [-4, -2, 0, -3, -5],
-    'Pop':          [2, 1, 0, 2, 3],
-    'Hip-Hop':      [6, 4, 0, 2, 1],
+    'Flat':          [0, 0, 0, 0, 0],
+    'Bass Boost':    [8, 5, 0, -2, -3],
+    'Vocal Clarity': [0, -2, 4, 5, 3],
+    'Night Mode':    [-4, -2, 0, -3, -5],
+    'Pop':           [2, 1, 0, 2, 3],
+    'Hip-Hop':       [6, 4, 0, 2, 1],
   };
 
   void setBand(int index, double gain) {
@@ -64,7 +65,7 @@ class EqNotifier extends StateNotifier<EqState> {
 final eqProvider =
     StateNotifierProvider<EqNotifier, EqState>((_) => EqNotifier());
 
-// ── Equalizer Screen ───────────────────────────────────────────
+// ── Equalizer Screen ───────────────────────────────────────────────
 
 class EqualizerScreen extends ConsumerWidget {
   const EqualizerScreen({super.key});
@@ -80,8 +81,7 @@ class EqualizerScreen extends ConsumerWidget {
         backgroundColor: AppColors.background,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
+          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text('Equalizer',
@@ -96,10 +96,9 @@ class EqualizerScreen extends ConsumerWidget {
             padding: const EdgeInsets.only(right: 16),
             child: Center(
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withOpacity(0.15),
+                  color: AppColors.accent.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(eq.preset,
@@ -116,7 +115,6 @@ class EqualizerScreen extends ConsumerWidget {
       ),
       body: Column(
         children: [
-          // ── Preset chips ───────────────────────────────────
           SizedBox(
             height: 48,
             child: ListView(
@@ -132,26 +130,19 @@ class EqualizerScreen extends ConsumerWidget {
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
                     margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: active
-                          ? AppColors.accent
-                          : AppColors.surface,
+                      color: active ? AppColors.accent : AppColors.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: active
-                            ? AppColors.accent
-                            : AppColors.border,
+                        color: active ? AppColors.accent : AppColors.border,
                       ),
                     ),
                     child: Text(name,
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: active
-                              ? Colors.black
-                              : AppColors.textSecondary,
+                          color: active ? Colors.black : AppColors.textSecondary,
                           fontFamily: 'SpaceGrotesk',
                         )),
                   ),
@@ -159,10 +150,7 @@ class EqualizerScreen extends ConsumerWidget {
               }).toList(),
             ),
           ),
-
           const SizedBox(height: 32),
-
-          // ── EQ Bands ───────────────────────────────────────
           Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -182,10 +170,7 @@ class EqualizerScreen extends ConsumerWidget {
               ),
             ),
           ),
-
           const SizedBox(height: 32),
-
-          // ── Reset button ───────────────────────────────────
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
             child: GestureDetector(
@@ -232,9 +217,7 @@ class _BandSlider extends StatelessWidget {
           style: TextStyle(
             fontSize: 10,
             fontWeight: FontWeight.w600,
-            color: band.gain == 0
-                ? AppColors.textSecondary
-                : AppColors.accent,
+            color: band.gain == 0 ? AppColors.textSecondary : AppColors.accent,
             fontFamily: 'SpaceGrotesk',
           ),
         ),
@@ -248,9 +231,8 @@ class _BandSlider extends StatelessWidget {
                 activeTrackColor: AppColors.accent,
                 inactiveTrackColor: AppColors.border,
                 thumbColor: AppColors.accent,
-                overlayColor: AppColors.accent.withOpacity(0.15),
-                thumbShape:
-                    const RoundSliderThumbShape(enabledThumbRadius: 8),
+                overlayColor: AppColors.accent.withValues(alpha: 0.15),
+                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
               ),
               child: Slider(
                 value: band.gain,
@@ -263,8 +245,7 @@ class _BandSlider extends StatelessWidget {
         ),
         const SizedBox(height: 8),
         Text(band.label,
-            style: const TextStyle(
-                fontSize: 10, color: AppColors.textSecondary)),
+            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
       ],
     );
   }

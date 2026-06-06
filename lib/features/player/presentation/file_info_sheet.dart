@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/models/media_item.dart';// ── File Info Sheet ─────────────────────────────────────────────
+import '../../../core/models/media_item.dart';
+
+// ── File Info Sheet ───────────────────────────────────────────────
 
 class FileInfoSheet extends StatelessWidget {
   final MediaItem item;
@@ -47,8 +48,7 @@ class FileInfoSheet extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Icon(Icons.info_outline_rounded,
-                    color: AppColors.accent, size: 20),
+                const Icon(Icons.info_outline_rounded, color: AppColors.accent, size: 20),
                 const SizedBox(width: 8),
                 const Text('File Info',
                     style: TextStyle(
@@ -81,7 +81,9 @@ class FileInfoSheet extends StatelessWidget {
   }
 
   String _fmtDate(DateTime dt) {
-    return '${dt.day}/${dt.month}/${dt.year} ${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+    return '${dt.day}/${dt.month}/${dt.year} '
+        '${dt.hour.toString().padLeft(2, '0')}:'
+        '${dt.minute.toString().padLeft(2, '0')}';
   }
 }
 
