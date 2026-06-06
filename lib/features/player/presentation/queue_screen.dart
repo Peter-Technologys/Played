@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 
@@ -130,7 +130,7 @@ class QueueScreen extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(
                       horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.accent.withOpacity(0.15),
+                    color: AppColors.accent.withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text('${queue.items.length}',
@@ -196,7 +196,7 @@ class QueueScreen extends ConsumerWidget {
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: queue.items.length,
-                    onReorder: (old, newIdx) {
+                    onReorderItem: (old, newIdx) {
                       HapticFeedback.mediumImpact();
                       ref
                           .read(queueProvider.notifier)

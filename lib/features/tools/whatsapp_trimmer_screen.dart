@@ -1,5 +1,4 @@
 import '../../../app/theme/app_colors.dart';import 'dart:io';
-import 'dart:async' show unawaited;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -205,23 +204,22 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
             GestureDetector(
               onTap: status == TrimStatus.trimming
                   ? null
-                  : () {
+                  : () async {
                       HapticFeedback.mediumImpact();
                       ref.read(trimStatusProvider.notifier).state =
                           TrimStatus.trimming;
                       ref.read(trimProgressProvider.notifier).state = 0;
-                      unawaited(FfmpegService.instance
+                      final result = await FfmpegService.instance
                           .extractAudio(
                         videoPath: mediaItem.filePath,
                         onProgress: (p) => ref
                             .read(trimProgressProvider.notifier)
                             .state = p,
-                      ).then((result) {
-                        ref.read(trimStatusProvider.notifier).state =
-                            result != null
-                                ? TrimStatus.done
-                                : TrimStatus.error;
-                      }));
+                      );
+                      ref.read(trimStatusProvider.notifier).state =
+                          result != null
+                              ? TrimStatus.done
+                              : TrimStatus.error;
                     },
               child: Container(
                 width: double.infinity,

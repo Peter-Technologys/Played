@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 
 class BatterySaverToggle extends StatelessWidget {
@@ -22,7 +22,7 @@ class BatterySaverToggle extends StatelessWidget {
             const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
         decoration: BoxDecoration(
           color: isActive
-              ? AppColors.accent.withOpacity(0.15)
+              ? AppColors.accent.withValues(alpha: 0.15)
               : Colors.black54,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
@@ -57,7 +57,7 @@ class BatterySaverToggle extends StatelessWidget {
         .animate(target: isActive ? 1 : 0)
         .shimmer(
           duration: 1200.ms,
-          color: AppColors.accent.withOpacity(0.3),
+          color: AppColors.accent.withValues(alpha: 0.3),
         );
   }
 }
