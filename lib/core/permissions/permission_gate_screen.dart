@@ -79,7 +79,7 @@ class _SplashLoader extends StatelessWidget {
             // App logo / wordmark
             Text(
               'PLAYED',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 42,
                 fontWeight: FontWeight.w700,
                 color: AppColors.accent,
@@ -90,7 +90,7 @@ class _SplashLoader extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               'Your media. Your rules.',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
                 fontFamily: 'SpaceGrotesk',
@@ -100,7 +100,7 @@ class _SplashLoader extends StatelessWidget {
             SizedBox(
               width: 32,
               height: 32,
-              child: CircularProgressIndicator(
+              child: const CircularProgressIndicator(
                 color: AppColors.accent,
                 strokeWidth: 2,
               ),
@@ -108,7 +108,7 @@ class _SplashLoader extends StatelessWidget {
             const SizedBox(height: 16),
             Text(
               'Requesting permissions...',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
               ),
@@ -197,7 +197,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(
                           color: isPermanent
-                              ? Colors.redAccent.withOpacity(0.4)
+                              ? Colors.redAccent.withValues(alpha: 0.4)
                               : AppColors.border,
                         ),
                       ),
@@ -252,7 +252,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
                     borderRadius: BorderRadius.circular(16),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.accent.withOpacity(0.35),
+                        color: AppColors.accent.withValues(alpha: 0.35),
                         blurRadius: 16,
                         offset: const Offset(0, 4),
                       ),

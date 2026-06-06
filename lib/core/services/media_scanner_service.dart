@@ -1,9 +1,7 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:uuid/uuid.dart';
 import '../models/media_item.dart';
-import '../database/played_database.dart';
 
 /// Scans device storage for all audio and video files.
 /// Runs on an isolate-friendly compute call to avoid UI jank.
@@ -55,7 +53,7 @@ class MediaScannerService {
           final title = fileName.replaceAll(RegExp(r'\.[^.]+$'), '');
 
           final item = MediaItem(
-            id: uuid.v5(Uuid.NAMESPACE_URL, entity.path),
+            id: uuid.v5(Uuid.dns, entity.path),
             title: title,
             fileName: fileName,
             filePath: entity.path,

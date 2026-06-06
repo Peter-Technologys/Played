@@ -3,9 +3,9 @@ import 'dart:typed_data';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
-import '../../database/played_database.dart';
-import '../../models/vault_item.dart';
-import '../../models/media_item.dart';
+import '../database/played_database.dart';
+import '../models/vault_item.dart';
+import '../models/media_item.dart';
 
 /// Handles moving media files into and out of the encrypted Private Vault.
 /// Files are copied into a hidden app-private directory and registered
