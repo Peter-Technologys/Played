@@ -4,17 +4,15 @@ linter:
   rules:
     # Style
     prefer_single_quotes: true
-    # prefer_const_constructors disabled — causes too many false positives
-    # with animated widgets and Riverpod providers that can't be const
     prefer_const_constructors: false
     prefer_const_declarations: true
+    prefer_const_literals_to_create_immutables: false
     prefer_final_fields: true
     prefer_final_locals: true
     avoid_print: true
     use_super_parameters: false
 
-# Disable prefer_const_literals_to_create_immutables too
-    prefer_const_literals_to_create_immutables: false
+    # Safety
     avoid_dynamic_calls: false
     cancel_subscriptions: true
     close_sinks: true
