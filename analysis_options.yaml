@@ -15,7 +15,10 @@ linter:
     avoid_dynamic_calls: false
     cancel_subscriptions: true
     close_sinks: true
-    unawaited_futures: true
+    # unawaited_futures disabled — causes false positives on Flutter's
+    # showDialog, Navigator.push and url_launcher patterns which are
+    # intentionally fire-and-forget in UI code
+    unawaited_futures: false
 
 analyzer:
   exclude:

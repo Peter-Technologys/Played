@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart' hide RepeatMode;
 import 'package:flutter/services.dart';
-import 'dart:async' show unawaited;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -297,11 +296,11 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Rate Played',
             subtitle: 'Leave a review on the Play Store',
             color: AppColors.warning,
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
               final uri = Uri.parse(
                   'https://play.google.com/store/apps/details?id=com.petersmart.played');
-              unawaited(canLaunchUrl(uri).then((ok) { if (ok) unawaited(launchUrl(uri)); }));
+              if (await canLaunchUrl(uri)) await launchUrl(uri);
             },
           ),
           _ActionTile(
@@ -309,11 +308,11 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Send Feedback',
             subtitle: 'Report a bug or suggest a feature',
             color: AppColors.accent,
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
               final uri = Uri.parse(
                   'mailto:support@petersmartlink.com?subject=Feedback%20%E2%80%94%20Played%20App');
-              unawaited(canLaunchUrl(uri).then((ok) { if (ok) unawaited(launchUrl(uri)); }));
+              if (await canLaunchUrl(uri)) await launchUrl(uri);
             },
           ),
           _ActionTile(
@@ -321,10 +320,10 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Privacy Policy',
             subtitle: 'How we handle your data',
             color: AppColors.textSecondary,
-            onTap: () {
+            onTap: () async {
               HapticFeedback.lightImpact();
               final uri = Uri.parse('https://petersmartlink.com/privacy');
-              unawaited(canLaunchUrl(uri).then((ok) { if (ok) unawaited(launchUrl(uri)); }));
+              if (await canLaunchUrl(uri)) await launchUrl(uri);
             },
           ),
 

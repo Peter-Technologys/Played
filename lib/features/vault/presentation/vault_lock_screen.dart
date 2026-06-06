@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:async' show unawaited;
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -60,7 +59,13 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
       final canCheck = await _auth.canCheckBiometrics;
       final isSupported = await _auth.isDeviceSupported();
       if (!canCheck && !isSupported) {
-        unawaited(_showPinDialog());
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => _SetPinDialog(
+              onSuccess: () =>
+                  ref.read(vaultUnlockedProvider.notifier).state = true),
+        );
         return;
       }
       final ok = await _auth.authenticate(
