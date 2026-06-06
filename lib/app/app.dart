@@ -13,7 +13,7 @@ class PlayedApp extends StatelessWidget {
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
-        navigationBarColor: Colors.transparent,
+        // navigationBarColor removed — not a valid SystemUiOverlayStyle parameter in Flutter 3.x
       ),
     );
 

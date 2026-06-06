@@ -14,12 +14,12 @@ class AppTheme {
         primary: AppColors.accent,
         secondary: AppColors.accentViolet,
         surface: AppColors.surface,
-        background: AppColors.background,
+        // background removed — deprecated after v3.18, use surface instead
         error: AppColors.error,
         onPrimary: Colors.black,
         onSecondary: Colors.white,
         onSurface: AppColors.textPrimary,
-        onBackground: AppColors.textPrimary,
+        // onBackground removed — deprecated after v3.18, use onSurface instead
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
@@ -44,7 +44,7 @@ class AppTheme {
         activeTrackColor: AppColors.accent,
         inactiveTrackColor: AppColors.border,
         thumbColor: AppColors.accent,
-        overlayColor: AppColors.accent.withOpacity(0.2),
+        overlayColor: AppColors.accent.withValues(alpha: 0.2),
       ),
       dividerTheme: const DividerThemeData(
         color: AppColors.border,

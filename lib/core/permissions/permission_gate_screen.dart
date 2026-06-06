@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../app/theme/app_colors.dart';
+// Fixed import path: file is in lib/core/permissions/, so needs two levels up
+import '../../app/theme/app_colors.dart';
 
 /// Shown on first launch. Requests all required runtime permissions
 /// before allowing the user into the main app.
@@ -130,7 +131,8 @@ class _PermissionDeniedScreen extends StatelessWidget {
     required this.onRetry,
   });
 
-  static const Map<Permission, String> _labels = {
+  // Non-const: Permission overrides == and hashCode so cannot be used as a const map key
+  static final Map<Permission, String> _labels = {
     Permission.storage: 'Storage — scan local media files',
     Permission.audio: 'Audio files — read music',
     Permission.videos: 'Video files — read videos',

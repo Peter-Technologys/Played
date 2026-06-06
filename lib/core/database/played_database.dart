@@ -1,5 +1,5 @@
 import 'dart:convert';
-import 'dart:typed_data';
+// dart:typed_data removed — Uint8List is already re-exported by flutter/foundation.dart
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -49,8 +49,9 @@ class PlayedDatabase {
     _shelfCacheBox = await Hive.openBox<String>(HiveBoxes.shelfCache);
 
     // Open AES-256 encrypted vault box
+    // openEncryptedBox was removed in hive 2.x — use openBox with encryptionCipher instead
     final vaultKey = await _deriveVaultKey();
-    _vaultBox = await Hive.openEncryptedBox<dynamic>(
+    _vaultBox = await Hive.openBox<dynamic>(
       HiveBoxes.vault,
       encryptionCipher: HiveAesCipher(vaultKey),
     );

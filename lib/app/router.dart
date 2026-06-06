@@ -221,7 +221,7 @@ class _CenterNavItem extends StatelessWidget {
               boxShadow: isActive
                   ? [
                       BoxShadow(
-                        color: const Color(0xFF00D4FF).withOpacity(0.45),
+                        color: const Color(0xFF00D4FF).withValues(alpha: 0.45),
                         blurRadius: 18,
                         spreadRadius: 2,
                       )
@@ -272,7 +272,7 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF00D4FF).withOpacity(0.1)
+              ? const Color(0xFF00D4FF).withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -334,7 +334,7 @@ class _ToolTile extends StatelessWidget {
             Container(
               width: 40, height: 40,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.12),
+                color: color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: color, size: 20),
