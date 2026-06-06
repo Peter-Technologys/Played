@@ -1,10 +1,12 @@
 import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/media_scanner_service.dart';
 
 // ── Models & Providers ─────────────────────────────────────────
 
@@ -220,9 +222,9 @@ class _StatusPill extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -273,7 +275,7 @@ class _RadarView extends StatelessWidget {
             border: Border.all(color: AppColors.accent, width: 2),
             boxShadow: [
               BoxShadow(
-                  color: AppColors.accent.withOpacity(0.3),
+                  color: AppColors.accent.withValues(alpha: 0.3),
                   blurRadius: 20,
                   spreadRadius: 4)
             ],
@@ -363,10 +365,10 @@ class _DeviceAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.surface,
-            border: Border.all(color: AppColors.accent.withOpacity(0.5), width: 1.5),
+            border: Border.all(color: AppColors.accent.withValues(alpha: 0.5), width: 1.5),
             boxShadow: [
               BoxShadow(
-                  color: AppColors.accent.withOpacity(0.15),
+                  color: AppColors.accent.withValues(alpha: 0.15),
                   blurRadius: 10)
             ],
           ),
@@ -387,18 +389,30 @@ class _DeviceAvatar extends StatelessWidget {
   }
 }
 
-// ── File Tray ───────────────────────────────────────────────
+// ── File Tray — shows real scanned media files ──────────────────
 
-class _FileTray extends StatelessWidget {
+class _FileTray extends StatefulWidget {
   final List<DiscoveredDevice> devices;
   const _FileTray({required this.devices});
 
-  static const List<Map<String, dynamic>> _mockFiles = [
-    {'title': 'Omwana_Remix.mp3', 'icon': Icons.audio_file_rounded, 'size': '4.2 MB'},
-    {'title': 'Kampala_Night.mp4', 'icon': Icons.video_file_rounded, 'size': '38 MB'},
-    {'title': 'DJ_Ciza_Mix.mp3', 'icon': Icons.audio_file_rounded, 'size': '11 MB'},
-    {'title': 'Bebe_Cool.mp3', 'icon': Icons.audio_file_rounded, 'size': '3.8 MB'},
-  ];
+  @override
+  State<_FileTray> createState() => _FileTrayState();
+}
+
+class _FileTrayState extends State<_FileTray> {
+  List<MediaItem> _files = [];
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFiles();
+  }
+
+  Future<void> _loadFiles() async {
+    final items = await MediaScannerService.instance.scanAll();
+    if (mounted) setState(() { _files = items.take(20).toList(); _loading = false; });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -418,18 +432,32 @@ class _FileTray extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Expanded(
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _mockFiles.length,
-            separatorBuilder: (_, __) => const SizedBox(width: 10),
-            itemBuilder: (context, i) => _DraggableFileCard(
-              title: _mockFiles[i]['title'] as String,
-              icon: _mockFiles[i]['icon'] as IconData,
-              size: _mockFiles[i]['size'] as String,
-              targetDevice: devices.isNotEmpty ? devices.first : null,
-            ),
-          ),
+          child: _loading
+              ? const Center(child: CircularProgressIndicator(
+                  color: AppColors.accent, strokeWidth: 2))
+              : _files.isEmpty
+                  ? const Center(child: Text('No media files found',
+                      style: TextStyle(color: AppColors.textSecondary,
+                          fontSize: 12)))
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: _files.length,
+                      separatorBuilder: (_, __) => const SizedBox(width: 10),
+                      itemBuilder: (context, i) {
+                        final item = _files[i];
+                        return _DraggableFileCard(
+                          title: item.title,
+                          icon: item.isVideo
+                              ? Icons.video_file_rounded
+                              : Icons.audio_file_rounded,
+                          size: item.formattedSize,
+                          targetDevice: widget.devices.isNotEmpty
+                              ? widget.devices.first
+                              : null,
+                        );
+                      },
+                    ),
         ),
       ],
     );
@@ -511,7 +539,7 @@ class _CardBody extends StatelessWidget {
             width: active ? 1.5 : 1),
         boxShadow: glowing
             ? [BoxShadow(
-                color: AppColors.accent.withOpacity(0.4),
+                color: AppColors.accent.withValues(alpha: 0.4),
                 blurRadius: 16, spreadRadius: 2)]
             : null,
       ),
@@ -565,7 +593,7 @@ class _ScanButton extends StatelessWidget {
               color: isScanning ? AppColors.accent : AppColors.border),
           boxShadow: isScanning
               ? [BoxShadow(
-                  color: AppColors.accent.withOpacity(0.35),
+                  color: AppColors.accent.withValues(alpha: 0.35),
                   blurRadius: 12)]
               : null,
         ),

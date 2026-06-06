@@ -374,7 +374,7 @@ class _IconBtn extends StatelessWidget {
         height: 40,
         decoration: BoxDecoration(
           color: accent
-              ? AppColors.accent.withOpacity(0.12)
+              ? AppColors.accent.withValues(alpha: 0.12)
               : AppColors.surface,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
