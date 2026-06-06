@@ -4,10 +4,16 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/utils/duration_formatter.dart';
+import 'queue_screen.dart';
+import 'lyrics_screen.dart';
+import 'file_info_sheet.dart';
+import 'equalizer_screen.dart';
+import 'widgets/sleep_timer.dart';
 
 // ── State ──────────────────────────────────────────────────
 
@@ -88,6 +94,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       state = state.copyWith(isFavorite: !state.isFavorite);
   void savePosition(String mediaId) =>
       PlayedDatabase.instance.saveSeekPosition(mediaId, state.position);
+  void pause() => _player.pause();
 
   @override
   void dispose() {
@@ -127,14 +134,16 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
     if (s == AppLifecycleState.paused) {
-      ref.read(audioPlayerProvider.notifier)
+      ref
+          .read(audioPlayerProvider.notifier)
           .savePosition(widget.mediaItem.id);
     }
   }
 
   @override
   void dispose() {
-    ref.read(audioPlayerProvider.notifier)
+    ref
+        .read(audioPlayerProvider.notifier)
         .savePosition(widget.mediaItem.id);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -164,15 +173,24 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
-                  const Text('NOW PLAYING',
-                      style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                        letterSpacing: 1.5,
-                        fontFamily: 'SpaceGrotesk',
-                      )),
+                  const Text(
+                    'NOW PLAYING',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 1.5,
+                      fontFamily: 'SpaceGrotesk',
+                    ),
+                  ),
                   const Spacer(),
+                  // Sleep timer
+                  SleepTimerButton(
+                    onExpire: () => ref
+                        .read(audioPlayerProvider.notifier)
+                        .pause(),
+                  ),
+                  const SizedBox(width: 4),
                   IconButton(
                     icon: const Icon(Icons.more_vert_rounded,
                         color: AppColors.textSecondary, size: 22),
@@ -205,15 +223,17 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.mediaItem.title,
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                              fontFamily: 'SpaceGrotesk',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
+                        Text(
+                          widget.mediaItem.title,
+                          style: const TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'SpaceGrotesk',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 4),
                         Text(
                           widget.mediaItem.artist ?? 'Unknown Artist',
@@ -227,7 +247,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       ],
                     ),
                   ),
-                  // Favourite toggle
                   GestureDetector(
                     onTap: () => ref
                         .read(audioPlayerProvider.notifier)
@@ -280,6 +299,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     ref.read(audioPlayerProvider.notifier).skipForward(),
                 onSpeedChange: (s) =>
                     ref.read(audioPlayerProvider.notifier).setSpeed(s),
+                onQueue: () => _showQueue(context),
+                onLyrics: () => _showLyrics(context, ps.position),
+                onEqualizer: () => context.push('/player/equalizer'),
               ),
             ),
 
@@ -297,7 +319,54 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       shape: const RoundedRectangleBorder(
           borderRadius:
               BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _OptionsSheet(mediaItem: widget.mediaItem),
+      builder: (_) => _OptionsSheet(
+        mediaItem: widget.mediaItem,
+        onFileInfo: () {
+          Navigator.pop(context);
+          showModalBottomSheet(
+            context: context,
+            backgroundColor: AppColors.surface,
+            isScrollControlled: true,
+            shape: const RoundedRectangleBorder(
+                borderRadius:
+                    BorderRadius.vertical(top: Radius.circular(24))),
+            builder: (_) => FileInfoSheet(item: widget.mediaItem),
+          );
+        },
+        onOpenInStudio: () {
+          Navigator.pop(context);
+          context.push('/studio');
+        },
+        onTrimForWhatsApp: () {
+          Navigator.pop(context);
+          context.push('/tools/whatsapp', extra: widget.mediaItem);
+        },
+      ),
+    );
+  }
+
+  void _showQueue(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => const QueueScreen(),
+    );
+  }
+
+  void _showLyrics(BuildContext context, Duration position) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+          borderRadius:
+              BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => LyricsSheet(
+          item: widget.mediaItem, position: position),
     );
   }
 }
@@ -377,7 +446,8 @@ class _SeekBar extends StatelessWidget {
           child: Slider(
             value: progress,
             onChanged: (v) => onSeek(Duration(
-                milliseconds: (v * duration.inMilliseconds).toInt())),
+                milliseconds:
+                    (v * duration.inMilliseconds).toInt())),
           ),
         ),
         Padding(
@@ -411,6 +481,9 @@ class _Controls extends StatelessWidget {
   final VoidCallback onSkipBack;
   final VoidCallback onSkipForward;
   final ValueChanged<double> onSpeedChange;
+  final VoidCallback onQueue;
+  final VoidCallback onLyrics;
+  final VoidCallback onEqualizer;
 
   const _Controls({
     required this.isPlaying,
@@ -420,93 +493,162 @@ class _Controls extends StatelessWidget {
     required this.onSkipBack,
     required this.onSkipForward,
     required this.onSpeedChange,
+    required this.onQueue,
+    required this.onLyrics,
+    required this.onEqualizer,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      crossAxisAlignment: CrossAxisAlignment.center,
+    return Column(
       children: [
-        // Speed chip
-        GestureDetector(
-          onTap: () {
-            const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-            final idx = speeds.indexOf(speed);
-            onSpeedChange(speeds[(idx + 1) % speeds.length]);
-          },
-          child: Container(
-            padding: const EdgeInsets.symmetric(
-                horizontal: 10, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Text('${speed}x',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.accent,
-                  fontFamily: 'SpaceGrotesk',
-                )),
-          ),
-        ),
-
-        // Skip back 10s
-        IconButton(
-          icon: const Icon(Icons.replay_10_rounded,
-              color: AppColors.textPrimary, size: 34),
-          onPressed: onSkipBack,
-        ),
-
-        // Play / Pause
-        GestureDetector(
-          onTap: onTogglePlay,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.accent,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withOpacity(0.45),
-                  blurRadius: 24,
-                  spreadRadius: 2,
+        // Main transport row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // Speed chip
+            GestureDetector(
+              onTap: () {
+                const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+                final idx = speeds.indexOf(speed);
+                onSpeedChange(speeds[(idx + 1) % speeds.length]);
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.border),
                 ),
-              ],
-            ),
-            child: isLoading
-                ? const Padding(
-                    padding: EdgeInsets.all(20),
-                    child: CircularProgressIndicator(
-                        color: Colors.black, strokeWidth: 2))
-                : Icon(
-                    isPlaying
-                        ? Icons.pause_rounded
-                        : Icons.play_arrow_rounded,
-                    color: Colors.black,
-                    size: 38,
+                child: Text(
+                  '${speed}x',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.accent,
+                    fontFamily: 'SpaceGrotesk',
                   ),
-          ),
+                ),
+              ),
+            ),
+
+            // Skip back 10s
+            IconButton(
+              icon: const Icon(Icons.replay_10_rounded,
+                  color: AppColors.textPrimary, size: 34),
+              onPressed: onSkipBack,
+            ),
+
+            // Play / Pause
+            GestureDetector(
+              onTap: onTogglePlay,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.accent,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.accent.withOpacity(0.45),
+                      blurRadius: 24,
+                      spreadRadius: 2,
+                    ),
+                  ],
+                ),
+                child: isLoading
+                    ? const Padding(
+                        padding: EdgeInsets.all(20),
+                        child: CircularProgressIndicator(
+                            color: Colors.black, strokeWidth: 2))
+                    : Icon(
+                        isPlaying
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.black,
+                        size: 38,
+                      ),
+              ),
+            ),
+
+            // Skip forward 10s
+            IconButton(
+              icon: const Icon(Icons.forward_10_rounded,
+                  color: AppColors.textPrimary, size: 34),
+              onPressed: onSkipForward,
+            ),
+
+            // Queue
+            IconButton(
+              icon: const Icon(Icons.queue_music_rounded,
+                  color: AppColors.textSecondary, size: 26),
+              onPressed: onQueue,
+            ),
+          ],
         ),
 
-        // Skip forward 10s
-        IconButton(
-          icon: const Icon(Icons.forward_10_rounded,
-              color: AppColors.textPrimary, size: 34),
-          onPressed: onSkipForward,
-        ),
+        const SizedBox(height: 12),
 
-        // Queue
-        IconButton(
-          icon: const Icon(Icons.queue_music_rounded,
-              color: AppColors.textSecondary, size: 26),
-          onPressed: () {},
+        // Secondary actions row
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            _SecondaryBtn(
+              icon: Icons.lyrics_rounded,
+              label: 'Lyrics',
+              onTap: onLyrics,
+            ),
+            _SecondaryBtn(
+              icon: Icons.equalizer_rounded,
+              label: 'EQ',
+              onTap: onEqualizer,
+            ),
+          ],
         ),
       ],
+    );
+  }
+}
+
+class _SecondaryBtn extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  const _SecondaryBtn(
+      {required this.icon, required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding:
+            const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, color: AppColors.textSecondary, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontFamily: 'SpaceGrotesk',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
@@ -515,21 +657,32 @@ class _Controls extends StatelessWidget {
 
 class _OptionsSheet extends StatelessWidget {
   final MediaItem mediaItem;
-  const _OptionsSheet({required this.mediaItem});
+  final VoidCallback onFileInfo;
+  final VoidCallback onOpenInStudio;
+  final VoidCallback onTrimForWhatsApp;
+
+  const _OptionsSheet({
+    required this.mediaItem,
+    required this.onFileInfo,
+    required this.onOpenInStudio,
+    required this.onTrimForWhatsApp,
+  });
 
   @override
   Widget build(BuildContext context) {
     final options = [
-      _Opt(Icons.playlist_add_rounded, 'Add to Playlist', AppColors.accent),
-      _Opt(Icons.lock_rounded, 'Move to Vault', AppColors.accentViolet),
+      _Opt(Icons.playlist_add_rounded, 'Add to Playlist',
+          AppColors.accent, null),
+      _Opt(Icons.lock_rounded, 'Move to Vault',
+          AppColors.accentViolet, null),
       _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop',
-          AppColors.accent),
+          AppColors.accent, null),
       _Opt(Icons.graphic_eq_rounded, 'Open in Studio',
-          AppColors.accentViolet),
-      _Opt(Icons.download_rounded, 'Extract Audio (MP3)',
-          AppColors.accent),
+          AppColors.accentViolet, onOpenInStudio),
+      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',
+          AppColors.accent, onTrimForWhatsApp),
       _Opt(Icons.info_outline_rounded, 'File Info',
-          AppColors.textSecondary),
+          AppColors.textSecondary, onFileInfo),
     ];
 
     return Padding(
@@ -537,7 +690,6 @@ class _OptionsSheet extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40,
@@ -549,7 +701,6 @@ class _OptionsSheet extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          // Track info
           Row(
             children: [
               Container(
@@ -567,19 +718,23 @@ class _OptionsSheet extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(mediaItem.title,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'SpaceGrotesk',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    Text(mediaItem.formattedSize,
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary)),
+                    Text(
+                      mediaItem.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'SpaceGrotesk',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      mediaItem.formattedSize,
+                      style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary),
+                    ),
                   ],
                 ),
               ),
@@ -598,13 +753,21 @@ class _OptionsSheet extends StatelessWidget {
                   ),
                   child: Icon(o.icon, color: o.color, size: 18),
                 ),
-                title: Text(o.label,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'SpaceGrotesk',
-                    )),
-                onTap: () => Navigator.pop(context),
+                title: Text(
+                  o.label,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'SpaceGrotesk',
+                  ),
+                ),
+                onTap: () {
+                  if (o.onTap != null) {
+                    o.onTap!();
+                  } else {
+                    Navigator.pop(context);
+                  }
+                },
                 contentPadding:
                     const EdgeInsets.symmetric(horizontal: 0),
                 dense: true,
@@ -619,5 +782,6 @@ class _Opt {
   final IconData icon;
   final String label;
   final Color color;
-  const _Opt(this.icon, this.label, this.color);
+  final VoidCallback? onTap;
+  const _Opt(this.icon, this.label, this.color, this.onTap);
 }
