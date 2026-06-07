@@ -6,6 +6,7 @@ import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
+// share_plus v10+: use Share.shareXFiles (static method on Share, not SharePlus)
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
@@ -73,7 +74,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     });
     _player.positionStream.listen((p) => state = state.copyWith(position: p));
     _player.durationStream.listen((d) {
-      if (d != null) state = state.copyWith(duration: d);
+      if (d != null) { state = state.copyWith(duration: d); }
     });
   }
 
@@ -93,7 +94,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       _player.seek(state.position + const Duration(seconds: 10));
   Future<void> skipBack() =>
       _player.seek(state.position - const Duration(seconds: 10));
-  void setSpeed(double s) { _player.setSpeed(s); state = state.copyWith(speed: s); }
+  void setSpeed(double s) {
+    _player.setSpeed(s);
+    state = state.copyWith(speed: s);
+  }
   void toggleFavorite() => state = state.copyWith(isFavorite: !state.isFavorite);
   void toggleShuffle()  => state = state.copyWith(isShuffle: !state.isShuffle);
   void cycleRepeat() {
@@ -138,8 +142,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused)
+    // Wrapped in braces to satisfy curly_braces_in_flow_control_structures lint
+    if (s == AppLifecycleState.paused) {
       ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
+    }
   }
 
   @override
@@ -381,7 +387,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         color: AppColors.accent,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accent.withOpacity(0.45),
+                            // withValues replaces deprecated withOpacity
+                            color: AppColors.accent.withValues(alpha: 0.45),
                             blurRadius: 24, spreadRadius: 2,
                           ),
                         ],
@@ -448,7 +455,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     icon: Icons.share_rounded,
                     label: 'Share',
                     // Share the media file using the system share sheet
-                    onTap: () => SharePlus.shareXFiles(
+                    // share_plus v10+: Share.shareXFiles is the correct static API
+                    onTap: () => Share.shareXFiles(
                       [XFile(widget.mediaItem.filePath)],
                       text: widget.mediaItem.title,
                     ),
@@ -477,13 +485,15 @@ class _AlbumArt extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      transform: Matrix4.identity()..scale(isPlaying ? 1.0 : 0.88),
+      // scaleByDouble replaces the deprecated scale() method on Matrix4
+      transform: Matrix4.identity()..scaleByDouble(isPlaying ? 1.0 : 0.88),
       transformAlignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withOpacity(isPlaying ? 0.35 : 0.1),
+            // withValues replaces deprecated withOpacity
+            color: AppColors.accent.withValues(alpha: isPlaying ? 0.35 : 0.1),
             blurRadius: isPlaying ? 48 : 16,
             spreadRadius: isPlaying ? 6 : 0,
           ),
@@ -528,7 +538,8 @@ class _SeekBar extends StatelessWidget {
             activeTrackColor: AppColors.accent,
             inactiveTrackColor: AppColors.border,
             thumbColor: AppColors.accent,
-            overlayColor: AppColors.accent.withOpacity(0.15),
+            // withValues replaces deprecated withOpacity
+            overlayColor: AppColors.accent.withValues(alpha: 0.15),
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
           child: Slider(
@@ -744,7 +755,8 @@ class _OptionsSheet extends ConsumerWidget {
                 leading: Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(
-                    color: o.color.withOpacity(0.12),
+                    // withValues replaces deprecated withOpacity
+                  color: o.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(o.icon, color: o.color, size: 18),

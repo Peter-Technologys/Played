@@ -3,7 +3,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/utils/duration_formatter.dart';
-import 'media_card.dart';
+// media_card.dart removed — MediaCard is not used in search results list
+
 
 /// Full-screen search delegate for media files.
 class MediaSearchDelegate extends SearchDelegate<MediaItem?> {

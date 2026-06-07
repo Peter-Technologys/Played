@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
-import '../../../../core/utils/duration_formatter.dart';
+// duration_formatter.dart removed — not used in this file (formatting is done inside MediaCard)
 import 'media_card.dart';
 
 /// Horizontal scrolling "Recently Played" timeline at the top of My Space.

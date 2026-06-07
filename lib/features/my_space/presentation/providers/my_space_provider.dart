@@ -1,7 +1,9 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/utils/shelf_sorter.dart';
-import '../data/media_repository.dart';
-import '../domain/shelf_use_case.dart';
+// Corrected import paths: this file lives 4 levels deep
+// (lib/features/my_space/presentation/providers/) so core/ needs ../../../../
+import '../../../../core/utils/shelf_sorter.dart';
+import '../../data/media_repository.dart';
+import '../../domain/shelf_use_case.dart';
 
 final mediaRepositoryProvider = Provider<MediaRepository>(
   (_) => MediaRepository.instance,

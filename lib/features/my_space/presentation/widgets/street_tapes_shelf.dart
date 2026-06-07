@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
-import 'media_card.dart';
+// media_card.dart removed — StreetTapesShelf uses its own _TapeRow widget, not MediaCard
+
 
 /// Dynamic "Street Tapes" shelf — DJ/Mix audio longer than 20 minutes.
 class StreetTapesShelf extends StatelessWidget {

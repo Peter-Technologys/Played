@@ -5,7 +5,9 @@ import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 import '../providers/my_space_provider.dart';
-import '../../player/presentation/queue_screen.dart';
+// Corrected import path: media_card.dart is 5 levels deep
+// (lib/features/my_space/presentation/widgets/) so player/ needs ../../../
+import '../../../player/presentation/queue_screen.dart';
 
 /// Modern glassmorphism media card with gradient overlay and
 /// animated press feedback. Used across all shelves and the grid.
@@ -49,7 +51,8 @@ class _MediaCardState extends State<MediaCard>
       onTapDown: (_) => _press.forward(),
       onTapUp: (details) {
         _press.reverse();
-        // Add all items from My Space to the queue, start from this item
+        // Add all items from My Space to the queue, start from this item.
+        // bundleAsync is ShelfBundle (non-nullable) inside whenData callback.
         final ref = ProviderScope.containerOf(context);
         final bundleAsync = ref.read(mySpaceProvider);
         bundleAsync.whenData((bundle) {
@@ -58,11 +61,12 @@ class _MediaCardState extends State<MediaCard>
             ...bundle.cinemaShelf,
             ...bundle.streetTapesShelf,
           ];
-          final startIndex = allItems.indexWhere((e) => e.id == widget.item.id);
+          final startIndex =
+              allItems.indexWhere((e) => e.id == widget.item.id);
           ref.read(queueProvider.notifier).setQueue(
-            allItems,
-            startIndex: startIndex < 0 ? 0 : startIndex,
-          );
+                allItems,
+                startIndex: startIndex < 0 ? 0 : startIndex,
+              );
         });
         final route = widget.item.isVideo ? '/player/video' : '/player/audio';
         context.push(route, extra: widget.item);
@@ -75,7 +79,6 @@ class _MediaCardState extends State<MediaCard>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
-              // Subtle gradient card background
               gradient: const LinearGradient(
                 colors: [Color(0xFF0D1117), Color(0xFF161B27)],
                 begin: Alignment.topLeft,
@@ -96,7 +99,6 @@ class _MediaCardState extends State<MediaCard>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Thumbnail with gradient overlay ──────────────────
                 Expanded(
                   child: ClipRRect(
                     borderRadius: const BorderRadius.vertical(
@@ -104,7 +106,6 @@ class _MediaCardState extends State<MediaCard>
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // Background gradient
                         Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
@@ -117,14 +118,12 @@ class _MediaCardState extends State<MediaCard>
                             ),
                           ),
                         ),
-                        // Subtle grid pattern overlay
                         Opacity(
                           opacity: 0.04,
                           child: CustomPaint(
                             painter: _GridPainter(),
                           ),
                         ),
-                        // Icon centered
                         Center(
                           child: Container(
                             width: 52,
@@ -145,7 +144,6 @@ class _MediaCardState extends State<MediaCard>
                             ),
                           ),
                         ),
-                        // Bottom gradient overlay for text legibility
                         const Positioned(
                           bottom: 0, left: 0, right: 0,
                           child: SizedBox(
@@ -164,7 +162,6 @@ class _MediaCardState extends State<MediaCard>
                             ),
                           ),
                         ),
-                        // Type badge top-right
                         Positioned(
                           top: 8, right: 8,
                           child: ClipRRect(
@@ -198,8 +195,6 @@ class _MediaCardState extends State<MediaCard>
                     ),
                   ),
                 ),
-
-                // ── Info ────────────────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 10, 10, 12),
                   child: Column(
@@ -231,7 +226,6 @@ class _MediaCardState extends State<MediaCard>
                             ),
                           ),
                           const Spacer(),
-                          // File size dot
                           Container(
                             width: 4, height: 4,
                             decoration: BoxDecoration(
@@ -253,7 +247,6 @@ class _MediaCardState extends State<MediaCard>
   }
 }
 
-// Subtle dot-grid background painter for the card thumbnail
 class _GridPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
