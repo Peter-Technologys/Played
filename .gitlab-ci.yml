@@ -22,13 +22,15 @@ cache:
     - .pub-cache/
     - .dart_tool/
 
-# ── Validate ──────────────────────────────────────────────
+# ── Validate ────────────────────────────────────────────────────────
 analyze:
   stage: validate
   script:
     - flutter pub get
-    # build_runner removed — flutter analyze does not need generated files
-    # --no-fatal-warnings ensures only errors fail the build
+    # Generate code (freezed, riverpod, json_serializable) before analyzing.
+    # Without this step flutter analyze reports missing generated files as errors
+    # because the project uses code generation for models and providers.
+    - flutter pub run build_runner build --delete-conflicting-outputs
     - flutter analyze --no-fatal-infos --no-fatal-warnings
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -44,7 +46,7 @@ format_check:
   # allow_failure: true so formatting issues don't block MR pipelines
   allow_failure: true
 
-# ── Test ────────────────────────────────────────────────────
+# ── Test ──────────────────────────────────────────────────────────
 unit_test:
   stage: test
   script:
@@ -64,7 +66,7 @@ unit_test:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# ── Build ────────────────────────────────────────────────────
+# ── Build ──────────────────────────────────────────────────────────
 build_apk_debug:
   stage: build
   script:
@@ -89,6 +91,16 @@ build_apk_release:
   script:
     - flutter pub get
     - flutter pub run build_runner build --delete-conflicting-outputs
+    # Guard: fail early with a clear message if signing variables are missing.
+    # Without this the build silently produces an unsigned APK that cannot
+    # be installed on real devices or published to the Play Store.
+    - |
+      if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
+        echo "ERROR: One or more signing variables are not set."
+        echo "Required: KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD"
+        echo "Set them in GitLab → Settings → CI/CD → Variables (Masked + Protected)."
+        exit 1
+      fi
     # Decode the Base64 keystore from CI variable into a file the build can use
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
     # Pass signing credentials via env vars (read by build.gradle signingConfigs.release)
