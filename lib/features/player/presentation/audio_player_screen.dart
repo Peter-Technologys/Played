@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
 // share_plus v10+: use Share.shareXFiles (static method on Share, not SharePlus)
 import 'package:share_plus/share_plus.dart';
@@ -17,7 +16,6 @@ import '../../../core/utils/duration_formatter.dart';
 import 'queue_screen.dart';
 import 'lyrics_screen.dart';
 import 'file_info_sheet.dart';
-import 'equalizer_screen.dart';
 import 'widgets/sleep_timer.dart';
 
 // ── State ──────────────────────────────────────────────────────
@@ -142,7 +140,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState s) {
-    // Wrapped in braces to satisfy curly_braces_in_flow_control_structures lint
     if (s == AppLifecycleState.paused) {
       ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
     }
@@ -154,8 +151,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
-
-  // ── Sheet helpers ──────────────────────────────────────────
 
   void _showQueue() => showModalBottomSheet(
     context: context, backgroundColor: AppColors.surface,
@@ -205,8 +200,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       body: SafeArea(
         child: Column(
           children: [
-
-            // ── Top bar ──────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
@@ -237,8 +230,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-
-            // ── Album art ────────────────────────────────────
             Expanded(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 8),
@@ -248,10 +239,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ),
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ── Track info + favourite ────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -296,10 +284,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-
             const SizedBox(height: 20),
-
-            // ── Seek bar ─────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _SeekBar(
@@ -309,10 +294,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     ref.read(audioPlayerProvider.notifier).seek(d),
               ),
             ),
-
             const SizedBox(height: 8),
-
-            // ── Shuffle / Speed / Repeat row ──────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -355,10 +337,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-
             const SizedBox(height: 12),
-
-            // ── Main transport ────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
@@ -387,7 +366,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         color: AppColors.accent,
                         boxShadow: [
                           BoxShadow(
-                            // withValues replaces deprecated withOpacity
                             color: AppColors.accent.withValues(alpha: 0.45),
                             blurRadius: 24, spreadRadius: 2,
                           ),
@@ -415,7 +393,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: const Icon(Icons.skip_next_rounded,
                         color: AppColors.textPrimary, size: 34),
-                    // Navigate to next track in queue
                     onPressed: () {
                       ref.read(queueProvider.notifier).next();
                       final next = ref.read(queueProvider).current;
@@ -427,10 +404,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-
             const SizedBox(height: 16),
-
-            // ── Secondary actions ─────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
@@ -454,8 +428,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   _SecondaryBtn(
                     icon: Icons.share_rounded,
                     label: 'Share',
-                    // Share the media file using the system share sheet
-                    // share_plus v10+: Share.shareXFiles is the correct static API
                     onTap: () => Share.shareXFiles(
                       [XFile(widget.mediaItem.filePath)],
                       text: widget.mediaItem.title,
@@ -464,7 +436,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-
             const SizedBox(height: 24),
           ],
         ),
@@ -485,14 +456,12 @@ class _AlbumArt extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      // scaleByDouble replaces the deprecated scale() method on Matrix4
-      transform: Matrix4.identity()..scaleByDouble(isPlaying ? 1.0 : 0.88),
+      transform: Matrix4.identity()..scale(isPlaying ? 1.0 : 0.88),
       transformAlignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            // withValues replaces deprecated withOpacity
             color: AppColors.accent.withValues(alpha: isPlaying ? 0.35 : 0.1),
             blurRadius: isPlaying ? 48 : 16,
             spreadRadius: isPlaying ? 6 : 0,
@@ -538,7 +507,6 @@ class _SeekBar extends StatelessWidget {
             activeTrackColor: AppColors.accent,
             inactiveTrackColor: AppColors.border,
             thumbColor: AppColors.accent,
-            // withValues replaces deprecated withOpacity
             overlayColor: AppColors.accent.withValues(alpha: 0.15),
             thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
           ),
@@ -648,8 +616,6 @@ class _SecondaryBtn extends StatelessWidget {
 
 // ── Options Sheet ──────────────────────────────────────────────
 
-// _OptionsSheet is a ConsumerWidget so it can access queueProvider
-// and VaultService for 'Add to Playlist' and 'Move to Vault' actions.
 class _OptionsSheet extends ConsumerWidget {
   final MediaItem mediaItem;
   final VoidCallback onFileInfo;
@@ -665,21 +631,18 @@ class _OptionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final options = [
-      // Add to queue (full playlist UI can be extended later)
       _Opt(Icons.playlist_add_rounded, 'Add to Playlist', AppColors.accent, () {
         ref.read(queueProvider.notifier).addToQueue(mediaItem);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Added to queue')));
       }),
-      // Move file into AES-256 encrypted vault
       _Opt(Icons.lock_rounded, 'Move to Vault', AppColors.accentViolet, () async {
         Navigator.pop(context);
         await VaultService.instance.lockItem(mediaItem);
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Moved to Vault')));
+        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Moved to Vault'))); }
       }),
-      // Air-Drop sharing — guide user to Air-Drop tab
       _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop', AppColors.accent, () {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -687,15 +650,13 @@ class _OptionsSheet extends ConsumerWidget {
       }),
       _Opt(Icons.graphic_eq_rounded,    'Open in Studio',      AppColors.accentViolet, onOpenInStudio),
       _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent,       onTrimForWhatsApp),
-      // Extract audio track using FFmpeg
       _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
         Navigator.pop(context);
         await FfmpegService.instance.extractAudio(
             videoPath: mediaItem.filePath, onProgress: (_) {});
-        if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Audio extracted to Downloads')));
+        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Audio extracted to Downloads'))); }
       }),
-      // Cast — stub, requires Chromecast SDK integration
       _Opt(Icons.cast_rounded, 'Cast to Device', AppColors.textSecondary, () {
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -755,8 +716,7 @@ class _OptionsSheet extends ConsumerWidget {
                 leading: Container(
                   width: 36, height: 36,
                   decoration: BoxDecoration(
-                    // withValues replaces deprecated withOpacity
-                  color: o.color.withValues(alpha: 0.12),
+                    color: o.color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
                   ),
                   child: Icon(o.icon, color: o.color, size: 18),
