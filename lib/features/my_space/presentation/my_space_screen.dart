@@ -83,7 +83,6 @@ class _SpaceContent extends ConsumerWidget {
             child: Row(
               crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                // Title block
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
@@ -93,7 +92,6 @@ class _SpaceContent extends ConsumerWidget {
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
-                        fontFamily: 'SpaceGrotesk',
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -105,8 +103,6 @@ class _SpaceContent extends ConsumerWidget {
                   ],
                 ),
                 const Spacer(),
-
-                // Search
                 _IconBtn(
                   icon: Icons.search_rounded,
                   onTap: () => showSearch(
@@ -115,19 +111,13 @@ class _SpaceContent extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-
-                // Sort / Filter
                 _SortButton(current: sort),
                 const SizedBox(width: 8),
-
-                // Refresh
                 _IconBtn(
                   icon: Icons.refresh_rounded,
                   onTap: () => ref.invalidate(mySpaceProvider),
                 ),
                 const SizedBox(width: 8),
-
-                // Settings — core action for the whole app
                 _IconBtn(
                   icon: Icons.settings_rounded,
                   onTap: () => context.push('/settings'),
@@ -140,11 +130,9 @@ class _SpaceContent extends ConsumerWidget {
 
         const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-        // ── Empty state ──────────────────────────────────────
         if (totalFiles == 0)
           const SliverFillRemaining(child: _EmptyState()),
 
-        // ── Recently Played Timeline ────────────────────────
         if (bundle.recentTimeline.isNotEmpty) ...
           [
             SliverToBoxAdapter(
@@ -155,7 +143,6 @@ class _SpaceContent extends ConsumerWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 28)),
           ],
 
-        // ── Cinema Shelf ───────────────────────────────────
         if (bundle.hasCinema) ...
           [
             SliverToBoxAdapter(
@@ -166,7 +153,6 @@ class _SpaceContent extends ConsumerWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 28)),
           ],
 
-        // ── Street Tapes Shelf ────────────────────────────
         if (bundle.hasStreetTapes) ...
           [
             SliverToBoxAdapter(
@@ -177,7 +163,6 @@ class _SpaceContent extends ConsumerWidget {
             const SliverToBoxAdapter(child: SizedBox(height: 28)),
           ],
 
-        // ── All Files header ────────────────────────────────
         if (totalFiles > 0)
           SliverToBoxAdapter(
             child: Padding(
@@ -191,7 +176,6 @@ class _SpaceContent extends ConsumerWidget {
                       fontWeight: FontWeight.w600,
                       color: AppColors.textSecondary,
                       letterSpacing: 1.2,
-                      fontFamily: 'SpaceGrotesk',
                     ),
                   ),
                   const Spacer(),
@@ -208,7 +192,6 @@ class _SpaceContent extends ConsumerWidget {
         if (totalFiles > 0)
           const SliverToBoxAdapter(child: SizedBox(height: 12)),
 
-        // ── All Files Grid ──────────────────────────────────
         if (totalFiles > 0)
           SliverPadding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -301,14 +284,13 @@ class _SortButton extends ConsumerWidget {
                 fontSize: 18,
                 fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary,
-                fontFamily: 'SpaceGrotesk',
               ),
             ),
             const SizedBox(height: 16),
             ...MediaSort.values.map((s) {
               final label = switch (s) {
                 MediaSort.dateAdded => 'Date Added (newest first)',
-                MediaSort.name => 'Name (A → Z)',
+                MediaSort.name => 'Name (A \u2192 Z)',
                 MediaSort.size => 'File Size (largest first)',
                 MediaSort.duration => 'Duration (longest first)',
               };
@@ -329,13 +311,9 @@ class _SortButton extends ConsumerWidget {
                   label,
                   style: TextStyle(
                     fontSize: 14,
-                    color: isActive
-                        ? AppColors.accent
-                        : AppColors.textPrimary,
-                    fontWeight: isActive
-                        ? FontWeight.w700
-                        : FontWeight.w500,
-                    fontFamily: 'SpaceGrotesk',
+                    color: isActive ? AppColors.accent : AppColors.textPrimary,
+                    fontWeight:
+                        isActive ? FontWeight.w700 : FontWeight.w500,
                   ),
                 ),
                 trailing: isActive
@@ -411,7 +389,14 @@ class _EmptyState extends StatelessWidget {
             ),
             child: const Icon(Icons.folder_open_rounded,
                 color: AppColors.textSecondary, size: 36),
-          ),
+          )
+              .animate(onPlay: (c) => c.repeat(reverse: true))
+              .scaleXY(
+                begin: 1.0,
+                end: 1.08,
+                duration: 1000.ms,
+                curve: Curves.easeInOut,
+              ),
           const SizedBox(height: 20),
           const Text(
             'No media found',
@@ -419,18 +404,15 @@ class _EmptyState extends StatelessWidget {
               fontSize: 18,
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
-              fontFamily: 'SpaceGrotesk',
             ),
-          ),
+          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
           const SizedBox(height: 8),
           const Text(
             'Add audio or video files to your device\nand tap refresh to scan.',
             textAlign: TextAlign.center,
             style: TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.5),
-          ),
+                fontSize: 13, color: AppColors.textSecondary, height: 1.5),
+          ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
         ],
       ),
     );
@@ -439,8 +421,31 @@ class _EmptyState extends StatelessWidget {
 
 // ── Scanning Loader ─────────────────────────────────────────
 
-class _ScanningLoader extends StatelessWidget {
+class _ScanningLoader extends StatefulWidget {
   const _ScanningLoader();
+
+  @override
+  State<_ScanningLoader> createState() => _ScanningLoaderState();
+}
+
+class _ScanningLoaderState extends State<_ScanningLoader>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    _pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _pulse.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -448,15 +453,70 @@ class _ScanningLoader extends StatelessWidget {
       padding: const EdgeInsets.all(20),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
-        children: const [
-          SizedBox(height: 24),
-          LoadingShimmer(height: 32, width: 160),
-          SizedBox(height: 8),
-          LoadingShimmer(height: 14, width: 100),
-          SizedBox(height: 28),
-          MediaGridShimmer(count: 4),
-          SizedBox(height: 28),
-          MediaGridShimmer(count: 4),
+        children: [
+          const SizedBox(height: 40),
+          // Animated radar ring — no Lottie file needed
+          Center(
+            child: AnimatedBuilder(
+              animation: _pulse,
+              builder: (_, __) => Stack(
+                alignment: Alignment.center,
+                children: [
+                  // Outer pulse ring
+                  Container(
+                    width: 100 + (_pulse.value * 20),
+                    height: 100 + (_pulse.value * 20),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: AppColors.accent.withValues(
+                            alpha: 0.15 + _pulse.value * 0.1),
+                        width: 1.5,
+                      ),
+                    ),
+                  ),
+                  // Inner icon ring
+                  Container(
+                    width: 72,
+                    height: 72,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.accent.withValues(alpha: 0.08),
+                      border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.4),
+                        width: 2,
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.radar_rounded,
+                      color: AppColors.accent,
+                      size: 32,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ).animate().fadeIn(duration: 400.ms),
+          const SizedBox(height: 20),
+          Center(
+            child: const Text(
+              'Scanning your device...',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            )
+                .animate(onPlay: (c) => c.repeat())
+                .shimmer(duration: 1200.ms, color: AppColors.accent),
+          ),
+          const SizedBox(height: 40),
+          const LoadingShimmer(height: 32, width: 160),
+          const SizedBox(height: 8),
+          const LoadingShimmer(height: 14, width: 100),
+          const SizedBox(height: 28),
+          const MediaGridShimmer(count: 4),
+          const SizedBox(height: 28),
+          const MediaGridShimmer(count: 4),
         ],
       ),
     );
@@ -479,7 +539,10 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.error_outline_rounded,
-                color: AppColors.textSecondary, size: 48),
+                    color: AppColors.error, size: 48)
+                .animate()
+                .shake(duration: 600.ms, delay: 200.ms)
+                .fadeIn(duration: 300.ms),
             const SizedBox(height: 16),
             const Text(
               'Could not scan media',
@@ -487,16 +550,15 @@ class _ErrorView extends StatelessWidget {
                 color: AppColors.textPrimary,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
-                fontFamily: 'SpaceGrotesk',
               ),
-            ),
+            ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
             const SizedBox(height: 8),
             Text(
               message,
               style: const TextStyle(
                   color: AppColors.textSecondary, fontSize: 12),
               textAlign: TextAlign.center,
-            ),
+            ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
             const SizedBox(height: 24),
             GestureDetector(
               onTap: onRetry,
@@ -512,11 +574,13 @@ class _ErrorView extends StatelessWidget {
                   style: TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.w700,
-                    fontFamily: 'SpaceGrotesk',
                   ),
                 ),
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 200.ms)
+                .slideY(begin: 0.1, end: 0),
           ],
         ),
       ),

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-// flutter_riverpod removed — OnboardingScreen is a StatefulWidget, not a ConsumerWidget
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 
@@ -64,16 +63,19 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       body: SafeArea(
         child: Column(
           children: [
+            // Skip button
             Align(
               alignment: Alignment.topRight,
               child: TextButton(
                 onPressed: widget.onDone,
-                child: const Text('Skip',
-                    style: TextStyle(
-                        color: AppColors.textSecondary,
-                        fontFamily: 'SpaceGrotesk')),
+                child: const Text(
+                  'Skip',
+                  style: TextStyle(color: AppColors.textSecondary),
+                ),
               ),
-            ),
+            ).animate().fadeIn(duration: 400.ms),
+
+            // Pages
             Expanded(
               child: PageView.builder(
                 controller: _controller,
@@ -83,6 +85,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     _PageView(page: _pages[i], index: i),
               ),
             ),
+
+            // Dot indicators
             Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: List.generate(
@@ -93,13 +97,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   width: i == _page ? 24 : 8,
                   height: 8,
                   decoration: BoxDecoration(
-                    color: i == _page ? _pages[_page].color : AppColors.border,
+                    color: i == _page
+                        ? _pages[_page].color
+                        : AppColors.border,
                     borderRadius: BorderRadius.circular(4),
                   ),
                 ),
               ),
-            ),
+            ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
+
             const SizedBox(height: 32),
+
+            // CTA button
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: GestureDetector(
@@ -128,12 +137,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: Colors.black,
-                      fontFamily: 'SpaceGrotesk',
                     ),
                   ),
                 ),
               ),
-            ),
+            )
+                .animate()
+                .fadeIn(duration: 500.ms, delay: 300.ms)
+                .slideY(begin: 0.2, end: 0, curve: Curves.easeOut),
+
             const SizedBox(height: 32),
           ],
         ),
@@ -154,13 +166,15 @@ class _PageView extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Animated emoji icon — elastic pop in
           Container(
             width: 140,
             height: 140,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: page.color.withValues(alpha: 0.1),
-              border: Border.all(color: page.color.withValues(alpha: 0.3), width: 2),
+              border: Border.all(
+                  color: page.color.withValues(alpha: 0.3), width: 2),
               boxShadow: [
                 BoxShadow(
                   color: page.color.withValues(alpha: 0.2),
@@ -170,7 +184,8 @@ class _PageView extends StatelessWidget {
               ],
             ),
             child: Center(
-              child: Text(page.emoji, style: const TextStyle(fontSize: 64)),
+              child: Text(page.emoji,
+                  style: const TextStyle(fontSize: 64)),
             ),
           )
               .animate()
@@ -181,18 +196,25 @@ class _PageView extends StatelessWidget {
                 curve: Curves.elasticOut,
               )
               .fadeIn(duration: 300.ms),
+
           const SizedBox(height: 40),
-          Text(page.title,
-              style: TextStyle(
-                fontSize: 30,
-                fontWeight: FontWeight.w700,
-                color: page.color,
-                fontFamily: 'SpaceGrotesk',
-              ))
+
+          // Title — fade + slide up
+          Text(
+            page.title,
+            style: TextStyle(
+              fontSize: 30,
+              fontWeight: FontWeight.w700,
+              color: page.color,
+            ),
+          )
               .animate()
               .fadeIn(duration: 400.ms, delay: 150.ms)
-              .slideY(begin: 0.1),
+              .slideY(begin: 0.15, end: 0, curve: Curves.easeOut),
+
           const SizedBox(height: 16),
+
+          // Subtitle — fade + slide up (delayed)
           Text(
             page.subtitle,
             textAlign: TextAlign.center,
@@ -200,12 +222,11 @@ class _PageView extends StatelessWidget {
               fontSize: 15,
               color: AppColors.textSecondary,
               height: 1.6,
-              fontFamily: 'SpaceGrotesk',
             ),
           )
               .animate()
               .fadeIn(duration: 400.ms, delay: 250.ms)
-              .slideY(begin: 0.1),
+              .slideY(begin: 0.15, end: 0, curve: Curves.easeOut),
         ],
       ),
     );

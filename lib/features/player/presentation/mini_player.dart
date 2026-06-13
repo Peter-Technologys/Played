@@ -71,7 +71,6 @@ class MiniPlayer extends ConsumerWidget {
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
-                      fontFamily: 'SpaceGrotesk',
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
