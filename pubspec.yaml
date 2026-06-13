@@ -17,11 +17,12 @@ dependencies:
   audio_session: ^0.1.18
 
   # FFmpeg Processing
-  # ffmpeg_kit_flutter_full_gpl was discontinued and its Maven artifact
-  # (com.arthenica:ffmpeg-kit-full-gpl:6.0-2) no longer exists in any
-  # public repository. Replaced with ffmpeg_kit_flutter (the original
-  # package) which resolves from pub.dev and has working Maven artifacts.
-  ffmpeg_kit_flutter: ^6.0.3
+  # NOTE: All ffmpeg_kit_flutter packages (ffmpeg_kit_flutter,
+  # ffmpeg_kit_flutter_full_gpl, etc.) are discontinued — their native
+  # Maven artifacts (com.arthenica:ffmpeg-kit-*:6.0-2) no longer exist
+  # in any public repository and cannot be resolved during Android builds.
+  # Removed until a working replacement is available.
+  # See: https://github.com/arthenica/ffmpeg-kit/issues/367
 
   # Local Database
   hive: ^2.2.3

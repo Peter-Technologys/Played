@@ -3,8 +3,6 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        // Required for ffmpeg_kit_flutter native artifacts
-        maven { url 'https://github.com/tanersener/ffmpeg-kit/releases/download/v6.0/maven' }
     }
 }
 
