@@ -17,10 +17,11 @@ dependencies:
   audio_session: ^0.1.18
 
   # FFmpeg Processing
-  # ffmpeg_kit_flutter_min_gpl was abandoned and removed from pub.dev.
-  # Replaced with ffmpeg_kit_flutter_full_gpl which is actively maintained
-  # and provides the same API surface (FFmpegKit, ReturnCode, etc.).
-  ffmpeg_kit_flutter_full_gpl: ^6.0.3
+  # ffmpeg_kit_flutter_full_gpl was discontinued and its Maven artifact
+  # (com.arthenica:ffmpeg-kit-full-gpl:6.0-2) no longer exists in any
+  # public repository. Replaced with ffmpeg_kit_flutter (the original
+  # package) which resolves from pub.dev and has working Maven artifacts.
+  ffmpeg_kit_flutter: ^0.2.1
 
   # Local Database
   hive: ^2.2.3

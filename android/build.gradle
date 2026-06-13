@@ -3,9 +3,8 @@ allprojects {
     repositories {
         google()
         mavenCentral()
-        // Required for ffmpeg_kit_flutter_full_gpl native artifacts
-        maven { url 'https://jitpack.io' }
-        maven { url 'https://github.com/arthenica/ffmpeg-kit/releases/download/v6.0/maven' }
+        // Required for ffmpeg_kit_flutter native artifacts
+        maven { url 'https://github.com/tanersener/ffmpeg-kit/releases/download/v6.0/maven' }
     }
 }
 
