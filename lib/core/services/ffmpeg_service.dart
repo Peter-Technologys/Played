@@ -1,4 +1,3 @@
-import 'dart:io';
 // Updated import: ffmpeg_kit_flutter_min_gpl was abandoned and removed from
 // pub.dev. ffmpeg_kit_flutter_full_gpl is the maintained replacement and
 // exposes the same FFmpegKit / ReturnCode API.
