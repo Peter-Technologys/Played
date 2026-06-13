@@ -8,7 +8,6 @@ variables:
   FLUTTER_VERSION: "stable"
   ANDROID_COMPILE_SDK: "34"
   ANDROID_BUILD_TOOLS: "34.0.0"
-  # Suppress verbose pub dependency resolution output
   PUB_ENVIRONMENT: "bot.github"
 
 stages:
@@ -22,14 +21,23 @@ cache:
     - .pub-cache/
     - .dart_tool/
 
+# ── Shared script snippet: inject google-services.json ──────────────
+# GOOGLE_SERVICES_JSON must be set in GitLab → Settings → CI/CD → Variables
+# as a File variable OR a masked variable containing the raw JSON content.
+.inject_google_services: &inject_google_services |
+  if [ -z "$GOOGLE_SERVICES_JSON" ]; then
+    echo "ERROR: GOOGLE_SERVICES_JSON variable is not set."
+    echo "Go to GitLab → Settings → CI/CD → Variables and add it."
+    exit 1
+  fi
+  echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+  echo "google-services.json injected successfully."
+
 # ── Validate ────────────────────────────────────────────────────────
 analyze:
   stage: validate
   script:
     - flutter pub get
-    # Generate code (freezed, riverpod, json_serializable) before analyzing.
-    # Without this step flutter analyze reports missing generated files as errors
-    # because the project uses code generation for models and providers.
     - flutter pub run build_runner build --delete-conflicting-outputs
     - flutter analyze --no-fatal-infos --no-fatal-warnings
   rules:
@@ -43,7 +51,6 @@ format_check:
     - dart format --set-exit-if-changed lib/
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  # allow_failure: true so formatting issues don't block MR pipelines
   allow_failure: true
 
 # ── Test ──────────────────────────────────────────────────────────
@@ -70,6 +77,7 @@ unit_test:
 build_apk_debug:
   stage: build
   script:
+    - *inject_google_services
     - flutter pub get
     - flutter pub run build_runner build --delete-conflicting-outputs
     - flutter build apk --debug
@@ -81,32 +89,27 @@ build_apk_debug:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
 # Signed release APK — runs on main branch pushes and version tags.
-# Requires the following CI/CD Variables (Settings → CI/CD → Variables):
-#   KEYSTORE_BASE64  — Base64-encoded .jks keystore file (masked, protected)
-#   STORE_PASSWORD   — Keystore password (masked, protected)
-#   KEY_ALIAS        — Key alias inside the keystore (masked, protected)
-#   KEY_PASSWORD     — Key password (masked, protected)
+# Required CI/CD Variables (Settings → CI/CD → Variables, all Masked + Protected):
+#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
+#   KEYSTORE_BASE64      — Base64-encoded .jks keystore file
+#   STORE_PASSWORD       — Keystore password
+#   KEY_ALIAS            — Key alias inside the keystore
+#   KEY_PASSWORD         — Key password
 build_apk_release:
   stage: build
   script:
+    - *inject_google_services
     - flutter pub get
     - flutter pub run build_runner build --delete-conflicting-outputs
-    # Guard: fail early with a clear message if signing variables are missing.
-    # Without this the build silently produces an unsigned APK that cannot
-    # be installed on real devices or published to the Play Store.
     - |
       if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
         echo "ERROR: One or more signing variables are not set."
         echo "Required: KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD"
-        echo "Set them in GitLab → Settings → CI/CD → Variables (Masked + Protected)."
         exit 1
       fi
-    # Decode the Base64 keystore from CI variable into a file the build can use
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-    # Pass signing credentials via env vars (read by build.gradle signingConfigs.release)
     - export KEYSTORE_PATH="keystore.jks"
     - flutter build apk --release --split-per-abi
-    # Remove keystore file so it is never included in artifacts
     - rm -f android/app/keystore.jks
   artifacts:
     paths:
