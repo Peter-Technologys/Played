@@ -250,7 +250,6 @@ class _BatterySaverOverlay extends StatelessWidget {
                 color: AppColors.textPrimary,
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
-                fontFamily: 'SpaceGrotesk',
               ),
             ),
             const SizedBox(height: 8),

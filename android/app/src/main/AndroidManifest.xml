@@ -98,6 +98,11 @@
             android:name="com.arthenica.ffmpegkit.FFmpegKitConfig"
             android:exported="false" />
 
+        <!-- AdMob App ID — required by Google Mobile Ads SDK -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-2517163652161686~2375986122" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
