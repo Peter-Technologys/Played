@@ -5,11 +5,9 @@ import '../../app/theme/app_colors.dart';
 import '../../core/services/pro_service.dart';
 
 /// Wraps any Pro-only feature.
-/// If the user has active Pro, [child] is shown directly.
-/// Otherwise a paywall sheet is shown with a "Watch Ad" button.
-///
-/// Usage:
-///   ProGate(child: EqScreen(), featureName: 'Equalizer')
+/// - Active Pro (timer not expired) → shows child directly, no ad needed.
+/// - No Pro + internet → shows paywall with rewarded ad.
+/// - No Pro + offline → shows friendly offline message, no crash.
 class ProGate extends StatefulWidget {
   final Widget child;
   final String featureName;
@@ -81,7 +79,8 @@ class _ProPaywallState extends State<_ProPaywall> {
   RewardedInterstitialAd? _ad;
   bool _loading = false;
   bool _adReady = false;
-  String? _errorMessage;
+  // null = no error, 'offline' = no internet, other string = ad error
+  String? _errorState;
 
   @override
   void initState() {
@@ -90,7 +89,7 @@ class _ProPaywallState extends State<_ProPaywall> {
   }
 
   void _loadAd() {
-    setState(() { _loading = true; _errorMessage = null; });
+    setState(() { _loading = true; _errorState = null; });
     RewardedInterstitialAd.load(
       adUnitId: _adUnitId,
       request: const AdRequest(),
@@ -102,9 +101,12 @@ class _ProPaywallState extends State<_ProPaywall> {
         onAdFailedToLoad: (error) {
           debugPrint('[ProGate] Ad failed: $error');
           if (mounted) {
+            // Error code 2 = no internet / network error
+            final isOffline = error.code == 2;
             setState(() {
               _loading = false;
-              _errorMessage = 'Ad not available right now. Try again later.';
+              _adReady = false;
+              _errorState = isOffline ? 'offline' : 'ad_error';
             });
           }
         },
@@ -118,7 +120,7 @@ class _ProPaywallState extends State<_ProPaywall> {
       onAdDismissedFullScreenContent: (ad) => ad.dispose(),
       onAdFailedToShowFullScreenContent: (ad, error) {
         ad.dispose();
-        if (mounted) setState(() => _errorMessage = 'Could not show ad.');
+        if (mounted) setState(() => _errorState = 'ad_error');
       },
     );
     _ad!.show(
@@ -137,6 +139,8 @@ class _ProPaywallState extends State<_ProPaywall> {
 
   @override
   Widget build(BuildContext context) {
+    final isOffline = _errorState == 'offline';
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -145,25 +149,32 @@ class _ProPaywallState extends State<_ProPaywall> {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Crown icon
+              // Crown / offline icon
               Container(
                 width: 100, height: 100,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  gradient: const LinearGradient(
-                    colors: [AppColors.accent, AppColors.accentViolet],
+                  gradient: LinearGradient(
+                    colors: isOffline
+                        ? [AppColors.textSecondary, AppColors.border]
+                        : [AppColors.accent, AppColors.accentViolet],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: AppColors.accent.withValues(alpha: 0.4),
+                      color: (isOffline ? AppColors.border : AppColors.accent)
+                          .withValues(alpha: 0.4),
                       blurRadius: 32, spreadRadius: 4,
                     ),
                   ],
                 ),
-                child: const Icon(Icons.workspace_premium_rounded,
-                    color: Colors.black, size: 52),
+                child: Icon(
+                  isOffline
+                      ? Icons.wifi_off_rounded
+                      : Icons.workspace_premium_rounded,
+                  color: Colors.black, size: 52,
+                ),
               )
                   .animate()
                   .scale(
@@ -176,9 +187,9 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 32),
 
-              // Feature name
+              // Title
               Text(
-                widget.featureName,
+                isOffline ? 'No Internet' : widget.featureName,
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 26,
@@ -190,9 +201,12 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 12),
 
+              // Description
               Text(
-                widget.featureDescription ??
-                    'This is a Pro feature. Watch a short ad to unlock it free for 24 hours.',
+                isOffline
+                    ? 'Connect to the internet to watch a short ad and unlock ${widget.featureName} free for 30 minutes.'
+                    : (widget.featureDescription ??
+                        'Watch a short ad to unlock this feature free for 30 minutes.'),
                 textAlign: TextAlign.center,
                 style: const TextStyle(
                   fontSize: 14,
@@ -203,63 +217,74 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 12),
 
-              // 30min badge
+              // Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
+                  color: (isOffline ? AppColors.border : AppColors.accent)
+                      .withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: (isOffline ? AppColors.border : AppColors.accent)
+                        .withValues(alpha: 0.3),
+                  ),
                 ),
-                child: const Text(
-                  '\u23f0  Unlocks for 30 minutes',
+                child: Text(
+                  isOffline
+                      ? '\uD83D\uDCF6  Internet required to load ad'
+                      : '\u23f0  Unlocks for 30 minutes',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
-                    color: AppColors.accent,
+                    color: isOffline ? AppColors.textSecondary : AppColors.accent,
                   ),
                 ),
               ).animate().fadeIn(duration: 400.ms, delay: 250.ms),
 
               const SizedBox(height: 40),
 
-              // Pro features list
-              ..._proFeatures.map((f) => _FeatureRow(icon: f.$1, label: f.$2))
-                  .toList()
-                  .animate(interval: 60.ms)
-                  .fadeIn(duration: 300.ms, delay: 300.ms)
-                  .slideX(begin: -0.05),
+              // Pro features list (only show when not offline)
+              if (!isOffline)
+                ..._proFeatures.map((f) => _FeatureRow(icon: f.$1, label: f.$2))
+                    .toList()
+                    .animate(interval: 60.ms)
+                    .fadeIn(duration: 300.ms, delay: 300.ms)
+                    .slideX(begin: -0.05),
 
-              const SizedBox(height: 40),
+              if (!isOffline) const SizedBox(height: 40),
 
-              // Error message
-              if (_errorMessage != null)
+              // Ad error message (not offline, but ad failed)
+              if (_errorState == 'ad_error')
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(_errorMessage!,
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                          color: AppColors.error, fontSize: 12)),
+                  child: Text(
+                    'Ad not available right now. Please try again.',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        color: AppColors.error, fontSize: 12),
+                  ),
                 ),
 
-              // Watch Ad button
+              // Action button
               GestureDetector(
-                onTap: _adReady ? _watchAd : (_loading ? null : _loadAd),
+                onTap: isOffline
+                    ? _loadAd  // retry when offline (user may have turned on internet)
+                    : (_adReady ? _watchAd : (_loading ? null : _loadAd)),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: double.infinity,
                   height: 56,
                   decoration: BoxDecoration(
-                    gradient: _adReady
+                    gradient: (_adReady && !isOffline)
                         ? const LinearGradient(
                             colors: [AppColors.accent, AppColors.accentViolet])
                         : null,
-                    color: _adReady ? null : AppColors.surface,
+                    color: (_adReady && !isOffline) ? null : AppColors.surface,
                     borderRadius: BorderRadius.circular(16),
-                    border: _adReady
+                    border: (_adReady && !isOffline)
                         ? null
                         : Border.all(color: AppColors.border),
-                    boxShadow: _adReady
+                    boxShadow: (_adReady && !isOffline)
                         ? [BoxShadow(
                             color: AppColors.accent.withValues(alpha: 0.35),
                             blurRadius: 16, offset: const Offset(0, 4))]
@@ -275,23 +300,27 @@ class _ProPaywallState extends State<_ProPaywall> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Icon(
-                                _adReady
-                                    ? Icons.play_circle_filled_rounded
-                                    : Icons.refresh_rounded,
-                                color: _adReady
+                                isOffline
+                                    ? Icons.refresh_rounded
+                                    : (_adReady
+                                        ? Icons.play_circle_filled_rounded
+                                        : Icons.refresh_rounded),
+                                color: (_adReady && !isOffline)
                                     ? Colors.black
                                     : AppColors.textSecondary,
                                 size: 22,
                               ),
                               const SizedBox(width: 10),
                               Text(
-                                _adReady
-                                    ? 'Watch Ad — Unlock Free for 30 mins'
-                                    : 'Retry Loading Ad',
+                                isOffline
+                                    ? 'Retry — Check Connection'
+                                    : (_adReady
+                                        ? 'Watch Ad — Unlock Free for 30 mins'
+                                        : 'Retry Loading Ad'),
                                 style: TextStyle(
                                   fontSize: 15,
                                   fontWeight: FontWeight.w700,
-                                  color: _adReady
+                                  color: (_adReady && !isOffline)
                                       ? Colors.black
                                       : AppColors.textSecondary,
                                 ),
