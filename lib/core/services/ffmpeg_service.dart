@@ -1,7 +1,4 @@
-import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
-import 'notification_service.dart';
 
 /// Handles background MP4 → MP3 audio extraction.
 /// NOTE: FFmpeg support is temporarily disabled — ffmpeg_kit_flutter and all

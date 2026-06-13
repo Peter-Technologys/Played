@@ -321,13 +321,14 @@ class _ProPaywallState extends State<_ProPaywall> {
 
 // ── Pro features list ─────────────────────────────────────────────
 
-const _proFeatures = [
-  (Icons.equalizer_rounded,            'Equalizer & Audio Effects'),
-  (Icons.graphic_eq_rounded,           'Studio Stem Splitter'),
-  (Icons.lock_rounded,                 'Private Vault'),
-  (Icons.phone_android_rounded,        'WhatsApp Trimmer'),
-  (Icons.speed_rounded,                'Playback Speed Control'),
-  (Icons.no_ads_rounded,               'Reduced Ads'),
+// ignore: prefer_const_declarations
+final _proFeatures = [
+  (Icons.equalizer_rounded,       'Equalizer & Audio Effects'),
+  (Icons.graphic_eq_rounded,      'Studio Stem Splitter'),
+  (Icons.lock_rounded,            'Private Vault'),
+  (Icons.phone_android_rounded,   'WhatsApp Trimmer'),
+  (Icons.speed_rounded,           'Playback Speed Control'),
+  (Icons.block_rounded,           'Reduced Ads'),
 ];
 
 class _FeatureRow extends StatelessWidget {
