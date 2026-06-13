@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 abstract class AppTextStyles {
-  static const String _font = 'SpaceGrotesk';
+  static const String _font = 'Inter';
 
   static const TextStyle heading1 = TextStyle(
     fontFamily: _font,

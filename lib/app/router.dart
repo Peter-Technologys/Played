@@ -99,7 +99,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
             const Text('Tools',
                 style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk',
+                  color: AppColors.textPrimary, fontFamily: 'Inter',
                 )),
             const SizedBox(height: 4),
             const Text('Quick utilities for your media',
@@ -241,7 +241,7 @@ class _CenterNavItem extends StatelessWidget {
               color: isActive
                   ? const Color(0xFF00D4FF)
                   : const Color(0xFF6B7280),
-              fontFamily: 'SpaceGrotesk',
+              fontFamily: 'Inter',
             ),
           ),
         ],
@@ -294,7 +294,7 @@ class _NavItem extends StatelessWidget {
                   color: isActive
                       ? const Color(0xFF00D4FF)
                       : const Color(0xFF6B7280),
-                  fontFamily: 'SpaceGrotesk',
+                  fontFamily: 'Inter',
                 )),
           ],
         ),
@@ -349,7 +349,7 @@ class _ToolTile extends StatelessWidget {
                   Text(label,
                       style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600,
-                        color: color, fontFamily: 'SpaceGrotesk',
+                        color: color, fontFamily: 'Inter',
                       )),
                   Text(subtitle,
                       style: const TextStyle(
