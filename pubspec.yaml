@@ -21,7 +21,7 @@ dependencies:
   # (com.arthenica:ffmpeg-kit-full-gpl:6.0-2) no longer exists in any
   # public repository. Replaced with ffmpeg_kit_flutter (the original
   # package) which resolves from pub.dev and has working Maven artifacts.
-  ffmpeg_kit_flutter: ^0.2.1
+  ffmpeg_kit_flutter: ^6.0.3
 
   # Local Database
   hive: ^2.2.3
