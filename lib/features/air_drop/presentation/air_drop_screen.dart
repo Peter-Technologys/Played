@@ -565,7 +565,7 @@ class _CardBody extends StatelessWidget {
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 4),
-          Text(widget.size,
+          Text(size,
               style: const TextStyle(
                   fontSize: 9, color: AppColors.textSecondary)),
         ],

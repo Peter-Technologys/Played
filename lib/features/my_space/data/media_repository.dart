@@ -1,7 +1,7 @@
-import '../../core/models/media_item.dart';
-import '../../core/services/media_scanner_service.dart';
-import '../../core/database/played_database.dart';
-import '../../core/utils/shelf_sorter.dart';
+import '../../../core/models/media_item.dart';
+import '../../../core/services/media_scanner_service.dart';
+import '../../../core/database/played_database.dart';
+import '../../../core/utils/shelf_sorter.dart';
 
 /// Data layer for My Space — wraps MediaScannerService
 /// and provides caching via PlayedDatabase.
