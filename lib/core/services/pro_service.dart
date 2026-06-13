@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Manages the user's Pro status.
-/// Pro is granted for 24 hours after watching a rewarded ad.
+/// Pro is granted for 30 minutes after watching a rewarded ad.
 /// Persisted in SharedPreferences so it survives app restarts.
 class ProService {
   ProService._();
@@ -16,12 +16,12 @@ class ProService {
     return DateTime.now().millisecondsSinceEpoch < expiry;
   }
 
-  /// Grants Pro access for [hours] hours (default 24).
+  /// Grants Pro access for [minutes] minutes (default 30).
   /// Called after a rewarded ad is successfully watched.
-  Future<void> grantPro({int hours = 24}) async {
+  Future<void> grantPro({int minutes = 30}) async {
     final prefs = await SharedPreferences.getInstance();
     final expiry = DateTime.now()
-        .add(Duration(hours: hours))
+        .add(Duration(minutes: minutes))
         .millisecondsSinceEpoch;
     await prefs.setInt(_kProExpiry, expiry);
   }

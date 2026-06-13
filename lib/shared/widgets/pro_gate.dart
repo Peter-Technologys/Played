@@ -123,7 +123,7 @@ class _ProPaywallState extends State<_ProPaywall> {
     );
     _ad!.show(
       onUserEarnedReward: (_, reward) async {
-        await ProService.instance.grantPro(hours: 24);
+        await ProService.instance.grantPro(minutes: 30);
         if (mounted) widget.onProGranted();
       },
     );
@@ -203,7 +203,7 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 12),
 
-              // 24h badge
+              // 30min badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
@@ -212,7 +212,7 @@ class _ProPaywallState extends State<_ProPaywall> {
                   border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
                 ),
                 child: const Text(
-                  '\u23f0  Unlocks for 24 hours',
+                  '\u23f0  Unlocks for 30 minutes',
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
@@ -286,7 +286,7 @@ class _ProPaywallState extends State<_ProPaywall> {
                               const SizedBox(width: 10),
                               Text(
                                 _adReady
-                                    ? 'Watch Ad — Unlock Free for 24h'
+                                    ? 'Watch Ad — Unlock Free for 30 mins'
                                     : 'Retry Loading Ad',
                                 style: TextStyle(
                                   fontSize: 15,
