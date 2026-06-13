@@ -13,6 +13,7 @@ import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
+import '../shared/widgets/ad_banner_slot.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -142,6 +143,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const MiniPlayer(),
+          const AdBannerSlot(),
           Container(
             decoration: const BoxDecoration(
               color: Color(0xFF111827),
