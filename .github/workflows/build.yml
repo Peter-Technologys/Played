@@ -157,9 +157,9 @@ jobs:
       - name: Run code generation
         run: flutter pub run build_runner build --delete-conflicting-outputs
 
-      # Decode google-services.json from secret — required by the Google Services plugin
-      - name: Decode google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+      # Write google-services.json from variable — required by the Google Services plugin
+      - name: Write google-services.json
+        run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
       - name: Build debug APK
         run: flutter build apk --debug
@@ -209,9 +209,9 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
-      # Decode google-services.json from secret — required by the Google Services plugin
-      - name: Decode google-services.json
-        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+      # Write google-services.json from variable — required by the Google Services plugin
+      - name: Write google-services.json
+        run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
       - name: Build signed release APK
         env:
