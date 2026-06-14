@@ -40,3 +40,20 @@ void main() async {
     ),
   );
 }
+
+/// Initialises Firebase and anonymous auth in the background.
+/// Never blocks the app launch — all Firebase features degrade gracefully
+/// when offline. Local Hive + SharedPreferences always work regardless.
+void _initFirebaseInBackground() {
+  Future(() async {
+    try {
+      await Firebase.initializeApp();
+      await AuthService.instance.signInAnonymouslyIfNeeded();
+    } catch (e) {
+      // Offline or Firebase unavailable — app continues with local storage.
+      // Auth will retry automatically next time the user opens the app
+      // with an internet connection.
+      debugPrint('[Firebase] Background init failed (offline?): $e');
+    }
+  });
+}
