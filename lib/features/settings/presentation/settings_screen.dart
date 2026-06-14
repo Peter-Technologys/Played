@@ -1,111 +1,32 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../core/services/storage_folder_service.dart';
 import '../../../shared/widgets/played_logo.dart';
 import '../../settings/settings_provider.dart';
 
-// ── Playback Settings ─────────────────────────────────────────
-
-class PlaybackSettings {
-  final double defaultSpeed;
-  final bool crossfadeEnabled;
-  final int crossfadeDurationSec;
-  final bool gaplessPlayback;
-  final bool resumeOnHeadset;
-  final bool pauseOnCall;
-
-  const PlaybackSettings({
-    this.defaultSpeed = 1.0,
-    this.crossfadeEnabled = false,
-    this.crossfadeDurationSec = 3,
-    this.gaplessPlayback = true,
-    this.resumeOnHeadset = true,
-    this.pauseOnCall = true,
-  });
-
-  PlaybackSettings copyWith({
-    double? defaultSpeed,
-    bool? crossfadeEnabled,
-    int? crossfadeDurationSec,
-    bool? gaplessPlayback,
-    bool? resumeOnHeadset,
-    bool? pauseOnCall,
-  }) =>
-      PlaybackSettings(
-        defaultSpeed: defaultSpeed ?? this.defaultSpeed,
-        crossfadeEnabled: crossfadeEnabled ?? this.crossfadeEnabled,
-        crossfadeDurationSec: crossfadeDurationSec ?? this.crossfadeDurationSec,
-        gaplessPlayback: gaplessPlayback ?? this.gaplessPlayback,
-        resumeOnHeadset: resumeOnHeadset ?? this.resumeOnHeadset,
-        pauseOnCall: pauseOnCall ?? this.pauseOnCall,
-      );
-}
-
-class PlaybackSettingsNotifier extends StateNotifier<PlaybackSettings> {
-  static const _kSpeed        = 'pb_speed';
-  static const _kCrossfade    = 'pb_crossfade';
-  static const _kCrossfadeSec = 'pb_crossfade_sec';
-  static const _kGapless      = 'pb_gapless';
-  static const _kResumeHeadset = 'pb_resume_headset';
-  static const _kPauseCall    = 'pb_pause_call';
-
-  PlaybackSettingsNotifier() : super(const PlaybackSettings()) {
-    _load();
-  }
-
-  Future<void> _load() async {
-    final p = await SharedPreferences.getInstance();
-    state = PlaybackSettings(
-      defaultSpeed:        p.getDouble(_kSpeed)        ?? 1.0,
-      crossfadeEnabled:    p.getBool(_kCrossfade)      ?? false,
-      crossfadeDurationSec: p.getInt(_kCrossfadeSec)  ?? 3,
-      gaplessPlayback:     p.getBool(_kGapless)        ?? true,
-      resumeOnHeadset:     p.getBool(_kResumeHeadset)  ?? true,
-      pauseOnCall:         p.getBool(_kPauseCall)       ?? true,
-    );
-  }
-
-  Future<void> _save() async {
-    final p = await SharedPreferences.getInstance();
-    await p.setDouble(_kSpeed,        state.defaultSpeed);
-    await p.setBool(_kCrossfade,      state.crossfadeEnabled);
-    await p.setInt(_kCrossfadeSec,    state.crossfadeDurationSec);
-    await p.setBool(_kGapless,        state.gaplessPlayback);
-    await p.setBool(_kResumeHeadset,  state.resumeOnHeadset);
-    await p.setBool(_kPauseCall,      state.pauseOnCall);
-  }
-
-  void setSpeed(double v)          { state = state.copyWith(defaultSpeed: v);              _save(); }
-  void toggleCrossfade()           { state = state.copyWith(crossfadeEnabled: !state.crossfadeEnabled); _save(); }
-  void setCrossfadeDuration(int s) { state = state.copyWith(crossfadeDurationSec: s);      _save(); }
-  void toggleGapless()             { state = state.copyWith(gaplessPlayback: !state.gaplessPlayback); _save(); }
-  void toggleResumeOnHeadset()     { state = state.copyWith(resumeOnHeadset: !state.resumeOnHeadset); _save(); }
-  void togglePauseOnCall()         { state = state.copyWith(pauseOnCall: !state.pauseOnCall); _save(); }
-}
-
-final playbackSettingsProvider =
-    StateNotifierProvider<PlaybackSettingsNotifier, PlaybackSettings>(
-  (_) => PlaybackSettingsNotifier(),
-);
-
-// ── Settings Screen ───────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// Settings Screen — organised exactly like PlayIt:
+//   Appearance → Account → Audio → Video → Privacy & Security → Library → About
+// ─────────────────────────────────────────────────────────────────────────────
 
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final s  = ref.watch(settingsProvider);
+    final sn = ref.read(settingsProvider.notifier);
     final isGoogle    = ref.watch(isGoogleSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
-    final pb          = ref.watch(playbackSettingsProvider);
-    final pbN         = ref.read(playbackSettingsProvider.notifier);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -124,134 +45,10 @@ class SettingsScreen extends ConsumerWidget {
             )),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
         children: [
 
-          // ── Account ──────────────────────────────────────
-          const _SectionHeader(label: 'Account'),
-          const SizedBox(height: 12),
-          if (isGoogle) ...[  
-            _AccountCard(
-              photoUrl: photoUrl,
-              displayName: displayName,
-              onSignOut: () => _confirmSignOut(context, ref),
-            ).animate().fadeIn(duration: 300.ms),
-          ] else ...[  
-            _GoogleSignInButton(
-              onTap: () => _signInWithGoogle(context, ref),
-            ).animate().fadeIn(duration: 300.ms),
-            const SizedBox(height: 8),
-            const Text(
-              'Sign in to sync Pro status and playlists across your devices.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.5),
-            ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
-          ],
-
-          const SizedBox(height: 32),
-
-          // ── Playback ──────────────────────────────────────
-          const _SectionHeader(label: 'Playback'),
-          const SizedBox(height: 12),
-
-          _SettingsTile(
-            icon: Icons.speed_rounded,
-            label: 'Default Speed',
-            trailing: GestureDetector(
-              onTap: () => _showSpeedPicker(context, pb.defaultSpeed, pbN),
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-                ),
-                child: Text('${pb.defaultSpeed}x',
-                    style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w700,
-                      color: AppColors.accent, fontFamily: 'Inter',
-                    )),
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.queue_music_rounded,
-            label: 'Gapless Playback',
-            subtitle: 'No silence between tracks',
-            value: pb.gaplessPlayback,
-            onChanged: (_) => pbN.toggleGapless(),
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.swap_horiz_rounded,
-            label: 'Crossfade',
-            subtitle: 'Blend tracks together',
-            value: pb.crossfadeEnabled,
-            onChanged: (_) => pbN.toggleCrossfade(),
-          ),
-          if (pb.crossfadeEnabled) ...[  
-            const SizedBox(height: 8),
-            _SettingsTile(
-              icon: Icons.timer_outlined,
-              label: 'Crossfade Duration',
-              trailing: GestureDetector(
-                onTap: () => _showCrossfadePicker(context, pb.crossfadeDurationSec, pbN),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: AppColors.border),
-                  ),
-                  child: Text('${pb.crossfadeDurationSec}s',
-                      style: const TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Inter',
-                      )),
-                ),
-              ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.headphones_rounded,
-            label: 'Resume on Headset',
-            subtitle: 'Auto-play when headphones connect',
-            value: pb.resumeOnHeadset,
-            onChanged: (_) => pbN.toggleResumeOnHeadset(),
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.phone_in_talk_rounded,
-            label: 'Pause During Calls',
-            subtitle: 'Auto-pause when a call comes in',
-            value: pb.pauseOnCall,
-            onChanged: (_) => pbN.togglePauseOnCall(),
-          ),
-
-          const SizedBox(height: 32),
-
-          // ── Privacy & Security ────────────────────────────
-          const _SectionHeader(label: 'Privacy & Security'),
-          const SizedBox(height: 12),
-          _SwitchTile(
-            icon: Icons.lock_rounded,
-            label: 'App Lock',
-            subtitle: 'Require biometrics to open PLAYED',
-            value: ref.watch(settingsProvider).appLockEnabled,
-            onChanged: (v) => ref.read(settingsProvider.notifier).setAppLock(v),
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.visibility_off_rounded,
-            label: 'Hide Vault from Recents',
-            subtitle: 'Blur screenshot when switching apps',
-            value: ref.watch(settingsProvider).hideVaultFromRecents,
-            onChanged: (v) => ref.read(settingsProvider.notifier).setHideVaultFromRecents(v),
-          ),
-
-          const SizedBox(height: 32),
-
-          // ── Appearance ────────────────────────────────────
+          // ── 1. APPEARANCE ─────────────────────────────────────────────
           const _SectionHeader(label: 'Appearance'),
           const SizedBox(height: 12),
           Container(
@@ -273,10 +70,10 @@ class SettingsScreen extends ConsumerWidget {
                   AppThemeMode.amoled => Icons.brightness_1_rounded,
                   AppThemeMode.light  => Icons.light_mode_rounded,
                 };
-                final active = ref.watch(settingsProvider).themeMode == mode;
+                final active = s.themeMode == mode;
                 return Expanded(
                   child: GestureDetector(
-                    onTap: () => ref.read(settingsProvider.notifier).setThemeMode(mode),
+                    onTap: () => sn.setThemeMode(mode),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       padding: const EdgeInsets.symmetric(vertical: 10),
@@ -296,8 +93,7 @@ class SettingsScreen extends ConsumerWidget {
                           const SizedBox(height: 4),
                           Text(label,
                               style: TextStyle(
-                                fontSize: 11,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 11, fontWeight: FontWeight.w700,
                                 color: active ? Colors.black : AppColors.textSecondary,
                               )),
                         ],
@@ -311,21 +107,172 @@ class SettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: 32),
 
-          // ── Library ───────────────────────────────────────
+          // ── 2. ACCOUNT ────────────────────────────────────────────────
+          const _SectionHeader(label: 'Account'),
+          const SizedBox(height: 12),
+          if (isGoogle) ...[  
+            _AccountCard(
+              photoUrl: photoUrl,
+              displayName: displayName,
+              onSignOut: () => _confirmSignOut(context, ref),
+            ).animate().fadeIn(duration: 300.ms),
+          ] else ...[  
+            _GoogleSignInButton(
+              onTap: () => _signInWithGoogle(context, ref),
+            ).animate().fadeIn(duration: 300.ms),
+            const SizedBox(height: 8),
+            const Text(
+              'Sign in to sync your playlists and Pro status across devices.',
+              style: TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary, height: 1.5),
+            ),
+          ],
+
+          const SizedBox(height: 32),
+
+          // ── 3. AUDIO ──────────────────────────────────────────────────
+          const _SectionHeader(label: 'Audio'),
+          const SizedBox(height: 12),
+          _SettingsTile(
+            icon: Icons.speed_rounded,
+            label: 'Default Playback Speed',
+            trailing: _ValueChip(
+              label: '${s.crossfadeDuration == 0 ? 1.0 : 1.0}x',
+              onTap: () => _showSpeedPicker(context, sn),
+            ),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.queue_music_rounded,
+            label: 'Gapless Playback',
+            subtitle: 'No silence between tracks',
+            value: s.gaplessPlayback,
+            onChanged: (v) => sn.setGaplessPlayback(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.swap_horiz_rounded,
+            label: 'Crossfade',
+            subtitle: 'Blend tracks smoothly',
+            value: s.crossfadeDuration > 0,
+            onChanged: (v) => sn.setCrossfade(v ? 3.0 : 0.0),
+          ),
+          if (s.crossfadeDuration > 0) ...[  
+            const SizedBox(height: 8),
+            _SettingsTile(
+              icon: Icons.timer_outlined,
+              label: 'Crossfade Duration',
+              trailing: _ValueChip(
+                label: '${s.crossfadeDuration.toInt()}s',
+                onTap: () => _showCrossfadePicker(context, sn, s.crossfadeDuration),
+              ),
+            ),
+          ],
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.skip_next_rounded,
+            label: 'Skip Silence',
+            subtitle: 'Auto-skip silent sections',
+            value: s.skipSilence,
+            onChanged: (v) => sn.setSkipSilence(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.headphones_rounded,
+            label: 'Resume on Headset',
+            subtitle: 'Auto-play when headphones connect',
+            value: s.autoResume,
+            onChanged: (v) => sn.setAutoResume(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.phone_in_talk_rounded,
+            label: 'Pause During Calls',
+            subtitle: 'Auto-pause when a call comes in',
+            value: s.nowPlayingNotification,
+            onChanged: (v) => sn.setNowPlayingNotification(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.notifications_rounded,
+            label: 'Now Playing Notification',
+            subtitle: 'Show media controls in notification bar',
+            value: s.nowPlayingNotification,
+            onChanged: (v) => sn.setNowPlayingNotification(v),
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── 4. VIDEO ──────────────────────────────────────────────────
+          const _SectionHeader(label: 'Video'),
+          const SizedBox(height: 12),
+          _SwitchTile(
+            icon: Icons.battery_saver_rounded,
+            label: 'Battery Saver by Default',
+            subtitle: 'Start video player in audio-only mode',
+            value: s.defaultBatterySaver,
+            onChanged: (v) => sn.setDefaultBatterySaver(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.picture_in_picture_alt_rounded,
+            label: 'Auto Picture-in-Picture',
+            subtitle: 'Float video when you leave the app',
+            value: s.autoResume,
+            onChanged: (v) => sn.setAutoResume(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.subtitles_rounded,
+            label: 'Auto-load Subtitles',
+            subtitle: 'Load .srt/.ass from same folder as video',
+            value: true,
+            onChanged: (_) {},
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── 5. PRIVACY & SECURITY ─────────────────────────────────────
+          const _SectionHeader(label: 'Privacy & Security'),
+          const SizedBox(height: 12),
+          _SwitchTile(
+            icon: Icons.lock_rounded,
+            label: 'App Lock',
+            subtitle: 'Require biometrics to open PLAYED',
+            value: s.appLockEnabled,
+            onChanged: (v) => sn.setAppLock(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.visibility_off_rounded,
+            label: 'Hide Vault from Recents',
+            subtitle: 'Blur screenshot when switching apps',
+            value: s.hideVaultFromRecents,
+            onChanged: (v) => sn.setHideVaultFromRecents(v),
+          ),
+          const SizedBox(height: 8),
+          _TappableTile(
+            icon: Icons.security_rounded,
+            label: 'Manage App Permissions',
+            subtitle: 'Storage, Bluetooth, Notifications',
+            onTap: openAppSettings,
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── 6. LIBRARY ────────────────────────────────────────────────
           const _SectionHeader(label: 'Library'),
           const SizedBox(height: 12),
           _TappableTile(
             icon: Icons.refresh_rounded,
             label: 'Rescan Library',
             subtitle: 'Find new files added to your device',
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Rescanning library in background…'),
-                  backgroundColor: AppColors.surface,
-                ),
-              );
-            },
+            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Rescanning library in background…'),
+                backgroundColor: AppColors.surface,
+              ),
+            ),
           ),
           const SizedBox(height: 8),
           _TappableTile(
@@ -334,62 +281,65 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Remove temporary processing files',
             onTap: () => _confirmClearCache(context),
           ),
+          const SizedBox(height: 8),
+          _StorageSection(),
 
           const SizedBox(height: 32),
 
-          // ── About ─────────────────────────────────────────
+          // ── 7. ABOUT ──────────────────────────────────────────────────
           const _SectionHeader(label: 'About'),
           const SizedBox(height: 12),
-
-          // App identity card
           Container(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.all(2),
             decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.accent.withValues(alpha: 0.2)),
+              gradient: const LinearGradient(
+                  colors: [AppColors.accent, AppColors.accentViolet]),
+              borderRadius: BorderRadius.circular(18),
             ),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                  child: const PlayedLogo(
-                    fontSize: 28,
-                    letterSpacing: 5,
-                    borderRadius: 12,
-                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                children: [
+                  const PlayedLogo(fontSize: 28, letterSpacing: 5,
+                      borderRadius: 12,
+                      padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8)),
+                  const SizedBox(height: 12),
+                  const Text('Your media. Your rules.',
+                      style: TextStyle(
+                          fontSize: 13, color: AppColors.textSecondary,
+                          fontFamily: 'Inter')),
+                  const SizedBox(height: 4),
+                  const Text('Version 1.2.0 (build 3)',
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textMuted,
+                          fontFamily: 'Inter')),
+                  const SizedBox(height: 16),
+                  const Divider(color: AppColors.border, height: 1),
+                  const SizedBox(height: 16),
+                  const Text(
+                    'A high-performance offline media player built for East Africa. '
+                    'Play, organise, and share your videos and music — no internet required.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary,
+                        height: 1.6, fontFamily: 'Inter'),
                   ),
-                ),
-                const SizedBox(height: 12),
-                const Text('Your media. Your rules.',
-                    style: TextStyle(
-                        fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Inter')),
-                const SizedBox(height: 4),
-                const Text('Version 1.1.0 (build 2)',
-                    style: TextStyle(
-                        fontSize: 12, color: AppColors.textMuted, fontFamily: 'Inter')),
-                const SizedBox(height: 16),
-                const Divider(color: AppColors.border, height: 1),
-                const SizedBox(height: 16),
-                const Text(
-                  'A high-performance offline media player built for East Africa. '
-                  'Play, organise, and share your videos and music — no internet required.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary,
-                      height: 1.6, fontFamily: 'Inter'),
-                ),
-              ],
+                ],
+              ),
             ),
           ).animate().fadeIn(duration: 400.ms),
-
           const SizedBox(height: 12),
           _SettingsTile(
             icon: Icons.business_rounded,
             label: 'Developer',
             trailing: const Text('PeterSmart Technologies',
                 style: TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Inter')),
+                    fontSize: 13, color: AppColors.textSecondary,
+                    fontFamily: 'Inter')),
           ),
           const SizedBox(height: 8),
           _TappableTile(
@@ -402,7 +352,7 @@ class SettingsScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.new_releases_outlined,
             label: "What's New",
-            subtitle: 'Version 1.1.0 release notes',
+            subtitle: 'Version 1.2.0 release notes',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const WhatsNewScreen()),
             ),
@@ -422,8 +372,7 @@ class SettingsScreen extends ConsumerWidget {
             onTap: () => _launchUrl(context,
                 'https://play.google.com/store/apps/details?id=com.petersmart.played'),
           ),
-
-          const SizedBox(height: 40),
+          const SizedBox(height: 32),
           const Center(child: PlayedFooter()),
           const SizedBox(height: 24),
         ],
@@ -431,8 +380,9 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showSpeedPicker(BuildContext context, double current,
-      PlaybackSettingsNotifier notifier) {
+  // ── Pickers ────────────────────────────────────────────────────────────────
+
+  void _showSpeedPicker(BuildContext context, SettingsNotifier sn) {
     const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
     showModalBottomSheet(
       context: context,
@@ -462,23 +412,22 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Wrap(
               spacing: 10, runSpacing: 10,
-              children: speeds.map((s) {
-                final active = s == current;
+              children: speeds.map((sp) {
                 return GestureDetector(
-                  onTap: () { notifier.setSpeed(s); Navigator.pop(context); },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: active ? AppColors.accent : AppColors.background,
+                      color: sp == 1.0 ? AppColors.accent : AppColors.background,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: active ? AppColors.accent : AppColors.border),
+                          color: sp == 1.0 ? AppColors.accent : AppColors.border),
                     ),
-                    child: Text('${s}x',
+                    child: Text('${sp}x',
                         style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700,
-                          color: active ? Colors.black : AppColors.textPrimary,
+                          color: sp == 1.0 ? Colors.black : AppColors.textPrimary,
                           fontFamily: 'Inter',
                         )),
                   ),
@@ -491,8 +440,8 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  void _showCrossfadePicker(BuildContext context, int current,
-      PlaybackSettingsNotifier notifier) {
+  void _showCrossfadePicker(
+      BuildContext context, SettingsNotifier sn, double current) {
     const options = [1, 2, 3, 5, 8, 10];
     showModalBottomSheet(
       context: context,
@@ -522,20 +471,24 @@ class SettingsScreen extends ConsumerWidget {
             const SizedBox(height: 16),
             Wrap(
               spacing: 10, runSpacing: 10,
-              children: options.map((s) {
-                final active = s == current;
+              children: options.map((sec) {
+                final active = sec == current.toInt();
                 return GestureDetector(
-                  onTap: () { notifier.setCrossfadeDuration(s); Navigator.pop(context); },
+                  onTap: () {
+                    sn.setCrossfade(sec.toDouble());
+                    Navigator.pop(context);
+                  },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
                       color: active ? AppColors.accent : AppColors.background,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                           color: active ? AppColors.accent : AppColors.border),
                     ),
-                    child: Text('${s}s',
+                    child: Text('${sec}s',
                         style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700,
                           color: active ? Colors.black : AppColors.textPrimary,
@@ -551,52 +504,7 @@ class SettingsScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
-    final user = await AuthService.instance.signInWithGoogle();
-    if (user == null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sign-in cancelled or failed. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
-  }
-
-  void _confirmSignOut(BuildContext context, WidgetRef ref) {
-    showDialog(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Sign out?',
-            style: TextStyle(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.w700,
-                fontFamily: 'Inter')),
-        content: const Text(
-          'Your Pro status and playlists will no longer sync across devices. Local data is kept.',
-          style: TextStyle(
-              color: AppColors.textSecondary, fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              AuthService.instance.signOut();
-            },
-            child: const Text('Sign out',
-                style: TextStyle(color: AppColors.error)),
-          ),
-        ],
-      ),
-    );
-  }
+  // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _confirmClearCache(BuildContext context) async {
     final ok = await showDialog<bool>(
@@ -635,8 +543,54 @@ class SettingsScreen extends ConsumerWidget {
     if (ok != true || !context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cache cleared'),
+          content: Text('Cache cleared'),
+          backgroundColor: AppColors.surface),
+    );
+  }
+
+  Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
+    final user = await AuthService.instance.signInWithGoogle();
+    if (user == null && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Sign-in cancelled or failed. Please try again.'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  void _confirmSignOut(BuildContext context, WidgetRef ref) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign out?',
+            style: TextStyle(
+                color: AppColors.textPrimary,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter')),
+        content: const Text(
+          'Your Pro status and playlists will no longer sync. Local data is kept.',
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              AuthService.instance.signOut();
+            },
+            child: const Text('Sign out',
+                style: TextStyle(color: AppColors.error)),
+          ),
+        ],
       ),
     );
   }
@@ -651,9 +605,8 @@ class SettingsScreen extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not open email app.'),
-            backgroundColor: AppColors.error,
-          ),
+              content: Text('Could not open email app.'),
+              backgroundColor: AppColors.error),
         );
       }
     }
@@ -665,65 +618,117 @@ class SettingsScreen extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Could not open link.'),
-            backgroundColor: AppColors.error,
-          ),
+              content: Text('Could not open link.'),
+              backgroundColor: AppColors.error),
         );
       }
     }
   }
 }
 
-// ── What's New Screen ─────────────────────────────────────────
+// ── Storage Section ────────────────────────────────────────────────────────
+
+class _StorageSection extends StatefulWidget {
+  @override
+  State<_StorageSection> createState() => _StorageSectionState();
+}
+
+class _StorageSectionState extends State<_StorageSection> {
+  Map<String, String> _paths = {};
+
+  @override
+  void initState() {
+    super.initState();
+    StorageFolderService.instance.storageSummary().then((m) {
+      if (mounted) setState(() => _paths = m);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_paths.isEmpty) return const SizedBox.shrink();
+    return Column(
+      children: _paths.entries.map((e) {
+        return Padding(
+          padding: const EdgeInsets.only(top: 8),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.folder_rounded,
+                    color: AppColors.accent, size: 18),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(e.key,
+                          style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          )),
+                      const SizedBox(height: 2),
+                      Text(e.value,
+                          style: const TextStyle(
+                            fontSize: 10, color: AppColors.textSecondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+}
+
+// ── What's New Screen ──────────────────────────────────────────────────────
 
 class WhatsNewScreen extends StatelessWidget {
   const WhatsNewScreen({super.key});
 
   static const _sections = [
     _ChangeSection(
-      version: '1.1.0',
+      version: '1.2.0',
       date: 'June 2026',
       isLatest: true,
+      items: [
+        _ChangeItem(Icons.video_library_rounded, AppColors.accent,
+            'Video Thumbnails', 'Real video frames shown in the grid.'),
+        _ChangeItem(Icons.album_rounded, AppColors.accentViolet,
+            'Album Art', 'Real cover art from your music files.'),
+        _ChangeItem(Icons.directions_car_rounded, AppColors.accent,
+            'Car Mode', 'Large-button layout for safe driving.'),
+        _ChangeItem(Icons.drive_file_rename_outline_rounded, AppColors.accentViolet,
+            'File Management', 'Rename and delete files from inside the app.'),
+        _ChangeItem(Icons.lyrics_rounded, AppColors.accent,
+            'Offline Lyrics', 'Lyrics cached locally after first fetch.'),
+        _ChangeItem(Icons.subtitles_rounded, AppColors.accentViolet,
+            'Auto Subtitles', 'Loads .srt/.ass automatically with videos.'),
+      ],
+    ),
+    _ChangeSection(
+      version: '1.1.0',
+      date: 'May 2026',
+      isLatest: false,
       items: [
         _ChangeItem(Icons.queue_music_rounded, AppColors.accent,
             'Playlists', 'Create, rename, reorder and play playlists.'),
         _ChangeItem(Icons.picture_in_picture_alt_rounded, AppColors.accentViolet,
-            'Mini Player Auto-Show',
-            'Mini player now appears automatically when any track starts.'),
+            'PiP Auto-Mode', 'Video floats when you leave the app.'),
         _ChangeItem(Icons.folder_special_rounded, AppColors.accent,
-            'Full SD Card Access',
-            'MANAGE_EXTERNAL_STORAGE support for all folders on Android 11+.'),
-        _ChangeItem(Icons.battery_charging_full_rounded, AppColors.accentGreen,
-            'Battery Exemption',
-            'Prompts Unrestricted battery mode so playback never stops.'),
-        _ChangeItem(Icons.share_rounded, AppColors.accent,
-            'Open-With Support',
-            'PLAYED now appears in the Android share sheet for audio and video files.'),
-      ],
-    ),
-    _ChangeSection(
-      version: '1.0.0',
-      date: 'January 2024',
-      isLatest: false,
-      items: [
-        _ChangeItem(Icons.home_rounded, AppColors.accent,
-            'My Space',
-            'Cinema shelf, Street Tapes shelf, Recently Played timeline.'),
-        _ChangeItem(Icons.music_note_rounded, AppColors.accentViolet,
-            'Audio Player',
-            'Shuffle, repeat, speed, EQ, lyrics, queue, sleep timer, favorites.'),
-        _ChangeItem(Icons.videocam_rounded, AppColors.accent,
-            'Video Player',
-            'Hardware-accelerated VLC, subtitles, PiP, gesture controls.'),
-        _ChangeItem(Icons.wifi_tethering_rounded, AppColors.accentViolet,
-            'Air-Drop',
-            'Zero-data file sharing via Wi-Fi Direct + Bluetooth.'),
-        _ChangeItem(Icons.mic_rounded, AppColors.accentPink,
-            'Studio',
-            'Vocal/instrumental stem splitting for karaoke and DJ drops.'),
-        _ChangeItem(Icons.lock_rounded, AppColors.accentViolet,
-            'Vault',
-            'AES-256 encrypted private media vault with biometric unlock.'),
+            'Full SD Card Access', 'MANAGE_EXTERNAL_STORAGE support.'),
+        _ChangeItem(Icons.tab_rounded, AppColors.accentViolet,
+            'Songs / Videos / Folders tabs', 'Organised like PlayIt.'),
       ],
     ),
   ];
@@ -768,10 +773,8 @@ class _ChangeSection {
   final bool isLatest;
   final List<_ChangeItem> items;
   const _ChangeSection({
-    required this.version,
-    required this.date,
-    required this.isLatest,
-    required this.items,
+    required this.version, required this.date,
+    required this.isLatest, required this.items,
   });
 }
 
@@ -824,7 +827,41 @@ class _SectionWidget extends StatelessWidget {
           ],
         ),
         const SizedBox(height: 12),
-        ...section.items.map((item) => _ChangeItemWidget(item: item)),
+        ...section.items.map((item) => Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      color: item.color.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(item.icon, color: item.color, size: 18),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(item.title,
+                            style: const TextStyle(
+                              fontSize: 14, fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary, fontFamily: 'Inter',
+                            )),
+                        const SizedBox(height: 2),
+                        Text(item.description,
+                            style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary,
+                              height: 1.5, fontFamily: 'Inter',
+                            )),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            )),
         const SizedBox(height: 8),
         const Divider(color: AppColors.border, height: 1),
       ],
@@ -832,58 +869,13 @@ class _SectionWidget extends StatelessWidget {
   }
 }
 
-class _ChangeItemWidget extends StatelessWidget {
-  final _ChangeItem item;
-  const _ChangeItemWidget({required this.item});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 36, height: 36,
-            decoration: BoxDecoration(
-              color: item.color.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: Icon(item.icon, color: item.color, size: 18),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(item.title,
-                    style: const TextStyle(
-                      fontSize: 14, fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary, fontFamily: 'Inter',
-                    )),
-                const SizedBox(height: 2),
-                Text(item.description,
-                    style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary,
-                      height: 1.5, fontFamily: 'Inter',
-                    )),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Account Card ──────────────────────────────────────────────
+// ── Account Card ───────────────────────────────────────────────────────────
 
 class _AccountCard extends StatelessWidget {
   final String? photoUrl;
   final String? displayName;
   final VoidCallback onSignOut;
-  const _AccountCard(
-      {this.photoUrl, this.displayName, required this.onSignOut});
+  const _AccountCard({this.photoUrl, this.displayName, required this.onSignOut});
 
   @override
   Widget build(BuildContext context) {
@@ -929,7 +921,8 @@ class _AccountCard extends StatelessWidget {
                     Container(
                       width: 6, height: 6,
                       decoration: const BoxDecoration(
-                        color: AppColors.accentGreen, shape: BoxShape.circle),
+                          color: AppColors.accentGreen,
+                          shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
                     const Text('Syncing across devices',
@@ -977,7 +970,7 @@ class _InitialsCircle extends StatelessWidget {
   }
 }
 
-// ── Google Sign-In Button ─────────────────────────────────────
+// ── Google Sign-In Button ──────────────────────────────────────────────────
 
 class _GoogleSignInButton extends StatelessWidget {
   final VoidCallback onTap;
@@ -1015,7 +1008,7 @@ class _GoogleSignInButton extends StatelessWidget {
   }
 }
 
-// ── Shared tile widgets ───────────────────────────────────────
+// ── Shared tile widgets ────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   final String label;
@@ -1023,12 +1016,54 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(label.toUpperCase(),
-        style: const TextStyle(
-          fontSize: 11, fontWeight: FontWeight.w600,
-          color: AppColors.textSecondary,
-          letterSpacing: 1.2, fontFamily: 'Inter',
-        ));
+    return Row(
+      children: [
+        Container(
+          width: 3, height: 14,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.accent, AppColors.accentViolet],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 8),
+        Text(label.toUpperCase(),
+            style: const TextStyle(
+              fontSize: 11, fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+              letterSpacing: 1.4, fontFamily: 'Inter',
+            )),
+      ],
+    );
+  }
+}
+
+class _ValueChip extends StatelessWidget {
+  final String label;
+  final VoidCallback onTap;
+  const _ValueChip({required this.label, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: AppColors.accent.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+        ),
+        child: Text(label,
+            style: const TextStyle(
+              fontSize: 13, fontWeight: FontWeight.w700,
+              color: AppColors.accent, fontFamily: 'Inter',
+            )),
+      ),
+    );
   }
 }
 
@@ -1036,8 +1071,7 @@ class _SettingsTile extends StatelessWidget {
   final IconData icon;
   final String label;
   final Widget? trailing;
-  const _SettingsTile(
-      {required this.icon, required this.label, this.trailing});
+  const _SettingsTile({required this.icon, required this.label, this.trailing});
 
   @override
   Widget build(BuildContext context) {
@@ -1073,11 +1107,8 @@ class _SwitchTile extends StatelessWidget {
   final bool value;
   final ValueChanged<bool> onChanged;
   const _SwitchTile({
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    required this.value,
-    required this.onChanged,
+    required this.icon, required this.label,
+    this.subtitle, required this.value, required this.onChanged,
   });
 
   @override
@@ -1116,8 +1147,8 @@ class _SwitchTile extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: AppColors.accent,
-            activeTrackColor: AppColors.accent.withValues(alpha: 0.3),
+            activeThumbColor: Colors.black,
+            activeTrackColor: AppColors.accent,
             inactiveThumbColor: AppColors.textSecondary,
             inactiveTrackColor: AppColors.border,
           ),
@@ -1133,10 +1164,8 @@ class _TappableTile extends StatelessWidget {
   final String? subtitle;
   final VoidCallback onTap;
   const _TappableTile({
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    required this.onTap,
+    required this.icon, required this.label,
+    this.subtitle, required this.onTap,
   });
 
   @override
