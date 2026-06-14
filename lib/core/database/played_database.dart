@@ -11,14 +11,14 @@ import '../models/vault_item.dart';
 import 'hive_boxes.dart';
 import 'duration_adapter.dart';
 
-/// Central database service for PLAYED.
-/// Manages playlists, playback history, shelf caches,
-/// stem locations, and the AES-256 encrypted private vault.
+/// Central offline database for PLAYED.
+/// All data lives on-device in Hive boxes — no internet required.
+/// The encrypted vault uses AES-256 with a key stored in
+/// FlutterSecureStorage (Android Keystore-backed).
 class PlayedDatabase {
   PlayedDatabase._();
   static final PlayedDatabase instance = PlayedDatabase._();
 
-  // ── Box references ──────────────────────────────────────────
   late Box<MediaItem> _historyBox;
   late Box<Playlist> _playlistBox;
   late Box<StemCache> _stemBox;
@@ -28,29 +28,26 @@ class PlayedDatabase {
 
   bool _initialized = false;
 
-  // ── Initialization ──────────────────────────────────────────
-
   Future<void> init() async {
     if (_initialized) return;
 
     await Hive.initFlutter();
 
-    // Register adapters — Duration must be registered before MediaItem
+    // Register adapters — order matters: Duration before MediaItem
     if (!Hive.isAdapterRegistered(10)) Hive.registerAdapter(DurationAdapter());
-    if (!Hive.isAdapterRegistered(0)) Hive.registerAdapter(MediaItemAdapter());
-    if (!Hive.isAdapterRegistered(1)) Hive.registerAdapter(PlaylistAdapter());
-    if (!Hive.isAdapterRegistered(2)) Hive.registerAdapter(StemCacheAdapter());
-    if (!Hive.isAdapterRegistered(3)) Hive.registerAdapter(VaultItemAdapter());
+    if (!Hive.isAdapterRegistered(0))  Hive.registerAdapter(MediaItemAdapter());
+    if (!Hive.isAdapterRegistered(1))  Hive.registerAdapter(PlaylistAdapter());
+    if (!Hive.isAdapterRegistered(2))  Hive.registerAdapter(StemCacheAdapter());
+    if (!Hive.isAdapterRegistered(3))  Hive.registerAdapter(VaultItemAdapter());
 
-    // Open standard boxes
-    _historyBox = await Hive.openBox<MediaItem>(HiveBoxes.history);
-    _playlistBox = await Hive.openBox<Playlist>(HiveBoxes.playlists);
-    _stemBox = await Hive.openBox<StemCache>(HiveBoxes.stems);
+    _historyBox      = await Hive.openBox<MediaItem>(HiveBoxes.history);
+    _playlistBox     = await Hive.openBox<Playlist>(HiveBoxes.playlists);
+    _stemBox         = await Hive.openBox<StemCache>(HiveBoxes.stems);
     _seekPositionBox = await Hive.openBox<Map>(HiveBoxes.seekPositions);
-    _shelfCacheBox = await Hive.openBox<String>(HiveBoxes.shelfCache);
+    _shelfCacheBox   = await Hive.openBox<String>(HiveBoxes.shelfCache);
 
-    // Open AES-256 encrypted vault box
-    // openEncryptedBox was removed in hive 2.x — use openBox with encryptionCipher instead
+    // AES-256 encrypted vault — key is generated once and stored in
+    // Android Keystore via FlutterSecureStorage, never leaves the device
     final vaultKey = await _deriveVaultKey();
     _vaultBox = await Hive.openBox<dynamic>(
       HiveBoxes.vault,
@@ -61,14 +58,14 @@ class PlayedDatabase {
     debugPrint('[PlayedDB] Initialized successfully.');
   }
 
-  /// Derives a 32-byte AES key stored in FlutterSecureStorage.
-  /// Generated once per install using dart:math Random.secure() and
-  /// never leaves the device.
+  /// Generates (on first install) or retrieves a cryptographically secure
+  /// 32-byte AES key from FlutterSecureStorage.
   ///
-  /// The previous implementation used DateTime.microsecondsSinceEpoch % 256
-  /// in a tight loop which produced repeated byte values (very low entropy)
-  /// and could generate a key that fails HiveAesCipher validation, causing
-  /// a crash on first install.
+  /// FIX: The previous implementation used
+  ///   DateTime.now().microsecondsSinceEpoch % 256
+  /// in a tight loop which produced near-identical byte values (very low
+  /// entropy) and could generate a key that fails HiveAesCipher validation,
+  /// crashing the app before any UI appeared on first install.
   Future<Uint8List> _deriveVaultKey() async {
     const storage = FlutterSecureStorage(
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -76,7 +73,7 @@ class PlayedDatabase {
     const keyAlias = 'played_vault_key_v2';
     String? existing = await storage.read(key: keyAlias);
     if (existing == null) {
-      // Generate a cryptographically secure random 32-byte key
+      // Cryptographically secure random 32-byte key
       final rng = Random.secure();
       final key = Uint8List.fromList(
           List<int>.generate(32, (_) => rng.nextInt(256)));
@@ -116,15 +113,13 @@ class PlayedDatabase {
     return Duration(milliseconds: data['ms'] as int);
   }
 
-  Future<void> clearSeekPosition(String mediaId) async {
-    await _seekPositionBox.delete(mediaId);
-  }
+  Future<void> clearSeekPosition(String mediaId) async =>
+      _seekPositionBox.delete(mediaId);
 
   // ── Playlists ───────────────────────────────────────────────
 
-  Future<void> savePlaylist(Playlist playlist) async {
-    await _playlistBox.put(playlist.id, playlist);
-  }
+  Future<void> savePlaylist(Playlist playlist) async =>
+      _playlistBox.put(playlist.id, playlist);
 
   List<Playlist> getAllPlaylists() => _playlistBox.values.toList();
 
@@ -143,9 +138,8 @@ class PlayedDatabase {
 
   // ── Dynamic Shelf Cache ─────────────────────────────────────
 
-  Future<void> cacheShelf(String shelfKey, List<String> mediaIds) async {
-    await _shelfCacheBox.put(shelfKey, jsonEncode(mediaIds));
-  }
+  Future<void> cacheShelf(String shelfKey, List<String> mediaIds) async =>
+      _shelfCacheBox.put(shelfKey, jsonEncode(mediaIds));
 
   List<String> getShelfCache(String shelfKey) {
     final raw = _shelfCacheBox.get(shelfKey);
@@ -155,28 +149,21 @@ class PlayedDatabase {
 
   Future<void> invalidateShelfCache() async => _shelfCacheBox.clear();
 
-  // ── Stem Cache (Studio Split Tracks) ───────────────────────
+  // ── Stem Cache ──────────────────────────────────────────────
 
-  Future<void> saveStemCache(StemCache stem) async {
-    await _stemBox.put(stem.sourceMediaId, stem);
-  }
+  Future<void> saveStemCache(StemCache stem) async =>
+      _stemBox.put(stem.sourceMediaId, stem);
 
-  StemCache? getStemCache(String sourceMediaId) =>
-      _stemBox.get(sourceMediaId);
-
-  bool hasStemCache(String sourceMediaId) =>
-      _stemBox.containsKey(sourceMediaId);
-
+  StemCache? getStemCache(String sourceMediaId) => _stemBox.get(sourceMediaId);
+  bool hasStemCache(String sourceMediaId) => _stemBox.containsKey(sourceMediaId);
   Future<void> deleteStemCache(String sourceMediaId) async =>
       _stemBox.delete(sourceMediaId);
-
   List<StemCache> getAllStems() => _stemBox.values.toList();
 
   // ── Private Vault ───────────────────────────────────────────
 
-  Future<void> addToVault(VaultItem item) async {
-    await _vaultBox.put(item.mediaId, item.toJson());
-  }
+  Future<void> addToVault(VaultItem item) async =>
+      _vaultBox.put(item.mediaId, item.toJson());
 
   Future<VaultItem?> getVaultItem(String mediaId) async {
     final raw = _vaultBox.get(mediaId);
@@ -205,9 +192,8 @@ class PlayedDatabase {
     return data != null && (data['fav'] as bool? ?? false);
   }
 
-  Future<void> setFavoriteFlag(String mediaId, bool value) async {
-    await _seekPositionBox.put('$_kFavPrefix$mediaId', {'fav': value});
-  }
+  Future<void> setFavoriteFlag(String mediaId, bool value) async =>
+      _seekPositionBox.put('$_kFavPrefix$mediaId', {'fav': value});
 
   List<String> getAllFavoriteIds() {
     return _seekPositionBox.keys

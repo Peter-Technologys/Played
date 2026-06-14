@@ -1,12 +1,21 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../app/theme/app_colors.dart';
 
 /// Shown on first launch. Requests all required runtime permissions.
-/// Critical permissions (storage/media) block the app.
-/// Optional permissions (Bluetooth, Location, Notifications) are requested
-/// silently but never block the user — they can grant later via Air-Drop.
+///
+/// Permission tiers:
+///   CRITICAL  — storage/media. App cannot scan files without these.
+///   IMPORTANT — MANAGE_EXTERNAL_STORAGE (Android 11+). Needed to index
+///               files on SD cards and in non-standard folders. Redirects
+///               to system settings (cannot be requested inline).
+///   OPTIONAL  — Bluetooth, Location, Notifications. Only needed for
+///               Air-Drop. App works fine without them.
+///   BATTERY   — Battery optimisation exemption. Prevents Android from
+///               killing the background playback service.
 class PermissionGateScreen extends StatefulWidget {
   final Widget child;
   const PermissionGateScreen({super.key, required this.child});
@@ -46,16 +55,70 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> {
 
   Future<void> _checkPermissions() async {
     setState(() => _checking = true);
+
+    // 1. Critical permissions
     final criticalStatuses = await _critical.request();
-    // Request optional silently — result not used to gate the app
-    final optionalStatuses = await _optional.request();
+
+    // 2. Optional permissions (result never blocks the app)
+    await _optional.request();
+
+    // 3. MANAGE_EXTERNAL_STORAGE — Android 11+ only, cannot be requested
+    //    inline; we check and prompt the user to go to Settings if needed.
+    if (Platform.isAndroid) {
+      final manageStatus = await Permission.manageExternalStorage.status;
+      if (!manageStatus.isGranted) {
+        // Non-blocking: show a one-time banner after the gate passes
+        _promptManageStorage();
+      }
+    }
+
+    // 4. Battery optimisation exemption
+    await _requestBatteryExemption();
+
     final criticalGranted = criticalStatuses.values
         .every((s) => s == PermissionStatus.granted ||
             s == PermissionStatus.limited);
+
     setState(() {
-      _statuses = {...criticalStatuses, ...optionalStatuses};
+      _statuses = criticalStatuses;
       _criticalGranted = criticalGranted;
       _checking = false;
+    });
+  }
+
+  /// Requests battery optimisation exemption so Android never kills
+  /// the background playback service (Unrestricted battery mode).
+  Future<void> _requestBatteryExemption() async {
+    try {
+      final status = await Permission.ignoreBatteryOptimizations.status;
+      if (!status.isGranted) {
+        await Permission.ignoreBatteryOptimizations.request();
+      }
+    } catch (_) {
+      // Not available on all OEMs — ignore silently
+    }
+  }
+
+  /// Shows a non-blocking snackbar prompting the user to grant
+  /// MANAGE_EXTERNAL_STORAGE via system Settings.
+  void _promptManageStorage() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          backgroundColor: AppColors.surface,
+          duration: const Duration(seconds: 8),
+          content: const Text(
+            'For full SD card access, grant "All Files Access" in Settings.',
+            style: TextStyle(color: AppColors.textPrimary, fontSize: 13),
+          ),
+          action: SnackBarAction(
+            label: 'Open Settings',
+            textColor: AppColors.accent,
+            onPressed: openAppSettings,
+          ),
+        ),
+      );
     });
   }
 
@@ -104,20 +167,15 @@ class _SplashLoader extends StatelessWidget {
             ).animate().fadeIn(duration: 600.ms, delay: 200.ms),
             const SizedBox(height: 48),
             const SizedBox(
-              width: 32,
-              height: 32,
+              width: 32, height: 32,
               child: CircularProgressIndicator(
-                color: AppColors.accent,
-                strokeWidth: 2,
-              ),
+                  color: AppColors.accent, strokeWidth: 2),
             ),
             const SizedBox(height: 16),
             Text(
               'Setting up...',
               style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-              ),
+                  fontSize: 12, color: AppColors.textSecondary),
             ).animate().fadeIn(duration: 400.ms, delay: 500.ms),
           ],
         ),
@@ -126,7 +184,7 @@ class _SplashLoader extends StatelessWidget {
   }
 }
 
-// ── Permission Denied Screen (critical only) ──────────────────
+// ── Permission Denied Screen ──────────────────────────────────
 
 class _PermissionDeniedScreen extends StatelessWidget {
   final Map<Permission, PermissionStatus> statuses;
@@ -135,7 +193,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
       {required this.statuses, required this.onRetry});
 
   static final Map<Permission, String> _labels = {
-    Permission.storage: 'Storage — scan local media files',
+    Permission.storage: 'Storage — scan local media files (Android ≤ 12)',
     Permission.audio:   'Audio files — read music (Android 13+)',
     Permission.videos:  'Video files — read videos (Android 13+)',
   };
@@ -164,21 +222,19 @@ class _PermissionDeniedScreen extends StatelessWidget {
               const Text(
                 'Storage Access Required',
                 style: TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'SpaceGrotesk',
+                  fontSize: 24, fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk',
                 ),
               ),
               const SizedBox(height: 8),
               const Text(
-                'PLAYED needs access to your media files to work. '
-                'Bluetooth and Location are optional — only needed for Air-Drop.',
+                'PLAYED needs access to your media files to work.\n'
+                'Bluetooth and Location are optional — only needed for Air-Drop.\n\n'
+                'For best results also grant:\n'
+                '• All Files Access (Settings → Apps → PLAYED → Permissions)\n'
+                '• Unrestricted battery usage (Settings → Battery → PLAYED)',
                 style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.5,
-                ),
+                    fontSize: 13, color: AppColors.textSecondary, height: 1.5),
               ),
               const SizedBox(height: 28),
               Expanded(
@@ -214,8 +270,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
                             child: Text(
                               _labels[e.key] ?? e.key.toString(),
                               style: const TextStyle(
-                                fontSize: 13,
-                                color: AppColors.textPrimary,
+                                fontSize: 13, color: AppColors.textPrimary,
                                 fontFamily: 'SpaceGrotesk',
                               ),
                             ),
@@ -223,11 +278,9 @@ class _PermissionDeniedScreen extends StatelessWidget {
                           if (isPermanent)
                             TextButton(
                               onPressed: openAppSettings,
-                              child: const Text(
-                                'Open Settings',
-                                style: TextStyle(
-                                    color: AppColors.accent, fontSize: 12),
-                              ),
+                              child: const Text('Open Settings',
+                                  style: TextStyle(
+                                      color: AppColors.accent, fontSize: 12)),
                             ),
                         ],
                       ),
@@ -235,7 +288,35 @@ class _PermissionDeniedScreen extends StatelessWidget {
                   }).toList(),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 8),
+              // Open Settings shortcut for permanently denied
+              GestureDetector(
+                onTap: openAppSettings,
+                child: Container(
+                  width: double.infinity,
+                  height: 48,
+                  margin: const EdgeInsets.only(bottom: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  alignment: Alignment.center,
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.settings_rounded,
+                          color: AppColors.textSecondary, size: 18),
+                      SizedBox(width: 8),
+                      Text('Open App Settings',
+                          style: TextStyle(
+                            fontSize: 13, color: AppColors.textSecondary,
+                            fontFamily: 'SpaceGrotesk',
+                          )),
+                    ],
+                  ),
+                ),
+              ),
               GestureDetector(
                 onTap: onRetry,
                 child: Container(
@@ -249,8 +330,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
                     boxShadow: [
                       BoxShadow(
                         color: AppColors.accent.withValues(alpha: 0.35),
-                        blurRadius: 16,
-                        offset: const Offset(0, 4),
+                        blurRadius: 16, offset: const Offset(0, 4),
                       ),
                     ],
                   ),
@@ -258,10 +338,8 @@ class _PermissionDeniedScreen extends StatelessWidget {
                   child: const Text(
                     'Grant Storage Access',
                     style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.black,
-                      fontFamily: 'SpaceGrotesk',
+                      fontSize: 15, fontWeight: FontWeight.w700,
+                      color: Colors.black, fontFamily: 'SpaceGrotesk',
                     ),
                   ),
                 ),

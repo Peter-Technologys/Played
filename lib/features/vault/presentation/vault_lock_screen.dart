@@ -156,7 +156,6 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
-                    fontFamily: 'SpaceGrotesk',
                   )).animate().fadeIn(delay: 200.ms),
 
               const SizedBox(height: 8),
@@ -202,7 +201,6 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                               fontSize: 15,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
-                              fontFamily: 'SpaceGrotesk',
                             )),
                       ],
                     ),
@@ -217,8 +215,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                 child: const Text('Use PIN instead',
                     style: TextStyle(
                         color: AppColors.textSecondary,
-                        fontSize: 13,
-                        fontFamily: 'SpaceGrotesk')),
+                        fontSize: 13)),
               ),
 
               if (_errorMessage != null) ...
@@ -286,8 +283,7 @@ class _PinDialogState extends State<_PinDialog> {
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Enter PIN',
-          style: TextStyle(
-              color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk')),
+          style: TextStyle(color: AppColors.textPrimary)),
       content: TextField(
         controller: _controller,
         obscureText: true,
@@ -375,8 +371,7 @@ class _SetPinDialogState extends State<_SetPinDialog> {
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: const Text('Create Vault PIN',
-          style: TextStyle(
-              color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk')),
+          style: TextStyle(color: AppColors.textPrimary)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -496,7 +491,6 @@ class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
         ),
         title: const Text('Private Vault',
             style: TextStyle(
-              fontFamily: 'SpaceGrotesk',
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
               fontSize: 18,
@@ -518,8 +512,7 @@ class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
                     style: const TextStyle(
                         fontSize: 11,
                         color: AppColors.accentViolet,
-                        fontWeight: FontWeight.w600,
-                        fontFamily: 'SpaceGrotesk'),
+                        fontWeight: FontWeight.w600),
                   ),
                 ),
               ),
@@ -552,7 +545,6 @@ class _VaultGalleryScreenState extends State<VaultGalleryScreen> {
                             fontSize: 18,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
-                            fontFamily: 'SpaceGrotesk',
                           )),
                       const SizedBox(height: 8),
                       const Text(
@@ -632,7 +624,6 @@ class _VaultCard extends StatelessWidget {
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
-                    fontFamily: 'SpaceGrotesk',
                   ),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,

@@ -15,21 +15,30 @@ import 'features/settings/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── 1. Firebase + Crashlytics (background — never blocks launch) ──
+  // ── OFFLINE-FIRST BOOT ORDER ──────────────────────────────────────────
+  // 1. Firebase runs entirely in the background — never blocks launch.
+  //    The app works 100% offline from step 2 onward.
+  // 2. Hive local DB — all media history, playlists, vault, seek positions.
+  // 3. Local notifications — FFmpeg progress toasts.
+  // 4. AdMob SDK registration — safe offline, just registers the SDK.
+  // 5. Settings from SharedPreferences — loaded before runApp().
+  // 6. Error handlers wired BEFORE runApp() so no crash goes unlogged.
+  // ─────────────────────────────────────────────────────────────────────
+
+  // 1. Firebase + Crashlytics — fire-and-forget, never blocks
   _initFirebaseInBackground();
 
-  // ── 2. Local Hive database ────────────────────────────────────────
+  // 2. Hive local database — MUST succeed for the app to work offline
   try {
     await PlayedDatabase.instance.init();
   } catch (e, st) {
-    // Database failure is non-fatal on first launch if vault key
-    // generation races; log and continue — boxes will be re-opened.
-    debugPrint('[PlayedDB] Init error (non-fatal): $e');
+    debugPrint('[PlayedDB] Init error: $e');
+    // Log to Crashlytics if it is already ready; otherwise just print
     CrashlyticsService.instance.recordError(e, st,
         reason: 'PlayedDatabase.init() failed at startup');
   }
 
-  // ── 3. Local notifications ────────────────────────────────────────
+  // 3. Local notifications
   try {
     await NotificationService.instance.init();
   } catch (e, st) {
@@ -38,7 +47,7 @@ void main() async {
         reason: 'NotificationService.init() failed at startup');
   }
 
-  // ── 4. Google Mobile Ads SDK (safe offline — just registers SDK) ──
+  // 4. AdMob SDK — safe offline, just registers the SDK
   try {
     await MobileAds.instance.initialize();
   } catch (e, st) {
@@ -47,16 +56,14 @@ void main() async {
         reason: 'MobileAds.initialize() failed at startup');
   }
 
-  // ── 5. Pre-load persisted settings ───────────────────────────────
+  // 5. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
 
-  // ── 6. Wire Flutter framework errors → Crashlytics ───────────────
+  // 6. Wire Flutter + platform error handlers BEFORE runApp()
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     CrashlyticsService.instance.recordFlutterError(details);
   };
-
-  // Catch async errors that escape the Flutter framework
   PlatformDispatcher.instance.onError = (error, stack) {
     CrashlyticsService.instance.recordError(error, stack,
         reason: 'Uncaught platform error', fatal: true);
@@ -75,26 +82,31 @@ void main() async {
 }
 
 /// Initialises Firebase, Crashlytics, and anonymous auth in the background.
-/// Never blocks app launch — all features degrade gracefully offline.
+///
+/// This Future is intentionally NOT awaited — the app launches instantly
+/// using local Hive + SharedPreferences. Firebase features (Firestore Pro
+/// sync, Google Sign-In, Crashlytics) activate silently once the device
+/// has internet. If the device is permanently offline they are never used.
 void _initFirebaseInBackground() {
   Future(() async {
     try {
       await Firebase.initializeApp();
 
-      // Enable Crashlytics crash collection (disable in debug if preferred)
+      // Disable Crashlytics in debug builds to avoid noise
       await FirebaseCrashlytics.instance
           .setCrashlyticsCollectionEnabled(!kDebugMode);
 
-      // Pass Flutter errors to Crashlytics after Firebase is ready
+      // Hand Flutter errors to Crashlytics now that Firebase is ready
       FlutterError.onError =
           FirebaseCrashlytics.instance.recordFlutterFatalError;
 
-      // Initialise our service wrapper (sets user ID etc.)
+      // Initialise our wrapper (sets user ID from FirebaseAuth)
       await CrashlyticsService.instance.init();
 
-      // Silent anonymous sign-in
+      // Silent anonymous sign-in — only runs when online
       await AuthService.instance.signInAnonymouslyIfNeeded();
     } catch (e) {
+      // Offline or Firebase project not configured — app continues normally
       debugPrint('[Firebase] Background init failed (offline?): $e');
     }
   });

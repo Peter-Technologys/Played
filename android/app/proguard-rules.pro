@@ -1,6 +1,9 @@
 -keep class io.flutter.** { *; }
--keep class com.arthenica.** { *; }
 -keep class org.videolan.** { *; }
 -keep class com.google.android.gms.nearby.** { *; }
+-keep class com.google.firebase.** { *; }
+-keep class com.google.android.gms.ads.** { *; }
+-keep class com.ryanheise.audioservice.** { *; }
+-keep class com.petersmart.played.BootReceiver { *; }
 -dontwarn io.flutter.**
--dontwarn com.arthenica.**
+-dontwarn org.videolan.**

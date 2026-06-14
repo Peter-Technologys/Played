@@ -117,6 +117,11 @@ class _SpaceContent extends ConsumerWidget {
                 _SortButton(current: sort),
                 const SizedBox(width: 8),
                 _IconBtn(
+                  icon: Icons.queue_music_rounded,
+                  onTap: () => context.push('/playlists'),
+                ),
+                const SizedBox(width: 8),
+                _IconBtn(
                   icon: Icons.refresh_rounded,
                   onTap: () => ref.invalidate(mySpaceProvider),
                 ),
