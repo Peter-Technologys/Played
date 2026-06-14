@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/my_space/presentation/my_space_screen.dart';
+import '../features/my_space/presentation/folder_browser_screen.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/studio/presentation/studio_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
@@ -38,7 +39,8 @@ class AppRouter {
           ),
         ],
       ),
-      GoRoute(path: '/settings',  builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/settings',      builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/tools/folders',  builder: (_, __) => const FolderBrowserScreen()),
       GoRoute(path: '/playlists', builder: (_, __) => const PlaylistsScreen()),
       // Vault is FREE — no ProGate
       GoRoute(path: '/vault',    builder: (_, __) => const VaultLockScreen()),
@@ -173,7 +175,10 @@ class _MainShellState extends ConsumerState<_MainShell> {
               subtitle: 'Navigate files by directory',
               color: AppColors.accent,
               isPro: false,
-              onTap: () => Navigator.pop(context),
+              onTap: () {
+                Navigator.pop(context);
+                GoRouter.of(context).push('/tools/folders');
+              },
             ),
           ],
         ),

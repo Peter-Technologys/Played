@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -35,17 +36,12 @@ class _ProGateState extends State<ProGate> {
   }
 
   Future<void> _checkPro() async {
-    // isProActive() reads SharedPreferences first (instant, offline-safe).
-    // Only hits Firestore if local Pro is expired AND device is online.
     final active = await ProService.instance.isProActive();
     if (mounted) setState(() { _isPro = active; _checking = false; });
   }
 
   @override
   Widget build(BuildContext context) {
-    // While checking Pro status show the child immediately if we have
-    // no network — avoids a spinner blocking an offline user from
-    // accessing a feature they may have already unlocked locally.
     if (_checking) {
       return const Scaffold(
         backgroundColor: AppColors.background,
@@ -81,7 +77,10 @@ class _ProPaywall extends StatefulWidget {
 }
 
 class _ProPaywallState extends State<_ProPaywall> {
-  static const _adUnitId = 'ca-app-pub-2517163652161686/6818964871';
+  // Use test ID in debug builds, live ID in release builds.
+  static String get _adUnitId => kDebugMode
+      ? 'ca-app-pub-3940256099942544/5354046379'   // AdMob test rewarded interstitial
+      : 'ca-app-pub-2517163652161686/6818964871';  // Production rewarded interstitial
 
   RewardedInterstitialAd? _ad;
   bool _loading = false;
@@ -194,7 +193,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 32),
 
-              // Title
               Text(
                 isOffline ? 'No Internet' : widget.featureName,
                 textAlign: TextAlign.center,
@@ -208,7 +206,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 12),
 
-              // Description
               Text(
                 isOffline
                     ? 'Connect to the internet to watch a short ad and unlock ${widget.featureName} free for 30 minutes.'
@@ -224,7 +221,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 12),
 
-              // Badge
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                 decoration: BoxDecoration(
@@ -250,7 +246,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 40),
 
-              // Pro features list (only show when not offline)
               if (!isOffline)
                 ..._proFeatures.map((f) => _FeatureRow(icon: f.$1, label: f.$2))
                     .toList()
@@ -260,7 +255,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               if (!isOffline) const SizedBox(height: 40),
 
-              // Ad error message (not offline, but ad failed)
               if (_errorState == 'ad_error')
                 Padding(
                   padding: const EdgeInsets.only(bottom: 16),
@@ -272,10 +266,9 @@ class _ProPaywallState extends State<_ProPaywall> {
                   ),
                 ),
 
-              // Action button
               GestureDetector(
                 onTap: isOffline
-                    ? _loadAd  // retry when offline (user may have turned on internet)
+                    ? _loadAd
                     : (_adReady ? _watchAd : (_loading ? null : _loadAd)),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
@@ -341,7 +334,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
               const SizedBox(height: 16),
 
-              // Back
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: const Text('Maybe Later',
