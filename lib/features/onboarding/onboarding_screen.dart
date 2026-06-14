@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../shared/widgets/played_logo.dart';
 
 /// 3-screen onboarding shown only on first launch.
 class OnboardingScreen extends StatefulWidget {
@@ -75,6 +76,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ).animate().fadeIn(duration: 400.ms),
 
+            // Logo at top
+            const Padding(
+              padding: EdgeInsets.only(top: 8, bottom: 4),
+              child: Center(
+                child: PlayedLogo(fontSize: 22, letterSpacing: 4, borderRadius: 10,
+                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6)),
+              ),
+            ).animate().fadeIn(duration: 500.ms),
+
             // Pages
             Expanded(
               child: PageView.builder(
@@ -147,6 +157,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 .slideY(begin: 0.2, end: 0, curve: Curves.easeOut),
 
             const SizedBox(height: 32),
+
+            // Footer
+            const PlayedFooter(),
           ],
         ),
       ),

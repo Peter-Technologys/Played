@@ -7,6 +7,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
+import '../../../shared/widgets/played_logo.dart';
 
 // ── Playback Settings ─────────────────────────────────────────
 
@@ -244,17 +245,12 @@ class SettingsScreen extends ConsumerWidget {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 8),
-                  decoration: BoxDecoration(
-                    border: Border.all(
-                        color: AppColors.accent.withValues(alpha: 0.35), width: 1.5),
-                    borderRadius: BorderRadius.circular(12),
-                    color: AppColors.accent.withValues(alpha: 0.05),
+                  child: const PlayedLogo(
+                    fontSize: 28,
+                    letterSpacing: 5,
+                    borderRadius: 12,
+                    padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8),
                   ),
-                  child: const Text('PLAYED',
-                      style: TextStyle(
-                        fontSize: 28, fontWeight: FontWeight.w700,
-                        color: AppColors.accent, fontFamily: 'Inter', letterSpacing: 5,
-                      )),
                 ),
                 const SizedBox(height: 12),
                 const Text('Your media. Your rules.',
@@ -320,13 +316,7 @@ class SettingsScreen extends ConsumerWidget {
           ),
 
           const SizedBox(height: 40),
-          const Center(
-            child: Text('from PeterSmart Technologies',
-                style: TextStyle(
-                  fontSize: 11, color: AppColors.textMuted,
-                  fontFamily: 'Inter', letterSpacing: 0.5,
-                )),
-          ),
+          const Center(child: PlayedFooter()),
           const SizedBox(height: 24),
         ],
       ),
