@@ -22,8 +22,9 @@ void main() async {
   // Initialize local notifications (FFmpeg extraction progress)
   await NotificationService.instance.init();
 
-  // Initialize Google Mobile Ads SDK
-  // Replace test ad unit IDs with real ones before publishing
+  // Initialize Google Mobile Ads SDK only — actual ad loading is deferred
+  // until connectivity is confirmed (handled inside each ad widget).
+  // This call is safe offline; it just registers the SDK.
   await MobileAds.instance.initialize();
 
   // Pre-load persisted settings from SharedPreferences before runApp()

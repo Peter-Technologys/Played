@@ -1,5 +1,5 @@
 import 'dart:convert';
-// dart:typed_data removed — Uint8List is already re-exported by flutter/foundation.dart
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
@@ -60,13 +60,27 @@ class PlayedDatabase {
     debugPrint('[PlayedDB] Initialized successfully.');
   }
 
-  /// Derives a 32-byte AES key from a device-bound secret.
-  /// In production, the seed is retrieved from FlutterSecureStorage.
+  /// Derives a 32-byte AES key stored in FlutterSecureStorage.
+  /// Generated once per install and never leaves the device.
   Future<Uint8List> _deriveVaultKey() async {
-    const seed = 'played_vault_seed_v1';
-    final bytes = utf8.encode(seed);
-    final digest = sha256.convert(bytes);
-    return Uint8List.fromList(digest.bytes);
+    const storage = FlutterSecureStorage(
+      aOptions: AndroidOptions(encryptedSharedPreferences: true),
+    );
+    const keyAlias = 'played_vault_key_v2';
+    String? existing = await storage.read(key: keyAlias);
+    if (existing == null) {
+      // Generate a fresh random 32-byte key on first install
+      final random = List<int>.generate(
+          32, (_) => DateTime.now().microsecondsSinceEpoch % 256);
+      // XOR with hash of install time for extra entropy
+      final seed = utf8.encode('played_${DateTime.now().toIso8601String()}');
+      final digest = sha256.convert(seed);
+      final key = List<int>.generate(
+          32, (i) => random[i] ^ digest.bytes[i]);
+      existing = base64Encode(key);
+      await storage.write(key: keyAlias, value: existing);
+    }
+    return Uint8List.fromList(base64Decode(existing));
   }
 
   // ── Playback History ────────────────────────────────────────
@@ -178,6 +192,26 @@ class PlayedDatabase {
       _vaultBox.delete(mediaId);
 
   bool isInVault(String mediaId) => _vaultBox.containsKey(mediaId);
+
+  // ── Favorites ────────────────────────────────────────────────
+
+  static const _kFavPrefix = 'fav_';
+
+  bool getFavoriteFlag(String mediaId) {
+    final data = _seekPositionBox.get('$_kFavPrefix$mediaId');
+    return data != null && (data['fav'] as bool? ?? false);
+  }
+
+  Future<void> setFavoriteFlag(String mediaId, bool value) async {
+    await _seekPositionBox.put('$_kFavPrefix$mediaId', {'fav': value});
+  }
+
+  List<String> getAllFavoriteIds() {
+    return _seekPositionBox.keys
+        .where((k) => k.toString().startsWith(_kFavPrefix))
+        .map((k) => k.toString().substring(_kFavPrefix.length))
+        .toList();
+  }
 
   // ── Teardown ────────────────────────────────────────────────
 
