@@ -48,6 +48,7 @@ class _VideoPlayerScreenState
   bool _pipAutoEnabled = false; // true after user manually enters PiP once
   bool _isInPip = false;
   bool _screenLocked = false;
+  bool _isSpeedBoosting = false; // long-press 2x speed boost
 
   @override
   void initState() {
@@ -316,6 +317,53 @@ class _VideoPlayerScreenState
                                 height: 1.3)),
                       ],
                     ),
+                  ),
+                ),
+              ),
+            ),
+
+          // ── Long-press 2× speed boost (like PlayIt) ──────────────────
+          if (!_screenLocked)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.translucent,
+                onLongPressStart: (_) {
+                  _vlcController.setPlaybackSpeed(2.0);
+                  if (mounted) setState(() => _isSpeedBoosting = true);
+                },
+                onLongPressEnd: (_) {
+                  _vlcController.setPlaybackSpeed(1.0);
+                  if (mounted) setState(() => _isSpeedBoosting = false);
+                },
+              ),
+            ),
+
+          // Speed boost badge
+          if (_isSpeedBoosting)
+            Positioned(
+              top: 60, left: 0, right: 0,
+              child: Center(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.5)),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.fast_forward_rounded,
+                          color: AppColors.accent, size: 18),
+                      SizedBox(width: 6),
+                      Text('2× Speed',
+                          style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 13)),
+                    ],
                   ),
                 ),
               ),

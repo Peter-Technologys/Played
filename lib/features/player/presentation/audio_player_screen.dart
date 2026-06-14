@@ -434,13 +434,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: const Icon(Icons.skip_previous_rounded,
                         color: AppColors.textPrimary, size: 34),
-                    onPressed: () {
-                      ref.read(queueProvider.notifier).previous();
-                      final prev = ref.read(queueProvider).current;
-                      if (prev != null) {
-                        ref.read(audioPlayerProvider.notifier).load(prev);
-                      }
-                    },
+                    onPressed: () =>
+                        ref.read(audioPlayerProvider.notifier).skipPrevious(),
                   ),
                   IconButton(
                     icon: const Icon(Icons.replay_10_rounded,
@@ -491,13 +486,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: const Icon(Icons.skip_next_rounded,
                         color: AppColors.textPrimary, size: 34),
-                    onPressed: () {
-                      ref.read(queueProvider.notifier).next();
-                      final next = ref.read(queueProvider).current;
-                      if (next != null) {
-                        ref.read(audioPlayerProvider.notifier).load(next);
-                      }
-                    },
+                    onPressed: () =>
+                        ref.read(audioPlayerProvider.notifier).skipNext(),
                   ),
                 ],
               ),
