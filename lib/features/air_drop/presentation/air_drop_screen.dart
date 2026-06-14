@@ -1,4 +1,4 @@
-import 'dart:math';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,10 +6,11 @@ import 'package:nearby_connections/nearby_connections.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/data/media_repository.dart';
+import 'dart:math';
 
 // ── Models & Providers ───────────────────────────────────────────────
 
-enum AirDropStatus { idle, scanning, connected, sending, done, error }
+enum AirDropStatus { idle, advertising, scanning, connected, sending, receiving, done, error }
 
 class DiscoveredDevice {
   final String endpointId;
@@ -27,6 +28,8 @@ final airDropStatusProvider =
 final discoveredDevicesProvider =
     StateProvider<List<DiscoveredDevice>>((_) => []);
 final sendProgressProvider = StateProvider<double>((_) => 0.0);
+final receiveProgressProvider = StateProvider<double>((_) => 0.0);
+final receivedFileProvider = StateProvider<String?>((_) => null);
 
 // ── Screen ──────────────────────────────────────────────────────
 
@@ -40,15 +43,10 @@ class AirDropScreen extends ConsumerStatefulWidget {
 class _AirDropScreenState extends ConsumerState<AirDropScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _pulseController;
+  final Map<String, String> _connectedEndpoints = {}; // endpointId -> name
 
-  static const List<DiscoveredDevice> _mockDevices = [
-    DiscoveredDevice(
-        endpointId: 'ep1', name: 'Kampala-Phone', avatarEmoji: '\uD83D\uDCF1'),
-    DiscoveredDevice(
-        endpointId: 'ep2', name: 'DJ-Tablet', avatarEmoji: '\uD83D\uDCBB'),
-    DiscoveredDevice(
-        endpointId: 'ep3', name: 'Aisha-S23', avatarEmoji: '\uD83D\uDCF2'),
-  ];
+  static const String _serviceId = 'com.played.airdrop';
+  static const String _userName  = 'played_user';
 
   @override
   void initState() {
@@ -56,24 +54,49 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
     _pulseController =
         AnimationController(vsync: this, duration: const Duration(seconds: 2))
           ..repeat();
+    // Start advertising immediately so other devices can find this one
+    _startAdvertising();
   }
 
   @override
   void dispose() {
     _pulseController.dispose();
     Nearby().stopDiscovery();
+    Nearby().stopAdvertising();
+    Nearby().stopAllEndpoints();
     super.dispose();
   }
+
+  // ── Advertising (receive mode) ──────────────────────────────────
+
+  Future<void> _startAdvertising() async {
+    try {
+      await Nearby().startAdvertising(
+        _userName,
+        Strategy.P2P_CLUSTER,
+        onConnectionInitiated: _onConnectionInitiated,
+        onConnectionResult: _onConnectionResult,
+        onDisconnected: _onDisconnected,
+        serviceId: _serviceId,
+      );
+    } catch (e) {
+      debugPrint('[AirDrop] Advertising failed: $e');
+    }
+  }
+
+  // ── Discovery (send mode) ───────────────────────────────────────
 
   Future<void> _startScanning() async {
     ref.read(airDropStatusProvider.notifier).state = AirDropStatus.scanning;
     try {
       await Nearby().startDiscovery(
-        'played_user',
+        _userName,
         Strategy.P2P_CLUSTER,
         onEndpointFound: (id, name, _) {
           final device = DiscoveredDevice(
-              endpointId: id, name: name, avatarEmoji: '\uD83D\uDCF1');
+              endpointId: id,
+              name: name,
+              avatarEmoji: _emojiForName(name));
           final current = ref.read(discoveredDevicesProvider);
           if (!current.any((d) => d.endpointId == id)) {
             ref.read(discoveredDevicesProvider.notifier).state = [
@@ -88,10 +111,11 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               .where((d) => d.endpointId != id)
               .toList();
         },
-        serviceId: 'com.played.airdrop',
+        serviceId: _serviceId,
       );
-    } catch (_) {
-      ref.read(discoveredDevicesProvider.notifier).state = _mockDevices;
+    } catch (e) {
+      debugPrint('[AirDrop] Discovery failed: $e');
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.error;
     }
   }
 
@@ -101,11 +125,140 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
     ref.read(discoveredDevicesProvider.notifier).state = [];
   }
 
+  // ── Connection callbacks ────────────────────────────────────────
+
+  void _onConnectionInitiated(String endpointId, ConnectionInfo info) {
+    // Auto-accept all incoming connections
+    Nearby().acceptConnection(
+      endpointId,
+      onPayLoadRecieved: _onPayloadReceived,
+      onPayloadTransferUpdate: _onPayloadTransferUpdate,
+    );
+    _connectedEndpoints[endpointId] = info.endpointName;
+    ref.read(airDropStatusProvider.notifier).state = AirDropStatus.connected;
+  }
+
+  void _onConnectionResult(String endpointId, Status status) {
+    if (status == Status.CONNECTED) {
+      _connectedEndpoints[endpointId] = endpointId;
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.connected;
+    } else {
+      _connectedEndpoints.remove(endpointId);
+      if (_connectedEndpoints.isEmpty) {
+        ref.read(airDropStatusProvider.notifier).state = AirDropStatus.scanning;
+      }
+    }
+  }
+
+  void _onDisconnected(String endpointId) {
+    _connectedEndpoints.remove(endpointId);
+    if (_connectedEndpoints.isEmpty) {
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.idle;
+    }
+  }
+
+  // ── Payload callbacks ───────────────────────────────────────────
+
+  void _onPayloadReceived(String endpointId, Payload payload) {
+    if (payload.type == PayloadType.FILE) {
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.receiving;
+      // The file is saved automatically by the nearby_connections plugin
+      // to the app's cache directory. We track it via transfer updates.
+    }
+  }
+
+  void _onPayloadTransferUpdate(String endpointId, PayloadTransferUpdate update) {
+    final total = update.totalBytes;
+    final transferred = update.bytesTransferred;
+    if (total > 0) {
+      final progress = transferred / total;
+      final status = ref.read(airDropStatusProvider);
+      if (status == AirDropStatus.sending) {
+        ref.read(sendProgressProvider.notifier).state = progress;
+      } else {
+        ref.read(receiveProgressProvider.notifier).state = progress;
+      }
+    }
+    if (update.status == PayloadStatus.SUCCESS) {
+      final currentStatus = ref.read(airDropStatusProvider);
+      if (currentStatus == AirDropStatus.receiving) {
+        // File received — copy to Downloads
+        _saveReceivedFile(update.id);
+      }
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.done;
+      ref.read(sendProgressProvider.notifier).state = 0;
+      ref.read(receiveProgressProvider.notifier).state = 0;
+    } else if (update.status == PayloadStatus.FAILURE) {
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.error;
+    }
+  }
+
+  Future<void> _saveReceivedFile(int payloadId) async {
+    try {
+      final downloadsDir = Directory('/storage/emulated/0/Download/AirDrop');
+      if (!await downloadsDir.exists()) await downloadsDir.create(recursive: true);
+      // nearby_connections saves received files to cache — move to Downloads
+      final cacheDir = Directory('/data/data/com.petersmart.played/cache');
+      final files = cacheDir.listSync().whereType<File>().toList();
+      for (final f in files) {
+        if (f.path.contains(payloadId.toString())) {
+          final dest = '${downloadsDir.path}/${f.path.split('/').last}';
+          await f.copy(dest);
+          await f.delete();
+          ref.read(receivedFileProvider.notifier).state = dest;
+          break;
+        }
+      }
+    } catch (e) {
+      debugPrint('[AirDrop] saveReceivedFile error: $e');
+    }
+  }
+
+  // ── Send file to endpoint ───────────────────────────────────────
+
+  Future<void> _sendFile(String endpointId, MediaItem item) async {
+    if (!_connectedEndpoints.containsKey(endpointId)) {
+      // Request connection first
+      try {
+        await Nearby().requestConnection(
+          _userName,
+          endpointId,
+          onConnectionInitiated: _onConnectionInitiated,
+          onConnectionResult: _onConnectionResult,
+          onDisconnected: _onDisconnected,
+        );
+      } catch (e) {
+        debugPrint('[AirDrop] requestConnection error: $e');
+        ref.read(airDropStatusProvider.notifier).state = AirDropStatus.error;
+        return;
+      }
+      // Wait briefly for connection to establish
+      await Future.delayed(const Duration(milliseconds: 800));
+    }
+
+    try {
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.sending;
+      ref.read(sendProgressProvider.notifier).state = 0;
+      await Nearby().sendFilePayload(endpointId, item.filePath);
+    } catch (e) {
+      debugPrint('[AirDrop] sendFile error: $e');
+      ref.read(airDropStatusProvider.notifier).state = AirDropStatus.error;
+    }
+  }
+
+  String _emojiForName(String name) {
+    const emojis = ['📱', '💻', '📲', '🎵', '🎧', '📡'];
+    return emojis[name.hashCode.abs() % emojis.length];
+  }
+
   @override
   Widget build(BuildContext context) {
     final status = ref.watch(airDropStatusProvider);
     final devices = ref.watch(discoveredDevicesProvider);
     final isScanning = status == AirDropStatus.scanning;
+    final sendProgress = ref.watch(sendProgressProvider);
+    final receiveProgress = ref.watch(receiveProgressProvider);
+    final receivedFile = ref.watch(receivedFileProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -152,6 +305,83 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               child: _StatusPill(status: status, deviceCount: devices.length),
             ),
 
+            // ── Transfer progress bars ────────────────────────────────
+            if (status == AirDropStatus.sending && sendProgress > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Sending... ${(sendProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.accent)),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: sendProgress,
+                        backgroundColor: AppColors.border,
+                        valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (status == AirDropStatus.receiving && receiveProgress > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Receiving... ${(receiveProgress * 100).toInt()}%',
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.accentGreen)),
+                    const SizedBox(height: 6),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: receiveProgress,
+                        backgroundColor: AppColors.border,
+                        valueColor: const AlwaysStoppedAnimation(AppColors.accentGreen),
+                        minHeight: 6,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            if (status == AirDropStatus.done && receivedFile != null)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.accentGreen.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                        color: AppColors.accentGreen.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.check_circle_rounded,
+                          color: AppColors.accentGreen, size: 18),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Saved to Downloads/AirDrop',
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.accentGreen,
+                              fontWeight: FontWeight.w600),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
             const SizedBox(height: 24),
 
             // ── Radar ──────────────────────────────────────────────
@@ -169,10 +399,10 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
                 children: [
-                  const Icon(Icons.swipe_up_rounded,
+                  const Icon(Icons.touch_app_rounded,
                       color: AppColors.textSecondary, size: 16),
                   const SizedBox(width: 6),
-                  const Text('Drag a file card up onto a device to send',
+                  const Text('Tap a file card to send to a discovered device',
                       style: TextStyle(
                           fontSize: 12, color: AppColors.textSecondary)),
                 ],
@@ -182,7 +412,10 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
             // ── File tray ───────────────────────────────────────────
             Expanded(
               flex: 3,
-              child: _FileTray(devices: devices),
+              child: _FileTray(
+                devices: devices,
+                onSend: _sendFile,
+              ),
             ),
 
             const SizedBox(height: 16),
@@ -203,17 +436,21 @@ class _StatusPill extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final (label, color, icon) = switch (status) {
-      AirDropStatus.idle => ('Tap Scan to find nearby devices',
+      AirDropStatus.idle       => ('Advertising — tap Scan to find devices',
           AppColors.textSecondary, Icons.radar_rounded),
-      AirDropStatus.scanning => ('Scanning... $deviceCount device(s) found',
+      AirDropStatus.advertising => ('Visible to nearby devices',
+          AppColors.accentGreen, Icons.wifi_tethering_rounded),
+      AirDropStatus.scanning   => ('Scanning... $deviceCount device(s) found',
           AppColors.accent, Icons.wifi_tethering_rounded),
-      AirDropStatus.connected => ('Connected — ready to send',
-          AppColors.success, Icons.check_circle_rounded),
-      AirDropStatus.sending => ('Sending file...',
+      AirDropStatus.connected  => ('Connected — tap a file to send',
+          AppColors.accentGreen, Icons.check_circle_rounded),
+      AirDropStatus.sending    => ('Sending file...',
           Colors.amber, Icons.upload_rounded),
-      AirDropStatus.done => ('Transfer complete!',
-          AppColors.success, Icons.check_circle_rounded),
-      AirDropStatus.error => ('Connection failed. Try again.',
+      AirDropStatus.receiving  => ('Receiving file...',
+          AppColors.accentGreen, Icons.download_rounded),
+      AirDropStatus.done       => ('Transfer complete!',
+          AppColors.accentGreen, Icons.check_circle_rounded),
+      AirDropStatus.error      => ('Connection failed. Try again.',
           AppColors.error, Icons.error_outline_rounded),
     };
 
@@ -301,7 +538,7 @@ class _RadarView extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               SizedBox(height: 80),
-              Text('No devices found yet',
+              Text('Tap Scan to find nearby devices',
                   style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
@@ -388,7 +625,8 @@ class _DeviceAvatar extends StatelessWidget {
 
 class _FileTray extends StatefulWidget {
   final List<DiscoveredDevice> devices;
-  const _FileTray({required this.devices});
+  final Future<void> Function(String endpointId, MediaItem item) onSend;
+  const _FileTray({required this.devices, required this.onSend});
 
   @override
   State<_FileTray> createState() => _FileTrayState();
@@ -405,10 +643,6 @@ class _FileTrayState extends State<_FileTray> {
   }
 
   Future<void> _loadFiles() async {
-    // Use the cached MediaRepository instead of triggering a full device
-    // scan every time the Air-Drop tab is opened. Previously called
-    // MediaScannerService.instance.scanAll() which re-scanned the entire
-    // device on every tab switch — extremely slow on large libraries.
     final items = MediaRepository.instance.cachedItems ??
         await MediaRepository.instance.getAllMedia();
     if (mounted) {
@@ -417,6 +651,56 @@ class _FileTrayState extends State<_FileTray> {
         _loading = false;
       });
     }
+  }
+
+  void _onFileTapped(BuildContext context, MediaItem item) {
+    if (widget.devices.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No devices found. Tap Scan first.'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
+      return;
+    }
+    if (widget.devices.length == 1) {
+      widget.onSend(widget.devices.first.endpointId, item);
+      return;
+    }
+    // Multiple devices — show picker
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Send to',
+                style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary)),
+            const SizedBox(height: 12),
+            ...widget.devices.map((d) => ListTile(
+                  leading: Text(d.avatarEmoji,
+                      style: const TextStyle(fontSize: 24)),
+                  title: Text(d.name,
+                      style: const TextStyle(
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600)),
+                  onTap: () {
+                    Navigator.pop(context);
+                    widget.onSend(d.endpointId, item);
+                  },
+                )),
+          ],
+        ),
+      ),
+    );
   }
 
   @override
@@ -453,15 +737,15 @@ class _FileTrayState extends State<_FileTray> {
                       separatorBuilder: (_, __) => const SizedBox(width: 10),
                       itemBuilder: (context, i) {
                         final item = _files[i];
-                        return _DraggableFileCard(
-                          title: item.title,
-                          icon: item.isVideo
-                              ? Icons.video_file_rounded
-                              : Icons.audio_file_rounded,
-                          size: item.formattedSize,
-                          targetDevice: widget.devices.isNotEmpty
-                              ? widget.devices.first
-                              : null,
+                        return GestureDetector(
+                          onTap: () => _onFileTapped(context, item),
+                          child: _CardBody(
+                            title: item.title,
+                            icon: item.isVideo
+                                ? Icons.video_file_rounded
+                                : Icons.audio_file_rounded,
+                            size: item.formattedSize,
+                          ),
                         );
                       },
                     ),
@@ -471,114 +755,36 @@ class _FileTrayState extends State<_FileTray> {
   }
 }
 
-class _DraggableFileCard extends StatefulWidget {
-  final String title;
-  final IconData icon;
-  final String size;
-  final DiscoveredDevice? targetDevice;
-  const _DraggableFileCard({
-    required this.title,
-    required this.icon,
-    required this.size,
-    this.targetDevice,
-  });
-
-  @override
-  State<_DraggableFileCard> createState() => _DraggableFileCardState();
-}
-
-class _DraggableFileCardState extends State<_DraggableFileCard> {
-  bool _isSending = false;
-
-  void _onDragEnd(DraggableDetails _) {
-    setState(() => _isSending = true);
-    Future.delayed(const Duration(seconds: 2),
-        () {
-      if (mounted) setState(() => _isSending = false);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Draggable<String>(
-      data: widget.title,
-      feedback: Material(
-        color: Colors.transparent,
-        child: _CardBody(
-            title: widget.title,
-            icon: widget.icon,
-            size: widget.size,
-            isSending: false,
-            glowing: true),
-      ),
-      childWhenDragging: Opacity(
-        opacity: 0.25,
-        child: _CardBody(
-            title: widget.title,
-            icon: widget.icon,
-            size: widget.size,
-            isSending: false),
-      ),
-      onDragEnd: _onDragEnd,
-      child: _CardBody(
-          title: widget.title,
-          icon: widget.icon,
-          size: widget.size,
-          isSending: _isSending),
-    );
-  }
-}
-
 class _CardBody extends StatelessWidget {
   final String title;
   final IconData icon;
   final String size;
-  final bool isSending;
-  final bool glowing;
   const _CardBody({
     required this.title,
     required this.icon,
     required this.size,
-    required this.isSending,
-    this.glowing = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    final active = isSending || glowing;
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
+    return Container(
       width: 100,
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-            color: active ? AppColors.accent : AppColors.border,
-            width: active ? 1.5 : 1),
-        boxShadow: glowing
-            ? [
-                BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    spreadRadius: 2)
-              ]
-            : null,
+        border: Border.all(color: AppColors.border),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(
-            isSending ? Icons.send_rounded : icon,
-            color: active ? AppColors.accent : AppColors.textSecondary,
-            size: 26,
-          ),
+          Icon(icon, color: AppColors.accent, size: 26),
           const SizedBox(height: 8),
           Text(
-            isSending ? 'Sending...' : title,
-            style: TextStyle(
+            title,
+            style: const TextStyle(
               fontSize: 10,
-              color: active ? AppColors.accent : AppColors.textPrimary,
+              color: AppColors.textPrimary,
               fontWeight: FontWeight.w600,
               fontFamily: 'Inter',
             ),
