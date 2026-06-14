@@ -5,9 +5,11 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/pip_service.dart';
 import 'widgets/gesture_detector_layer.dart';
 import 'widgets/battery_saver_toggle.dart';
 import 'widgets/player_controls.dart';
@@ -18,6 +20,10 @@ final batterySaverProvider = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
 final brightnessProvider = StateProvider<double>((_) => 0.5);
 final volumeProvider = StateProvider<double>((_) => 0.8);
+
+// PiP preference key — set to true once the user manually enters PiP.
+// After that, PiP triggers automatically when the user leaves the app.
+const _kPipAutoKey = 'pip_auto_enabled';
 
 // ── Screen ────────────────────────────────────────────────────
 
@@ -37,12 +43,25 @@ class _VideoPlayerScreenState
   Timer? _controlsTimer;
   bool _isInitialized = false;
 
+  // PiP state
+  bool _pipSupported = false;
+  bool _pipAutoEnabled = false; // true after user manually enters PiP once
+  bool _isInPip = false;
+  bool _screenLocked = false;
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _lockToLandscape();
     _initPlayer();
+    _initPip();
+  }
+
+  Future<void> _initPip() async {
+    _pipSupported = await PipService.instance.isPipSupported();
+    final prefs = await SharedPreferences.getInstance();
+    _pipAutoEnabled = prefs.getBool(_kPipAutoKey) ?? false;
   }
 
   Future<void> _initPlayer() async {
@@ -71,7 +90,7 @@ class _VideoPlayerScreenState
       _vlcController.seekTo(savedPosition);
     }
 
-    setState(() => _isInitialized = true);
+    if (mounted) setState(() => _isInitialized = true);
     _startControlsTimer();
   }
 
@@ -94,12 +113,120 @@ class _VideoPlayerScreenState
   }
 
   void _toggleControls() {
+    if (_screenLocked) return; // locked screen ignores taps
     final visible = ref.read(controlsVisibleProvider);
     if (visible) {
       _controlsTimer?.cancel();
       ref.read(controlsVisibleProvider.notifier).state = false;
     } else {
       _startControlsTimer();
+    }
+  }
+
+  // ── PiP ────────────────────────────────────────────────────
+
+  /// Called when the user manually taps the PiP button.
+  /// Enters PiP and remembers the preference so future app-background
+  /// events also trigger PiP automatically (like PlayIt).
+  Future<void> _enterPipManual() async {
+    if (!_pipSupported) return;
+    // Remember that the user has opted in
+    if (!_pipAutoEnabled) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool(_kPipAutoKey, true);
+      _pipAutoEnabled = true;
+    }
+    await PipService.instance.enterPip();
+    if (mounted) setState(() => _isInPip = true);
+  }
+
+  /// Called when the user taps the PiP button for the first time —
+  /// shows a one-time explanation before entering PiP.
+  Future<void> _onPipButtonTapped() async {
+    if (!_pipSupported) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Picture-in-Picture is not supported on this device.'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
+      return;
+    }
+    if (!_pipAutoEnabled) {
+      // First time — explain what PiP does
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: AppColors.surface,
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: const Text(
+            'Picture in Picture',
+            style: TextStyle(
+                color: AppColors.textPrimary, fontWeight: FontWeight.w700),
+          ),
+          content: const Text(
+            'The video will float over other apps.\n\n'
+            'After using it once, PLAYED will automatically enter PiP '
+            'whenever you leave the app while a video is playing — just like PlayIt.',
+            style: TextStyle(
+                color: AppColors.textSecondary, fontSize: 13, height: 1.6),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10)),
+              ),
+              child: const Text('Enter PiP',
+                  style: TextStyle(fontWeight: FontWeight.w700)),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+    }
+    await _enterPipManual();
+  }
+
+  // ── Screen lock ─────────────────────────────────────────────
+
+  void _toggleScreenLock() {
+    setState(() => _screenLocked = !_screenLocked);
+    if (_screenLocked) {
+      _controlsTimer?.cancel();
+      ref.read(controlsVisibleProvider.notifier).state = false;
+    } else {
+      _startControlsTimer();
+    }
+  }
+
+  // ── Lifecycle ───────────────────────────────────────────────
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      // Save position
+      PlayedDatabase.instance.saveSeekPosition(
+        widget.mediaItem.id,
+        _vlcController.value.position,
+      );
+      // Auto-PiP: only if user has opted in by using it manually before
+      if (_pipAutoEnabled && _pipSupported && !_isInPip) {
+        PipService.instance.enterPip();
+        if (mounted) setState(() => _isInPip = true);
+      }
+    }
+    if (state == AppLifecycleState.resumed) {
+      if (mounted) setState(() => _isInPip = false);
     }
   }
 
@@ -117,16 +244,6 @@ class _VideoPlayerScreenState
         DeviceOrientation.values);
     await SystemChrome.setEnabledSystemUIMode(
         SystemUiMode.edgeToEdge);
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused) {
-      PlayedDatabase.instance.saveSeekPosition(
-        widget.mediaItem.id,
-        _vlcController.value.position,
-      );
-    }
   }
 
   @override
@@ -167,57 +284,99 @@ class _VideoPlayerScreenState
                 .animate()
                 .fadeIn(duration: 400.ms),
 
-          // ── Gesture Layer ──────────────────────────────────
-          GestureDetectorLayer(
-            onTap: _toggleControls,
-            onBrightnessChange: (delta) {
-              final current = ref.read(brightnessProvider);
-              ref.read(brightnessProvider.notifier).state =
-                  (current + delta).clamp(0.0, 1.0);
-            },
-            onVolumeChange: (delta) {
-              final current = ref.read(volumeProvider);
-              final newVol = (current + delta).clamp(0.0, 1.0);
-              ref.read(volumeProvider.notifier).state = newVol;
-              _vlcController.setVolume((newVol * 100).toInt());
-            },
-            onSeek: (delta) {
-              final current = _vlcController.value.position;
-              _vlcController.seekTo(current + delta);
-              _startControlsTimer();
-            },
-          ),
-
-          // ── Controls Overlay ───────────────────────────────
-          AnimatedOpacity(
-            opacity: controlsVisible ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 300),
-            child: IgnorePointer(
-              ignoring: !controlsVisible,
-              child: PlayerControls(
-                controller: _vlcController,
-                mediaItem: widget.mediaItem,
-                onBack: () => Navigator.of(context).pop(),
+          // ── Screen Lock Overlay ─────────────────────────────
+          if (_screenLocked)
+            Positioned.fill(
+              child: GestureDetector(
+                onTap: _toggleScreenLock,
+                child: Container(
+                  color: Colors.transparent,
+                  alignment: Alignment.centerLeft,
+                  padding: const EdgeInsets.only(left: 20),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                          color: AppColors.accent.withValues(alpha: 0.4)),
+                    ),
+                    child: const Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.lock_rounded,
+                            color: AppColors.accent, size: 22),
+                        SizedBox(height: 4),
+                        Text('Tap to\nunlock',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                                color: Colors.white70,
+                                fontSize: 10,
+                                height: 1.3)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
-          ),
 
-          // ── Battery Saver Toggle ───────────────────────────
-          Positioned(
-            top: 16,
-            right: 16,
-            child: BatterySaverToggle(
-              isActive: batterySaver,
-              onToggle: (val) {
-                ref.read(batterySaverProvider.notifier).state = val;
-                if (val) {
-                  _vlcController.setVideoTrack(-1);
-                } else {
-                  _vlcController.setVideoTrack(0);
-                }
+          // ── Gesture Layer ──────────────────────────────────
+          if (!_screenLocked)
+            GestureDetectorLayer(
+              onTap: _toggleControls,
+              onBrightnessChange: (delta) {
+                final current = ref.read(brightnessProvider);
+                ref.read(brightnessProvider.notifier).state =
+                    (current + delta).clamp(0.0, 1.0);
+              },
+              onVolumeChange: (delta) {
+                final current = ref.read(volumeProvider);
+                final newVol = (current + delta).clamp(0.0, 1.0);
+                ref.read(volumeProvider.notifier).state = newVol;
+                _vlcController.setVolume((newVol * 100).toInt());
+              },
+              onSeek: (delta) {
+                final current = _vlcController.value.position;
+                _vlcController.seekTo(current + delta);
+                _startControlsTimer();
               },
             ),
-          ),
+
+          // ── Controls Overlay ───────────────────────────────
+          if (!_screenLocked)
+            AnimatedOpacity(
+              opacity: controlsVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: IgnorePointer(
+                ignoring: !controlsVisible,
+                child: PlayerControls(
+                  controller: _vlcController,
+                  mediaItem: widget.mediaItem,
+                  onBack: () => Navigator.of(context).pop(),
+                  onPip: _onPipButtonTapped,
+                  onLockScreen: _toggleScreenLock,
+                ),
+              ),
+            ),
+
+          // ── Battery Saver Toggle ───────────────────────────
+          if (!_screenLocked)
+            Positioned(
+              top: 16,
+              right: 16,
+              child: BatterySaverToggle(
+                isActive: batterySaver,
+                onToggle: (val) {
+                  ref.read(batterySaverProvider.notifier).state = val;
+                  if (val) {
+                    _vlcController.setVideoTrack(-1);
+                  } else {
+                    _vlcController.setVideoTrack(0);
+                  }
+                },
+              ),
+            ),
 
           // ── Brightness / Volume Indicators ──────────────────
           _SwipeIndicators(),
