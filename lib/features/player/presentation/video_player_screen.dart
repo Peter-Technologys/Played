@@ -69,6 +69,9 @@ class _VideoPlayerScreenState
     final savedPosition =
         PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id);
 
+    // Auto-detect subtitle file in same folder as video
+    final subtitlePath = _findSubtitle(widget.mediaItem.filePath);
+
     _vlcController = VlcPlayerController.file(
       File(widget.mediaItem.filePath),
       hwAcc: HwAcc.full,
@@ -81,6 +84,10 @@ class _VideoPlayerScreenState
           VlcVideoOptions.dropLateFrames(true),
           VlcVideoOptions.skipFrames(true),
         ]),
+        // Auto-load subtitle if found alongside the video
+        extras: subtitlePath != null
+            ? ['--sub-file=$subtitlePath']
+            : [],
       ),
     );
 
@@ -93,6 +100,19 @@ class _VideoPlayerScreenState
 
     if (mounted) setState(() => _isInitialized = true);
     _startControlsTimer();
+  }
+
+  /// Looks for a .srt or .ass subtitle file with the same base name
+  /// as the video in the same directory. Returns the path if found.
+  String? _findSubtitle(String videoPath) {
+    try {
+      final base = videoPath.replaceAll(RegExp(r'\.[^.]+$'), '');
+      for (final ext in ['.srt', '.ass', '.ssa', '.vtt']) {
+        final f = File('$base$ext');
+        if (f.existsSync()) return f.path;
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _onPlayerStateChanged() {
