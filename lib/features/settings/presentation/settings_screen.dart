@@ -1,13 +1,16 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/storage_folder_service.dart';
+import '../../../features/my_space/presentation/providers/my_space_provider.dart';
 import '../../../shared/widgets/played_logo.dart';
 import '../../settings/settings_provider.dart';
 
@@ -136,8 +139,8 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.speed_rounded,
             label: 'Default Playback Speed',
             trailing: _ValueChip(
-              label: '${s.crossfadeDuration == 0 ? 1.0 : 1.0}x',
-              onTap: () => _showSpeedPicker(context, sn),
+              label: '${s.playbackSpeed}x',
+              onTap: () => _showSpeedPicker(context, sn, s.playbackSpeed),
             ),
           ),
           const SizedBox(height: 8),
@@ -188,8 +191,8 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.phone_in_talk_rounded,
             label: 'Pause During Calls',
             subtitle: 'Auto-pause when a call comes in',
-            value: s.nowPlayingNotification,
-            onChanged: (v) => sn.setNowPlayingNotification(v),
+            value: s.pauseDuringCalls,
+            onChanged: (v) => sn.setPauseDuringCalls(v),
           ),
           const SizedBox(height: 8),
           _SwitchTile(
@@ -217,16 +220,16 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.picture_in_picture_alt_rounded,
             label: 'Auto Picture-in-Picture',
             subtitle: 'Float video when you leave the app',
-            value: s.autoResume,
-            onChanged: (v) => sn.setAutoResume(v),
+            value: s.autoPip,
+            onChanged: (v) => sn.setAutoPip(v),
           ),
           const SizedBox(height: 8),
           _SwitchTile(
             icon: Icons.subtitles_rounded,
             label: 'Auto-load Subtitles',
             subtitle: 'Load .srt/.ass from same folder as video',
-            value: true,
-            onChanged: (_) {},
+            value: s.autoLoadSubtitles,
+            onChanged: (v) => sn.setAutoLoadSubtitles(v),
           ),
 
           const SizedBox(height: 32),
@@ -266,12 +269,15 @@ class SettingsScreen extends ConsumerWidget {
             icon: Icons.refresh_rounded,
             label: 'Rescan Library',
             subtitle: 'Find new files added to your device',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Rescanning library in background…'),
-                backgroundColor: AppColors.surface,
-              ),
-            ),
+            onTap: () {
+              ref.read(mediaLibraryProvider.notifier).refresh();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Rescanning library in background…'),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
           ),
           const SizedBox(height: 8),
           _TappableTile(
@@ -381,7 +387,7 @@ class SettingsScreen extends ConsumerWidget {
 
   // ── Pickers ────────────────────────────────────────────────────────────────
 
-  void _showSpeedPicker(BuildContext context, SettingsNotifier sn) {
+  void _showSpeedPicker(BuildContext context, SettingsNotifier sn, double current) {
     const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
     showModalBottomSheet(
       context: context,
@@ -412,21 +418,26 @@ class SettingsScreen extends ConsumerWidget {
             Wrap(
               spacing: 10, runSpacing: 10,
               children: speeds.map((sp) {
+                final active = sp == current;
                 return GestureDetector(
-                  onTap: () => Navigator.pop(context),
-                  child: Container(
+                  onTap: () {
+                    sn.setPlaybackSpeed(sp);
+                    Navigator.pop(context);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
                     padding: const EdgeInsets.symmetric(
                         horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
-                      color: sp == 1.0 ? AppColors.accent : AppColors.background,
+                      color: active ? AppColors.accent : AppColors.background,
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
-                          color: sp == 1.0 ? AppColors.accent : AppColors.border),
+                          color: active ? AppColors.accent : AppColors.border),
                     ),
                     child: Text('${sp}x',
                         style: TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700,
-                          color: sp == 1.0 ? Colors.black : AppColors.textPrimary,
+                          color: active ? Colors.black : AppColors.textPrimary,
                           fontFamily: 'Inter',
                         )),
                   ),
@@ -540,6 +551,15 @@ class SettingsScreen extends ConsumerWidget {
       ),
     );
     if (ok != true || !context.mounted) return;
+    try {
+      final tmp = await getTemporaryDirectory();
+      final dirs = ['video_thumbs', 'album_art'];
+      for (final name in dirs) {
+        final dir = Directory('${tmp.path}/$name');
+        if (await dir.exists()) await dir.delete(recursive: true);
+      }
+    } catch (_) {}
+    if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
           content: Text('Cache cleared'),

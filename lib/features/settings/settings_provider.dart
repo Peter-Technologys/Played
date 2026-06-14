@@ -18,6 +18,11 @@ class AppSettings {
   final bool hideVaultFromRecents;
   final List<String> scanFolders;
   final String language;
+  // New fields
+  final double playbackSpeed;
+  final bool autoPip;
+  final bool pauseDuringCalls;
+  final bool autoLoadSubtitles;
 
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
@@ -33,6 +38,10 @@ class AppSettings {
     this.hideVaultFromRecents = true,
     this.scanFolders = const [],
     this.language = 'en',
+    this.playbackSpeed = 1.0,
+    this.autoPip = false,
+    this.pauseDuringCalls = true,
+    this.autoLoadSubtitles = true,
   });
 
   AppSettings copyWith({
@@ -49,6 +58,10 @@ class AppSettings {
     bool? hideVaultFromRecents,
     List<String>? scanFolders,
     String? language,
+    double? playbackSpeed,
+    bool? autoPip,
+    bool? pauseDuringCalls,
+    bool? autoLoadSubtitles,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -66,68 +79,79 @@ class AppSettings {
             hideVaultFromRecents ?? this.hideVaultFromRecents,
         scanFolders: scanFolders ?? this.scanFolders,
         language: language ?? this.language,
+        playbackSpeed: playbackSpeed ?? this.playbackSpeed,
+        autoPip: autoPip ?? this.autoPip,
+        pauseDuringCalls: pauseDuringCalls ?? this.pauseDuringCalls,
+        autoLoadSubtitles: autoLoadSubtitles ?? this.autoLoadSubtitles,
       );
 
   // ── SharedPreferences keys ──
-  static const _kTheme        = 'settings_theme';
-  static const _kAutoResume   = 'settings_auto_resume';
-  static const _kBatterySaver = 'settings_battery_saver';
-  static const _kRepeat       = 'settings_repeat';
-  static const _kShuffle      = 'settings_shuffle';
-  static const _kCrossfade    = 'settings_crossfade';
-  static const _kSkipSilence  = 'settings_skip_silence';
-  static const _kGapless      = 'settings_gapless';
-  static const _kNotification = 'settings_notification';
-  static const _kAppLock      = 'settings_app_lock';
-  static const _kHideVault    = 'settings_hide_vault';
-  static const _kLanguage     = 'settings_language';
+  static const _kTheme          = 'settings_theme';
+  static const _kAutoResume     = 'settings_auto_resume';
+  static const _kBatterySaver   = 'settings_battery_saver';
+  static const _kRepeat         = 'settings_repeat';
+  static const _kShuffle        = 'settings_shuffle';
+  static const _kCrossfade      = 'settings_crossfade';
+  static const _kSkipSilence    = 'settings_skip_silence';
+  static const _kGapless        = 'settings_gapless';
+  static const _kNotification   = 'settings_notification';
+  static const _kAppLock        = 'settings_app_lock';
+  static const _kHideVault      = 'settings_hide_vault';
+  static const _kLanguage       = 'settings_language';
+  static const _kPlaybackSpeed  = 'settings_playback_speed';
+  static const _kAutoPip        = 'settings_auto_pip';
+  static const _kPauseCalls     = 'settings_pause_calls';
+  static const _kAutoSubtitles  = 'settings_auto_subtitles';
 
-  /// Load all settings from SharedPreferences.
-  /// Called once in main() before runApp() so UI starts with correct values.
   static Future<AppSettings> load() async {
     final p = await SharedPreferences.getInstance();
     return AppSettings(
       themeMode: AppThemeMode.values[
           (p.getInt(_kTheme) ?? AppThemeMode.dark.index)
               .clamp(0, AppThemeMode.values.length - 1)],
-      autoResume:             p.getBool(_kAutoResume)   ?? true,
-      defaultBatterySaver:    p.getBool(_kBatterySaver) ?? false,
+      autoResume:             p.getBool(_kAutoResume)    ?? true,
+      defaultBatterySaver:    p.getBool(_kBatterySaver)  ?? false,
       repeatMode: RepeatMode.values[
           (p.getInt(_kRepeat) ?? RepeatMode.off.index)
               .clamp(0, RepeatMode.values.length - 1)],
-      shuffle:                p.getBool(_kShuffle)      ?? false,
-      crossfadeDuration:      p.getDouble(_kCrossfade)  ?? 0.0,
-      skipSilence:            p.getBool(_kSkipSilence)  ?? false,
-      gaplessPlayback:        p.getBool(_kGapless)      ?? true,
-      nowPlayingNotification: p.getBool(_kNotification) ?? true,
-      appLockEnabled:         p.getBool(_kAppLock)      ?? false,
-      hideVaultFromRecents:   p.getBool(_kHideVault)    ?? true,
-      language:               p.getString(_kLanguage)   ?? 'en',
+      shuffle:                p.getBool(_kShuffle)       ?? false,
+      crossfadeDuration:      p.getDouble(_kCrossfade)   ?? 0.0,
+      skipSilence:            p.getBool(_kSkipSilence)   ?? false,
+      gaplessPlayback:        p.getBool(_kGapless)       ?? true,
+      nowPlayingNotification: p.getBool(_kNotification)  ?? true,
+      appLockEnabled:         p.getBool(_kAppLock)       ?? false,
+      hideVaultFromRecents:   p.getBool(_kHideVault)     ?? true,
+      language:               p.getString(_kLanguage)    ?? 'en',
+      playbackSpeed:          p.getDouble(_kPlaybackSpeed) ?? 1.0,
+      autoPip:                p.getBool(_kAutoPip)       ?? false,
+      pauseDuringCalls:       p.getBool(_kPauseCalls)    ?? true,
+      autoLoadSubtitles:      p.getBool(_kAutoSubtitles) ?? true,
     );
   }
 
-  /// Persist current settings to SharedPreferences.
-  /// Called automatically by SettingsNotifier on every change.
   Future<void> save() async {
     final p = await SharedPreferences.getInstance();
-    await p.setInt(_kTheme,         themeMode.index);
-    await p.setBool(_kAutoResume,    autoResume);
-    await p.setBool(_kBatterySaver,  defaultBatterySaver);
-    await p.setInt(_kRepeat,         repeatMode.index);
-    await p.setBool(_kShuffle,       shuffle);
-    await p.setDouble(_kCrossfade,   crossfadeDuration);
-    await p.setBool(_kSkipSilence,   skipSilence);
-    await p.setBool(_kGapless,       gaplessPlayback);
-    await p.setBool(_kNotification,  nowPlayingNotification);
-    await p.setBool(_kAppLock,       appLockEnabled);
-    await p.setBool(_kHideVault,     hideVaultFromRecents);
-    await p.setString(_kLanguage,    language);
+    await p.setInt(_kTheme,           themeMode.index);
+    await p.setBool(_kAutoResume,      autoResume);
+    await p.setBool(_kBatterySaver,    defaultBatterySaver);
+    await p.setInt(_kRepeat,           repeatMode.index);
+    await p.setBool(_kShuffle,         shuffle);
+    await p.setDouble(_kCrossfade,     crossfadeDuration);
+    await p.setBool(_kSkipSilence,     skipSilence);
+    await p.setBool(_kGapless,         gaplessPlayback);
+    await p.setBool(_kNotification,    nowPlayingNotification);
+    await p.setBool(_kAppLock,         appLockEnabled);
+    await p.setBool(_kHideVault,       hideVaultFromRecents);
+    await p.setString(_kLanguage,      language);
+    await p.setDouble(_kPlaybackSpeed, playbackSpeed);
+    await p.setBool(_kAutoPip,         autoPip);
+    await p.setBool(_kPauseCalls,      pauseDuringCalls);
+    await p.setBool(_kAutoSubtitles,   autoLoadSubtitles);
   }
 }
 
 // ── Notifier: persists every change to SharedPreferences ──
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  // Accepts initial settings pre-loaded from SharedPreferences in main()
   SettingsNotifier(AppSettings initial) : super(initial);
 
   Future<void> _update(AppSettings s) async {
@@ -148,9 +172,12 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   void setHideVaultFromRecents(bool v)    => _update(state.copyWith(hideVaultFromRecents: v));
   void setScanFolders(List<String> v)     => _update(state.copyWith(scanFolders: v));
   void setLanguage(String v)              => _update(state.copyWith(language: v));
+  void setPlaybackSpeed(double v)         => _update(state.copyWith(playbackSpeed: v));
+  void setAutoPip(bool v)                 => _update(state.copyWith(autoPip: v));
+  void setPauseDuringCalls(bool v)        => _update(state.copyWith(pauseDuringCalls: v));
+  void setAutoLoadSubtitles(bool v)       => _update(state.copyWith(autoLoadSubtitles: v));
 }
 
-// Seeded in main() with values loaded from SharedPreferences
 final settingsProvider =
     StateNotifierProvider<SettingsNotifier, AppSettings>(
   (_) => SettingsNotifier(const AppSettings()),
