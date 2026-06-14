@@ -184,8 +184,10 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                       HapticFeedback.mediumImpact();
                       ref.read(trimStatusProvider.notifier).state = TrimStatus.trimming;
                       ref.read(trimProgressProvider.notifier).state = 0;
-                      final result = await FfmpegService.instance.extractAudio(
+                      final result = await FfmpegService.instance.trimForWhatsApp(
                         videoPath: mediaItem.filePath,
+                        startSec: start,
+                        endSec: end,
                         onProgress: (p) =>
                             ref.read(trimProgressProvider.notifier).state = p,
                       );
