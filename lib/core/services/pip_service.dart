@@ -6,7 +6,7 @@ class PipService {
   PipService._();
   static final PipService instance = PipService._();
 
-  static const _channel = MethodChannel('com.played.app/pip');
+  static const _channel = MethodChannel('com.petersmart.played/pip');
 
   /// Enters PiP mode with the given aspect ratio.
   Future<void> enterPip({double aspectRatioWidth = 16, double aspectRatioHeight = 9}) async {
