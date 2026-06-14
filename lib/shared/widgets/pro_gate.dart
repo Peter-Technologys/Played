@@ -35,16 +35,23 @@ class _ProGateState extends State<ProGate> {
   }
 
   Future<void> _checkPro() async {
+    // isProActive() reads SharedPreferences first (instant, offline-safe).
+    // Only hits Firestore if local Pro is expired AND device is online.
     final active = await ProService.instance.isProActive();
     if (mounted) setState(() { _isPro = active; _checking = false; });
   }
 
   @override
   Widget build(BuildContext context) {
+    // While checking Pro status show the child immediately if we have
+    // no network — avoids a spinner blocking an offline user from
+    // accessing a feature they may have already unlocked locally.
     if (_checking) {
       return const Scaffold(
         backgroundColor: AppColors.background,
-        body: Center(child: CircularProgressIndicator(color: AppColors.accent)),
+        body: Center(
+          child: CircularProgressIndicator(color: AppColors.accent),
+        ),
       );
     }
     if (_isPro) return widget.child;
