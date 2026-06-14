@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../app/theme/app_colors.dart';
 
-/// Bottom banner ad slot using the real AdMob ad unit.
-/// Displays a standard banner (320x50) and falls back to a
-/// placeholder while the ad is loading or if it fails.
+/// Bottom banner ad slot.
+/// Only loads the ad when the device has an active internet connection.
+/// Collapses to zero height when offline or ad not loaded — no empty bar.
 class AdBannerSlot extends StatefulWidget {
   const AdBannerSlot({super.key});
 
-  /// Production ad unit ID for played_bottom_banner.
   static const String _adUnitId = 'ca-app-pub-2517163652161686/9744511115';
 
   @override
@@ -18,14 +18,24 @@ class AdBannerSlot extends StatefulWidget {
 class _AdBannerSlotState extends State<AdBannerSlot> {
   BannerAd? _bannerAd;
   bool _adLoaded = false;
+  bool _triedLoading = false;
 
   @override
   void initState() {
     super.initState();
+    _loadIfOnline();
+  }
+
+  Future<void> _loadIfOnline() async {
+    final result = await Connectivity().checkConnectivity();
+    final isOnline = result != ConnectivityResult.none;
+    if (!isOnline || !mounted) return;
     _loadAd();
   }
 
   void _loadAd() {
+    if (_triedLoading) return;
+    _triedLoading = true;
     final ad = BannerAd(
       adUnitId: AdBannerSlot._adUnitId,
       size: AdSize.banner,
@@ -35,8 +45,10 @@ class _AdBannerSlotState extends State<AdBannerSlot> {
           if (mounted) setState(() => _adLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
-          debugPrint('[AdMob] Banner failed to load: $error');
+          debugPrint('[AdMob] Banner failed: $error');
           ad.dispose();
+          // Allow retry on next build
+          if (mounted) setState(() => _triedLoading = false);
         },
       ),
     );
@@ -52,6 +64,8 @@ class _AdBannerSlotState extends State<AdBannerSlot> {
 
   @override
   Widget build(BuildContext context) {
+    // Offline or ad not ready — collapse to nothing, no grey placeholder
+    if (!_adLoaded || _bannerAd == null) return const SizedBox.shrink();
     return Container(
       width: double.infinity,
       height: 52,
@@ -61,17 +75,7 @@ class _AdBannerSlotState extends State<AdBannerSlot> {
           top: BorderSide(color: AppColors.border, width: 1),
         ),
       ),
-      child: _adLoaded && _bannerAd != null
-          ? AdWidget(ad: _bannerAd!)
-          : const Center(
-              child: Text(
-                'Ad space',
-                style: TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ),
+      child: AdWidget(ad: _bannerAd!),
     );
   }
 }

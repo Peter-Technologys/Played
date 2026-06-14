@@ -1,11 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:permission_handler/permission_handler.dart';
-// Fixed import path: file is in lib/core/permissions/, so needs two levels up
 import '../../app/theme/app_colors.dart';
 
-/// Shown on first launch. Requests all required runtime permissions
-/// before allowing the user into the main app.
+/// Shown on first launch. Requests all required runtime permissions.
+/// Critical permissions (storage/media) block the app.
+/// Optional permissions (Bluetooth, Location, Notifications) are requested
+/// silently but never block the user — they can grant later via Air-Drop.
 class PermissionGateScreen extends StatefulWidget {
   final Widget child;
   const PermissionGateScreen({super.key, required this.child});
@@ -16,14 +17,18 @@ class PermissionGateScreen extends StatefulWidget {
 
 class _PermissionGateScreenState extends State<PermissionGateScreen> {
   bool _checking = true;
-  bool _allGranted = false;
+  bool _criticalGranted = false;
   Map<Permission, PermissionStatus> _statuses = {};
 
-  // All permissions the app needs
-  static final List<Permission> _required = [
-    Permission.storage,
-    Permission.audio,
-    Permission.videos,
+  // Critical — app cannot scan media without these
+  static final List<Permission> _critical = [
+    Permission.storage,  // Android ≤ 12
+    Permission.audio,    // Android 13+
+    Permission.videos,   // Android 13+
+  ];
+
+  // Optional — only needed for Air-Drop; app works fine without them
+  static final List<Permission> _optional = [
     Permission.bluetooth,
     Permission.bluetoothScan,
     Permission.bluetoothAdvertise,
@@ -41,13 +46,15 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> {
 
   Future<void> _checkPermissions() async {
     setState(() => _checking = true);
-    final statuses = await _required.request();
-    final allGranted = statuses.values
+    final criticalStatuses = await _critical.request();
+    // Request optional silently — result not used to gate the app
+    final optionalStatuses = await _optional.request();
+    final criticalGranted = criticalStatuses.values
         .every((s) => s == PermissionStatus.granted ||
             s == PermissionStatus.limited);
     setState(() {
-      _statuses = statuses;
-      _allGranted = allGranted;
+      _statuses = {...criticalStatuses, ...optionalStatuses};
+      _criticalGranted = criticalGranted;
       _checking = false;
     });
   }
@@ -55,7 +62,7 @@ class _PermissionGateScreenState extends State<PermissionGateScreen> {
   @override
   Widget build(BuildContext context) {
     if (_checking) return const _SplashLoader();
-    if (_allGranted) return widget.child;
+    if (_criticalGranted) return widget.child;
     return _PermissionDeniedScreen(
       statuses: _statuses,
       onRetry: _checkPermissions,
@@ -76,7 +83,6 @@ class _SplashLoader extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // App logo / wordmark
             Text(
               'PLAYED',
               style: const TextStyle(
@@ -97,17 +103,17 @@ class _SplashLoader extends StatelessWidget {
               ),
             ).animate().fadeIn(duration: 600.ms, delay: 200.ms),
             const SizedBox(height: 48),
-            SizedBox(
+            const SizedBox(
               width: 32,
               height: 32,
-              child: const CircularProgressIndicator(
+              child: CircularProgressIndicator(
                 color: AppColors.accent,
                 strokeWidth: 2,
               ),
-            ).animate().fadeIn(duration: 400.ms, delay: 400.ms),
+            ),
             const SizedBox(height: 16),
             Text(
-              'Requesting permissions...',
+              'Setting up...',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textSecondary,
@@ -120,37 +126,27 @@ class _SplashLoader extends StatelessWidget {
   }
 }
 
-// ── Permission Denied Screen ──────────────────────────────────
+// ── Permission Denied Screen (critical only) ──────────────────
 
 class _PermissionDeniedScreen extends StatelessWidget {
   final Map<Permission, PermissionStatus> statuses;
   final VoidCallback onRetry;
+  const _PermissionDeniedScreen(
+      {required this.statuses, required this.onRetry});
 
-  const _PermissionDeniedScreen({
-    required this.statuses,
-    required this.onRetry,
-  });
-
-  // Non-const: Permission overrides == and hashCode so cannot be used as a const map key
   static final Map<Permission, String> _labels = {
     Permission.storage: 'Storage — scan local media files',
-    Permission.audio: 'Audio files — read music',
-    Permission.videos: 'Video files — read videos',
-    Permission.bluetooth: 'Bluetooth — Air-Drop sharing',
-    Permission.bluetoothScan: 'Bluetooth Scan — find nearby devices',
-    Permission.bluetoothAdvertise: 'Bluetooth Advertise — be discoverable',
-    Permission.bluetoothConnect: 'Bluetooth Connect — transfer files',
-    Permission.locationWhenInUse: 'Location — required for Bluetooth scan',
-    Permission.nearbyWifiDevices: 'Nearby Wi-Fi — high-speed Air-Drop',
-    Permission.notification: 'Notifications — extraction progress',
+    Permission.audio:   'Audio files — read music (Android 13+)',
+    Permission.videos:  'Video files — read videos (Android 13+)',
   };
 
   @override
   Widget build(BuildContext context) {
     final denied = statuses.entries
         .where((e) =>
-            e.value == PermissionStatus.denied ||
-            e.value == PermissionStatus.permanentlyDenied)
+            _labels.containsKey(e.key) &&
+            (e.value == PermissionStatus.denied ||
+             e.value == PermissionStatus.permanentlyDenied))
         .toList();
 
     return Scaffold(
@@ -162,11 +158,11 @@ class _PermissionDeniedScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 24),
-              const Icon(Icons.security_rounded,
+              const Icon(Icons.folder_off_rounded,
                   color: AppColors.accent, size: 48),
               const SizedBox(height: 20),
               const Text(
-                'Permissions Required',
+                'Storage Access Required',
                 style: TextStyle(
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
@@ -176,7 +172,8 @@ class _PermissionDeniedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'PLAYED needs the following permissions to work fully offline.',
+                'PLAYED needs access to your media files to work. '
+                'Bluetooth and Location are optional — only needed for Air-Drop.',
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
@@ -227,10 +224,9 @@ class _PermissionDeniedScreen extends StatelessWidget {
                             TextButton(
                               onPressed: openAppSettings,
                               child: const Text(
-                                'Settings',
+                                'Open Settings',
                                 style: TextStyle(
-                                    color: AppColors.accent,
-                                    fontSize: 12),
+                                    color: AppColors.accent, fontSize: 12),
                               ),
                             ),
                         ],
@@ -260,7 +256,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: const Text(
-                    'Grant Permissions',
+                    'Grant Storage Access',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
