@@ -25,13 +25,11 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
       ),
       inputDecorationTheme: const InputDecorationTheme(
         border: InputBorder.none,
-        hintStyle: TextStyle(
-            color: AppColors.textSecondary, fontFamily: 'SpaceGrotesk'),
+        hintStyle: TextStyle(color: AppColors.textSecondary),
       ),
       textTheme: const TextTheme(
         titleLarge: TextStyle(
             color: AppColors.textPrimary,
-            fontFamily: 'SpaceGrotesk',
             fontSize: 16),
       ),
     );
@@ -81,8 +79,7 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
             const SizedBox(height: 12),
             Text('No results for "$query"',
                 style: const TextStyle(
-                    color: AppColors.textSecondary,
-                    fontFamily: 'SpaceGrotesk')),
+                    color: AppColors.textSecondary)),
           ],
         ),
       );
@@ -139,7 +136,6 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
-                              fontFamily: 'SpaceGrotesk',
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
