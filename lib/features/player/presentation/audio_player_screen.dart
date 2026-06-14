@@ -141,6 +141,27 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       _player.seek(state.position + const Duration(seconds: 10));
   Future<void> skipBack() =>
       _player.seek(state.position - const Duration(seconds: 10));
+
+  /// Skip to next track in queue and load it.
+  void skipNext() {
+    if (_container == null) return;
+    _container!.read(queueProvider.notifier).next();
+    final next = _container!.read(queueProvider).current;
+    if (next != null) load(next);
+  }
+
+  /// Skip to previous track in queue and load it.
+  void skipPrevious() {
+    // If more than 3 s in, restart current track instead
+    if (state.position.inSeconds > 3) {
+      _player.seek(Duration.zero);
+      return;
+    }
+    if (_container == null) return;
+    _container!.read(queueProvider.notifier).previous();
+    final prev = _container!.read(queueProvider).current;
+    if (prev != null) load(prev);
+  }
   void setSpeed(double s) {
     _player.setSpeed(s);
     state = state.copyWith(speed: s);

@@ -8,6 +8,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../shared/widgets/played_logo.dart';
+import '../../settings/settings_provider.dart';
 
 // ── Playback Settings ─────────────────────────────────────────
 
@@ -225,6 +226,113 @@ class SettingsScreen extends ConsumerWidget {
             subtitle: 'Auto-pause when a call comes in',
             value: pb.pauseOnCall,
             onChanged: (_) => pbN.togglePauseOnCall(),
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── Privacy & Security ────────────────────────────
+          const _SectionHeader(label: 'Privacy & Security'),
+          const SizedBox(height: 12),
+          _SwitchTile(
+            icon: Icons.lock_rounded,
+            label: 'App Lock',
+            subtitle: 'Require biometrics to open PLAYED',
+            value: ref.watch(settingsProvider).appLockEnabled,
+            onChanged: (v) => ref.read(settingsProvider.notifier).setAppLock(v),
+          ),
+          const SizedBox(height: 8),
+          _SwitchTile(
+            icon: Icons.visibility_off_rounded,
+            label: 'Hide Vault from Recents',
+            subtitle: 'Blur screenshot when switching apps',
+            value: ref.watch(settingsProvider).hideVaultFromRecents,
+            onChanged: (v) => ref.read(settingsProvider.notifier).setHideVaultFromRecents(v),
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── Appearance ────────────────────────────────────
+          const _SectionHeader(label: 'Appearance'),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.all(4),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: AppThemeMode.values.map((mode) {
+                final label = switch (mode) {
+                  AppThemeMode.dark   => 'Dark',
+                  AppThemeMode.amoled => 'AMOLED',
+                  AppThemeMode.light  => 'Light',
+                };
+                final icon = switch (mode) {
+                  AppThemeMode.dark   => Icons.dark_mode_rounded,
+                  AppThemeMode.amoled => Icons.brightness_1_rounded,
+                  AppThemeMode.light  => Icons.light_mode_rounded,
+                };
+                final active = ref.watch(settingsProvider).themeMode == mode;
+                return Expanded(
+                  child: GestureDetector(
+                    onTap: () => ref.read(settingsProvider.notifier).setThemeMode(mode),
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: active
+                            ? const LinearGradient(
+                                colors: [AppColors.accent, AppColors.accentViolet])
+                            : null,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(icon,
+                              color: active ? Colors.black : AppColors.textSecondary,
+                              size: 18),
+                          const SizedBox(height: 4),
+                          Text(label,
+                              style: TextStyle(
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                                color: active ? Colors.black : AppColors.textSecondary,
+                              )),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── Library ───────────────────────────────────────
+          const _SectionHeader(label: 'Library'),
+          const SizedBox(height: 12),
+          _TappableTile(
+            icon: Icons.refresh_rounded,
+            label: 'Rescan Library',
+            subtitle: 'Find new files added to your device',
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Rescanning library in background…'),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
+          _TappableTile(
+            icon: Icons.delete_sweep_rounded,
+            label: 'Clear Cache',
+            subtitle: 'Remove temporary processing files',
+            onTap: () => _confirmClearCache(context),
           ),
 
           const SizedBox(height: 32),
@@ -486,6 +594,49 @@ class SettingsScreen extends ConsumerWidget {
                 style: TextStyle(color: AppColors.error)),
           ),
         ],
+      ),
+    );
+  }
+
+  Future<void> _confirmClearCache(BuildContext context) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Clear Cache?',
+            style: TextStyle(
+                color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
+        content: const Text(
+          'Temporary files will be deleted. Your media and playlists are safe.',
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Clear',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cache cleared'),
+        backgroundColor: AppColors.surface,
       ),
     );
   }

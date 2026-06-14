@@ -340,7 +340,20 @@ class PlaylistDetailScreen extends ConsumerWidget {
               fontSize: 18,
             )),
         actions: [
-          if (tracks.isNotEmpty)
+          if (tracks.isNotEmpty) ...[
+            IconButton(
+              icon: const Icon(Icons.shuffle_rounded,
+                  color: AppColors.textSecondary, size: 22),
+              tooltip: 'Shuffle play',
+              onPressed: () {
+                HapticFeedback.mediumImpact();
+                final shuffled = List.of(tracks)..shuffle();
+                ref.read(queueProvider.notifier).setQueue(shuffled);
+                ref.read(miniPlayerItemProvider.notifier).state = shuffled.first;
+                ref.read(audioPlayerProvider.notifier).load(shuffled.first);
+                context.push('/player/audio', extra: shuffled.first);
+              },
+            ),
             IconButton(
               icon: const Icon(Icons.play_arrow_rounded,
                   color: AppColors.accent, size: 28),
@@ -353,6 +366,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 context.push('/player/audio', extra: tracks.first);
               },
             ),
+          ],
         ],
       ),
       body: tracks.isEmpty

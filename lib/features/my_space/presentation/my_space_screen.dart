@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
@@ -297,21 +298,21 @@ class _SongList extends ConsumerWidget {
   }
 }
 
-class _SongRow extends StatelessWidget {
+class _SongRow extends ConsumerWidget {
   final MediaItem item;
   final int index;
   final VoidCallback onTap;
   const _SongRow({required this.item, required this.index, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return InkWell(
       onTap: onTap,
+      onLongPress: () => _showContextMenu(context, ref),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            // Track number / art placeholder
             Container(
               width: 48,
               height: 48,
@@ -343,7 +344,8 @@ class _SongRow extends StatelessWidget {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    item.artist != null && item.artist!.isNotEmpty &&
+                    item.artist != null &&
+                            item.artist!.isNotEmpty &&
                             item.artist != '<unknown>'
                         ? item.artist!
                         : item.formattedDuration,
@@ -366,10 +368,250 @@ class _SongRow extends StatelessWidget {
               ),
             ),
             const SizedBox(width: 4),
-            const Icon(Icons.more_vert_rounded,
-                color: AppColors.textSecondary, size: 18),
+            GestureDetector(
+              onTap: () => _showContextMenu(context, ref),
+              child: const Icon(Icons.more_vert_rounded,
+                  color: AppColors.textSecondary, size: 18),
+            ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showContextMenu(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _SongContextMenu(item: item, ref: ref),
+    );
+  }
+}
+
+class _SongContextMenu extends ConsumerWidget {
+  final MediaItem item;
+  final WidgetRef ref;
+  const _SongContextMenu({required this.item, required this.ref});
+
+  @override
+  Widget build(BuildContext context, WidgetRef r) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Title row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentViolet.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.music_note_rounded,
+                      color: AppColors.accentViolet, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title,
+                          style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                          ),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(
+                        item.artist != null && item.artist != '<unknown>'
+                            ? item.artist!
+                            : item.formattedDuration,
+                        style: const TextStyle(
+                            fontSize: 12, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: AppColors.border, height: 1),
+          _ContextOption(
+            icon: Icons.play_arrow_rounded,
+            label: 'Play',
+            color: AppColors.accent,
+            onTap: () {
+              Navigator.pop(context);
+              r.read(queueProvider.notifier).setQueue([item]);
+              context.push('/player/audio', extra: item);
+            },
+          ),
+          _ContextOption(
+            icon: Icons.queue_music_rounded,
+            label: 'Add to Queue',
+            color: AppColors.accent,
+            onTap: () {
+              Navigator.pop(context);
+              r.read(queueProvider.notifier).addToQueue(item);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Added to queue')),
+              );
+            },
+          ),
+          _ContextOption(
+            icon: Icons.playlist_add_rounded,
+            label: 'Add to Playlist',
+            color: AppColors.accent,
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/playlists');
+            },
+          ),
+          _ContextOption(
+            icon: Icons.share_rounded,
+            label: 'Share',
+            color: AppColors.textSecondary,
+            onTap: () {
+              Navigator.pop(context);
+              // share_plus
+            },
+          ),
+          _ContextOption(
+            icon: Icons.lock_rounded,
+            label: 'Move to Vault',
+            color: AppColors.accentViolet,
+            onTap: () async {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Moved to Vault')),
+              );
+            },
+          ),
+          _ContextOption(
+            icon: Icons.info_outline_rounded,
+            label: 'File Info',
+            color: AppColors.textSecondary,
+            onTap: () {
+              Navigator.pop(context);
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: AppColors.surface,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(24))),
+                builder: (_) => _FileInfoSheet(item: item),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContextOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ContextOption({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(label,
+          style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500)),
+      onTap: onTap,
+      dense: true,
+    );
+  }
+}
+
+class _FileInfoSheet extends StatelessWidget {
+  final MediaItem item;
+  const _FileInfoSheet({required this.item});
+
+  @override
+  Widget build(BuildContext context) {
+    final rows = [
+      ('Title', item.title),
+      ('Artist', item.artist ?? 'Unknown'),
+      ('Album', item.album ?? 'Unknown'),
+      ('Duration', item.formattedDuration),
+      ('Size', item.formattedSize),
+      ('Path', item.filePath),
+      ('Added', item.addedAt.toLocal().toString().split('.').first),
+    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 16),
+          const Text('File Info',
+              style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 16),
+          ...rows.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 10),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    SizedBox(
+                      width: 72,
+                      child: Text(r.$1,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                              fontWeight: FontWeight.w600)),
+                    ),
+                    Expanded(
+                      child: Text(r.$2,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textPrimary)),
+                    ),
+                  ],
+                ),
+              )),
+        ],
       ),
     );
   }
