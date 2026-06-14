@@ -11,6 +11,7 @@ import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
 import '../../player/presentation/queue_screen.dart';
+import 'file_management_sheet.dart';
 
 // ── Recently Played row ─────────────────────────────────────────────
 class _RecentlyPlayedRow extends ConsumerWidget {

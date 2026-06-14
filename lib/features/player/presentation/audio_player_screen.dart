@@ -17,6 +17,7 @@ import 'mini_player.dart';
 import 'queue_screen.dart';
 import 'lyrics_screen.dart';
 import 'file_info_sheet.dart';
+import 'car_mode_screen.dart';
 import 'widgets/sleep_timer.dart';
 
 // ── State ──────────────────────────────────────────────────────

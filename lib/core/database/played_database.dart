@@ -201,7 +201,15 @@ class PlayedDatabase {
         .toList();
   }
 
-  // ── Teardown ────────────────────────────────────────────────
+  // ── Lyrics Cache ──────────────────────────────────────────────────────
+
+  Future<void> cacheLyrics(String mediaId, String rawLyrics) async =>
+      _shelfCacheBox.put('lyrics_$mediaId', rawLyrics);
+
+  String? getCachedLyrics(String mediaId) =>
+      _shelfCacheBox.get('lyrics_$mediaId');
+
+  // ── Teardown ──────────────────────────────────────────────────────
 
   Future<void> close() async {
     await Hive.close();
