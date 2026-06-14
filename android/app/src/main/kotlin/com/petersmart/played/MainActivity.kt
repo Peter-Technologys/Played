@@ -23,6 +23,14 @@ class MainActivity : FlutterActivity() {
     private val pipChannel   = "com.petersmart.played/pip"
     private val mediaChannel = "com.petersmart.played/media_store"
     private val fileChannel  = "com.petersmart.played/file_ops"
+    private val eqChannel    = "com.petersmart.played/equalizer"
+    private val phoneChannel = "com.petersmart.played/phone_state"
+
+    private var equalizer: android.media.audiofx.Equalizer? = null
+
+    @Suppress("DEPRECATION")
+    private var phoneStateListener: android.telephony.PhoneStateListener? = null
+    private var telephonyManager: android.telephony.TelephonyManager? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -60,7 +68,40 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // ── File operations ──────────────────────────────────────────────
+        // ── Phone state (Pause During Calls) ───────────────────────────────────────
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, phoneChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setPauseDuringCalls" -> {
+                        val enabled = call.argument<Boolean>("enabled") ?: true
+                        if (enabled) registerPhoneListener() else unregisterPhoneListener()
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+        registerPhoneListener()
+
+        // ── Equalizer ─────────────────────────────────────────────────────────
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, eqChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setBands" -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val gains = call.argument<List<Double>>("gains") ?: emptyList()
+                        applyEqBands(gains)
+                        result.success(null)
+                    }
+                    "release" -> {
+                        equalizer?.release()
+                        equalizer = null
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // ── File operations ──────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, fileChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -255,6 +296,57 @@ class MainActivity : FlutterActivity() {
             ) > 0
             if (!deleted) file.delete() else true
         } catch (_: Exception) { false }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun registerPhoneListener() {
+        if (phoneStateListener != null) return
+        try {
+            telephonyManager = getSystemService(TELEPHONY_SERVICE)
+                as? android.telephony.TelephonyManager ?: return
+            phoneStateListener = object : android.telephony.PhoneStateListener() {
+                override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                    val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                    when (state) {
+                        android.telephony.TelephonyManager.CALL_STATE_RINGING,
+                        android.telephony.TelephonyManager.CALL_STATE_OFFHOOK ->
+                            am.requestAudioFocus(null,
+                                android.media.AudioManager.STREAM_MUSIC,
+                                android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+                        android.telephony.TelephonyManager.CALL_STATE_IDLE ->
+                            am.abandonAudioFocus(null)
+                    }
+                }
+            }
+            telephonyManager!!.listen(phoneStateListener,
+                android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
+        } catch (e: Exception) {
+            android.util.Log.w("PhoneState", "register failed: ${e.message}")
+        }
+    }
+
+    @Suppress("DEPRECATION")
+    private fun unregisterPhoneListener() {
+        phoneStateListener?.let {
+            telephonyManager?.listen(it, android.telephony.PhoneStateListener.LISTEN_NONE)
+        }
+        phoneStateListener = null
+    }
+
+    private fun applyEqBands(gains: List<Double>) {
+        try {
+            if (equalizer == null) {
+                equalizer = android.media.audiofx.Equalizer(0, 0).apply { enabled = true }
+            }
+            val eq = equalizer ?: return
+            val range = eq.getBandLevelRange()
+            gains.take(eq.numberOfBands.toInt()).forEachIndexed { i, gainDb ->
+                val mb = (gainDb * 100).toInt().toShort().coerceIn(range[0], range[1])
+                eq.setBandLevel(i.toShort(), mb)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("Equalizer", "applyEqBands failed: ${e.message}")
+        }
     }
 
     private fun renameFile(path: String, newName: String): String? {
