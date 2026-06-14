@@ -60,29 +60,65 @@ class AudioPlayerState {
 }
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
-  final AudioPlayer _player = AudioPlayer();
+  // Singleton player — prevents double-audio and memory leaks
+  // when the player screen is pushed/popped multiple times.
+  static final AudioPlayer _player = AudioPlayer();
+  String? _currentItemId;
 
   AudioPlayerNotifier() : super(const AudioPlayerState()) {
     _player.playerStateStream.listen((s) {
+      if (!mounted) return;
       state = state.copyWith(
         isPlaying: s.playing,
         isLoading: s.processingState == ProcessingState.loading ||
             s.processingState == ProcessingState.buffering,
       );
     });
-    _player.positionStream.listen((p) => state = state.copyWith(position: p));
+    _player.positionStream.listen((p) {
+      if (!mounted) return;
+      state = state.copyWith(position: p);
+      // Autosave seek position every 5 seconds
+      if (_currentItemId != null && p.inSeconds % 5 == 0 && p.inSeconds > 0) {
+        PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
+      }
+    });
     _player.durationStream.listen((d) {
-      if (d != null) { state = state.copyWith(duration: d); }
+      if (!mounted) return;
+      if (d != null) state = state.copyWith(duration: d);
+    });
+    // Auto-advance to next track when current finishes
+    _player.processingStateStream.listen((ps) {
+      if (ps == ProcessingState.completed) {
+        _onTrackComplete();
+      }
     });
   }
 
+  void _onTrackComplete() {
+    // Handled by the screen via repeat/queue logic
+  }
+
   Future<void> load(MediaItem item) async {
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.music());
-    final saved = PlayedDatabase.instance.getSeekPosition(item.id);
-    await _player.setFilePath(item.filePath);
-    if (saved != null) await _player.seek(saved);
-    await _player.play();
+    _currentItemId = item.id;
+    state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      final saved = PlayedDatabase.instance.getSeekPosition(item.id);
+      await _player.setFilePath(item.filePath);
+      if (saved != null && saved.inSeconds > 0) await _player.seek(saved);
+      await _player.play();
+    } catch (e) {
+      debugPrint('[Player] Failed to load ${item.filePath}: $e');
+      if (mounted) state = state.copyWith(isLoading: false);
+    }
+  }
+
+  bool _loadFavorite(String id) {
+    // Favorites persisted in Hive seekPositions box reused as flags box
+    // We use a dedicated key prefix to avoid collision
+    final data = PlayedDatabase.instance.getFavoriteFlag(id);
+    return data;
   }
 
   void togglePlay() => _player.playing ? _player.pause() : _player.play();
@@ -96,7 +132,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _player.setSpeed(s);
     state = state.copyWith(speed: s);
   }
-  void toggleFavorite() => state = state.copyWith(isFavorite: !state.isFavorite);
+
+  void toggleFavorite() {
+    final next = !state.isFavorite;
+    state = state.copyWith(isFavorite: next);
+    if (_currentItemId != null) {
+      PlayedDatabase.instance.setFavoriteFlag(_currentItemId!, next);
+    }
+  }
+
   void toggleShuffle()  => state = state.copyWith(isShuffle: !state.isShuffle);
   void cycleRepeat() {
     final next = RepeatState.values[
@@ -107,7 +151,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       PlayedDatabase.instance.saveSeekPosition(id, state.position);
 
   @override
-  void dispose() { _player.dispose(); super.dispose(); }
+  void dispose() {
+    // Do NOT dispose the singleton player here — it lives for the app lifetime
+    super.dispose();
+  }
 }
 
 final audioPlayerProvider =
@@ -347,7 +394,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: const Icon(Icons.skip_previous_rounded,
                         color: AppColors.textPrimary, size: 34),
-                    onPressed: () {},
+                    onPressed: () {
+                      ref.read(queueProvider.notifier).previous();
+                      final prev = ref.read(queueProvider).current;
+                      if (prev != null) {
+                        ref.read(audioPlayerProvider.notifier).load(prev);
+                      }
+                    },
                   ),
                   IconButton(
                     icon: const Icon(Icons.replay_10_rounded,

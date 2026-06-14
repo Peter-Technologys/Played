@@ -65,12 +65,19 @@ dependencies:
   # Ads (non-intrusive)
   google_mobile_ads: ^4.0.0
 
+  # Secure storage for vault key
+  flutter_secure_storage: ^9.2.2
+
+  # Connectivity — defer ads/Firebase when offline
+  connectivity_plus: ^6.0.3
+
   # Utilities
   uuid: ^4.3.3
   intl: ^0.19.0
   equatable: ^2.0.5
   freezed_annotation: ^2.4.1
   json_annotation: ^4.8.1
+  cupertino_icons: ^1.0.8
 
   # Firebase Auth + Firestore (optional — app works fully without signing in)
   firebase_auth: ^5.3.1
