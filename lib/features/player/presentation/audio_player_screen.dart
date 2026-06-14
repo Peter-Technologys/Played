@@ -1,18 +1,20 @@
 import 'dart:io';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:go_router/go_router.dart';
-// share_plus v10+: use Share.shareXFiles (static method on Share, not SharePlus)
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
+import '../../../core/services/audio_handler.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/utils/duration_formatter.dart';
+import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
 import 'queue_screen.dart';
 import 'lyrics_screen.dart';
@@ -62,9 +64,10 @@ class AudioPlayerState {
 }
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
-  // Singleton player — prevents double-audio and memory leaks
-  // when the player screen is pushed/popped multiple times.
-  static final AudioPlayer _player = AudioPlayer();
+  // Route all playback through the audio_service handler.
+  // This gives us the notification media player for free.
+  PlayedAudioHandler get _handler => globalAudioHandler!;
+  AudioPlayer get _player => _handler.player;
   String? _currentItemId;
 
   AudioPlayerNotifier() : super(const AudioPlayerState()) {
@@ -108,24 +111,27 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _container = container;
   }
 
-  Future<void> load(MediaItem item) async {
+  Future<void> load(MediaItem item, {AppSettings? settings}) async {
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
-
-    // ── Auto-show mini player whenever a track starts ──────────────
     _container?.read(miniPlayerItemProvider.notifier).state = item;
 
-    try {
-      final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
-      final saved = PlayedDatabase.instance.getSeekPosition(item.id);
-      await _player.setFilePath(item.filePath);
-      if (saved != null && saved.inSeconds > 0) await _player.seek(saved);
-      await _player.play();
-    } catch (e) {
-      debugPrint('[Player] Failed to load ${item.filePath}: $e');
-      if (mounted) state = state.copyWith(isLoading: false);
-    }
+    final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
+    final speed       = settings?.playbackSpeed ?? state.speed;
+    final skipSilence = settings?.skipSilence ?? false;
+
+    final session = await AudioSession.instance;
+    await session.configure(const AudioSessionConfiguration.music());
+
+    // loadAndPlay goes through audio_service — creates the notification
+    await _handler.loadAndPlay(
+      item,
+      speed: speed,
+      skipSilence: skipSilence,
+      savedPosition: saved,
+    );
+    state = state.copyWith(speed: speed);
+    PlayedDatabase.instance.recordPlay(item);
   }
 
   bool _loadFavorite(String id) {
@@ -135,15 +141,14 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     return data;
   }
 
-  void togglePlay() => _player.playing ? _player.pause() : _player.play();
-  void pause()      => _player.pause();
-  Future<void> seek(Duration p) => _player.seek(p);
+  void togglePlay() => _player.playing ? _handler.pause() : _handler.play();
+  void pause()      => _handler.pause();
+  Future<void> seek(Duration p) => _handler.seek(p);
   Future<void> skipForward() =>
-      _player.seek(state.position + const Duration(seconds: 10));
+      _handler.seek(state.position + const Duration(seconds: 10));
   Future<void> skipBack() =>
-      _player.seek(state.position - const Duration(seconds: 10));
+      _handler.seek(state.position - const Duration(seconds: 10));
 
-  /// Skip to next track in queue and load it.
   void skipNext() {
     if (_container == null) return;
     _container!.read(queueProvider.notifier).next();
@@ -151,11 +156,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     if (next != null) load(next);
   }
 
-  /// Skip to previous track in queue and load it.
   void skipPrevious() {
-    // If more than 3 s in, restart current track instead
     if (state.position.inSeconds > 3) {
-      _player.seek(Duration.zero);
+      _handler.seek(Duration.zero);
       return;
     }
     if (_container == null) return;
@@ -163,8 +166,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final prev = _container!.read(queueProvider).current;
     if (prev != null) load(prev);
   }
+
   void setSpeed(double s) {
-    _player.setSpeed(s);
+    _handler.setSpeed(s);
     state = state.copyWith(speed: s);
   }
 
@@ -182,22 +186,19 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final next = RepeatState.values[
         (state.repeat.index + 1) % RepeatState.values.length];
     state = state.copyWith(repeat: next);
-    // Apply to just_audio so repeat actually works
     switch (next) {
-      case RepeatState.off:
-        AudioPlayerNotifier._player.setLoopMode(LoopMode.off);
-      case RepeatState.one:
-        AudioPlayerNotifier._player.setLoopMode(LoopMode.one);
-      case RepeatState.all:
-        AudioPlayerNotifier._player.setLoopMode(LoopMode.all);
+      case RepeatState.off: _player.setLoopMode(LoopMode.off);
+      case RepeatState.one: _player.setLoopMode(LoopMode.one);
+      case RepeatState.all: _player.setLoopMode(LoopMode.all);
     }
   }
+
   void savePosition(String id) =>
       PlayedDatabase.instance.saveSeekPosition(id, state.position);
 
   @override
   void dispose() {
-    // Do NOT dispose the singleton player here — it lives for the app lifetime
+    // Do NOT stop the handler — it lives for the app lifetime
     super.dispose();
   }
 }
@@ -231,7 +232,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(audioPlayerProvider.notifier).load(widget.mediaItem);
+      final settings = ref.read(settingsProvider);
+      ref.read(audioPlayerProvider.notifier).load(
+        widget.mediaItem,
+        settings: settings,
+      );
       PlayedDatabase.instance.recordPlay(widget.mediaItem);
     });
   }
@@ -766,8 +771,7 @@ class _OptionsSheet extends ConsumerWidget {
       }),
       _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop', AppColors.accent, () {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Open the Air-Drop tab to share')));
+        context.go('/airdrop');
       }),
       _Opt(Icons.graphic_eq_rounded,    'Open in Studio',      AppColors.accentViolet, onOpenInStudio),
       _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent,       onTrimForWhatsApp),
@@ -780,8 +784,30 @@ class _OptionsSheet extends ConsumerWidget {
       }),
       _Opt(Icons.cast_rounded, 'Cast to Device', AppColors.textSecondary, () {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cast coming soon')));
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Cast to Device',
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
+            content: const Text(
+              'Chromecast / DLNA casting is coming in a future update.\n\n'
+              'For now, use Air-Drop to send files to nearby devices.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Got it', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
       }),
       _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
     ];

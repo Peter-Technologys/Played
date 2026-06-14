@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:audio_service/audio_service.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/foundation.dart';
@@ -7,6 +8,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
+import 'core/services/audio_handler.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/crashlytics_service.dart';
 import 'core/services/notification_service.dart';
@@ -35,7 +37,21 @@ void main() async {
     StorageFolderService.instance.ensureCreated(),
   ]);
 
-  // 3. Pre-load persisted settings
+  // 3. Initialise audio_service — creates the foreground media service
+  //    that powers the notification media player on Android.
+  globalAudioHandler = await AudioService.init(
+    builder: () => PlayedAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.petersmart.played.audio',
+      androidNotificationChannelName: 'PLAYED Media',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      androidNotificationIcon: 'mipmap/ic_launcher',
+      notificationColor: Color(0xFF00D4FF),
+    ),
+  );
+
+  // 4. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
 
   // 4. Wire Flutter + platform error handlers BEFORE runApp()

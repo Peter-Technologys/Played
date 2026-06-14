@@ -7,11 +7,13 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
+import '../../../core/services/vault_service.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
 import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
 import '../../player/presentation/queue_screen.dart';
+import '../../playlists/playlist_screen.dart';
 import 'file_management_sheet.dart';
 
 // ── Recently Played row ─────────────────────────────────────────────
@@ -521,6 +523,156 @@ class _SongContextMenu extends ConsumerWidget {
   final WidgetRef ref;
   const _SongContextMenu({required this.item, required this.ref});
 
+  // Shows a bottom sheet to pick which playlist to add the song to.
+  void _showPlaylistPicker(BuildContext context, WidgetRef r) {
+    final playlists = PlayedDatabase.instance.getAllPlaylists();
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40, height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                const Text('Add to Playlist',
+                    style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                    )),
+                const Spacer(),
+                GestureDetector(
+                  onTap: () async {
+                    Navigator.pop(context);
+                    final ctrl = TextEditingController();
+                    final name = await showDialog<String>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        backgroundColor: AppColors.surface,
+                        title: const Text('New Playlist',
+                            style: TextStyle(color: AppColors.textPrimary)),
+                        content: TextField(
+                          controller: ctrl,
+                          autofocus: true,
+                          style: const TextStyle(color: AppColors.textPrimary),
+                          decoration: const InputDecoration(
+                            hintText: 'Playlist name',
+                            hintStyle: TextStyle(color: AppColors.textSecondary),
+                            enabledBorder: UnderlineInputBorder(
+                                borderSide: BorderSide(color: AppColors.border)),
+                            focusedBorder: UnderlineInputBorder(
+                                borderSide: BorderSide(color: AppColors.accent)),
+                          ),
+                          onSubmitted: (v) => Navigator.pop(context, v),
+                        ),
+                        actions: [
+                          TextButton(
+                              onPressed: () => Navigator.pop(context),
+                              child: const Text('Cancel',
+                                  style: TextStyle(color: AppColors.textSecondary))),
+                          ElevatedButton(
+                            onPressed: () => Navigator.pop(context, ctrl.text),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.accent),
+                            child: const Text('Create',
+                                style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+                          ),
+                        ],
+                      ),
+                    );
+                    if (name != null && name.trim().isNotEmpty && context.mounted) {
+                      final pl = await r.read(playlistsProvider.notifier).create(name.trim());
+                      await r.read(playlistsProvider.notifier).addTrack(pl.id, item);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added to "${pl.name}"'),
+                            backgroundColor: AppColors.surface,
+                          ),
+                        );
+                      }
+                    }
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
+                    ),
+                    child: const Text('+ New',
+                        style: TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                        )),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (playlists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: 16),
+                child: Center(
+                  child: Text('No playlists yet. Tap + New to create one.',
+                      style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                ),
+              )
+            else
+              ...playlists.map((pl) => ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 40, height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                            colors: [AppColors.accent, AppColors.accentViolet]),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.queue_music_rounded,
+                          color: Colors.black, size: 20),
+                    ),
+                    title: Text(pl.name,
+                        style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimary,
+                        )),
+                    subtitle: Text(
+                      '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textSecondary),
+                    ),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await r.read(playlistsProvider.notifier).addTrack(pl.id, item);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Added to "${pl.name}"'),
+                            backgroundColor: AppColors.surface,
+                          ),
+                        );
+                      }
+                    },
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef r) {
     return Padding(
@@ -606,7 +758,7 @@ class _SongContextMenu extends ConsumerWidget {
             color: AppColors.accent,
             onTap: () {
               Navigator.pop(context);
-              context.push('/playlists');
+              _showPlaylistPicker(context, r);
             },
           ),
           _ContextOption(
@@ -627,9 +779,27 @@ class _SongContextMenu extends ConsumerWidget {
             color: AppColors.accentViolet,
             onTap: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Moved to Vault')),
-              );
+              try {
+                await VaultService.instance.lockItem(item);
+                r.read(mediaLibraryProvider.notifier).refresh();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Moved to Vault ✔'),
+                      backgroundColor: AppColors.surface,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Vault error: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
             },
           ),
           _ContextOption(
