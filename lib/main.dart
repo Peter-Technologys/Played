@@ -11,12 +11,10 @@ import 'features/settings/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Firebase — must be first before any Firebase service is used
-  await Firebase.initializeApp();
-
-  // Silent anonymous auth — user never sees this.
-  // Runs after Firebase is ready; failures are caught inside the service.
-  await AuthService.instance.signInAnonymouslyIfNeeded();
+  // Initialize Firebase — wrapped in try/catch so the app launches
+  // fully offline (e.g. installed via Xender with no internet).
+  // Auth and Firestore sync silently in the background once online.
+  _initFirebaseInBackground();
 
   // Initialize Hive local database
   await PlayedDatabase.instance.init();
