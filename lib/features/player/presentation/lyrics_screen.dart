@@ -1,11 +1,12 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
-// flutter/services.dart removed — all used elements are provided by flutter/material.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/database/played_database.dart';
 
 // ── Provider ───────────────────────────────────────────────
 
@@ -34,17 +35,30 @@ class LyricsNotifier extends StateNotifier<LyricsState> {
   }
 
   Future<void> fetch() async {
+    // Check offline cache first
+    final cached = PlayedDatabase.instance.getCachedLyrics(item.id);
+    if (cached != null) {
+      final lines = cached
+          .split('\n')
+          .map((l) => l.trim())
+          .where((l) => l.isNotEmpty)
+          .toList();
+      state = LyricsState(lines: lines);
+      return;
+    }
+
     state = const LyricsState(isLoading: true);
     try {
       final artist = Uri.encodeComponent(item.artist ?? '');
       final title  = Uri.encodeComponent(item.title);
-      final url =
-          'https://api.lyrics.ovh/v1/$artist/$title';
+      final url = 'https://api.lyrics.ovh/v1/$artist/$title';
       final res = await http.get(Uri.parse(url))
           .timeout(const Duration(seconds: 8));
       if (res.statusCode == 200) {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final raw  = data['lyrics'] as String? ?? '';
+        // Cache for offline use
+        await PlayedDatabase.instance.cacheLyrics(item.id, raw);
         final lines = raw
             .split('\n')
             .map((l) => l.trim())
