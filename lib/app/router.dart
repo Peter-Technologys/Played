@@ -140,8 +140,16 @@ class _MainShellState extends ConsumerState<_MainShell> {
               isPro: true,
               onTap: () {
                 Navigator.pop(context);
-                GoRouter.of(context).push('/tools/whatsapp',
-                    extra: null);
+                // WhatsApp Trimmer requires a MediaItem — open a file first
+                // from My Space, then use the options menu to trim it.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Open a file from My Space, then tap ⋮ → Trim for WhatsApp',
+                    ),
+                    duration: Duration(seconds: 3),
+                  ),
+                );
               },
             ),
             // Studio — Pro

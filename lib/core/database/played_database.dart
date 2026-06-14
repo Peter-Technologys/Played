@@ -1,7 +1,8 @@
 import 'dart:convert';
+import 'dart:math';
+import 'dart:typed_data';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
 import '../models/playlist.dart';
@@ -61,7 +62,13 @@ class PlayedDatabase {
   }
 
   /// Derives a 32-byte AES key stored in FlutterSecureStorage.
-  /// Generated once per install and never leaves the device.
+  /// Generated once per install using dart:math Random.secure() and
+  /// never leaves the device.
+  ///
+  /// The previous implementation used DateTime.microsecondsSinceEpoch % 256
+  /// in a tight loop which produced repeated byte values (very low entropy)
+  /// and could generate a key that fails HiveAesCipher validation, causing
+  /// a crash on first install.
   Future<Uint8List> _deriveVaultKey() async {
     const storage = FlutterSecureStorage(
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -69,14 +76,10 @@ class PlayedDatabase {
     const keyAlias = 'played_vault_key_v2';
     String? existing = await storage.read(key: keyAlias);
     if (existing == null) {
-      // Generate a fresh random 32-byte key on first install
-      final random = List<int>.generate(
-          32, (_) => DateTime.now().microsecondsSinceEpoch % 256);
-      // XOR with hash of install time for extra entropy
-      final seed = utf8.encode('played_${DateTime.now().toIso8601String()}');
-      final digest = sha256.convert(seed);
-      final key = List<int>.generate(
-          32, (i) => random[i] ^ digest.bytes[i]);
+      // Generate a cryptographically secure random 32-byte key
+      final rng = Random.secure();
+      final key = Uint8List.fromList(
+          List<int>.generate(32, (_) => rng.nextInt(256)));
       existing = base64Encode(key);
       await storage.write(key: keyAlias, value: existing);
     }

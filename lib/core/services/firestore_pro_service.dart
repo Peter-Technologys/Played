@@ -6,6 +6,11 @@ import 'package:flutter/foundation.dart';
 /// works across multiple devices for the same Google account.
 ///
 /// Document path: users/{uid}/pro/status
+///
+/// IMPORTANT: fetchProExpiry() uses Source.cache first so it never
+/// hangs on startup when Firebase Auth is still initialising or the
+/// device is offline. A .get() call without a source hint will block
+/// until the network times out, which triggers the ANR watchdog.
 class FirestoreProService {
   FirestoreProService._();
   static final FirestoreProService instance = FirestoreProService._();
@@ -31,18 +36,35 @@ class FirestoreProService {
         SetOptions(merge: true),
       );
     } catch (e) {
-      // Offline — SharedPreferences fallback still holds the value.
       debugPrint('[FirestoreProService] Save failed (offline?): $e');
     }
   }
 
   /// Fetches Pro expiry from Firestore.
-  /// Returns 0 if not found or offline.
+  ///
+  /// Strategy:
+  ///   1. Try local Firestore cache first (instant, works offline).
+  ///   2. If cache miss, attempt a real network fetch with a 4-second
+  ///      timeout so we never block the UI thread.
+  ///   3. Return 0 on any failure — SharedPreferences is the source of
+  ///      truth for the current session.
   Future<int> fetchProExpiry() async {
     final doc = _proDoc;
     if (doc == null) return 0;
     try {
-      final snap = await doc.get();
+      // 1. Cache-first — instant even offline
+      final cached = await doc.get(GetOptions(source: Source.cache));
+      if (cached.exists) {
+        return (cached.data()?['expiry_ms'] as int?) ?? 0;
+      }
+    } catch (_) {
+      // Cache miss is normal on first install — fall through to network
+    }
+    try {
+      // 2. Network fetch with timeout — prevents ANR on slow connections
+      final snap = await doc
+          .get(GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 4));
       if (!snap.exists) return 0;
       return (snap.data()?['expiry_ms'] as int?) ?? 0;
     } catch (e) {
