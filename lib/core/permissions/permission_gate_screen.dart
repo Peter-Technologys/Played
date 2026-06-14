@@ -245,7 +245,9 @@ class _PermissionDeniedScreen extends StatelessWidget {
     required this.onRetry,
   });
 
-  static const Map<Permission, String> _labels = {
+  // _labels cannot be const because Permission overrides == and hashCode,
+  // which is not allowed for const map keys.
+  static final Map<Permission, String> _labels = {
     Permission.storage: 'Storage — scan local media files (Android ≤ 12)',
     Permission.audio:   'Audio files — read music (Android 13+)',
     Permission.videos:  'Video files — read videos (Android 13+)',

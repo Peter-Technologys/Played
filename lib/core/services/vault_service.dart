@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import '../database/played_database.dart';
@@ -75,7 +74,7 @@ class VaultService {
     if (await vaultFile.exists()) {
       // Overwrite with zeros before deleting for secure erase
       final size = await vaultFile.length();
-      await vaultFile.writeAsBytes(Uint8List(size));
+      await vaultFile.writeAsBytes(List<int>.filled(size, 0));
       await vaultFile.delete();
     }
 

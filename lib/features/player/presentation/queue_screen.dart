@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 
-// ── Queue Provider ─────────────────────────────────────────────
+// ── Queue Provider ───────────────────────────────────────────────────
 
 class QueueState {
   final List<MediaItem> items;
@@ -78,7 +78,7 @@ class QueueNotifier extends StateNotifier<QueueState> {
 final queueProvider =
     StateNotifierProvider<QueueNotifier, QueueState>((_) => QueueNotifier());
 
-// ── Queue Screen ───────────────────────────────────────────────
+// ── Queue Screen ───────────────────────────────────────────────────
 
 class QueueScreen extends ConsumerWidget {
   const QueueScreen({super.key});
@@ -115,7 +115,7 @@ class QueueScreen extends ConsumerWidget {
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
-                      fontFamily: 'SpaceGrotesk',
+                      fontFamily: 'Inter',
                     )),
                 const SizedBox(width: 8),
                 Container(
@@ -129,7 +129,7 @@ class QueueScreen extends ConsumerWidget {
                         fontSize: 11,
                         color: AppColors.accent,
                         fontWeight: FontWeight.w700,
-                        fontFamily: 'SpaceGrotesk',
+                        fontFamily: 'Inter',
                       )),
                 ),
                 const Spacer(),
@@ -140,7 +140,9 @@ class QueueScreen extends ConsumerWidget {
                   },
                   child: Icon(
                     Icons.shuffle_rounded,
-                    color: queue.shuffle ? AppColors.accent : AppColors.textSecondary,
+                    color: queue.shuffle
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
                     size: 22,
                   ),
                 ),
@@ -154,7 +156,7 @@ class QueueScreen extends ConsumerWidget {
                       style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
-                          fontFamily: 'SpaceGrotesk')),
+                          fontFamily: 'Inter')),
                 ),
               ],
             ),
@@ -173,14 +175,15 @@ class QueueScreen extends ConsumerWidget {
                         Text('Queue is empty',
                             style: TextStyle(
                                 color: AppColors.textSecondary,
-                                fontFamily: 'SpaceGrotesk')),
+                                fontFamily: 'Inter')),
                       ],
                     ),
                   )
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: queue.items.length,
-                    onReorder: (old, newIdx) {
+                    // onReorderItem replaces deprecated onReorder
+                    onReorderItem: (old, newIdx) {
                       HapticFeedback.mediumImpact();
                       ref.read(queueProvider.notifier).reorder(old, newIdx);
                     },
@@ -219,7 +222,7 @@ class QueueScreen extends ConsumerWidget {
                               color: isCurrent
                                   ? AppColors.accent
                                   : AppColors.textPrimary,
-                              fontFamily: 'SpaceGrotesk',
+                              fontFamily: 'Inter',
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
