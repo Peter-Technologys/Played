@@ -23,6 +23,10 @@ class MainActivity : FlutterActivity() {
     private val pipChannel   = "com.petersmart.played/pip"
     private val mediaChannel = "com.petersmart.played/media_store"
     private val fileChannel  = "com.petersmart.played/file_ops"
+    private val eqChannel    = "com.petersmart.played/equalizer"
+
+    // Android Equalizer AudioEffect — created once, reused across sessions.
+    private var equalizer: android.media.audiofx.Equalizer? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -60,7 +64,26 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // ── File operations ──────────────────────────────────────────────
+        // ── Equalizer ─────────────────────────────────────────────────────────
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, eqChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setBands" -> {
+                        @Suppress("UNCHECKED_CAST")
+                        val gains = call.argument<List<Double>>("gains") ?: emptyList()
+                        applyEqBands(gains)
+                        result.success(null)
+                    }
+                    "release" -> {
+                        equalizer?.release()
+                        equalizer = null
+                        result.success(null)
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // ── File operations ──────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, fileChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -255,6 +278,29 @@ class MainActivity : FlutterActivity() {
             ) > 0
             if (!deleted) file.delete() else true
         } catch (_: Exception) { false }
+    }
+
+    // ── Equalizer ────────────────────────────────────────────────────────────
+    // Uses Android's built-in AudioEffect Equalizer (no extra library needed).
+    // audioSessionId 0 = global output mix — affects all audio on the device.
+    private fun applyEqBands(gains: List<Double>) {
+        try {
+            if (equalizer == null) {
+                equalizer = android.media.audiofx.Equalizer(0, 0).apply {
+                    enabled = true
+                }
+            }
+            val eq = equalizer ?: return
+            val bandCount = eq.numberOfBands.toInt()
+            val range = eq.getBandLevelRange()
+            gains.take(bandCount).forEachIndexed { i, gainDb ->
+                val millibels = (gainDb * 100).toInt().toShort()
+                val clamped = millibels.coerceIn(range[0], range[1])
+                eq.setBandLevel(i.toShort(), clamped)
+            }
+        } catch (e: Exception) {
+            android.util.Log.w("Equalizer", "applyEqBands failed: ${e.message}")
+        }
     }
 
     private fun renameFile(path: String, newName: String): String? {
