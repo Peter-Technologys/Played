@@ -17,7 +17,6 @@ class CinemaShelf extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Row(
             children: [
-              // Gradient pill label
               Container(
                 padding: const EdgeInsets.symmetric(
                     horizontal: 10, vertical: 5),
@@ -30,7 +29,7 @@ class CinemaShelf extends StatelessWidget {
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('🎬',
+                    Text('\uD83C\uDFAC',
                         style: TextStyle(fontSize: 12)),
                     SizedBox(width: 5),
                     Text(
@@ -40,7 +39,7 @@ class CinemaShelf extends StatelessWidget {
                         fontWeight: FontWeight.w800,
                         color: Colors.black,
                         letterSpacing: 1.2,
-                        fontFamily: 'SpaceGrotesk',
+                        fontFamily: 'Inter',
                       ),
                     ),
                   ],

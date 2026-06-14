@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
-// media_card.dart removed — StreetTapesShelf uses its own _TapeRow widget, not MediaCard
-
 
 /// Dynamic "Street Tapes" shelf — DJ/Mix audio longer than 20 minutes.
 class StreetTapesShelf extends StatelessWidget {
@@ -27,7 +25,7 @@ class StreetTapesShelf extends StatelessWidget {
                   fontWeight: FontWeight.w600,
                   color: AppColors.textSecondary,
                   letterSpacing: 1.2,
-                  fontFamily: 'SpaceGrotesk',
+                  fontFamily: 'Inter',
                 ),
               ),
               const Spacer(),
@@ -98,7 +96,7 @@ class _TapeRow extends StatelessWidget {
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: AppColors.textPrimary,
-                    fontFamily: 'SpaceGrotesk',
+                    fontFamily: 'Inter',
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,

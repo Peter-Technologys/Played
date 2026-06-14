@@ -10,6 +10,7 @@ import 'core/database/played_database.dart';
 import 'core/services/auth_service.dart';
 import 'core/services/crashlytics_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/storage_folder_service.dart';
 import 'features/settings/settings_provider.dart';
 
 void main() async {
@@ -26,12 +27,12 @@ void main() async {
   // 1. Firebase — fire-and-forget, never blocks
   _initFirebaseInBackground();
 
-  // 2. Run Hive DB, Notifications, and AdMob IN PARALLEL
-  //    Previously these ran sequentially, adding ~300-600ms to startup.
+  // 2. Run Hive DB, Notifications, AdMob, and PLAYED folder IN PARALLEL
   await Future.wait([
     _initDatabase(),
     _initNotifications(),
     _initAdMob(),
+    StorageFolderService.instance.ensureCreated(),
   ]);
 
   // 3. Pre-load persisted settings

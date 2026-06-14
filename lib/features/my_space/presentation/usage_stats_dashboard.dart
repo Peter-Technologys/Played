@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
-// flutter/services.dart removed — all used elements are provided by flutter/material.dart
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/media_item.dart';
 
-// ── Stats Provider ─────────────────────────────────────────────
+// ── Stats Provider ───────────────────────────────────────────────────
 
 class UsageStats {
   final Duration totalListeningTime;
@@ -36,7 +35,7 @@ final usageStatsProvider = FutureProvider<UsageStats>((ref) async {
   );
 });
 
-// ── Stats Dashboard Widget ───────────────────────────────────────
+// ── Stats Dashboard Widget ─────────────────────────────────────────────
 
 class UsageStatsDashboard extends ConsumerWidget {
   const UsageStatsDashboard({super.key});
@@ -75,7 +74,7 @@ class UsageStatsDashboard extends ConsumerWidget {
                       fontWeight: FontWeight.w700,
                       color: AppColors.accent,
                       letterSpacing: 1.2,
-                      fontFamily: 'SpaceGrotesk',
+                      fontFamily: 'Inter',
                     )),
               ],
             ),
@@ -123,7 +122,7 @@ class UsageStatsDashboard extends ConsumerWidget {
                           fontSize: 11,
                           fontWeight: FontWeight.w600,
                           color: AppColors.textPrimary,
-                          fontFamily: 'SpaceGrotesk',
+                          fontFamily: 'Inter',
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -177,7 +176,7 @@ class _StatCard extends StatelessWidget {
                   fontSize: 14,
                   fontWeight: FontWeight.w700,
                   color: color,
-                  fontFamily: 'SpaceGrotesk',
+                  fontFamily: 'Inter',
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis),
