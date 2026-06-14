@@ -1,4 +1,4 @@
-package com.played.app
+package com.petersmart.played
 
 import android.app.PictureInPictureParams
 import android.content.pm.PackageManager
@@ -10,7 +10,7 @@ import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterActivity() {
 
-    private val pipChannel = "com.played.app/pip"
+    private val pipChannel = "com.petersmart.played/pip"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -59,7 +59,6 @@ class MainActivity : FlutterActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        // Auto-enter PiP when user presses home during video playback
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isPipSupported()) {
             try {
                 val params = PictureInPictureParams.Builder()
