@@ -171,7 +171,7 @@ class SettingsScreen extends ConsumerWidget {
             label: 'Privacy Policy',
             onTap: () => _launchUrl(
               context,
-              'https://petersmartlink.com/played/privacy',
+              'https://app.petersmartlink.com/played/privacy',
             ),
           ),
           const SizedBox(height: 8),
