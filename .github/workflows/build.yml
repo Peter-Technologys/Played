@@ -219,7 +219,19 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build apk --release --split-per-abi
+        # flutter build exits 1 due to a file-watcher bug even when APKs are
+        # produced successfully. We run the command, capture the exit code,
+        # then verify the APKs exist ourselves before deciding whether to fail.
+        run: |
+          flutter build apk --release --split-per-abi || BUILD_EXIT=$?
+          APK_COUNT=$(find build/app/outputs/flutter-apk -name '*-release.apk' 2>/dev/null | wc -l)
+          echo "APKs found: $APK_COUNT"
+          if [ "$APK_COUNT" -gt 0 ]; then
+            echo "Build succeeded — APKs present despite non-zero exit code."
+            exit 0
+          fi
+          echo "Build genuinely failed — no APKs produced."
+          exit ${BUILD_EXIT:-1}
 
       # Remove keystore and google-services.json immediately after build — never store in artifacts
       - name: Remove keystore
