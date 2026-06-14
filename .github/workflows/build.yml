@@ -157,8 +157,16 @@ jobs:
       - name: Run code generation
         run: flutter pub run build_runner build --delete-conflicting-outputs
 
+      # Decode google-services.json from secret — required by the Google Services plugin
+      - name: Decode google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+
       - name: Build debug APK
         run: flutter build apk --debug
+
+      - name: Remove google-services.json
+        if: always()
+        run: rm -f android/app/google-services.json
 
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
@@ -201,6 +209,10 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
+      # Decode google-services.json from secret — required by the Google Services plugin
+      - name: Decode google-services.json
+        run: echo "${{ secrets.GOOGLE_SERVICES_JSON }}" | base64 -d > android/app/google-services.json
+
       - name: Build signed release APK
         env:
           KEYSTORE_PATH: keystore.jks
@@ -209,10 +221,14 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: flutter build apk --release --split-per-abi
 
-      # Remove keystore immediately after build — never store in artifacts
+      # Remove keystore and google-services.json immediately after build — never store in artifacts
       - name: Remove keystore
         if: always()
         run: rm -f android/app/keystore.jks
+
+      - name: Remove google-services.json
+        if: always()
+        run: rm -f android/app/google-services.json
 
       - name: Upload release APKs
         uses: actions/upload-artifact@v4
