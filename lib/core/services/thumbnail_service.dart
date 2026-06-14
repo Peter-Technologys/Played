@@ -1,5 +1,4 @@
 import 'package:flutter/services.dart';
-import 'package:flutter/foundation.dart';
 
 /// Dart wrapper for video thumbnail and album art native calls.
 class ThumbnailService {
