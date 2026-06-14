@@ -96,13 +96,15 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  # hive_generator 2.0.1 requires analyzer >=4.6.0 <7.0.0.
+  # Removing the explicit analyzer pin lets pub resolve the highest
+  # compatible version automatically (currently ^6.x via hive_generator).
   hive_generator: ^2.0.1
   build_runner: ^2.4.8
   freezed: ^2.4.7
   json_serializable: ^6.7.1
   riverpod_generator: ^2.3.9
   flutter_lints: ^3.0.1
-  analyzer: ^13.3.0
 
 flutter:
   uses-material-design: true

@@ -5,9 +5,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/services/media_scanner_service.dart';
+import '../../my_space/data/media_repository.dart';
 
-// ── Models & Providers ─────────────────────────────────────────
+// ── Models & Providers ───────────────────────────────────────────────
 
 enum AirDropStatus { idle, scanning, connected, sending, done, error }
 
@@ -28,7 +28,7 @@ final discoveredDevicesProvider =
     StateProvider<List<DiscoveredDevice>>((_) => []);
 final sendProgressProvider = StateProvider<double>((_) => 0.0);
 
-// ── Screen ──────────────────────────────────────────────────
+// ── Screen ──────────────────────────────────────────────────────
 
 class AirDropScreen extends ConsumerStatefulWidget {
   const AirDropScreen({super.key});
@@ -72,13 +72,13 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
         'played_user',
         Strategy.P2P_CLUSTER,
         onEndpointFound: (id, name, _) {
-          final device =
-              DiscoveredDevice(endpointId: id, name: name, avatarEmoji: '\uD83D\uDCF1');
+          final device = DiscoveredDevice(
+              endpointId: id, name: name, avatarEmoji: '\uD83D\uDCF1');
           final current = ref.read(discoveredDevicesProvider);
           if (!current.any((d) => d.endpointId == id)) {
             ref.read(discoveredDevicesProvider.notifier).state = [
               ...current,
-              device
+              device,
             ];
           }
         },
@@ -113,8 +113,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
-            // ── Header ───────────────────────────────────────
+            // ── Header ─────────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
               child: Row(
@@ -127,7 +126,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
                             fontSize: 28,
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
-                            fontFamily: 'SpaceGrotesk',
+                            fontFamily: 'Inter',
                           )),
                       const SizedBox(height: 2),
                       const Text('0MB data · Wi-Fi Direct + Bluetooth',
@@ -147,7 +146,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
 
             const SizedBox(height: 16),
 
-            // ── Status pill ───────────────────────────────────
+            // ── Status pill ───────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _StatusPill(status: status, deviceCount: devices.length),
@@ -155,7 +154,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
 
             const SizedBox(height: 24),
 
-            // ── Radar ────────────────────────────────────────
+            // ── Radar ──────────────────────────────────────────────
             Expanded(
               flex: 5,
               child: _RadarView(
@@ -165,7 +164,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               ),
             ),
 
-            // ── Instruction ──────────────────────────────────
+            // ── Instruction ─────────────────────────────────────────
             Padding(
               padding: const EdgeInsets.fromLTRB(20, 8, 20, 12),
               child: Row(
@@ -180,7 +179,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               ),
             ),
 
-            // ── File tray ───────────────────────────────────
+            // ── File tray ───────────────────────────────────────────
             Expanded(
               flex: 3,
               child: _FileTray(devices: devices),
@@ -194,7 +193,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
   }
 }
 
-// ── Status Pill ────────────────────────────────────────────
+// ── Status Pill ────────────────────────────────────────────────
 
 class _StatusPill extends StatelessWidget {
   final AirDropStatus status;
@@ -235,14 +234,14 @@ class _StatusPill extends StatelessWidget {
                   fontSize: 12,
                   color: color,
                   fontWeight: FontWeight.w600,
-                  fontFamily: 'SpaceGrotesk')),
+                  fontFamily: 'Inter')),
         ],
       ),
     );
   }
 }
 
-// ── Radar View ────────────────────────────────────────────
+// ── Radar View ────────────────────────────────────────────────
 
 class _RadarView extends StatelessWidget {
   final AnimationController pulseController;
@@ -264,7 +263,6 @@ class _RadarView extends StatelessWidget {
           _PulseRing(controller: pulseController, delay: 0.33, radius: 110),
           _PulseRing(controller: pulseController, delay: 0.66, radius: 150),
         ],
-        // This device
         Container(
           width: 68,
           height: 68,
@@ -282,7 +280,6 @@ class _RadarView extends StatelessWidget {
           child: const Icon(Icons.phone_android_rounded,
               color: AppColors.accent, size: 30),
         ),
-        // Discovered devices
         ...List.generate(devices.length, (i) {
           final angle = (2 * pi / devices.length) * i - pi / 2;
           const r = 130.0;
@@ -299,7 +296,6 @@ class _RadarView extends StatelessWidget {
                 ),
           );
         }),
-        // Empty hint
         if (!isScanning && devices.isEmpty)
           const Column(
             mainAxisSize: MainAxisSize.min,
@@ -309,7 +305,7 @@ class _RadarView extends StatelessWidget {
                   style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
-                      fontFamily: 'SpaceGrotesk')),
+                      fontFamily: 'Inter')),
             ],
           ),
       ],
@@ -339,8 +335,7 @@ class _PulseRing extends StatelessWidget {
             height: radius * 2 * p + radius,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border:
-                  Border.all(color: AppColors.accent, width: 1.5),
+              border: Border.all(color: AppColors.accent, width: 1.5),
             ),
           ),
         );
@@ -364,7 +359,8 @@ class _DeviceAvatar extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: AppColors.surface,
-            border: Border.all(color: AppColors.accent.withValues(alpha: 0.5), width: 1.5),
+            border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.5), width: 1.5),
             boxShadow: [
               BoxShadow(
                   color: AppColors.accent.withValues(alpha: 0.15),
@@ -380,7 +376,7 @@ class _DeviceAvatar extends StatelessWidget {
             style: const TextStyle(
                 fontSize: 10,
                 color: AppColors.textSecondary,
-                fontFamily: 'SpaceGrotesk'),
+                fontFamily: 'Inter'),
             maxLines: 1,
             overflow: TextOverflow.ellipsis),
       ],
@@ -388,7 +384,7 @@ class _DeviceAvatar extends StatelessWidget {
   }
 }
 
-// ── File Tray — shows real scanned media files ──────────────────
+// ── File Tray ───────────────────────────────────────────────────
 
 class _FileTray extends StatefulWidget {
   final List<DiscoveredDevice> devices;
@@ -409,8 +405,18 @@ class _FileTrayState extends State<_FileTray> {
   }
 
   Future<void> _loadFiles() async {
-    final items = await MediaScannerService.instance.scanAll();
-    if (mounted) setState(() { _files = items.take(20).toList(); _loading = false; });
+    // Use the cached MediaRepository instead of triggering a full device
+    // scan every time the Air-Drop tab is opened. Previously called
+    // MediaScannerService.instance.scanAll() which re-scanned the entire
+    // device on every tab switch — extremely slow on large libraries.
+    final items = MediaRepository.instance.cachedItems ??
+        await MediaRepository.instance.getAllMedia();
+    if (mounted) {
+      setState(() {
+        _files = items.take(20).toList();
+        _loading = false;
+      });
+    }
   }
 
   @override
@@ -426,18 +432,20 @@ class _FileTrayState extends State<_FileTray> {
                 fontWeight: FontWeight.w600,
                 color: AppColors.textSecondary,
                 letterSpacing: 1.2,
-                fontFamily: 'SpaceGrotesk',
+                fontFamily: 'Inter',
               )),
         ),
         const SizedBox(height: 10),
         Expanded(
           child: _loading
-              ? const Center(child: CircularProgressIndicator(
-                  color: AppColors.accent, strokeWidth: 2))
+              ? const Center(
+                  child: CircularProgressIndicator(
+                      color: AppColors.accent, strokeWidth: 2))
               : _files.isEmpty
-                  ? const Center(child: Text('No media files found',
-                      style: TextStyle(color: AppColors.textSecondary,
-                          fontSize: 12)))
+                  ? const Center(
+                      child: Text('No media files found',
+                          style: TextStyle(
+                              color: AppColors.textSecondary, fontSize: 12)))
                   : ListView.separated(
                       scrollDirection: Axis.horizontal,
                       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -485,7 +493,9 @@ class _DraggableFileCardState extends State<_DraggableFileCard> {
   void _onDragEnd(DraggableDetails _) {
     setState(() => _isSending = true);
     Future.delayed(const Duration(seconds: 2),
-        () { if (mounted) setState(() => _isSending = false); });
+        () {
+      if (mounted) setState(() => _isSending = false);
+    });
   }
 
   @override
@@ -495,19 +505,26 @@ class _DraggableFileCardState extends State<_DraggableFileCard> {
       feedback: Material(
         color: Colors.transparent,
         child: _CardBody(
-            title: widget.title, icon: widget.icon,
-            size: widget.size, isSending: false, glowing: true),
+            title: widget.title,
+            icon: widget.icon,
+            size: widget.size,
+            isSending: false,
+            glowing: true),
       ),
       childWhenDragging: Opacity(
         opacity: 0.25,
         child: _CardBody(
-            title: widget.title, icon: widget.icon,
-            size: widget.size, isSending: false),
+            title: widget.title,
+            icon: widget.icon,
+            size: widget.size,
+            isSending: false),
       ),
       onDragEnd: _onDragEnd,
       child: _CardBody(
-          title: widget.title, icon: widget.icon,
-          size: widget.size, isSending: _isSending),
+          title: widget.title,
+          icon: widget.icon,
+          size: widget.size,
+          isSending: _isSending),
     );
   }
 }
@@ -519,8 +536,11 @@ class _CardBody extends StatelessWidget {
   final bool isSending;
   final bool glowing;
   const _CardBody({
-    required this.title, required this.icon,
-    required this.size, required this.isSending, this.glowing = false,
+    required this.title,
+    required this.icon,
+    required this.size,
+    required this.isSending,
+    this.glowing = false,
   });
 
   @override
@@ -537,9 +557,12 @@ class _CardBody extends StatelessWidget {
             color: active ? AppColors.accent : AppColors.border,
             width: active ? 1.5 : 1),
         boxShadow: glowing
-            ? [BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.4),
-                blurRadius: 16, spreadRadius: 2)]
+            ? [
+                BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    spreadRadius: 2)
+              ]
             : null,
       ),
       child: Column(
@@ -557,7 +580,7 @@ class _CardBody extends StatelessWidget {
               fontSize: 10,
               color: active ? AppColors.accent : AppColors.textPrimary,
               fontWeight: FontWeight.w600,
-              fontFamily: 'SpaceGrotesk',
+              fontFamily: 'Inter',
             ),
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
@@ -591,9 +614,11 @@ class _ScanButton extends StatelessWidget {
           border: Border.all(
               color: isScanning ? AppColors.accent : AppColors.border),
           boxShadow: isScanning
-              ? [BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.35),
-                  blurRadius: 12)]
+              ? [
+                  BoxShadow(
+                      color: AppColors.accent.withValues(alpha: 0.35),
+                      blurRadius: 12)
+                ]
               : null,
         ),
         child: Row(
@@ -611,7 +636,7 @@ class _ScanButton extends StatelessWidget {
                 fontSize: 13,
                 fontWeight: FontWeight.w700,
                 color: isScanning ? Colors.black : AppColors.textPrimary,
-                fontFamily: 'SpaceGrotesk',
+                fontFamily: 'Inter',
               ),
             ),
           ],
