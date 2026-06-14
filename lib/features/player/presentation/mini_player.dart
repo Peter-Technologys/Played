@@ -48,13 +48,17 @@ class MiniPlayer extends ConsumerWidget {
             Container(
               width: 68,
               height: 68,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: const BorderRadius.horizontal(
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppColors.accent, AppColors.accentViolet],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.horizontal(
                     left: Radius.circular(18)),
               ),
               child: const Icon(Icons.music_note_rounded,
-                  color: AppColors.accent, size: 28),
+                  color: Colors.black, size: 28),
             ),
 
             const SizedBox(width: 12),

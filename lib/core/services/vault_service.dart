@@ -20,7 +20,8 @@ class VaultService {
   }
 
   /// Moves [item] into the vault.
-  /// Copies the file to the private vault directory, then registers it.
+  /// Copies the file to the private vault directory, registers it in Hive,
+  /// then deletes the original so it disappears from the media library.
   Future<VaultItem> lockItem(MediaItem item) async {
     final dir = await _vaultDir;
     final ext = item.fileName.split('.').last;
@@ -42,6 +43,13 @@ class VaultService {
     );
 
     await PlayedDatabase.instance.addToVault(vaultItem);
+
+    // Delete the original file so it no longer appears in the media library.
+    // Also remove from MediaStore so the system gallery doesn't show it.
+    try {
+      await source.delete();
+    } catch (_) {}
+
     debugPrint('[Vault] Locked: ${item.title}');
     return vaultItem;
   }
