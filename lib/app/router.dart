@@ -8,7 +8,7 @@ import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
 import '../features/player/presentation/equalizer_screen.dart';
 import '../features/player/presentation/mini_player.dart';
-import '../features/settings/settings_screen.dart';
+import '../features/settings/presentation/settings_screen.dart';
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../features/playlists/playlist_screen.dart';
