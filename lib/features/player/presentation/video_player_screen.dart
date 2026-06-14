@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_vlc_player/flutter_vlc_player.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import '../../../features/settings/settings_provider.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/media_item.dart';
@@ -45,10 +45,10 @@ class _VideoPlayerScreenState
 
   // PiP state
   bool _pipSupported = false;
-  bool _pipAutoEnabled = false; // true after user manually enters PiP once
+  bool _pipAutoEnabled = false;
   bool _isInPip = false;
   bool _screenLocked = false;
-  bool _isSpeedBoosting = false; // long-press 2x speed boost
+  bool _isSpeedBoosting = false;
 
   @override
   void initState() {
@@ -61,8 +61,8 @@ class _VideoPlayerScreenState
 
   Future<void> _initPip() async {
     _pipSupported = await PipService.instance.isPipSupported();
-    final prefs = await SharedPreferences.getInstance();
-    _pipAutoEnabled = prefs.getBool(_kPipAutoKey) ?? false;
+    final settings = ref.read(settingsProvider);
+    _pipAutoEnabled = settings.autoPip;
   }
 
   Future<void> _initPlayer() async {
@@ -153,8 +153,7 @@ class _VideoPlayerScreenState
     if (!_pipSupported) return;
     // Remember that the user has opted in
     if (!_pipAutoEnabled) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setBool(_kPipAutoKey, true);
+      ref.read(settingsProvider.notifier).setAutoPip(true);
       _pipAutoEnabled = true;
     }
     await PipService.instance.enterPip();
