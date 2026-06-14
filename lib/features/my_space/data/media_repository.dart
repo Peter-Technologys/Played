@@ -12,6 +12,9 @@ class MediaRepository {
 
   List<MediaItem>? _cachedItems;
 
+  /// Exposes the current in-memory cache (may be null before first scan).
+  List<MediaItem>? get cachedItems => _cachedItems;
+
   /// Returns all scanned media items.
   /// Filters out files that no longer exist on disk (deleted externally).
   /// Uses in-memory cache after first scan.

@@ -10,12 +10,39 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ## [Unreleased]
 
 ### Planned
-- Playlist creation & management
 - Chromecast / Cast to device
 - Offline LRC lyrics sync
 - Home screen now-playing widget
 - Android Auto support
 - iOS support
+
+---
+
+## [1.1.0] — 2026-06-14
+
+### Added
+- **Playlists** — create, rename, delete playlists; add/remove tracks;
+  drag-to-reorder; Play All button; wired into My Space header
+- **Mini player auto-show** — mini player now appears automatically
+  whenever any track starts playing (was never set before)
+- **MANAGE_EXTERNAL_STORAGE** — full SD card + all-folders media indexing
+  on Android 11+; non-blocking prompt to grant via Settings
+- **Battery optimisation exemption** — prompts Unrestricted mode on first
+  launch so Android never kills the background playback service
+- **RECEIVE_BOOT_COMPLETED** — background service restarts after reboot
+- **SCHEDULE_EXACT_ALARM** — precise sleep timer on Android 12+
+- **BootReceiver.kt** — Kotlin broadcast receiver for boot restart
+- **network_security_config.xml** — cleartext allowed only for AdMob
+  domains; all other traffic enforced HTTPS
+- **Open-with support** — PLAYED now appears in Android share sheet for
+  audio/*, video/*, .ogg, and .mkv files
+- **Playlists route** `/playlists` added to GoRouter
+
+### Fixed
+- Mini player never appeared (miniPlayerItemProvider was never set)
+- Permission gate now explains All Files Access and battery exemption
+- Removed stale FFmpegKitConfig receiver (package was already removed)
+- ProGuard rules updated: removed arthenica, added Firebase + AdMob
 
 ---
 

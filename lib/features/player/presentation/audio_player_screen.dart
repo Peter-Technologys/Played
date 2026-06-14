@@ -98,9 +98,21 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     // Handled by the screen via repeat/queue logic
   }
 
+  // Keep a reference to the ProviderContainer so load() can update
+  // miniPlayerItemProvider without needing a BuildContext.
+  ProviderContainer? _container;
+
+  void attachContainer(ProviderContainer container) {
+    _container = container;
+  }
+
   Future<void> load(MediaItem item) async {
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
+
+    // ── Auto-show mini player whenever a track starts ──────────────
+    _container?.read(miniPlayerItemProvider.notifier).state = item;
+
     try {
       final session = await AudioSession.instance;
       await session.configure(const AudioSessionConfiguration.music());
@@ -159,7 +171,13 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
 final audioPlayerProvider =
     StateNotifierProvider<AudioPlayerNotifier, AudioPlayerState>(
-  (ref) => AudioPlayerNotifier(),
+  (ref) {
+    final notifier = AudioPlayerNotifier();
+    // Give the notifier access to the provider container so it can
+    // update miniPlayerItemProvider when a track loads.
+    notifier.attachContainer(ref.container);
+    return notifier;
+  },
 );
 
 // ── Screen ─────────────────────────────────────────────────────

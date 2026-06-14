@@ -11,6 +11,7 @@ import '../features/player/presentation/mini_player.dart';
 import '../features/settings/settings_screen.dart';
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
+import '../features/playlists/playlist_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
 import '../shared/widgets/ad_banner_slot.dart';
@@ -37,7 +38,8 @@ class AppRouter {
           ),
         ],
       ),
-      GoRoute(path: '/settings', builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/settings',  builder: (_, __) => const SettingsScreen()),
+      GoRoute(path: '/playlists', builder: (_, __) => const PlaylistsScreen()),
       // Vault is FREE — no ProGate
       GoRoute(path: '/vault',    builder: (_, __) => const VaultLockScreen()),
       // Equalizer is Pro
