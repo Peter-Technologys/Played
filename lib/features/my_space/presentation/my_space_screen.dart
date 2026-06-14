@@ -1,276 +1,770 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/utils/shelf_sorter.dart';
+import '../../../core/models/media_item.dart';
+import '../../../core/database/played_database.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
 import 'providers/my_space_provider.dart';
-import 'widgets/media_card.dart';
-import 'widgets/cinema_shelf.dart';
-import 'widgets/street_tapes_shelf.dart';
-import 'widgets/recently_played_timeline.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
+import '../../player/presentation/queue_screen.dart';
 
-// ── Sort options ─────────────────────────────────────────────
+// ── Sort ─────────────────────────────────────────────────────────────
 enum MediaSort { dateAdded, name, size, duration }
 
-final mediaSortProvider = StateProvider<MediaSort>((_) => MediaSort.dateAdded);
+final _sortProvider = StateProvider<MediaSort>((_) => MediaSort.dateAdded);
 
-class MySpaceScreen extends ConsumerWidget {
+// ── Root screen ──────────────────────────────────────────────────────
+
+class MySpaceScreen extends ConsumerStatefulWidget {
   const MySpaceScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final bundleAsync = ref.watch(mySpaceProvider);
+  ConsumerState<MySpaceScreen> createState() => _MySpaceScreenState();
+}
+
+class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final libraryAsync = ref.watch(mediaLibraryProvider);
+    final sort = ref.watch(_sortProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: bundleAsync.when(
-          loading: () => const _ScanningLoader(),
-          error: (e, st) => _ErrorView(
-              message: e.toString(),
-              onRetry: () => ref.invalidate(mySpaceProvider)),
-          data: (bundle) => _SpaceContent(bundle: bundle),
+        child: Column(
+          children: [
+            // ── Header ──────────────────────────────────────────────
+            _Header(
+              libraryAsync: libraryAsync,
+              sort: sort,
+              onRefresh: () =>
+                  ref.read(mediaLibraryProvider.notifier).refresh(),
+            ),
+
+            // ── Tab bar ─────────────────────────────────────────────
+            _TabBar(controller: _tabs),
+
+            // ── Tab views ───────────────────────────────────────────
+            Expanded(
+              child: libraryAsync.when(
+                loading: () => const _FullShimmer(),
+                error: (e, _) => _ErrorView(
+                  message: e.toString(),
+                  onRetry: () =>
+                      ref.read(mediaLibraryProvider.notifier).refresh(),
+                ),
+                data: (items) => _TabViews(
+                  controller: _tabs,
+                  items: items,
+                  sort: sort,
+                ),
+              ),
+            ),
+          ],
         ),
       ),
     );
   }
 }
 
-// ── Content ──────────────────────────────────────────────────
+// ── Header ───────────────────────────────────────────────────────────
 
-class _SpaceContent extends ConsumerWidget {
-  final ShelfBundle bundle;
-  const _SpaceContent({required this.bundle});
+class _Header extends ConsumerWidget {
+  final AsyncValue<List<MediaItem>> libraryAsync;
+  final MediaSort sort;
+  final VoidCallback onRefresh;
+
+  const _Header({
+    required this.libraryAsync,
+    required this.sort,
+    required this.onRefresh,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final sort = ref.watch(mediaSortProvider);
+    final total = libraryAsync.valueOrNull?.length ?? 0;
+    final isRefreshing = libraryAsync.isLoading;
 
-    final allItems = [
-      ...bundle.recentTimeline,
-      ...bundle.cinemaShelf,
-      ...bundle.streetTapesShelf,
-    ];
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'My Space',
+                style: TextStyle(
+                  fontSize: 26,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              Text(
+                total == 0 ? 'Scanning...' : '$total files',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ],
+          ),
+          const Spacer(),
+          const UserAvatarButton(),
+          const SizedBox(width: 8),
+          _IconBtn(
+            icon: Icons.search_rounded,
+            onTap: () {
+              final items = ref.read(mediaLibraryProvider).valueOrNull ?? [];
+              showSearch(
+                context: context,
+                delegate: MediaSearchDelegate(allItems: items),
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+          _SortBtn(current: sort),
+          const SizedBox(width: 8),
+          _IconBtn(
+            icon: isRefreshing ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
+            onTap: isRefreshing ? () {} : onRefresh,
+          ),
+          const SizedBox(width: 8),
+          _IconBtn(
+            icon: Icons.settings_rounded,
+            accent: true,
+            onTap: () => context.push('/settings'),
+          ),
+        ],
+      ).animate().fadeIn(duration: 300.ms),
+    );
+  }
+}
 
-    final sorted = List.of(allItems)
-      ..sort((a, b) {
-        switch (sort) {
-          case MediaSort.name:
-            return a.title.compareTo(b.title);
-          case MediaSort.size:
-            return b.fileSizeBytes.compareTo(a.fileSizeBytes);
-          case MediaSort.duration:
-            return (b.duration ?? Duration.zero)
-                .compareTo(a.duration ?? Duration.zero);
-          case MediaSort.dateAdded:
-            return b.addedAt.compareTo(a.addedAt);
-        }
-      });
+// ── Tab bar ──────────────────────────────────────────────────────────
 
-    final totalFiles = allItems.length;
+class _TabBar extends StatelessWidget {
+  final TabController controller;
+  const _TabBar({required this.controller});
 
-    return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-
-        // ── Header ─────────────────────────────────────────
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.center,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'My Space',
-                      style: TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      '$totalFiles files on device',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-                const Spacer(),
-                const UserAvatarButton(),
-                const SizedBox(width: 8),
-                _IconBtn(
-                  icon: Icons.search_rounded,
-                  onTap: () => showSearch(
-                    context: context,
-                    delegate: MediaSearchDelegate(allItems: allItems),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                _SortButton(current: sort),
-                const SizedBox(width: 8),
-                _IconBtn(
-                  icon: Icons.queue_music_rounded,
-                  onTap: () => context.push('/playlists'),
-                ),
-                const SizedBox(width: 8),
-                _IconBtn(
-                  icon: Icons.refresh_rounded,
-                  onTap: () => ref.invalidate(mySpaceProvider),
-                ),
-                const SizedBox(width: 8),
-                _IconBtn(
-                  icon: Icons.settings_rounded,
-                  onTap: () => context.push('/settings'),
-                  accent: true,
-                ),
-              ],
-            ),
-          ).animate().fadeIn(duration: 300.ms),
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+      height: 40,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: TabBar(
+        controller: controller,
+        indicator: BoxDecoration(
+          gradient: const LinearGradient(
+            colors: [AppColors.accent, AppColors.accentViolet],
+          ),
+          borderRadius: BorderRadius.circular(10),
         ),
+        indicatorSize: TabBarIndicatorSize.tab,
+        dividerColor: Colors.transparent,
+        labelColor: Colors.black,
+        unselectedLabelColor: AppColors.textSecondary,
+        labelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+          fontFamily: 'Inter',
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          fontFamily: 'Inter',
+        ),
+        tabs: const [
+          Tab(text: 'Songs'),
+          Tab(text: 'Videos'),
+          Tab(text: 'Folders'),
+          Tab(text: 'Playlists'),
+        ],
+      ),
+    );
+  }
+}
 
-        const SliverToBoxAdapter(child: SizedBox(height: 20)),
+// ── Tab views ────────────────────────────────────────────────────────
 
-        if (totalFiles == 0)
-          const SliverFillRemaining(child: _EmptyState()),
+class _TabViews extends StatelessWidget {
+  final TabController controller;
+  final List<MediaItem> items;
+  final MediaSort sort;
 
-        if (bundle.recentTimeline.isNotEmpty) ...
-          [
-            SliverToBoxAdapter(
-              child: RecentlyPlayedTimeline(items: bundle.recentTimeline)
-                  .animate()
-                  .fadeIn(duration: 400.ms, delay: 100.ms),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 28)),
-          ],
+  const _TabViews({
+    required this.controller,
+    required this.items,
+    required this.sort,
+  });
 
-        if (bundle.hasCinema) ...
-          [
-            SliverToBoxAdapter(
-              child: CinemaShelf(items: bundle.cinemaShelf)
-                  .animate()
-                  .fadeIn(duration: 400.ms, delay: 200.ms),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 28)),
-          ],
+  List<MediaItem> _sorted(List<MediaItem> src) {
+    final list = List.of(src);
+    switch (sort) {
+      case MediaSort.name:
+        list.sort((a, b) => a.title.compareTo(b.title));
+      case MediaSort.size:
+        list.sort((a, b) => b.fileSizeBytes.compareTo(a.fileSizeBytes));
+      case MediaSort.duration:
+        list.sort((a, b) => (b.duration ?? Duration.zero)
+            .compareTo(a.duration ?? Duration.zero));
+      case MediaSort.dateAdded:
+        list.sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    }
+    return list;
+  }
 
-        if (bundle.hasStreetTapes) ...
-          [
-            SliverToBoxAdapter(
-              child: StreetTapesShelf(items: bundle.streetTapesShelf)
-                  .animate()
-                  .fadeIn(duration: 400.ms, delay: 300.ms),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 28)),
-          ],
+  @override
+  Widget build(BuildContext context) {
+    final songs = _sorted(items.where((e) => !e.isVideo).toList());
+    final videos = _sorted(items.where((e) => e.isVideo).toList());
 
-        if (totalFiles > 0)
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  const Text(
-                    'ALL FILES',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.2,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    '$totalFiles total',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary),
-                  ),
-                ],
-              ),
-            ),
-          ),
+    return TabBarView(
+      controller: controller,
+      children: [
+        // Songs
+        items.isEmpty
+            ? const _EmptyState(icon: Icons.music_note_rounded, label: 'No songs found')
+            : _SongList(items: songs),
 
-        if (totalFiles > 0)
-          const SliverToBoxAdapter(child: SizedBox(height: 12)),
+        // Videos
+        items.isEmpty
+            ? const _EmptyState(icon: Icons.videocam_rounded, label: 'No videos found')
+            : _VideoGrid(items: videos),
 
-        if (totalFiles > 0)
-          SliverPadding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            sliver: SliverGrid(
-              delegate: SliverChildBuilderDelegate(
-                (context, i) => MediaCard(item: sorted[i])
-                    .animate()
-                    .fadeIn(
-                      duration: 300.ms,
-                      delay: Duration(milliseconds: i * 40),
-                    )
-                    .slideY(begin: 0.05),
-                childCount: sorted.length,
-              ),
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 0.78,
-              ),
-            ),
-          ),
+        // Folders
+        _FoldersTab(items: items),
 
-        const SliverToBoxAdapter(child: SizedBox(height: 100)),
+        // Playlists
+        const _PlaylistsTab(),
       ],
     );
   }
 }
 
-// ── Sort Button ─────────────────────────────────────────────
+// ── Songs tab — flat list like PlayIt ────────────────────────────────
 
-class _SortButton extends ConsumerWidget {
-  final MediaSort current;
-  const _SortButton({required this.current});
+class _SongList extends ConsumerWidget {
+  final List<MediaItem> items;
+  const _SongList({required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return GestureDetector(
-      onTap: () => _showSortSheet(context, ref),
-      child: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: current != MediaSort.dateAdded
-                ? AppColors.accent
-                : AppColors.border,
-          ),
-        ),
-        child: Icon(
-          Icons.sort_rounded,
-          color: current != MediaSort.dateAdded
-              ? AppColors.accent
-              : AppColors.textSecondary,
-          size: 20,
+    if (items.isEmpty) {
+      return const _EmptyState(
+          icon: Icons.music_note_rounded, label: 'No songs found');
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return _SongRow(
+          item: item,
+          index: i,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+            context.push('/player/audio', extra: item);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _SongRow extends StatelessWidget {
+  final MediaItem item;
+  final int index;
+  final VoidCallback onTap;
+  const _SongRow({required this.item, required this.index, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            // Track number / art placeholder
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.music_note_rounded,
+                color: AppColors.accentViolet,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Text(
+                    item.artist != null && item.artist!.isNotEmpty &&
+                            item.artist != '<unknown>'
+                        ? item.artist!
+                        : item.formattedDuration,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              item.formattedDuration,
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
+            ),
+            const SizedBox(width: 4),
+            const Icon(Icons.more_vert_rounded,
+                color: AppColors.textSecondary, size: 18),
+          ],
         ),
       ),
     );
   }
+}
 
-  void _showSortSheet(BuildContext context, WidgetRef ref) {
+// ── Videos tab — grid like PlayIt ────────────────────────────────────
+
+class _VideoGrid extends ConsumerWidget {
+  final List<MediaItem> items;
+  const _VideoGrid({required this.items});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (items.isEmpty) {
+      return const _EmptyState(
+          icon: Icons.videocam_rounded, label: 'No videos found');
+    }
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 16 / 11,
+      ),
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return _VideoCard(
+          item: item,
+          onTap: () {
+            HapticFeedback.lightImpact();
+            ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+            context.push('/player/video', extra: item);
+          },
+        );
+      },
+    );
+  }
+}
+
+class _VideoCard extends StatelessWidget {
+  final MediaItem item;
+  final VoidCallback onTap;
+  const _VideoCard({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: ClipRRect(
+                borderRadius:
+                    const BorderRadius.vertical(top: Radius.circular(13)),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [
+                            AppColors.accent.withValues(alpha: 0.15),
+                            AppColors.surface,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
+                      ),
+                    ),
+                    const Center(
+                      child: Icon(
+                        Icons.play_circle_rounded,
+                        color: AppColors.accent,
+                        size: 36,
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 6,
+                      right: 6,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.7),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          item.formattedDuration,
+                          style: const TextStyle(
+                            fontSize: 10,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
+              child: Text(
+                item.title,
+                style: const TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                  fontFamily: 'Inter',
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Folders tab ──────────────────────────────────────────────────────
+
+class _FoldersTab extends StatelessWidget {
+  final List<MediaItem> items;
+  const _FoldersTab({required this.items});
+
+  Map<String, List<MediaItem>> _buildFolders() {
+    final map = <String, List<MediaItem>>{};
+    for (final item in items) {
+      final parts = item.filePath.split('/');
+      final folder = parts.length > 1
+          ? parts.sublist(0, parts.length - 1).join('/')
+          : '/';
+      map.putIfAbsent(folder, () => []).add(item);
+    }
+    return map;
+  }
+
+  String _folderName(String path) {
+    final parts = path.split('/');
+    return parts.lastWhere((p) => p.isNotEmpty, orElse: () => path);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const _EmptyState(
+          icon: Icons.folder_open_rounded, label: 'No folders found');
+    }
+    final folders = _buildFolders();
+    final keys = folders.keys.toList()..sort();
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      itemCount: keys.length,
+      itemBuilder: (context, i) {
+        final path = keys[i];
+        final files = folders[path]!;
+        final name = _folderName(path);
+        final audioCount = files.where((f) => !f.isVideo).length;
+        final videoCount = files.where((f) => f.isVideo).length;
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            tileColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.border),
+            ),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.folder_rounded,
+                  color: AppColors.accent, size: 24),
+            ),
+            title: Text(
+              name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              [
+                if (audioCount > 0) '$audioCount song${audioCount == 1 ? '' : 's'}',
+                if (videoCount > 0) '$videoCount video${videoCount == 1 ? '' : 's'}',
+              ].join(' · '),
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textSecondary, size: 20),
+            onTap: () => _openFolder(context, name, files),
+          ),
+        );
+      },
+    );
+  }
+
+  void _openFolder(
+      BuildContext context, String name, List<MediaItem> files) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _FolderDetailPage(name: name, items: files),
+    ));
+  }
+}
+
+class _FolderDetailPage extends ConsumerWidget {
+  final String name;
+  final List<MediaItem> items;
+  const _FolderDetailPage({required this.name, required this.items});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(name,
+            style: const TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+              fontSize: 16,
+            )),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text('${items.length} files',
+                  style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary)),
+            ),
+          ),
+        ],
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return _SongRow(
+            item: item,
+            index: i,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+              final route = item.isVideo ? '/player/video' : '/player/audio';
+              context.push(route, extra: item);
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Playlists tab ────────────────────────────────────────────────────
+
+class _PlaylistsTab extends StatelessWidget {
+  const _PlaylistsTab();
+
+  @override
+  Widget build(BuildContext context) {
+    final playlists = PlayedDatabase.instance.getAllPlaylists();
+    if (playlists.isEmpty) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const _EmptyState(
+              icon: Icons.queue_music_rounded, label: 'No playlists yet'),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () => context.push('/playlists'),
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.accent, AppColors.accentViolet],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Create Playlist',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      itemCount: playlists.length,
+      itemBuilder: (context, i) {
+        final pl = playlists[i];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            tileColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.border),
+            ),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.queue_music_rounded,
+                  color: AppColors.accentViolet, size: 22),
+            ),
+            title: Text(
+              pl.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            subtitle: Text(
+              '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textSecondary, size: 20),
+            onTap: () => context.push('/playlists'),
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Sort button ──────────────────────────────────────────────────────
+
+class _SortBtn extends ConsumerWidget {
+  final MediaSort current;
+  const _SortBtn({required this.current});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return _IconBtn(
+      icon: Icons.sort_rounded,
+      accent: current != MediaSort.dateAdded,
+      onTap: () => _showSheet(context, ref),
+    );
+  }
+
+  void _showSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -286,51 +780,39 @@ class _SortButton extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
-              'Sort Files',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
+            const Text('Sort by',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
+                )),
             const SizedBox(height: 16),
             ...MediaSort.values.map((s) {
               final label = switch (s) {
-                MediaSort.dateAdded => 'Date Added (newest first)',
+                MediaSort.dateAdded => 'Date Added',
                 MediaSort.name => 'Name (A \u2192 Z)',
-                MediaSort.size => 'File Size (largest first)',
-                MediaSort.duration => 'Duration (longest first)',
-              };
-              final icon = switch (s) {
-                MediaSort.dateAdded => Icons.calendar_today_rounded,
-                MediaSort.name => Icons.sort_by_alpha_rounded,
-                MediaSort.size => Icons.data_usage_rounded,
-                MediaSort.duration => Icons.timer_rounded,
+                MediaSort.size => 'File Size',
+                MediaSort.duration => 'Duration',
               };
               final isActive = current == s;
               return ListTile(
-                leading: Icon(icon,
-                    color: isActive
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
-                    size: 20),
-                title: Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: isActive ? AppColors.accent : AppColors.textPrimary,
-                    fontWeight:
-                        isActive ? FontWeight.w700 : FontWeight.w500,
-                  ),
-                ),
+                title: Text(label,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isActive
+                          ? AppColors.accent
+                          : AppColors.textPrimary,
+                      fontWeight: isActive
+                          ? FontWeight.w700
+                          : FontWeight.w500,
+                    )),
                 trailing: isActive
                     ? const Icon(Icons.check_rounded,
                         color: AppColors.accent, size: 18)
                     : null,
                 contentPadding: EdgeInsets.zero,
                 onTap: () {
-                  ref.read(mediaSortProvider.notifier).state = s;
+                  ref.read(_sortProvider.notifier).state = s;
                   Navigator.pop(context);
                 },
               );
@@ -342,7 +824,7 @@ class _SortButton extends ConsumerWidget {
   }
 }
 
-// ── Icon Button ─────────────────────────────────────────────
+// ── Shared widgets ───────────────────────────────────────────────────
 
 class _IconBtn extends StatelessWidget {
   final IconData icon;
@@ -356,30 +838,28 @@ class _IconBtn extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        width: 40,
-        height: 40,
+        width: 38,
+        height: 38,
         decoration: BoxDecoration(
           color: accent
               ? AppColors.accent.withValues(alpha: 0.12)
               : AppColors.surface,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(
               color: accent ? AppColors.accent : AppColors.border),
         ),
-        child: Icon(
-          icon,
-          color: accent ? AppColors.accent : AppColors.textSecondary,
-          size: 20,
-        ),
+        child: Icon(icon,
+            color: accent ? AppColors.accent : AppColors.textSecondary,
+            size: 18),
       ),
     );
   }
 }
 
-// ── Empty State ────────────────────────────────────────────
-
 class _EmptyState extends StatelessWidget {
-  const _EmptyState();
+  final IconData icon;
+  final String label;
+  const _EmptyState({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
@@ -388,150 +868,52 @@ class _EmptyState extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 80,
-            height: 80,
+            width: 72,
+            height: 72,
             decoration: BoxDecoration(
               color: AppColors.surface,
               shape: BoxShape.circle,
               border: Border.all(color: AppColors.border),
             ),
-            child: const Icon(Icons.folder_open_rounded,
-                color: AppColors.textSecondary, size: 36),
-          )
-              .animate(onPlay: (c) => c.repeat(reverse: true))
-              .scaleXY(
-                begin: 1.0,
-                end: 1.08,
-                duration: 1000.ms,
-                curve: Curves.easeInOut,
-              ),
-          const SizedBox(height: 20),
-          const Text(
-            'No media found',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
+            child: Icon(icon, color: AppColors.textSecondary, size: 32),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
-          ).animate().fadeIn(duration: 400.ms).slideY(begin: 0.1),
-          const SizedBox(height: 8),
+          ),
+          const SizedBox(height: 6),
           const Text(
-            'Add audio or video files to your device\nand tap refresh to scan.',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                fontSize: 13, color: AppColors.textSecondary, height: 1.5),
-          ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+            'Files will appear here after scanning.',
+            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Scanning Loader ─────────────────────────────────────────
-
-class _ScanningLoader extends StatefulWidget {
-  const _ScanningLoader();
-
-  @override
-  State<_ScanningLoader> createState() => _ScanningLoaderState();
-}
-
-class _ScanningLoaderState extends State<_ScanningLoader>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _pulse;
-
-  @override
-  void initState() {
-    super.initState();
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    )..repeat(reverse: true);
-  }
-
-  @override
-  void dispose() {
-    _pulse.dispose();
-    super.dispose();
-  }
+class _FullShimmer extends StatelessWidget {
+  const _FullShimmer();
 
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(20),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(height: 40),
-          // Animated radar ring — no Lottie file needed
-          Center(
-            child: AnimatedBuilder(
-              animation: _pulse,
-              builder: (_, __) => Stack(
-                alignment: Alignment.center,
-                children: [
-                  // Outer pulse ring
-                  Container(
-                    width: 100 + (_pulse.value * 20),
-                    height: 100 + (_pulse.value * 20),
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(
-                        color: AppColors.accent.withValues(
-                            alpha: 0.15 + _pulse.value * 0.1),
-                        width: 1.5,
-                      ),
-                    ),
-                  ),
-                  // Inner icon ring
-                  Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: AppColors.accent.withValues(alpha: 0.08),
-                      border: Border.all(
-                        color: AppColors.accent.withValues(alpha: 0.4),
-                        width: 2,
-                      ),
-                    ),
-                    child: const Icon(
-                      Icons.radar_rounded,
-                      color: AppColors.accent,
-                      size: 32,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ).animate().fadeIn(duration: 400.ms),
-          const SizedBox(height: 20),
-          Center(
-            child: const Text(
-              'Scanning your device...',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-            )
-                .animate(onPlay: (c) => c.repeat())
-                .shimmer(duration: 1200.ms, color: AppColors.accent),
-          ),
-          const SizedBox(height: 40),
-          const LoadingShimmer(height: 32, width: 160),
-          const SizedBox(height: 8),
-          const LoadingShimmer(height: 14, width: 100),
-          const SizedBox(height: 28),
-          const MediaGridShimmer(count: 4),
-          const SizedBox(height: 28),
+          const MediaGridShimmer(count: 6),
+          const SizedBox(height: 16),
           const MediaGridShimmer(count: 4),
         ],
       ),
     );
   }
 }
-
-// ── Error View ─────────────────────────────────────────────
 
 class _ErrorView extends StatelessWidget {
   final String message;
@@ -547,26 +929,18 @@ class _ErrorView extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             const Icon(Icons.error_outline_rounded,
-                    color: AppColors.error, size: 48)
-                .animate()
-                .shake(duration: 600.ms, delay: 200.ms)
-                .fadeIn(duration: 300.ms),
+                color: AppColors.error, size: 48),
             const SizedBox(height: 16),
-            const Text(
-              'Could not scan media',
-              style: TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
+            const Text('Could not load media',
+                style: TextStyle(
+                    color: AppColors.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
-            Text(
-              message,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12),
-              textAlign: TextAlign.center,
-            ).animate().fadeIn(duration: 400.ms, delay: 150.ms),
+            Text(message,
+                style: const TextStyle(
+                    color: AppColors.textSecondary, fontSize: 12),
+                textAlign: TextAlign.center),
             const SizedBox(height: 24),
             GestureDetector(
               onTap: onRetry,
@@ -577,18 +951,12 @@ class _ErrorView extends StatelessWidget {
                   color: AppColors.accent,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Text(
-                  'Try Again',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                child: const Text('Try Again',
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.w700)),
               ),
-            )
-                .animate()
-                .fadeIn(duration: 400.ms, delay: 200.ms)
-                .slideY(begin: 0.1, end: 0),
+            ),
           ],
         ),
       ),
