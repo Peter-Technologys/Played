@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
-
 class SettingsScreen extends ConsumerWidget {
   const SettingsScreen({super.key});
 

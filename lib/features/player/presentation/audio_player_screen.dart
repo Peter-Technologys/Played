@@ -7,7 +7,6 @@ import 'package:audio_session/audio_session.dart';
 import 'package:go_router/go_router.dart';
 // share_plus v10+: use Share.shareXFiles (static method on Share, not SharePlus)
 import 'package:share_plus/share_plus.dart';
-import 'package:vector_math/vector_math_64.dart' show Vector3;
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
@@ -529,11 +528,10 @@ class _AlbumArt extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      transform: Matrix4.identity()
-          ..scaleByVector3(Vector3(
-              isPlaying ? 1.0 : 0.88,
-              isPlaying ? 1.0 : 0.88,
-              1.0)),
+      transform: Matrix4.diagonal3Values(
+          isPlaying ? 1.0 : 0.88,
+          isPlaying ? 1.0 : 0.88,
+          1.0),
       transformAlignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
