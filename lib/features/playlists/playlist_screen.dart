@@ -34,6 +34,7 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
       name: name,
       mediaIds: [],
       createdAt: DateTime.now(),
+      updatedAt: DateTime.now(),
     );
     await PlayedDatabase.instance.savePlaylist(playlist);
     state = [...state, playlist];
@@ -48,6 +49,7 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
       name: newName,
       mediaIds: playlist.mediaIds,
       createdAt: playlist.createdAt,
+      updatedAt: DateTime.now(),
     );
     await PlayedDatabase.instance.savePlaylist(updated);
     state = state.map((p) => p.id == id ? updated : p).toList();
@@ -371,17 +373,17 @@ class PlaylistDetailScreen extends ConsumerWidget {
           : ReorderableListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: tracks.length,
-              onReorder: (oldIndex, newIndex) {
+              onReorderItem: (oldIndex, newIndex) {
                 // Reorder mediaIds in the playlist
                 final ids = List<String>.from(playlist.mediaIds);
                 final id = ids.removeAt(oldIndex);
-                ids.insert(
-                    newIndex > oldIndex ? newIndex - 1 : newIndex, id);
+                ids.insert(newIndex, id);
                 final updated = Playlist(
                   id: playlist.id,
                   name: playlist.name,
                   mediaIds: ids,
                   createdAt: playlist.createdAt,
+                  updatedAt: DateTime.now(),
                 );
                 PlayedDatabase.instance.savePlaylist(updated);
                 ref.read(playlistsProvider.notifier).load();

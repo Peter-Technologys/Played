@@ -13,6 +13,7 @@ import '../../../core/database/played_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/utils/duration_formatter.dart';
+import 'mini_player.dart';
 import 'queue_screen.dart';
 import 'lyrics_screen.dart';
 import 'file_info_sheet.dart';
@@ -527,7 +528,7 @@ class _AlbumArt extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      transform: Matrix4.identity()..scale(isPlaying ? 1.0 : 0.88),
+      transform: Matrix4.identity()..scaleByDouble(isPlaying ? 1.0 : 0.88),
       transformAlignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),

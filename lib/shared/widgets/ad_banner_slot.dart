@@ -28,7 +28,7 @@ class _AdBannerSlotState extends State<AdBannerSlot> {
 
   Future<void> _loadIfOnline() async {
     final result = await Connectivity().checkConnectivity();
-    final isOnline = result != ConnectivityResult.none;
+    final isOnline = !result.contains(ConnectivityResult.none);
     if (!isOnline || !mounted) return;
     _loadAd();
   }
