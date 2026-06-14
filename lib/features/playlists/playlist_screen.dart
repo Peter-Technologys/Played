@@ -111,7 +111,7 @@ class PlaylistsScreen extends ConsumerWidget {
       body: playlists.isEmpty
           ? _EmptyState(onCreate: () => _showCreateDialog(context, ref))
           : ListView.separated(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
               itemCount: playlists.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
@@ -129,6 +129,14 @@ class PlaylistsScreen extends ConsumerWidget {
                     delay: Duration(milliseconds: i * 40));
               },
             ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _showCreateDialog(context, ref),
+        backgroundColor: AppColors.accent,
+        foregroundColor: Colors.black,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('New Playlist',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+      ),
     );
   }
 

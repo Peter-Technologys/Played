@@ -427,6 +427,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     onPressed: () =>
                         ref.read(audioPlayerProvider.notifier).skipBack(),
                   ),
+      // Gradient play button
                   GestureDetector(
                     onTap: () =>
                         ref.read(audioPlayerProvider.notifier).togglePlay(),
@@ -435,11 +436,15 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       width: 72, height: 72,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.accent,
+                        gradient: const LinearGradient(
+                          colors: [AppColors.accent, AppColors.accentViolet],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                        ),
                         boxShadow: [
                           BoxShadow(
                             color: AppColors.accent.withValues(alpha: 0.45),
-                            blurRadius: 24, spreadRadius: 2,
+                            blurRadius: 28, spreadRadius: 4,
                           ),
                         ],
                       ),
@@ -549,10 +554,23 @@ class _AlbumArt extends StatelessWidget {
             ? Image.file(File(albumArtPath!),
                 fit: BoxFit.cover, width: double.infinity)
             : Container(
-                color: AppColors.surface,
-                child: const Center(
-                  child: Icon(Icons.music_note_rounded,
-                      color: AppColors.accent, size: 80),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.accent.withValues(alpha: 0.15),
+                      AppColors.accentViolet.withValues(alpha: 0.25),
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                child: Center(
+                  child: Icon(
+                    Icons.music_note_rounded,
+                    color: AppColors.accent.withValues(
+                        alpha: isPlaying ? 0.9 : 0.5),
+                    size: 80,
+                  ),
                 ),
               ),
       ),
