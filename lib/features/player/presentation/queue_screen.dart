@@ -180,7 +180,7 @@ class QueueScreen extends ConsumerWidget {
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: queue.items.length,
-                    onReorderItem: (old, newIdx) {
+                    onReorder: (old, newIdx) {
                       HapticFeedback.mediumImpact();
                       ref.read(queueProvider.notifier).reorder(old, newIdx);
                     },
