@@ -2,10 +2,15 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 
-/// Syncs Pro expiry to Firestore so it survives reinstalls and
-/// works across multiple devices for the same Google account.
+/// Syncs Pro expiry to Firestore — ONLINE ONLY.
 ///
-/// Document path: users/{uid}/pro/status
+/// This service is only called after Firebase has initialised in the
+/// background. Every method is fully offline-safe:
+///   - fetchProExpiry() reads from local Firestore cache first (instant,
+///     works offline), then falls back to a network fetch with a 4-second
+///     timeout so it never hangs the UI thread or triggers an ANR.
+///   - saveProExpiry() / clearProExpiry() are fire-and-forget with
+///     try/catch — offline failures are silently ignored.
 class FirestoreProService {
   FirestoreProService._();
   static final FirestoreProService instance = FirestoreProService._();
@@ -20,8 +25,6 @@ class FirestoreProService {
     return _db.collection('users').doc(uid).collection('pro').doc('status');
   }
 
-  /// Saves Pro expiry timestamp to Firestore.
-  /// No-op if user is not authenticated.
   Future<void> saveProExpiry(int expiryMs) async {
     final doc = _proDoc;
     if (doc == null) return;
@@ -31,18 +34,35 @@ class FirestoreProService {
         SetOptions(merge: true),
       );
     } catch (e) {
-      // Offline — SharedPreferences fallback still holds the value.
       debugPrint('[FirestoreProService] Save failed (offline?): $e');
     }
   }
 
-  /// Fetches Pro expiry from Firestore.
-  /// Returns 0 if not found or offline.
+  /// Cache-first fetch — never blocks startup.
+  ///
+  /// 1. Try Firestore local cache (instant, works offline).
+  /// 2. On cache miss, attempt network with 4-second timeout.
+  /// 3. Return 0 on any failure — SharedPreferences is the source of
+  ///    truth for the current session.
   Future<int> fetchProExpiry() async {
     final doc = _proDoc;
     if (doc == null) return 0;
+
+    // 1. Local cache — instant even offline
     try {
-      final snap = await doc.get();
+      final cached = await doc.get(GetOptions(source: Source.cache));
+      if (cached.exists) {
+        return (cached.data()?['expiry_ms'] as int?) ?? 0;
+      }
+    } catch (_) {
+      // Cache miss on first install — fall through to network
+    }
+
+    // 2. Network with timeout — prevents ANR on slow connections
+    try {
+      final snap = await doc
+          .get(GetOptions(source: Source.server))
+          .timeout(const Duration(seconds: 4));
       if (!snap.exists) return 0;
       return (snap.data()?['expiry_ms'] as int?) ?? 0;
     } catch (e) {
@@ -51,7 +71,6 @@ class FirestoreProService {
     }
   }
 
-  /// Clears Pro from Firestore (e.g. on revoke).
   Future<void> clearProExpiry() async {
     final doc = _proDoc;
     if (doc == null) return;
