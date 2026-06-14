@@ -54,6 +54,9 @@ dependencies:
   shimmer: ^3.0.0
   sliding_up_panel: ^2.0.0+1
 
+  # Device info — used to detect Android SDK version for permission logic
+  device_info_plus: ^10.1.0
+
   # File System
   path_provider: ^2.1.2
   permission_handler: ^11.3.0

@@ -1,19 +1,36 @@
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../app/theme/app_colors.dart';
 import '../../shared/widgets/played_logo.dart';
 
-/// Shown on first launch. Requests all required runtime permissions.
+// Cached SDK version so we only call device_info_plus once per session.
+int? _cachedSdkInt;
+
+/// Returns the Android SDK version integer (e.g. 36 for Android 16).
+/// Uses device_info_plus which reads via the proper platform channel.
+/// Result is cached after the first call.
+Future<int> _androidSdkVersion() async {
+  if (_cachedSdkInt != null) return _cachedSdkInt!;
+  try {
+    final info = await DeviceInfoPlugin().androidInfo;
+    _cachedSdkInt = info.version.sdkInt;
+  } catch (_) {
+    _cachedSdkInt = 30; // safe fallback
+  }
+  return _cachedSdkInt!;
+}
+
+/// Shown on first launch (and whenever critical permissions are missing).
+/// Requests the correct permissions for the running Android version:
 ///
-/// Permission tiers:
-///   CRITICAL  — storage/media. App cannot scan files without these.
-///   IMPORTANT — MANAGE_EXTERNAL_STORAGE (Android 11+). Needed to index
-///               files on SD cards and in non-standard folders.
-///   OPTIONAL  — Bluetooth, Location, Notifications. Only needed for
-///               Air-Drop. App works fine without them.
-///   BATTERY   — Battery optimisation exemption.
+///   Android ≤ 12 (SDK ≤ 32): READ_EXTERNAL_STORAGE (Permission.storage)
+///   Android 13+  (SDK ≥ 33): READ_MEDIA_AUDIO + READ_MEDIA_VIDEO
+///
+/// The legacy Permission.storage is ALWAYS denied on Android 13+ even
+/// after the user grants it — that is why the app was stuck on Android 16.
 class PermissionGateScreen extends StatefulWidget {
   final Widget child;
   const PermissionGateScreen({super.key, required this.child});
@@ -29,19 +46,8 @@ class _PermissionGateScreenState extends State<PermissionGateScreen>
   bool _hasPermanentlyDenied = false;
   Map<Permission, PermissionStatus> _statuses = {};
 
-  // Android 13+ uses granular media permissions.
-  // Android ≤ 12 uses the legacy READ_EXTERNAL_STORAGE (Permission.storage).
-  // We request both sets and accept whichever is applicable on the device.
-  static final List<Permission> _criticalAndroid13 = [
-    Permission.audio,
-    Permission.videos,
-  ];
-  static final List<Permission> _criticalLegacy = [
-    Permission.storage,
-  ];
-
   // Optional — only needed for Air-Drop; never blocks the app
-  static final List<Permission> _optional = [
+  static const List<Permission> _optional = [
     Permission.bluetooth,
     Permission.bluetoothScan,
     Permission.bluetoothAdvertise,
@@ -64,9 +70,9 @@ class _PermissionGateScreenState extends State<PermissionGateScreen>
     super.dispose();
   }
 
-  /// Re-check when user returns from system Settings.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Re-check every time the user comes back from system Settings.
     if (state == AppLifecycleState.resumed && !_criticalGranted) {
       _checkPermissions();
     }
@@ -76,42 +82,47 @@ class _PermissionGateScreenState extends State<PermissionGateScreen>
     if (!mounted) return;
     setState(() => _checking = true);
 
-    // ── Step 1: Critical permissions ────────────────────────────────────
-    // On Android 13+ (SDK 33+), READ_EXTERNAL_STORAGE is deprecated and
-    // always returns 'denied' even when granted. We detect the SDK version
-    // and only check the permissions that actually apply.
-    final isAndroid13Plus = Platform.isAndroid &&
-        (await _getAndroidSdkVersion()) >= 33;
+    // ── 1. Determine which critical permissions apply on this device ──────
+    final sdk = Platform.isAndroid ? await _androidSdkVersion() : 0;
 
-    Map<Permission, PermissionStatus> criticalStatuses;
-
-    if (isAndroid13Plus) {
-      // Android 13+: request granular media permissions only
-      criticalStatuses = await _criticalAndroid13.request();
+    // Android 13+ (SDK 33+): granular media permissions
+    // Android 12 and below: legacy READ_EXTERNAL_STORAGE
+    // iOS / other: no storage permission needed
+    final List<Permission> critical;
+    if (sdk >= 33) {
+      critical = [Permission.audio, Permission.videos];
+    } else if (sdk > 0) {
+      critical = [Permission.storage];
     } else {
-      // Android ≤ 12: request legacy storage permission
-      criticalStatuses = await _criticalLegacy.request();
+      critical = []; // iOS — no runtime storage permission
     }
 
-    // ── Step 2: Optional permissions (fire-and-forget, never blocks) ────
-    // Request silently in background — result is ignored
+    // ── 2. Request critical permissions ────────────────────────────────
+    final Map<Permission, PermissionStatus> criticalStatuses;
+    if (critical.isEmpty) {
+      criticalStatuses = {};
+    } else {
+      criticalStatuses = await critical.request();
+    }
+
+    // ── 3. Optional permissions — fire-and-forget, never blocks ──────────
     _optional.request().ignore();
 
-    // ── Step 3: MANAGE_EXTERNAL_STORAGE (Android 11+) ────────────────
-    if (Platform.isAndroid) {
+    // ── 4. MANAGE_EXTERNAL_STORAGE prompt (Android 11+, non-blocking) ───
+    if (sdk >= 30) {
       final manageStatus = await Permission.manageExternalStorage.status;
-      if (!manageStatus.isGranted) {
-        _promptManageStorage();
-      }
+      if (!manageStatus.isGranted) _promptManageStorage();
     }
 
-    // ── Step 4: Battery optimisation exemption ───────────────────────
+    // ── 5. Battery optimisation exemption ────────────────────────────
     await _requestBatteryExemption();
 
-    // ── Evaluate result ──────────────────────────────────────────────
-    final criticalGranted = criticalStatuses.values.every(
-      (s) => s == PermissionStatus.granted || s == PermissionStatus.limited,
-    );
+    // ── 6. Evaluate ──────────────────────────────────────────────────
+    // If there are no critical permissions (iOS), treat as granted.
+    final criticalGranted = criticalStatuses.isEmpty ||
+        criticalStatuses.values.every(
+          (s) => s == PermissionStatus.granted || s == PermissionStatus.limited,
+        );
     final hasPermanentlyDenied = criticalStatuses.values
         .any((s) => s == PermissionStatus.permanentlyDenied);
 
@@ -122,18 +133,6 @@ class _PermissionGateScreenState extends State<PermissionGateScreen>
       _hasPermanentlyDenied = hasPermanentlyDenied;
       _checking = false;
     });
-  }
-
-  /// Returns the Android SDK version (e.g. 33 for Android 13).
-  Future<int> _getAndroidSdkVersion() async {
-    try {
-      // permission_handler exposes this via the OS info
-      // Fallback: read from system property via Process
-      final result = await Process.run('getprop', ['ro.build.version.sdk']);
-      return int.tryParse(result.stdout.toString().trim()) ?? 30;
-    } catch (_) {
-      return 30; // safe fallback — treat as Android 11
-    }
   }
 
   Future<void> _requestBatteryExemption() async {
@@ -246,7 +245,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
     required this.onRetry,
   });
 
-  static final Map<Permission, String> _labels = {
+  static const Map<Permission, String> _labels = {
     Permission.storage: 'Storage — scan local media files (Android ≤ 12)',
     Permission.audio:   'Audio files — read music (Android 13+)',
     Permission.videos:  'Video files — read videos (Android 13+)',
@@ -265,7 +264,6 @@ class _PermissionDeniedScreen extends StatelessWidget {
       backgroundColor: AppColors.background,
       body: Stack(
         children: [
-          // Subtle radial glow
           Positioned(
             top: -60, left: 0, right: 0,
             child: Container(
@@ -288,11 +286,8 @@ class _PermissionDeniedScreen extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 32),
-
-                  // Logo
                   const Center(child: PlayedLogo()),
                   const SizedBox(height: 20),
-
                   const Text(
                     'Storage Access Required',
                     textAlign: TextAlign.center,
@@ -312,8 +307,6 @@ class _PermissionDeniedScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 16),
-
-                  // Recommendations card
                   Container(
                     padding: const EdgeInsets.all(14),
                     decoration: BoxDecoration(
@@ -345,8 +338,6 @@ class _PermissionDeniedScreen extends StatelessWidget {
                     ),
                   ),
                   const SizedBox(height: 20),
-
-                  // Denied permissions list
                   Expanded(
                     child: denied.isEmpty
                         ? const Center(
@@ -427,10 +418,7 @@ class _PermissionDeniedScreen extends StatelessWidget {
                             }).toList(),
                           ),
                   ),
-
                   const SizedBox(height: 8),
-
-                  // Open App Settings (secondary)
                   GestureDetector(
                     onTap: openAppSettings,
                     child: Container(
@@ -457,8 +445,6 @@ class _PermissionDeniedScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
-                  // Primary action button
                   GestureDetector(
                     onTap: hasPermanentlyDenied ? openAppSettings : onRetry,
                     child: Container(
@@ -492,7 +478,6 @@ class _PermissionDeniedScreen extends StatelessWidget {
                           color: Colors.white.withValues(alpha: 0.12),
                         ),
                   ),
-
                   const SizedBox(height: 12),
                   const PlayedFooter(),
                 ],
