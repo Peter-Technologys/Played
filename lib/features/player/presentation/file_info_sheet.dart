@@ -55,7 +55,7 @@ class FileInfoSheet extends StatelessWidget {
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: AppColors.textPrimary,
-                      fontFamily: 'SpaceGrotesk',
+                      fontFamily: 'Inter',
                     )),
               ],
             ),

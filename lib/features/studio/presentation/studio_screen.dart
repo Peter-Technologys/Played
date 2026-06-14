@@ -283,7 +283,7 @@ class _FilePicker extends ConsumerWidget {
                       color: hasFile
                           ? AppColors.textPrimary
                           : AppColors.textSecondary,
-                      fontFamily: 'SpaceGrotesk',
+                      fontFamily: 'Inter',
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

@@ -119,7 +119,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                     style: const TextStyle(
                         fontSize: 13,
                         color: AppColors.textPrimary,
-                        fontFamily: 'SpaceGrotesk'),
+                        fontFamily: 'Inter'),
                   ),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -132,7 +132,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                           fontSize: 11,
                           color: AppColors.accent,
                           fontWeight: FontWeight.w700,
-                          fontFamily: 'SpaceGrotesk',
+                          fontFamily: 'Inter',
                         )),
                   ),
                 ],

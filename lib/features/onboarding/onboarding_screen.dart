@@ -21,22 +21,36 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       emoji: '\uD83C\uDFAC',
       title: 'My Space',
       subtitle:
-          'All your videos and music in one place. Smart shelves auto-sort your Cinema films and DJ mixes.',
+          'All your videos and music in one place. Songs, Videos, Folders and Playlists — organised like PlayIt.',
       color: AppColors.accent,
+    ),
+    _OnboardPage(
+      emoji: '\uD83C\uDFA7',
+      title: 'Audio & Video Player',
+      subtitle:
+          'Shuffle, repeat, EQ, lyrics, sleep timer, car mode, PiP, screen lock and 2× speed boost.',
+      color: AppColors.accentViolet,
+    ),
+    _OnboardPage(
+      emoji: '\uD83D\uDD12',
+      title: 'Private Vault',
+      subtitle:
+          'AES-256 encrypted vault with biometric unlock. Your private media stays private.',
+      color: AppColors.accentViolet,
     ),
     _OnboardPage(
       emoji: '\uD83D\uDCF6',
       title: 'Air-Drop',
       subtitle:
           'Share any file with nearby phones using Wi-Fi Direct and Bluetooth. Zero internet data used.',
-      color: AppColors.accentViolet,
+      color: AppColors.accent,
     ),
     _OnboardPage(
       emoji: '\uD83C\uDFA4',
       title: 'The Studio',
       subtitle:
           'Split any song into vocals and instrumental. Practice karaoke or create DJ drops offline.',
-      color: AppColors.accent,
+      color: AppColors.accentViolet,
     ),
   ];
 
