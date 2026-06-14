@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
 
 /// Syncs Pro expiry to Firestore so it survives reinstalls and
 /// works across multiple devices for the same Google account.
@@ -31,7 +32,7 @@ class FirestoreProService {
       );
     } catch (e) {
       // Offline — SharedPreferences fallback still holds the value.
-      print('[FirestoreProService] Save failed (offline?): $e');
+      debugPrint('[FirestoreProService] Save failed (offline?): $e');
     }
   }
 
@@ -45,7 +46,7 @@ class FirestoreProService {
       if (!snap.exists) return 0;
       return (snap.data()?['expiry_ms'] as int?) ?? 0;
     } catch (e) {
-      print('[FirestoreProService] Fetch failed (offline?): $e');
+      debugPrint('[FirestoreProService] Fetch failed (offline?): $e');
       return 0;
     }
   }

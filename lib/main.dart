@@ -52,8 +52,6 @@ void _initFirebaseInBackground() {
       await AuthService.instance.signInAnonymouslyIfNeeded();
     } catch (e) {
       // Offline or Firebase unavailable — app continues with local storage.
-      // Auth will retry automatically next time the user opens the app
-      // with an internet connection.
       debugPrint('[Firebase] Background init failed (offline?): $e');
     }
   });

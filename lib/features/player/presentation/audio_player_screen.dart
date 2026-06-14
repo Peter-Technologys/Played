@@ -509,7 +509,7 @@ class _AlbumArt extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
-      transform: Matrix4.identity()..scaled(isPlaying ? 1.0 : 0.88),
+      transform: Matrix4.identity()..scale(isPlaying ? 1.0 : 0.88),
       transformAlignment: Alignment.center,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
