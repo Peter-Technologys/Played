@@ -7,25 +7,6 @@ import '../../../core/models/media_item.dart';
 import '../../my_space/data/media_repository.dart';
 import '../../player/presentation/audio_player_screen.dart';
 
-// ── Folder Browser Provider ────────────────────────────────────────────
-
-// Uses the cached MediaRepository instead of re-scanning the device
-// every time the folder browser is opened.
-final folderBrowserProvider =
-    FutureProvider<Map<String, List<MediaItem>>>((ref) async {
-  final items = MediaRepository.instance.cachedItems ??
-      await MediaRepository.instance.getAllMedia();
-  final Map<String, List<MediaItem>> folders = {};
-  for (final item in items) {
-    final parts = item.filePath.split('/');
-    final folder = parts.length > 1
-        ? parts.sublist(0, parts.length - 1).join('/')
-        : '/';
-    folders.putIfAbsent(folder, () => []).add(item);
-  }
-  return folders;
-});
-
 class FolderBrowserScreen extends StatelessWidget {
   const FolderBrowserScreen({super.key});
 
