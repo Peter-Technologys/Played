@@ -66,7 +66,7 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "deleteFile" -> {
                         val path = call.argument<String>("path") ?: ""
-                        result.success(deleteFile(path))
+                        result.success(deleteMediaFile(path))
                     }
                     "renameFile" -> {
                         val path    = call.argument<String>("path") ?: ""
@@ -243,7 +243,7 @@ class MainActivity : FlutterActivity() {
 
     // ── File operations ──────────────────────────────────────────────────
 
-    private fun deleteFile(path: String): Boolean {
+    private fun deleteMediaFile(path: String): Boolean {
         return try {
             val file = File(path)
             if (!file.exists()) return false
