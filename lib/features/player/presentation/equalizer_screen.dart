@@ -3,6 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 
+// Native channel for Android's built-in Equalizer AudioEffect.
+const _eqChannel = MethodChannel('com.petersmart.played/equalizer');
+
 // ── Provider ───────────────────────────────────────────────
 
 class EqBand {
@@ -47,6 +50,7 @@ class EqNotifier extends StateNotifier<EqState> {
     final updated = List<EqBand>.from(state.bands);
     updated[index] = updated[index].copyWith(gain: gain);
     state = state.copyWith(bands: updated, preset: 'Custom');
+    _applyToNative(updated);
   }
 
   void applyPreset(String name) {
@@ -57,6 +61,19 @@ class EqNotifier extends StateNotifier<EqState> {
       (i) => state.bands[i].copyWith(gain: gains[i]),
     );
     state = state.copyWith(bands: updated, preset: name);
+    _applyToNative(updated);
+  }
+
+  /// Sends band gains (in dB) to the Android Equalizer AudioEffect
+  /// via the native method channel. The native side converts to millibels.
+  Future<void> _applyToNative(List<EqBand> bands) async {
+    try {
+      await _eqChannel.invokeMethod('setBands', {
+        'gains': bands.map((b) => b.gain).toList(),
+      });
+    } catch (e) {
+      debugPrint('[EQ] Native call failed: $e');
+    }
   }
 
   List<String> get presetNames => _presets.keys.toList();

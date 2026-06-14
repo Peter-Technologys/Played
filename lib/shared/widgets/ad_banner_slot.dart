@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
@@ -9,7 +10,10 @@ import '../../app/theme/app_colors.dart';
 class AdBannerSlot extends StatefulWidget {
   const AdBannerSlot({super.key});
 
-  static const String _adUnitId = 'ca-app-pub-2517163652161686/9744511115';
+  // Use test ID in debug builds, live ID in release builds.
+  static String get _adUnitId => kDebugMode
+      ? 'ca-app-pub-3940256099942544/6300978111'   // AdMob test banner
+      : 'ca-app-pub-2517163652161686/9744511115';  // Production banner
 
   @override
   State<AdBannerSlot> createState() => _AdBannerSlotState();

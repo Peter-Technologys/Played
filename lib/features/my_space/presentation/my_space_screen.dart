@@ -441,12 +441,16 @@ class _SongRow extends ConsumerWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: AppColors.accentViolet.withValues(alpha: 0.12),
+                gradient: const LinearGradient(
+                  colors: [AppColors.accentViolet, AppColors.accent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
                 Icons.music_note_rounded,
-                color: AppColors.accentViolet,
+                color: Colors.white,
                 size: 22,
               ),
             ),
@@ -991,22 +995,26 @@ class _VideoCard extends StatelessWidget {
                   fit: StackFit.expand,
                   children: [
                     Container(
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [
-                            AppColors.accent.withValues(alpha: 0.15),
-                            AppColors.surface,
-                          ],
+                          colors: [AppColors.accent, AppColors.accentViolet],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
                         ),
                       ),
                     ),
-                    const Center(
-                      child: Icon(
-                        Icons.play_circle_rounded,
-                        color: AppColors.accent,
-                        size: 36,
+                    Center(
+                      child: Container(
+                        width: 44, height: 44,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.35),
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ),
                     Positioned(

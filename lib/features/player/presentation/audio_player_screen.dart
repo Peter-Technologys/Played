@@ -716,17 +716,17 @@ class _SecondaryBtn extends StatelessWidget {
           Container(
             width: 44, height: 44,
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: AppColors.accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
             ),
-            child: Icon(icon, color: AppColors.textSecondary, size: 20),
+            child: Icon(icon, color: AppColors.accent, size: 20),
           ),
           const SizedBox(height: 4),
           Text(label,
               style: const TextStyle(
-                fontSize: 10, color: AppColors.textSecondary,
-                fontFamily: 'Inter', fontWeight: FontWeight.w500,
+                fontSize: 10, color: AppColors.accent,
+                fontFamily: 'Inter', fontWeight: FontWeight.w600,
               )),
         ],
       ),
