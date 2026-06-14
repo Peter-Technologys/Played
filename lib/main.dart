@@ -1,13 +1,22 @@
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
+import 'core/services/auth_service.dart';
 import 'core/services/notification_service.dart';
 import 'features/settings/settings_provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Initialize Firebase — must be first before any Firebase service is used
+  await Firebase.initializeApp();
+
+  // Silent anonymous auth — user never sees this.
+  // Runs after Firebase is ready; failures are caught inside the service.
+  await AuthService.instance.signInAnonymouslyIfNeeded();
 
   // Initialize Hive local database
   await PlayedDatabase.instance.init();
