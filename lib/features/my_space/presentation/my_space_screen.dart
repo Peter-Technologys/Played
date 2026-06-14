@@ -608,9 +608,12 @@ class _SongContextMenu extends ConsumerWidget {
             icon: Icons.share_rounded,
             label: 'Share',
             color: AppColors.textSecondary,
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              // share_plus
+              await Share.shareXFiles(
+                [XFile(item.filePath)],
+                text: item.title,
+              );
             },
           ),
           _ContextOption(
@@ -621,6 +624,23 @@ class _SongContextMenu extends ConsumerWidget {
               Navigator.pop(context);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('Moved to Vault')),
+              );
+            },
+          ),
+          _ContextOption(
+            icon: Icons.drive_file_rename_outline_rounded,
+            label: 'Rename / Delete',
+            color: AppColors.textSecondary,
+            onTap: () {
+              Navigator.pop(context);
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: AppColors.surface,
+                isScrollControlled: true,
+                shape: const RoundedRectangleBorder(
+                    borderRadius:
+                        BorderRadius.vertical(top: Radius.circular(24))),
+                builder: (_) => FileManagementSheet(item: item),
               );
             },
           ),

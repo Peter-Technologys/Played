@@ -746,6 +746,12 @@ class _OptionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final options = [
+      _Opt(Icons.directions_car_rounded, 'Car Mode', AppColors.accent, () {
+        Navigator.pop(context);
+        Navigator.of(context).push(
+          MaterialPageRoute(builder: (_) => const CarModeScreen()),
+        );
+      }),
       _Opt(Icons.playlist_add_rounded, 'Add to Playlist', AppColors.accent, () {
         ref.read(queueProvider.notifier).addToQueue(mediaItem);
         Navigator.pop(context);
