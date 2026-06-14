@@ -1,59 +1,137 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
-/// Creates and manages the PLAYED folder at the ROOT of internal storage:
-///   /storage/emulated/0/PLAYED/
+/// Manages ALL storage locations for PLAYED.
 ///
-/// This makes PLAYED behave like a first-class app — its folder sits
-/// alongside Music/, Downloads/, DCIM/ etc. and is immediately visible
-/// in the device Files app, not buried in Android/data/.
+/// TWO storage areas are created:
 ///
-/// Sub-folders:
-///   PLAYED/Stems/        — vocal + instrumental stems from Studio
-///   PLAYED/Extracted/    — audio extracted from video files
-///   PLAYED/Trimmed/      — WhatsApp-trimmed clips
+/// 1. PUBLIC — /storage/emulated/0/PLAYED/
+///    Visible in the Files app. Survives app uninstall.
+///    User-facing exports go here.
+///    Sub-folders:
+///      PLAYED/Stems/      — vocal + instrumental stems from Studio
+///      PLAYED/Extracted/  — audio extracted from video
+///      PLAYED/Trimmed/    — WhatsApp-trimmed clips
+///
+/// 2. PRIVATE — /Android/data/com.petersmart.played/files/
+///    Managed by Android. Cleared when user clears app data.
+///    Internal app files go here (cache, temp, thumbnails).
+///    Sub-folders:
+///      files/cache/       — temporary processing files
+///      files/thumbnails/  — generated video thumbnails
+///
+/// NOTE: files/vault/ is intentionally NOT created here.
+///       It is managed exclusively by PlayedDatabase / VaultService.
 class StorageFolderService {
   StorageFolderService._();
   static final StorageFolderService instance = StorageFolderService._();
 
-  static const String _root = '/storage/emulated/0/PLAYED';
+  // ── Public paths (visible in Files app) ──────────────────────────────
+  static const String _publicRoot = '/storage/emulated/0/PLAYED';
 
-  Directory? _rootDir;
+  Directory? _publicRootDir;
+  Directory? _stemsDir;
+  Directory? _extractedDir;
+  Directory? _trimmedDir;
 
-  /// The root PLAYED directory at /storage/emulated/0/PLAYED
-  Future<Directory> get rootDirectory async {
-    if (_rootDir != null && await _rootDir!.exists()) return _rootDir!;
-    final dir = Directory(_root);
+  // ── Private paths (Android/data/com.petersmart.played/files/) ────────
+  Directory? _privateRootDir;
+  Directory? _cacheDir;
+  Directory? _thumbnailsDir;
+
+  // ─────────────────────────────────────────────────────────────────────
+  // PUBLIC directories
+  // ─────────────────────────────────────────────────────────────────────
+
+  /// /storage/emulated/0/PLAYED/
+  Future<Directory> get publicRoot async {
+    if (_publicRootDir != null && await _publicRootDir!.exists()) {
+      return _publicRootDir!;
+    }
+    final dir = Directory(_publicRoot);
     if (!await dir.exists()) await dir.create(recursive: true);
-    _rootDir = dir;
+    _publicRootDir = dir;
     return dir;
   }
 
   /// /storage/emulated/0/PLAYED/Stems/
   Future<Directory> get stemsDirectory async {
-    final root = await rootDirectory;
+    if (_stemsDir != null && await _stemsDir!.exists()) return _stemsDir!;
+    final root = await publicRoot;
     final dir = Directory('${root.path}/Stems');
     if (!await dir.exists()) await dir.create();
+    _stemsDir = dir;
     return dir;
   }
 
   /// /storage/emulated/0/PLAYED/Extracted/
   Future<Directory> get extractedDirectory async {
-    final root = await rootDirectory;
+    if (_extractedDir != null && await _extractedDir!.exists()) {
+      return _extractedDir!;
+    }
+    final root = await publicRoot;
     final dir = Directory('${root.path}/Extracted');
     if (!await dir.exists()) await dir.create();
+    _extractedDir = dir;
     return dir;
   }
 
   /// /storage/emulated/0/PLAYED/Trimmed/
   Future<Directory> get trimmedDirectory async {
-    final root = await rootDirectory;
+    if (_trimmedDir != null && await _trimmedDir!.exists()) {
+      return _trimmedDir!;
+    }
+    final root = await publicRoot;
     final dir = Directory('${root.path}/Trimmed');
     if (!await dir.exists()) await dir.create();
+    _trimmedDir = dir;
     return dir;
   }
 
-  /// Returns a full file path inside the given sub-folder.
+  // ─────────────────────────────────────────────────────────────────────
+  // PRIVATE directories  (Android/data/com.petersmart.played/files/)
+  // ─────────────────────────────────────────────────────────────────────
+
+  /// /Android/data/com.petersmart.played/files/
+  ///
+  /// Android creates this directory automatically when the app is installed.
+  /// [getExternalStorageDirectory] returns exactly:
+  ///   /storage/emulated/0/Android/data/com.petersmart.played/files
+  Future<Directory> get privateRoot async {
+    if (_privateRootDir != null && await _privateRootDir!.exists()) {
+      return _privateRootDir!;
+    }
+    final dir = await getExternalStorageDirectory();
+    if (dir == null) throw Exception('External storage not available');
+    _privateRootDir = dir;
+    return dir;
+  }
+
+  /// /Android/data/com.petersmart.played/files/cache/
+  Future<Directory> get privateCacheDirectory async {
+    if (_cacheDir != null && await _cacheDir!.exists()) return _cacheDir!;
+    final root = await privateRoot;
+    final dir = Directory('${root.path}/cache');
+    if (!await dir.exists()) await dir.create();
+    _cacheDir = dir;
+    return dir;
+  }
+
+  /// /Android/data/com.petersmart.played/files/thumbnails/
+  Future<Directory> get thumbnailsDirectory async {
+    if (_thumbnailsDir != null && await _thumbnailsDir!.exists()) {
+      return _thumbnailsDir!;
+    }
+    final root = await privateRoot;
+    final dir = Directory('${root.path}/thumbnails');
+    if (!await dir.exists()) await dir.create();
+    _thumbnailsDir = dir;
+    return dir;
+  }
+
+  // ── Convenience path helpers ──────────────────────────────────────────
+
   Future<String> pathInStems(String fileName) async =>
       '${(await stemsDirectory).path}/$fileName';
 
@@ -63,17 +141,55 @@ class StorageFolderService {
   Future<String> pathInTrimmed(String fileName) async =>
       '${(await trimmedDirectory).path}/$fileName';
 
-  /// Creates all sub-folders. Call once at startup.
+  Future<String> pathInCache(String fileName) async =>
+      '${(await privateCacheDirectory).path}/$fileName';
+
+  Future<String> pathInThumbnails(String fileName) async =>
+      '${(await thumbnailsDirectory).path}/$fileName';
+
+  // ── Startup ───────────────────────────────────────────────────────────
+
+  /// Creates all folders at startup. Safe to call before permissions are
+  /// granted — errors are caught and logged, not thrown.
   Future<void> ensureCreated() async {
+    // Public folders (require MANAGE_EXTERNAL_STORAGE on Android 11+)
     try {
-      await rootDirectory;
+      await publicRoot;
       await stemsDirectory;
       await extractedDirectory;
       await trimmedDirectory;
-      debugPrint('[Storage] PLAYED folder ready at $_root');
+      debugPrint('[Storage] Public PLAYED folder ready at $_publicRoot');
     } catch (e) {
-      // MANAGE_EXTERNAL_STORAGE not yet granted — will retry after permission
-      debugPrint('[Storage] Could not create PLAYED folder: $e');
+      debugPrint('[Storage] Public folder not ready (permission pending?): $e');
     }
+
+    // Private folders (always available, no special permission needed)
+    try {
+      await privateRoot;
+      await privateCacheDirectory;
+      await thumbnailsDirectory;
+      debugPrint('[Storage] Private app folder ready');
+    } catch (e) {
+      debugPrint('[Storage] Private folder error: $e');
+    }
+  }
+
+  // ── Storage info (for Settings screen) ───────────────────────────────
+
+  /// Returns a human-readable summary of all PLAYED storage locations.
+  Future<Map<String, String>> storageSummary() async {
+    final result = <String, String>{};
+    try {
+      result['Public (Files app)'] = (await publicRoot).path;
+      result['Stems'] = (await stemsDirectory).path;
+      result['Extracted Audio'] = (await extractedDirectory).path;
+      result['Trimmed Clips'] = (await trimmedDirectory).path;
+    } catch (_) {}
+    try {
+      result['App Data'] = (await privateRoot).path;
+      result['Cache'] = (await privateCacheDirectory).path;
+      result['Thumbnails'] = (await thumbnailsDirectory).path;
+    } catch (_) {}
+    return result;
   }
 }
