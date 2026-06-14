@@ -21,10 +21,6 @@ final controlsVisibleProvider = StateProvider<bool>((_) => true);
 final brightnessProvider = StateProvider<double>((_) => 0.5);
 final volumeProvider = StateProvider<double>((_) => 0.8);
 
-// PiP preference key — set to true once the user manually enters PiP.
-// After that, PiP triggers automatically when the user leaves the app.
-const _kPipAutoKey = 'pip_auto_enabled';
-
 // ── Screen ────────────────────────────────────────────────────
 
 class VideoPlayerScreen extends ConsumerStatefulWidget {
