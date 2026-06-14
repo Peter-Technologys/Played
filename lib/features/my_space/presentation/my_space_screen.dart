@@ -11,6 +11,7 @@ import 'widgets/cinema_shelf.dart';
 import 'widgets/street_tapes_shelf.dart';
 import 'widgets/recently_played_timeline.dart';
 import 'widgets/search_bar_widget.dart';
+import 'widgets/user_avatar_button.dart';
 
 // ── Sort options ─────────────────────────────────────────────
 enum MediaSort { dateAdded, name, size, duration }
@@ -103,6 +104,8 @@ class _SpaceContent extends ConsumerWidget {
                   ],
                 ),
                 const Spacer(),
+                const UserAvatarButton(),
+                const SizedBox(width: 8),
                 _IconBtn(
                   icon: Icons.search_rounded,
                   onTap: () => showSearch(
