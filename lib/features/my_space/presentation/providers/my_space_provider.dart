@@ -1,14 +1,18 @@
-import 'dart:isolate';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/database/played_database.dart';
 import '../../data/media_repository.dart';
 
+// Top-level function required by compute() — must not be a closure.
+Future<List<MediaItem>> _runScan(bool _) =>
+    MediaRepository.instance.getAllMedia(forceRefresh: true);
+
 /// The full media library — all songs + all videos.
-/// Two-phase loading:
-///   Phase 1: return cached Hive data instantly (zero wait).
-///   Phase 2: run a fresh MediaStore scan in the background,
-///            update the provider silently (no spinner shown).
+///
+/// Two-phase loading (no spinner on reopen):
+///   Phase 1: in-memory cache → Hive history seed → foreground scan
+///   Phase 2: compute() background scan, silently updates state
 final mediaLibraryProvider =
     AsyncNotifierProvider<MediaLibraryNotifier, List<MediaItem>>(
   MediaLibraryNotifier.new,
@@ -17,31 +21,34 @@ final mediaLibraryProvider =
 class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   @override
   Future<List<MediaItem>> build() async {
-    // Phase 1 — serve cached items from Hive immediately
-    final cached = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
-    if (cached.isNotEmpty) {
-      // Kick off background refresh without awaiting
+    // Phase 1a — in-memory cache (zero I/O, instant)
+    final cached = MediaRepository.instance.cachedItems;
+    if (cached != null && cached.isNotEmpty) {
       _backgroundRefresh();
       return cached;
     }
-    // First install — no cache yet, do a foreground scan (one time only)
+    // Phase 1b — Hive play-history as seed so UI is never blank
+    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
+    if (history.isNotEmpty) {
+      _backgroundRefresh();
+      return history;
+    }
+    // First install — foreground scan (one time only, shows shimmer)
     return MediaRepository.instance.getAllMedia(forceRefresh: true);
   }
 
-  /// Scans MediaStore in a background isolate, then silently updates state.
+  /// Runs a fresh MediaStore scan via compute() (background isolate that
+  /// shares process memory), then silently replaces state. No spinner.
   Future<void> _backgroundRefresh() async {
     try {
-      // Run the scan off the main thread
-      final fresh = await Isolate.run(
-        () => MediaRepository.instance.getAllMedia(forceRefresh: true),
-      );
-      state = AsyncData(fresh);
-    } catch (e) {
-      // Keep showing cached data — don't surface the error
+      final fresh = await compute(_runScan, true);
+      if (fresh.isNotEmpty) state = AsyncData(fresh);
+    } catch (_) {
+      // Keep cached data on error — never crash the UI
     }
   }
 
-  /// Called by the refresh button — shows a brief loading state.
+  /// Manual refresh — brief loading state then update.
   Future<void> refresh() async {
     MediaRepository.instance.invalidate();
     state = const AsyncLoading();
@@ -51,5 +58,5 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   }
 }
 
-// Legacy provider kept for MediaCard compatibility
+// Alias kept for MediaCard and other widgets
 final mySpaceProvider = mediaLibraryProvider;

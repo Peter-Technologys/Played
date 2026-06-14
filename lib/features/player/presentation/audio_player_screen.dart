@@ -176,10 +176,20 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void toggleShuffle()  => state = state.copyWith(isShuffle: !state.isShuffle);
+
   void cycleRepeat() {
     final next = RepeatState.values[
         (state.repeat.index + 1) % RepeatState.values.length];
     state = state.copyWith(repeat: next);
+    // Apply to just_audio so repeat actually works
+    switch (next) {
+      case RepeatState.off:
+        AudioPlayerNotifier._player.setLoopMode(LoopMode.off);
+      case RepeatState.one:
+        AudioPlayerNotifier._player.setLoopMode(LoopMode.one);
+      case RepeatState.all:
+        AudioPlayerNotifier._player.setLoopMode(LoopMode.all);
+    }
   }
   void savePosition(String id) =>
       PlayedDatabase.instance.saveSeekPosition(id, state.position);

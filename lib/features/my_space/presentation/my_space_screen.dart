@@ -12,6 +12,124 @@ import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
 import '../../player/presentation/queue_screen.dart';
 
+// ── Recently Played row ─────────────────────────────────────────────
+class _RecentlyPlayedRow extends ConsumerWidget {
+  const _RecentlyPlayedRow();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final recent = PlayedDatabase.instance.getRecentlyPlayed(limit: 20);
+    if (recent.isEmpty) return const SizedBox.shrink();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 10),
+          child: Text(
+            'RECENTLY PLAYED',
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textSecondary,
+              letterSpacing: 1.3,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 68,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: recent.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final item = recent[i];
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref
+                      .read(queueProvider.notifier)
+                      .setQueue(recent, startIndex: i);
+                  context.push(
+                    item.isVideo ? '/player/video' : '/player/audio',
+                    extra: item,
+                  );
+                },
+                child: Container(
+                  width: 220,
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppColors.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: item.isVideo
+                              ? AppColors.accent.withValues(alpha: 0.12)
+                              : AppColors.accentViolet.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          item.isVideo
+                              ? Icons.play_circle_rounded
+                              : Icons.music_note_rounded,
+                          color: item.isVideo
+                              ? AppColors.accent
+                              : AppColors.accentViolet,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              item.title,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary,
+                                fontFamily: 'Inter',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            Text(
+                              item.artist != null &&
+                                      item.artist != '<unknown>'
+                                  ? item.artist!
+                                  : item.formattedDuration,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                color: AppColors.textSecondary,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Sort ─────────────────────────────────────────────────────────────
 enum MediaSort { dateAdded, name, size, duration }
 
@@ -59,6 +177,9 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
               onRefresh: () =>
                   ref.read(mediaLibraryProvider.notifier).refresh(),
             ),
+
+            // ── Recently Played ──────────────────────────────────────
+            const _RecentlyPlayedRow(),
 
             // ── Tab bar ─────────────────────────────────────────────
             _TabBar(controller: _tabs),
