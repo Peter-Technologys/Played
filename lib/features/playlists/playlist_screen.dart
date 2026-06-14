@@ -95,7 +95,7 @@ class PlaylistsScreen extends ConsumerWidget {
         ),
         title: const Text('Playlists',
             style: TextStyle(
-              fontFamily: 'SpaceGrotesk',
+              fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
               fontSize: 18,
@@ -165,7 +165,7 @@ class PlaylistsScreen extends ConsumerWidget {
         backgroundColor: AppColors.surface,
         title: Text('Delete "${pl.name}"?',
             style: const TextStyle(
-                color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk')),
+                color: AppColors.textPrimary, fontFamily: 'Inter')),
         content: const Text('This will remove the playlist but not the files.',
             style: TextStyle(color: AppColors.textSecondary)),
         actions: [
@@ -238,7 +238,7 @@ class _PlaylistTile extends StatelessWidget {
                       style: const TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w700,
                         color: AppColors.textPrimary,
-                        fontFamily: 'SpaceGrotesk',
+                        fontFamily: 'Inter',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
@@ -326,7 +326,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
         ),
         title: Text(playlist.name,
             style: const TextStyle(
-              fontFamily: 'SpaceGrotesk',
+              fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
               color: AppColors.textPrimary,
               fontSize: 18,
@@ -358,7 +358,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                   const Text('No tracks yet',
                       style: TextStyle(
                           color: AppColors.textSecondary,
-                          fontFamily: 'SpaceGrotesk',
+                          fontFamily: 'Inter',
                           fontSize: 15)),
                   const SizedBox(height: 6),
                   const Text(
@@ -412,7 +412,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                       style: const TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600,
                         color: AppColors.textPrimary,
-                        fontFamily: 'SpaceGrotesk',
+                        fontFamily: 'Inter',
                       ),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis),
@@ -471,7 +471,7 @@ class _NameDialog extends StatelessWidget {
       backgroundColor: AppColors.surface,
       title: Text(title,
           style: const TextStyle(
-              color: AppColors.textPrimary, fontFamily: 'SpaceGrotesk')),
+              color: AppColors.textPrimary, fontFamily: 'Inter')),
       content: TextField(
         controller: controller,
         autofocus: true,
@@ -556,7 +556,7 @@ class _EmptyState extends StatelessWidget {
               child: const Text('Create Playlist',
                   style: TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w700,
-                    color: Colors.black, fontFamily: 'SpaceGrotesk',
+                    color: Colors.black, fontFamily: 'Inter',
                   )),
             ),
           ).animate().fadeIn(duration: 400.ms, delay: 200.ms),
