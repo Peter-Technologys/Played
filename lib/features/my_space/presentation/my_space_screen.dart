@@ -602,7 +602,7 @@ class _SongContextMenu extends ConsumerWidget {
             color: AppColors.accent,
             onTap: () {
               Navigator.pop(context);
-              context.push('/playlists');
+              _showPlaylistPicker(context, r, item);
             },
           ),
           _ContextOption(
@@ -623,9 +623,27 @@ class _SongContextMenu extends ConsumerWidget {
             color: AppColors.accentViolet,
             onTap: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Moved to Vault')),
-              );
+              try {
+                await VaultService.instance.lockItem(item);
+                r.read(mediaLibraryProvider.notifier).refresh();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Moved to Vault ✔'),
+                      backgroundColor: AppColors.surface,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Vault error: $e'),
+                      backgroundColor: AppColors.error,
+                    ),
+                  );
+                }
+              }
             },
           ),
           _ContextOption(
