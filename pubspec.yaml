@@ -12,8 +12,8 @@ dependencies:
 
   # Media Playback
   flutter_vlc_player: ^7.4.1
-  # video_player removed — flutter_vlc_player covers all playback needs
   just_audio: ^0.9.36
+  audio_service: ^0.18.13
   audio_session: ^0.1.18
 
   # FFmpeg Processing
