@@ -2,6 +2,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
@@ -38,12 +39,11 @@ class SettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
         children: [
           // ── Account section ──────────────────────────────
-          _SectionHeader(label: 'Account'),
+          const _SectionHeader(label: 'Account'),
           const SizedBox(height: 12),
 
           if (isGoogle) ...
             [
-              // Signed-in card
               _AccountCard(
                 photoUrl: photoUrl,
                 displayName: displayName,
@@ -52,7 +52,6 @@ class SettingsScreen extends ConsumerWidget {
             ]
           else ...
             [
-              // Sign-in button
               _GoogleSignInButton(
                 onTap: () => _signInWithGoogle(context, ref),
               ).animate().fadeIn(duration: 300.ms),
@@ -70,18 +69,139 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 32),
 
           // ── About section ────────────────────────────────
-          _SectionHeader(label: 'About'),
+          const _SectionHeader(label: 'About'),
           const SizedBox(height: 12),
+
+          // App identity card
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.2)),
+            ),
+            child: Column(
+              children: [
+                // Logo
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 18, vertical: 8),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: 0.35),
+                      width: 1.5,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    color: AppColors.accent.withValues(alpha: 0.05),
+                  ),
+                  child: const Text(
+                    'PLAYED',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.accent,
+                      fontFamily: 'Inter',
+                      letterSpacing: 5,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                const Text(
+                  'Your media. Your rules.',
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                const Text(
+                  'Version 1.1.0 (build 2)',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textMuted,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Divider(color: AppColors.border, height: 1),
+                const SizedBox(height: 16),
+                const Text(
+                  'A high-performance offline media player built for East Africa. '
+                  'Play, organise, and share your videos and music — no internet required.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                    height: 1.6,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ],
+            ),
+          ).animate().fadeIn(duration: 400.ms),
+
+          const SizedBox(height: 12),
+
+          // Developer tile
           _SettingsTile(
-            icon: Icons.info_outline_rounded,
-            label: 'Version',
+            icon: Icons.business_rounded,
+            label: 'Developer',
             trailing: const Text(
-              '1.0.0',
+              'PeterSmart Technologies',
               style: TextStyle(
                   fontSize: 13, color: AppColors.textSecondary),
             ),
           ),
-          const SizedBox(height: 100),
+          const SizedBox(height: 8),
+
+          // Contact / email tile
+          _TappableTile(
+            icon: Icons.email_outlined,
+            label: 'Contact Support',
+            subtitle: 'dev@petersmartlink.com',
+            onTap: () => _launchEmail(context),
+          ),
+          const SizedBox(height: 8),
+
+          // Privacy Policy tile
+          _TappableTile(
+            icon: Icons.privacy_tip_outlined,
+            label: 'Privacy Policy',
+            onTap: () => _launchUrl(
+              context,
+              'https://petersmartlink.com/played/privacy',
+            ),
+          ),
+          const SizedBox(height: 8),
+
+          // Rate the app tile
+          _TappableTile(
+            icon: Icons.star_outline_rounded,
+            label: 'Rate PLAYED',
+            subtitle: 'Enjoying the app? Leave a review!',
+            onTap: () => _launchUrl(
+              context,
+              'https://play.google.com/store/apps/details?id=com.petersmart.played',
+            ),
+          ),
+
+          const SizedBox(height: 40),
+
+          // Footer branding
+          const Center(
+            child: Text(
+              'from PeterSmart Technologies',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textMuted,
+                fontFamily: 'Inter',
+                letterSpacing: 0.5,
+              ),
+            ),
+          ),
+          const SizedBox(height: 24),
         ],
       ),
     );
@@ -114,8 +234,8 @@ class SettingsScreen extends ConsumerWidget {
         ),
         content: const Text(
           'Your Pro status and playlists will no longer sync across devices. Local data is kept.',
-          style:
-              TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, height: 1.5),
         ),
         actions: [
           TextButton(
@@ -134,6 +254,40 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  Future<void> _launchEmail(BuildContext context) async {
+    final uri = Uri(
+      scheme: 'mailto',
+      path: 'dev@petersmartlink.com',
+      queryParameters: {
+        'subject': 'PLAYED App Support',
+      },
+    );
+    if (!await launchUrl(uri)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open email app.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _launchUrl(BuildContext context, String url) async {
+    final uri = Uri.parse(url);
+    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not open link.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -157,7 +311,6 @@ class _AccountCard extends StatelessWidget {
       ),
       child: Row(
         children: [
-          // Avatar
           Container(
             width: 52,
             height: 52,
@@ -270,11 +423,10 @@ class _GoogleSignInButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: AppColors.border),
         ),
-        child: Row(
+        child: const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Google 'G' logo using coloured text (no asset needed)
-            const Text(
+            Text(
               'G',
               style: TextStyle(
                 fontSize: 20,
@@ -282,8 +434,8 @@ class _GoogleSignInButton extends StatelessWidget {
                 color: Color(0xFF4285F4),
               ),
             ),
-            const SizedBox(width: 12),
-            const Text(
+            SizedBox(width: 12),
+            Text(
               'Sign in with Google',
               style: TextStyle(
                 fontSize: 15,
@@ -350,6 +502,68 @@ class _SettingsTile extends StatelessWidget {
           ),
           if (trailing != null) trailing!,
         ],
+      ),
+    );
+  }
+}
+
+class _TappableTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String? subtitle;
+  final VoidCallback onTap;
+  const _TappableTile({
+    required this.icon,
+    required this.label,
+    this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: AppColors.accent, size: 20),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textPrimary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (subtitle != null) ...
+                    [
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle!,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                ],
+              ),
+            ),
+            const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textMuted, size: 20),
+          ],
+        ),
       ),
     );
   }

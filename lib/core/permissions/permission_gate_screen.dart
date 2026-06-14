@@ -193,7 +193,7 @@ class _PoweredByFooter extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(bottom: 8),
       child: Text(
-        'Powered by PeterSmart Technologies',
+        'from PeterSmart Technologies',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 11,
