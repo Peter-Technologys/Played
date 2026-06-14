@@ -57,6 +57,7 @@ class MediaScannerService {
         final size = raw['size'] as int? ?? 0;
         final dateAddedSec = raw['dateAdded'] as int? ?? 0;
         final isVideo = raw['isVideo'] as bool? ?? false;
+        final albumId = raw['albumId'] as String?;
 
         results.add(MediaItem(
           id: uuid.v5(Namespace.url.value, path),
@@ -72,6 +73,8 @@ class MediaScannerService {
           fileSizeBytes: size,
           artist: raw['artist'] as String?,
           album: raw['album'] as String?,
+          // Store albumId so UI can lazily fetch real album art
+          albumArtPath: albumId != null ? 'albumid:$albumId' : null,
         ));
       }
 
