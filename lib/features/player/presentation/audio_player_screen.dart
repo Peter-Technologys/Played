@@ -5,7 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:audio_session/audio_session.dart';
 import 'package:go_router/go_router.dart';
-// share_plus v10+: use Share.shareXFiles (static method on Share, not SharePlus)
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
@@ -13,6 +12,7 @@ import '../../../core/database/played_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/utils/duration_formatter.dart';
+import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
 import 'queue_screen.dart';
 import 'lyrics_screen.dart';
@@ -108,7 +108,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _container = container;
   }
 
-  Future<void> load(MediaItem item) async {
+  Future<void> load(MediaItem item, {AppSettings? settings}) async {
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
 
@@ -121,6 +121,14 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       final saved = PlayedDatabase.instance.getSeekPosition(item.id);
       await _player.setFilePath(item.filePath);
       if (saved != null && saved.inSeconds > 0) await _player.seek(saved);
+
+      // Apply settings if provided
+      if (settings != null) {
+        await _player.setSpeed(settings.playbackSpeed);
+        await _player.setSkipSilenceEnabled(settings.skipSilence);
+        state = state.copyWith(speed: settings.playbackSpeed);
+      }
+
       await _player.play();
     } catch (e) {
       debugPrint('[Player] Failed to load ${item.filePath}: $e');
@@ -231,7 +239,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      ref.read(audioPlayerProvider.notifier).load(widget.mediaItem);
+      final settings = ref.read(settingsProvider);
+      ref.read(audioPlayerProvider.notifier).load(
+        widget.mediaItem,
+        settings: settings,
+      );
       PlayedDatabase.instance.recordPlay(widget.mediaItem);
     });
   }
@@ -766,8 +778,7 @@ class _OptionsSheet extends ConsumerWidget {
       }),
       _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop', AppColors.accent, () {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Open the Air-Drop tab to share')));
+        context.go('/airdrop');
       }),
       _Opt(Icons.graphic_eq_rounded,    'Open in Studio',      AppColors.accentViolet, onOpenInStudio),
       _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent,       onTrimForWhatsApp),
@@ -780,8 +791,30 @@ class _OptionsSheet extends ConsumerWidget {
       }),
       _Opt(Icons.cast_rounded, 'Cast to Device', AppColors.textSecondary, () {
         Navigator.pop(context);
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Cast coming soon')));
+        showDialog(
+          context: context,
+          builder: (_) => AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            title: const Text('Cast to Device',
+                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
+            content: const Text(
+              'Chromecast / DLNA casting is coming in a future update.\n\n'
+              'For now, use Air-Drop to send files to nearby devices.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6),
+            ),
+            actions: [
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.accent,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+                child: const Text('Got it', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+              ),
+            ],
+          ),
+        );
       }),
       _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
     ];
