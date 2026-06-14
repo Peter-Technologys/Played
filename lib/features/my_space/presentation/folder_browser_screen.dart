@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/data/media_repository.dart';
-import '../../player/presentation/audio_player_screen.dart';
 
 class FolderBrowserScreen extends StatelessWidget {
   const FolderBrowserScreen({super.key});

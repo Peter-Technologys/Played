@@ -54,20 +54,13 @@ class _MediaCardState extends State<MediaCard>
         // Add all items from My Space to the queue, start from this item.
         // bundleAsync is ShelfBundle (non-nullable) inside whenData callback.
         final ref = ProviderScope.containerOf(context);
-        final bundleAsync = ref.read(mySpaceProvider);
-        bundleAsync.whenData((bundle) {
-          final allItems = [
-            ...bundle.recentTimeline,
-            ...bundle.cinemaShelf,
-            ...bundle.streetTapesShelf,
-          ];
-          final startIndex =
-              allItems.indexWhere((e) => e.id == widget.item.id);
-          ref.read(queueProvider.notifier).setQueue(
-                allItems,
-                startIndex: startIndex < 0 ? 0 : startIndex,
-              );
-        });
+        final allItems = ref.read(mySpaceProvider).valueOrNull ?? [];
+        final startIndex =
+            allItems.indexWhere((e) => e.id == widget.item.id);
+        ref.read(queueProvider.notifier).setQueue(
+              allItems,
+              startIndex: startIndex < 0 ? 0 : startIndex,
+            );
         final route = widget.item.isVideo ? '/player/video' : '/player/audio';
         context.push(route, extra: widget.item);
       },
