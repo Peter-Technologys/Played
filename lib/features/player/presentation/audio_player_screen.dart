@@ -281,7 +281,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       style: TextStyle(
                         fontSize: 11, fontWeight: FontWeight.w600,
                         color: AppColors.textSecondary,
-                        letterSpacing: 1.5, fontFamily: 'SpaceGrotesk',
+                        letterSpacing: 1.5, fontFamily: 'Inter',
                       )),
                   const Spacer(),
                   SleepTimerButton(
@@ -319,14 +319,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                             style: const TextStyle(
                               fontSize: 20, fontWeight: FontWeight.w700,
                               color: AppColors.textPrimary,
-                              fontFamily: 'SpaceGrotesk',
+                              fontFamily: 'Inter',
                             ),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 4),
                         Text(widget.mediaItem.artist ?? 'Unknown Artist',
                             style: const TextStyle(
                                 fontSize: 13, color: AppColors.textSecondary,
-                                fontFamily: 'SpaceGrotesk'),
+                                fontFamily: 'Inter'),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
                       ],
                     ),
@@ -392,7 +392,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                           style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w700,
                             color: AppColors.accent,
-                            fontFamily: 'SpaceGrotesk',
+                            fontFamily: 'Inter',
                           )),
                     ),
                   ),
@@ -683,7 +683,7 @@ class _SecondaryBtn extends StatelessWidget {
           Text(label,
               style: const TextStyle(
                 fontSize: 10, color: AppColors.textSecondary,
-                fontFamily: 'SpaceGrotesk', fontWeight: FontWeight.w500,
+                fontFamily: 'Inter', fontWeight: FontWeight.w500,
               )),
         ],
       ),
@@ -775,7 +775,7 @@ class _OptionsSheet extends ConsumerWidget {
                         style: const TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
-                          fontFamily: 'SpaceGrotesk',
+                          fontFamily: 'Inter',
                         ),
                         maxLines: 1, overflow: TextOverflow.ellipsis),
                     Text(mediaItem.formattedSize,
@@ -801,7 +801,7 @@ class _OptionsSheet extends ConsumerWidget {
                 title: Text(o.label,
                     style: const TextStyle(
                       fontSize: 14, color: AppColors.textPrimary,
-                      fontFamily: 'SpaceGrotesk',
+                      fontFamily: 'Inter',
                     )),
                 onTap: () {
                   if (o.onTap != null) { o.onTap!(); }
