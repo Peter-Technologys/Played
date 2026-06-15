@@ -83,7 +83,13 @@ class _PermissionGateScreenState extends State<PermissionGateScreen>
     setState(() => _checking = true);
 
     // ── 1. Determine which critical permissions apply on this device ──────
-    final sdk = Platform.isAndroid ? await _androidSdkVersion() : 0;
+    // Add a timeout so a hung DeviceInfoPlugin never stalls the splash screen.
+    final sdk = Platform.isAndroid
+        ? await _androidSdkVersion().timeout(
+            const Duration(seconds: 3),
+            onTimeout: () => 30, // safe fallback — assumes Android 11+
+          )
+        : 0;
 
     // Android 13+ (SDK 33+): granular media permissions
     // Android 12 and below: legacy READ_EXTERNAL_STORAGE
