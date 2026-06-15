@@ -1,8 +1,8 @@
 import 'dart:io';
-import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/stem_cache.dart';
+import '../../../core/services/cloudflare_service.dart';
 
 class StemResult {
   final String vocalPath;
@@ -10,55 +10,42 @@ class StemResult {
   const StemResult({required this.vocalPath, required this.instrumentalPath});
 }
 
-/// Handles audio splitting via audio-separator.net (Option B — free public API).
-/// Caches results permanently in Hive for offline playback.
+/// Handles audio splitting via Cloudflare Workers + R2 + Workflows.
+///
+/// Flow:
+///   1. Check local Hive cache — if stems already split, return instantly.
+///   2. Upload audio to Cloudflare Worker → triggers a Cloudflare Workflow.
+///   3. Workflow runs Demucs/Spleeter server-side, stores stems in R2.
+///   4. Poll for completion, download stems to device, cache in Hive.
+///
+/// This replaces the old audio-separator.net approach with a durable,
+/// resumable Cloudflare Workflow that survives network drops.
 class StemRepository {
-  // Free public Spleeter/Demucs API — no API key required
-  static const String _baseUrl = 'https://audio-separator.net/api';
-
-  final Dio _dio = Dio(BaseOptions(
-    connectTimeout: const Duration(seconds: 30),
-    receiveTimeout: const Duration(minutes: 5),
-  ));
-
-  Future<StemResult> splitAudio(File audioFile) async {
+  Future<StemResult> splitAudio(
+    File audioFile, {
+    void Function(double progress, String status)? onProgress,
+  }) async {
     final mediaId = audioFile.path.hashCode.toString();
 
-    // Return cached stems if available — avoids re-uploading
+    // 1. Return cached stems if available — avoids re-uploading
     final cached = PlayedDatabase.instance.getStemCache(mediaId);
-    if (cached != null) {
+    if (cached != null &&
+        await File(cached.vocalPath).exists() &&
+        await File(cached.instrumentalPath).exists()) {
+      onProgress?.call(1.0, 'Loaded from cache');
       return StemResult(
         vocalPath: cached.vocalPath,
         instrumentalPath: cached.instrumentalPath,
       );
     }
 
-    // Upload audio file to audio-separator.net
-    final formData = FormData.fromMap({
-      'audio': await MultipartFile.fromFile(
-        audioFile.path,
-        filename: audioFile.path.split('/').last,
-      ),
-      'model': 'htdemucs',   // High-quality Demucs model
-      'stems': '2',          // 2-stem: vocals + accompaniment
-      'output_format': 'mp3',
-    });
-
-    final response = await _dio.post(
-      '$_baseUrl/separate',
-      data: formData,
-      options: Options(responseType: ResponseType.json),
+    // 2. Upload to Cloudflare Worker + trigger Workflow
+    final r2Result = await CloudflareService.instance.splitStems(
+      audioFile,
+      onProgress: onProgress,
     );
 
-    if (response.statusCode != 200) {
-      throw Exception('Separator API returned ${response.statusCode}');
-    }
-
-    final data = response.data as Map<String, dynamic>;
-    final vocalUrl         = data['vocals_url']        as String;
-    final instrumentalUrl  = data['accompaniment_url'] as String;
-
-    // Download and cache stems locally for offline playback
+    // 3. Download stems from R2 to local device storage
     final dir = await getApplicationDocumentsDirectory();
     final stemDir = Directory('${dir.path}/stems/$mediaId');
     await stemDir.create(recursive: true);
@@ -66,21 +53,26 @@ class StemRepository {
     final vocalPath        = '${stemDir.path}/vocals.mp3';
     final instrumentalPath = '${stemDir.path}/instrumental.mp3';
 
+    onProgress?.call(0.92, 'Downloading stems...');
+
     await Future.wait([
-      _dio.download(vocalUrl, vocalPath),
-      _dio.download(instrumentalUrl, instrumentalPath),
+      CloudflareService.instance.downloadFromR2(
+        r2Result.vocalUrl, vocalPath),
+      CloudflareService.instance.downloadFromR2(
+        r2Result.instrumentalUrl, instrumentalPath),
     ]);
 
-    // Persist to Hive so next open is instant
-    final stemCache = StemCache(
+    // 4. Persist to Hive so next open is instant (offline)
+    await PlayedDatabase.instance.saveStemCache(StemCache(
       sourceMediaId: mediaId,
       sourceTitle: audioFile.path.split('/').last,
       vocalPath: vocalPath,
       instrumentalPath: instrumentalPath,
       cachedAt: DateTime.now(),
-      splitEngine: 'demucs-htdemucs',
-    );
-    await PlayedDatabase.instance.saveStemCache(stemCache);
+      splitEngine: 'cloudflare-demucs',
+    ));
+
+    onProgress?.call(1.0, 'Done!');
 
     return StemResult(
       vocalPath: vocalPath,
