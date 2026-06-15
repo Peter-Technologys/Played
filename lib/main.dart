@@ -24,6 +24,8 @@ void main() async {
   //    so startup is as fast as possible.
   // 3. Settings from SharedPreferences.
   // 4. Error handlers wired BEFORE runApp().
+  // 5. runApp() called immediately — UI appears at once.
+  // 6. AudioService.init() runs AFTER runApp() so it never blocks the UI.
   // ─────────────────────────────────────────────────────────────────────
 
   // 1. Firebase — fire-and-forget, never blocks
@@ -37,21 +39,7 @@ void main() async {
     StorageFolderService.instance.ensureCreated(),
   ]);
 
-  // 3. Initialise audio_service — creates the foreground media service
-  //    that powers the notification media player on Android.
-  globalAudioHandler = await AudioService.init(
-    builder: () => PlayedAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.petersmart.played.audio',
-      androidNotificationChannelName: 'PLAYED Media',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      androidNotificationIcon: 'mipmap/ic_launcher',
-      notificationColor: Color(0xFF00D4FF),
-    ),
-  );
-
-  // 4. Pre-load persisted settings
+  // 3. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
 
   // 4. Wire Flutter + platform error handlers BEFORE runApp()
@@ -65,6 +53,7 @@ void main() async {
     return true;
   };
 
+  // 5. Run app immediately — UI is visible before AudioService starts
   runApp(
     ProviderScope(
       overrides: [
@@ -72,6 +61,21 @@ void main() async {
             (ref) => SettingsNotifier(savedSettings)),
       ],
       child: const PlayedApp(),
+    ),
+  );
+
+  // 6. Initialise audio_service AFTER runApp so the loading screen
+  //    disappears instantly. Creates the foreground media service that
+  //    powers the notification media player on Android.
+  globalAudioHandler = await AudioService.init(
+    builder: () => PlayedAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.petersmart.played.audio',
+      androidNotificationChannelName: 'PLAYED Media',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: true,
+      androidNotificationIcon: 'mipmap/ic_launcher',
+      notificationColor: Color(0xFF00D4FF),
     ),
   );
 }

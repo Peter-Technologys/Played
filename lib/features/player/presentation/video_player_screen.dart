@@ -441,8 +441,15 @@ class _VideoPlayerScreenState
               ),
             ),
 
-          // ── Brightness / Volume Indicators ──────────────────
-          _SwipeIndicators(),
+          // ── Brightness / Volume Indicators — hidden when controls are hidden
+          AnimatedOpacity(
+            opacity: controlsVisible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              ignoring: !controlsVisible,
+              child: _SwipeIndicators(),
+            ),
+          ),
         ],
       ),
     );

@@ -37,7 +37,10 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
       artist: item.artist ?? 'Unknown Artist',
       album: item.album ?? '',
       duration: item.duration,
-      artUri: item.albumArtPath != null
+      // albumArtPath may be an 'albumid:12345' virtual MediaStore ID,
+      // not a real file path — only pass real file paths to Uri.file().
+      artUri: item.albumArtPath != null &&
+              !item.albumArtPath!.startsWith('albumid:')
           ? Uri.file(item.albumArtPath!)
           : null,
     ));
