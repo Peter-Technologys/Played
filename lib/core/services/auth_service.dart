@@ -1,21 +1,28 @@
 import 'package:flutter/foundation.dart';
+import 'appwrite_service.dart';
 
-/// Stub auth service — Firebase removed, Played is fully offline.
-/// Kept so any remaining call sites compile without changes.
+/// Auth service — delegates to AppwriteService.
+/// Kept as a thin wrapper so call sites in settings_screen.dart
+/// don't need to import AppwriteService directly.
 class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
-  /// Stream of auth state — always emits null (no remote auth).
+  /// Stream of auth state — always emits null (use authUserProvider instead).
   Stream<Object?> get authStateChanges => const Stream.empty();
 
-  /// No-op — no remote auth needed for an offline media player.
+  /// Creates an anonymous Appwrite session if none exists.
   Future<void> signInAnonymouslyIfNeeded() async {
-    debugPrint('[AuthService] Offline mode — no auth required.');
+    await AppwriteService.instance.signInAnonymouslyIfNeeded();
   }
 
-  /// No-op sign out.
+  /// Signs out of the current Appwrite session.
   Future<void> signOut() async {
-    debugPrint('[AuthService] Offline mode — no sign out needed.');
+    try {
+      await AppwriteService.instance.signOut();
+      debugPrint('[AuthService] Signed out of Appwrite.');
+    } catch (e) {
+      debugPrint('[AuthService] Sign out failed: $e');
+    }
   }
 }

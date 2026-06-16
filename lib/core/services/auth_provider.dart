@@ -1,16 +1,31 @@
+import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'auth_service.dart';
+import 'appwrite_service.dart';
 
-/// Streams the current auth state (always null — offline app).
-final authUserProvider = StreamProvider<Object?>((ref) {
-  return AuthService.instance.authStateChanges;
+/// Streams the current Appwrite user (null = not signed in).
+final authUserProvider = StreamProvider<models.User?>((ref) async* {
+  // Emit current user on startup, then re-emit on sign-in/out events.
+  yield await AppwriteService.instance.getCurrentUser();
 });
 
-/// Convenience provider — always false (no Google sign-in in offline mode).
-final isGoogleSignedInProvider = Provider<bool>((ref) => false);
+/// True when signed in with Google via Appwrite OAuth.
+final isGoogleSignedInProvider = Provider<bool>((ref) {
+  final userAsync = ref.watch(authUserProvider);
+  return userAsync.maybeWhen(
+    data: (user) => user != null,
+    orElse: () => false,
+  );
+});
 
-/// The signed-in user's display name — always null in offline mode.
-final displayNameProvider = Provider<String?>((ref) => null);
+/// The signed-in user's display name, or null.
+final displayNameProvider = Provider<String?>((ref) {
+  final userAsync = ref.watch(authUserProvider);
+  return userAsync.maybeWhen(
+    data: (user) => user?.name,
+    orElse: () => null,
+  );
+});
 
-/// The signed-in user's photo URL — always null in offline mode.
+/// The signed-in user's photo URL — Appwrite does not expose this directly.
+/// Returns null; use displayName initial as avatar fallback.
 final photoUrlProvider = Provider<String?>((ref) => null);
