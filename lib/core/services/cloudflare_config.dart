@@ -26,7 +26,7 @@ abstract class CloudflareConfig {
   /// R2 public bucket URL for downloading processed stems.
   /// Enable public access in R2 bucket settings → Public Access.
   static const String r2PublicUrl =
-      'https://pub-played-stems.r2.dev';
+      'https://pub-2189e34e5b9a4ec1bd7c5a0eec200655.r2.dev';
 
   // ── Auth ────────────────────────────────────────────────────────────
   /// Shared secret between the app and your Worker.

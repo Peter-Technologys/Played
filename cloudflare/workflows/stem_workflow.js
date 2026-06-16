@@ -25,7 +25,7 @@ export class StemWorkflow extends WorkflowEntrypoint {
       const obj = await this.env.STEMS_BUCKET.get(inputKey);
       if (!obj) throw new Error('Input file not found in R2');
       // In production: use R2 presigned URLs or Workers Sites
-      return `https://pub-played-stems.r2.dev/${inputKey}`;
+      return `https://pub-2189e34e5b9a4ec1bd7c5a0eec200655.r2.dev/${inputKey}`;
     });
 
     // Step 2: Call stem-splitting API (e.g. lalal.ai, moises.ai)
@@ -70,7 +70,7 @@ export class StemWorkflow extends WorkflowEntrypoint {
 
     // Step 4: Update job status to complete with public R2 URLs
     await step.do('update-status', async () => {
-      const base = `https://pub-played-stems.r2.dev/jobs/${jobId}`;
+      const base = `https://pub-2189e34e5b9a4ec1bd7c5a0eec200655.r2.dev/jobs/${jobId}`;
       await this.env.STEMS_BUCKET.put(`jobs/${jobId}/status.json`,
         JSON.stringify({
           status:            'complete',
