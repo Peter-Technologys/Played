@@ -4,29 +4,23 @@ import '../../../core/services/media_scanner_service.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/utils/shelf_sorter.dart';
 
-/// Data layer for My Space — wraps MediaScannerService
-/// and provides caching via PlayedDatabase.
+/// Data layer for My Space.
 class MediaRepository {
   MediaRepository._();
   static final MediaRepository instance = MediaRepository._();
 
   List<MediaItem>? _cachedItems;
-
-  /// Exposes the current in-memory cache (may be null before first scan).
   List<MediaItem>? get cachedItems => _cachedItems;
 
-  /// Returns all scanned media items.
-  /// Uses in-memory cache after first scan.
-  /// File-existence check is batched and non-blocking.
   Future<List<MediaItem>> getAllMedia({bool forceRefresh = false}) async {
     if (_cachedItems != null && !forceRefresh) return _cachedItems!;
 
     final scanned = await MediaScannerService.instance.scanAll();
 
-    // Guard: remove items whose file was deleted since last scan.
-    // Run checks concurrently (not sequentially) for speed.
+    // Concurrent file-existence check — fast and non-blocking
     final checks = await Future.wait(
-      scanned.map((item) => File(item.filePath).exists()),
+      scanned.map((item) => File(item.filePath).exists()
+          .catchError((_) => false)),
     );
     final alive = <MediaItem>[
       for (var i = 0; i < scanned.length; i++)
@@ -35,33 +29,37 @@ class MediaRepository {
 
     _cachedItems = alive;
 
-    // Persist shelf caches (fire-and-forget)
-    final bundle = ShelfSorter.buildAllShelves(alive);
-    PlayedDatabase.instance
-        .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
-        .ignore();
-    PlayedDatabase.instance
-        .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
-        .ignore();
+    // Fire-and-forget shelf cache update
+    try {
+      final bundle = ShelfSorter.buildAllShelves(alive);
+      PlayedDatabase.instance
+          .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
+          .ignore();
+      PlayedDatabase.instance
+          .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
+          .ignore();
+    } catch (_) {}
+
     return alive;
   }
 
-  /// Returns recently played items, filtering out deleted files.
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
-    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
-    // Use existsSync here — this is already called from a background isolate
-    // context via compute(), so blocking is acceptable.
-    final alive = history
-        .where((item) => File(item.filePath).existsSync())
-        .take(limit)
-        .toList();
-    return alive;
+    try {
+      final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
+      return history
+          .where((item) {
+            try { return File(item.filePath).existsSync(); } catch (_) { return false; }
+          })
+          .take(limit)
+          .toList();
+    } catch (_) {
+      return [];
+    }
   }
 
-  /// Records a play event for [item].
-  Future<void> recordPlay(MediaItem item) =>
-      PlayedDatabase.instance.recordPlay(item);
+  Future<void> recordPlay(MediaItem item) async {
+    try { await PlayedDatabase.instance.recordPlay(item); } catch (_) {}
+  }
 
-  /// Clears the in-memory cache, forcing a fresh scan next call.
   void invalidate() => _cachedItems = null;
 }

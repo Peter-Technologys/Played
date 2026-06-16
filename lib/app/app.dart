@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -24,14 +25,21 @@ class _PlayedAppState extends State<PlayedApp> {
   }
 
   Future<void> _checkOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    final done = prefs.getBool('onboarding_done') ?? false;
-    if (mounted) setState(() { _onboardingDone = done; _checking = false; });
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final done = prefs.getBool('onboarding_done') ?? false;
+      if (mounted) setState(() { _onboardingDone = done; _checking = false; });
+    } catch (_) {
+      // If SharedPreferences fails, skip onboarding and go straight to app
+      if (mounted) setState(() { _onboardingDone = true; _checking = false; });
+    }
   }
 
   Future<void> _completeOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('onboarding_done', true);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('onboarding_done', true);
+    } catch (_) {}
     if (mounted) setState(() => _onboardingDone = true);
   }
 
@@ -44,7 +52,21 @@ class _PlayedAppState extends State<PlayedApp> {
       ),
     );
 
-    if (_checking) return const SizedBox.shrink();
+    // Show a dark splash while checking — never a white screen
+    if (_checking) {
+      return const MaterialApp(
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          backgroundColor: Color(0xFF0A0F1E),
+          body: Center(
+            child: CircularProgressIndicator(
+              color: Color(0xFF00D4FF),
+              strokeWidth: 2,
+            ),
+          ),
+        ),
+      );
+    }
 
     if (!_onboardingDone) {
       return MaterialApp(

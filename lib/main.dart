@@ -15,13 +15,15 @@ import 'features/settings/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── BOOT ORDER (fastest possible cold start) ──────────────────────────
-  // 1. Hive DB — must be ready before runApp so providers can read data.
-  // 2. Settings — needed to override settingsProvider before runApp.
-  // 3. runApp() — called as early as possible so the splash is visible.
-  // 4. Everything else (AdMob, Appwrite, AudioService, Notifications,
-  //    StorageFolder) runs AFTER runApp in the background — never blocks UI.
-  // ─────────────────────────────────────────────────────────────────────
+  // Wire error handlers first — catch anything that happens during init
+  FlutterError.onError = (details) {
+    FlutterError.presentError(details);
+    debugPrint('[FlutterError] ${details.summary}');
+  };
+  PlatformDispatcher.instance.onError = (error, stack) {
+    debugPrint('[PlatformError] $error\n$stack');
+    return true; // prevent crash
+  };
 
   // 1. Hive DB — only blocking init (providers need it immediately)
   await _initDatabase();
@@ -29,17 +31,7 @@ void main() async {
   // 2. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
 
-  // 3. Wire Flutter error handlers BEFORE runApp()
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    debugPrint('[Error] ${details.summary}');
-  };
-  PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('[PlatformError] $error');
-    return true;
-  };
-
-  // 4. Run app immediately — splash is visible within ~100ms
+  // 3. Run app immediately — splash visible within ~100ms
   runApp(
     ProviderScope(
       overrides: [
@@ -50,19 +42,22 @@ void main() async {
     ),
   );
 
-  // 5. Everything else runs in background AFTER UI is visible
+  // 4. Everything else in background — never blocks UI
   unawaited(_initBackground());
 }
 
 Future<void> _initDatabase() async {
   try {
     await PlayedDatabase.instance.init();
-  } catch (e) {
-    debugPrint('[PlayedDB] Init error: $e');
+  } catch (e, st) {
+    debugPrint('[PlayedDB] Init error: $e\n$st');
+    // If Hive is corrupted, delete and retry with fresh boxes
+    try {
+      await PlayedDatabase.instance.deleteAndReinit();
+    } catch (_) {}
   }
 }
 
-/// All non-critical services — run after runApp so they never delay the UI.
 Future<void> _initBackground() async {
   await Future.wait([
     _initNotifications(),
@@ -73,7 +68,7 @@ Future<void> _initBackground() async {
 
   // AudioService must run after the widget tree is mounted
   try {
-    globalAudioHandler = await AudioService.init(
+    globalAudioHandler ??= await AudioService.init(
       builder: () => PlayedAudioHandler(),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.petersmart.played.audio',
@@ -108,7 +103,14 @@ Future<void> _initAdMob() async {
 Future<void> _initAppwrite() async {
   try {
     AppwriteService.instance.init();
-    await AppwriteService.instance.signInAnonymouslyIfNeeded();
+    // Fire-and-forget — never block startup on network
+    unawaited(
+      AppwriteService.instance.signInAnonymouslyIfNeeded()
+          .timeout(const Duration(seconds: 10))
+          .catchError((e) {
+        debugPrint('[Appwrite] Background init failed (offline?): $e');
+      }),
+    );
   } catch (e) {
     debugPrint('[Appwrite] Init error: $e');
   }

@@ -6,19 +6,16 @@ import '../../core/models/media_item.dart' as app;
 /// Global singleton — initialised once in main.dart via AudioService.init().
 PlayedAudioHandler? globalAudioHandler;
 
-/// Wraps just_audio inside audio_service so Android shows a
-/// lockscreen / notification media player with:
-///   - Track title, artist, album art
-///   - Play / Pause / Skip Previous / Skip Next buttons
-///   - Seek bar on the lock screen
-///   - Works from Bluetooth headsets and car audio
 class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
 
   PlayedAudioHandler() {
-    // Forward just_audio state → audio_service playback state
-    _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
-    // Handle audio interruptions (calls, other apps) gracefully
+    _player.playbackEventStream
+        .map(_transformEvent)
+        .pipe(playbackState)
+        .catchError((e) {
+      debugPrint('[AudioHandler] playbackEventStream error: $e');
+    });
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         playbackState.add(playbackState.value.copyWith(
@@ -28,8 +25,6 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
     });
   }
 
-  // ── Public API used by the Flutter UI ──────────────────────────────────────────
-
   AudioPlayer get player => _player;
 
   Future<void> loadAndPlay(
@@ -38,23 +33,21 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
     bool skipSilence = false,
     Duration? savedPosition,
   }) async {
-    // Update the media item shown in the notification / lock screen
-    mediaItem.add(MediaItem(
-      id: item.id,
-      title: item.title,
-      artist: item.artist ?? 'Unknown Artist',
-      album: item.album ?? '',
-      duration: item.duration,
-      // albumArtPath may be an 'albumid:12345' virtual MediaStore ID,
-      // not a real file path — only pass real file paths to Uri.file().
-      artUri: item.albumArtPath != null &&
-              !item.albumArtPath!.startsWith('albumid:')
-          ? Uri.file(item.albumArtPath!)
-          : null,
-    ));
-
     try {
+      mediaItem.add(MediaItem(
+        id:       item.id,
+        title:    item.title,
+        artist:   item.artist ?? 'Unknown Artist',
+        album:    item.album ?? '',
+        duration: item.duration,
+        artUri:   item.albumArtPath != null &&
+                  !item.albumArtPath!.startsWith('albumid:')
+            ? Uri.file(item.albumArtPath!)
+            : null,
+      ));
+
       await _player.setFilePath(item.filePath);
+
       if (savedPosition != null && savedPosition.inSeconds > 0) {
         await _player.seek(savedPosition);
       }
@@ -63,10 +56,9 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
       await play();
     } catch (e) {
       debugPrint('[AudioHandler] loadAndPlay error: $e');
+      // Don't rethrow — let the UI show the error state gracefully
     }
   }
-
-  // ── BaseAudioHandler overrides ──────────────────────────────────────────────────
 
   @override Future<void> play()  => _player.play();
   @override Future<void> pause() => _player.pause();
@@ -74,22 +66,24 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
     await _player.stop();
     await super.stop();
   }
-
-  /// Releases the player resources. Call only when the app is terminating.
-  Future<void> dispose() async {
-    await _player.dispose();
-  }
   @override Future<void> seek(Duration position) => _player.seek(position);
   @override Future<void> setSpeed(double speed)  => _player.setSpeed(speed);
+  @override Future<void> skipToNext()     async {}
+  @override Future<void> skipToPrevious() async {}
 
-  @override
-  Future<void> skipToNext()     async {} // handled by UI queue
-  @override
-  Future<void> skipToPrevious() async {} // handled by UI queue
-
-  // ── State transform ────────────────────────────────────────────────────────────
+  Future<void> disposePlayer() async {
+    try { await _player.dispose(); } catch (_) {}
+  }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
+    final processingState = {
+      ProcessingState.idle:      AudioProcessingState.idle,
+      ProcessingState.loading:   AudioProcessingState.loading,
+      ProcessingState.buffering: AudioProcessingState.buffering,
+      ProcessingState.ready:     AudioProcessingState.ready,
+      ProcessingState.completed: AudioProcessingState.completed,
+    }[_player.processingState] ?? AudioProcessingState.idle;
+
     return PlaybackState(
       controls: [
         MediaControl.skipToPrevious,
@@ -102,18 +96,12 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaAction.seekBackward,
       },
       androidCompactActionIndices: const [0, 1, 2],
-      processingState: const {
-        ProcessingState.idle:      AudioProcessingState.idle,
-        ProcessingState.loading:   AudioProcessingState.loading,
-        ProcessingState.buffering: AudioProcessingState.buffering,
-        ProcessingState.ready:     AudioProcessingState.ready,
-        ProcessingState.completed: AudioProcessingState.completed,
-      }[_player.processingState]!,
-      playing: _player.playing,
-      updatePosition: _player.position,
+      processingState: processingState,
+      playing:          _player.playing,
+      updatePosition:   _player.position,
       bufferedPosition: _player.bufferedPosition,
-      speed: _player.speed,
-      queueIndex: event.currentIndex,
+      speed:            _player.speed,
+      queueIndex:       event.currentIndex,
     );
   }
 }
