@@ -17,16 +17,16 @@ abstract class CloudflareConfig {
 
   /// Stem-splitting Workflow trigger endpoint.
   static const String stemWorkerUrl =
-      'https://played-stem-splitter.YOUR_SUBDOMAIN.workers.dev';
+      'https://played-stem-splitter.stream.petersmartlink.com';
 
   /// FFmpeg operations Worker endpoint (extract audio, trim for WhatsApp).
   static const String ffmpegWorkerUrl =
-      'https://played-ffmpeg.YOUR_SUBDOMAIN.workers.dev';
+      'https://played-ffmpeg.stream.petersmartlink.com';
 
   /// R2 public bucket URL for downloading processed stems.
   /// Enable public access in R2 bucket settings → Public Access.
   static const String r2PublicUrl =
-      'https://pub-YOUR_BUCKET_ID.r2.dev';
+      'https://pub-played-stems.r2.dev';
 
   // ── Auth ────────────────────────────────────────────────────────────
   /// Shared secret between the app and your Worker.

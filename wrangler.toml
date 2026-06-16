@@ -1,0 +1,24 @@
+# Wrangler config for PLAYED Cloudflare Workers
+# Deploy with: wrangler deploy
+
+name = "played-stem-splitter"
+main = "cloudflare/workers/stem_splitter.js"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "STEMS_BUCKET"
+bucket_name = "played-stems"
+
+[[workflows]]
+binding = "STEM_WORKFLOW"
+name = "stem-workflow"
+class_name = "StemWorkflow"
+
+[env.ffmpeg]
+name = "played-ffmpeg"
+main = "cloudflare/workers/ffmpeg_worker.js"
+compatibility_date = "2024-01-01"
+
+[[env.ffmpeg.r2_buckets]]
+binding = "FFMPEG_BUCKET"
+bucket_name = "played-ffmpeg"
