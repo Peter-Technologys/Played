@@ -111,7 +111,8 @@ class AppwriteService {
     int synced = 0;
     for (final pl in playlists) {
       try {
-        await _databases.upsertDocument(
+      try {
+        await _databases.updateDocument(
           databaseId:   Environment.databaseId,
           collectionId: Environment.playlistsCollection,
           documentId:   pl.id,
@@ -122,6 +123,23 @@ class AppwriteService {
             'updated_at': DateTime.now().toIso8601String(),
           },
         );
+      } on AppwriteException catch (ae) {
+        if (ae.code == 404) {
+          await _databases.createDocument(
+            databaseId:   Environment.databaseId,
+            collectionId: Environment.playlistsCollection,
+            documentId:   pl.id,
+            data: {
+              'name':       pl.name,
+              'media_ids':  jsonEncode(pl.mediaIds),
+              'created_at': pl.createdAt.toIso8601String(),
+              'updated_at': DateTime.now().toIso8601String(),
+            },
+          );
+        } else {
+          rethrow;
+        }
+      }
         synced++;
       } catch (e) {
         debugPrint('[Appwrite] Failed to sync playlist "${pl.name}": $e');
@@ -170,7 +188,8 @@ class AppwriteService {
     int synced = 0;
     for (final item in history) {
       try {
-        await _databases.upsertDocument(
+      try {
+        await _databases.updateDocument(
           databaseId:   Environment.databaseId,
           collectionId: Environment.historyCollection,
           documentId:   item.id,
@@ -182,6 +201,24 @@ class AppwriteService {
             'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
           },
         );
+      } on AppwriteException catch (ae) {
+        if (ae.code == 404) {
+          await _databases.createDocument(
+            databaseId:   Environment.databaseId,
+            collectionId: Environment.historyCollection,
+            documentId:   item.id,
+            data: {
+              'title':          item.title,
+              'artist':         item.artist ?? '',
+              'file_path':      item.filePath,
+              'is_video':       item.isVideo,
+              'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
+            },
+          );
+        } else {
+          rethrow;
+        }
+      }
         synced++;
       } catch (e) {
         debugPrint('[Appwrite] Failed to sync history item: $e');
