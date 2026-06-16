@@ -1,11 +1,39 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'router.dart';
 import '../core/permissions/permission_gate_screen.dart';
+import '../features/onboarding/onboarding_screen.dart';
 
-class PlayedApp extends StatelessWidget {
+class PlayedApp extends StatefulWidget {
   const PlayedApp({super.key});
+
+  @override
+  State<PlayedApp> createState() => _PlayedAppState();
+}
+
+class _PlayedAppState extends State<PlayedApp> {
+  bool _onboardingDone = false;
+  bool _checking = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkOnboarding();
+  }
+
+  Future<void> _checkOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    final done = prefs.getBool('onboarding_done') ?? false;
+    if (mounted) setState(() { _onboardingDone = done; _checking = false; });
+  }
+
+  Future<void> _completeOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('onboarding_done', true);
+    if (mounted) setState(() => _onboardingDone = true);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -13,9 +41,19 @@ class PlayedApp extends StatelessWidget {
       const SystemUiOverlayStyle(
         statusBarColor: Colors.transparent,
         statusBarIconBrightness: Brightness.light,
-        // navigationBarColor removed — not a valid SystemUiOverlayStyle parameter in Flutter 3.x
       ),
     );
+
+    if (_checking) return const SizedBox.shrink();
+
+    if (!_onboardingDone) {
+      return MaterialApp(
+        title: 'PLAYED',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark,
+        home: OnboardingScreen(onDone: _completeOnboarding),
+      );
+    }
 
     return MaterialApp.router(
       title: 'PLAYED',

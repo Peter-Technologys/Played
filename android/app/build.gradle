@@ -2,8 +2,6 @@ plugins {
     id "com.android.application"
     id "org.jetbrains.kotlin.android"
     id "dev.flutter.flutter-gradle-plugin"
-    id "com.google.gms.google-services"
-    id "com.google.firebase.crashlytics"
 }
 
 def localProperties = new Properties()
@@ -45,9 +43,6 @@ android {
         multiDexEnabled true
     }
 
-    // Build separate APKs per ABI — drops fat APK (~100 MB) to ~30-40 MB each.
-    // Run: flutter build apk --release --split-per-abi
-    // Share app-arm64-v8a-release.apk for modern phones.
     splits {
         abi {
             enable true
@@ -57,8 +52,6 @@ android {
         }
     }
 
-    // Release signing reads credentials from environment variables injected
-    // by GitLab CI/CD Variables — never hardcode secrets here.
     signingConfigs {
         release {
             storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
@@ -91,9 +84,11 @@ dependencies {
     implementation 'androidx.window:window:1.2.0'
     implementation 'androidx.window:window-java:1.2.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+}
 
-    // Firebase BoM — keeps all Firebase library versions in sync
-    implementation platform('com.google.firebase:firebase-bom:34.14.1')
-    implementation 'com.google.firebase:firebase-analytics'
-    implementation 'com.google.firebase:firebase-crashlytics'
+// Force flutter_web_auth_2 to a version compatible with Kotlin 2.x
+configurations.all {
+    resolutionStrategy {
+        force 'com.linusu:flutter_web_auth_2:4.0.0'
+    }
 }
