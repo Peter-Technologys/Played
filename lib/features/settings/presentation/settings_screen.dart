@@ -679,14 +679,25 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
-    final user = await AuthService.instance.signInWithGoogle();
-    if (user == null && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Sign-in cancelled or failed. Please try again.'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+    try {
+      await AppwriteService.instance.signInWithGoogle();
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Opening Google sign-in…'),
+            backgroundColor: AppColors.surface,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Sign-in failed. Please try again.'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
