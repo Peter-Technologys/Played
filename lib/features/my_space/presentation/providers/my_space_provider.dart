@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
@@ -28,13 +27,25 @@ final mediaLibraryProvider =
 );
 
 class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
-  StreamSubscription<dynamic>? _mediaObserver;
-  Timer? _debounce;
-
   @override
   Future<List<MediaItem>> build() async {
-    // Start listening to live MediaStore changes (USB, file manager, etc.)
-    _startMediaObserver();
+    // Subscribe to live MediaStore changes — auto-refresh on any file add
+    // (USB, file manager, SD card, Xender, Bluetooth, WhatsApp, etc.)
+    StreamSubscription<dynamic>? sub;
+    Timer? debounce;
+    try {
+      sub = _mediaEventChannel.receiveBroadcastStream().listen((_) {
+        debounce?.cancel();
+        debounce = Timer(const Duration(milliseconds: 1500), _backgroundRefresh);
+      });
+    } catch (e) {
+      debugPrint('[MediaLibrary] MediaObserver not available: $e');
+    }
+    // AsyncNotifier uses ref.onDispose — no override needed
+    ref.onDispose(() {
+      debounce?.cancel();
+      sub?.cancel();
+    });
 
     // Phase 1a — in-memory cache (zero I/O, instant)
     final cached = MediaRepository.instance.cachedItems;
@@ -50,31 +61,10 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       return history;
     }
 
-    // First install — foreground scan (one time only, shows shimmer)
+    // First install — foreground scan
     return MediaRepository.instance.getAllMedia(forceRefresh: true);
   }
 
-  /// Listens to Android MediaStore change events.
-  /// Debounced 1.5s so rapid file copies don't spam re-scans.
-  void _startMediaObserver() {
-    _mediaObserver?.cancel();
-    try {
-      _mediaObserver = _mediaEventChannel
-          .receiveBroadcastStream()
-          .listen((_) {
-        _debounce?.cancel();
-        _debounce = Timer(const Duration(milliseconds: 1500), () {
-          debugPrint('[MediaLibrary] MediaStore changed — auto-refreshing...');
-          _backgroundRefresh();
-        });
-      });
-    } catch (e) {
-      debugPrint('[MediaLibrary] MediaObserver not available: $e');
-    }
-  }
-
-  /// Runs a fresh scan via compute() (background isolate),
-  /// then silently replaces state. No spinner shown to the user.
   Future<void> _backgroundRefresh() async {
     try {
       final fresh = await compute(_runScan, true);
@@ -84,20 +74,12 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
-  /// Manual pull-to-refresh.
   Future<void> refresh() async {
     MediaRepository.instance.invalidate();
     state = const AsyncLoading();
     state = await AsyncValue.guard(
       () => MediaRepository.instance.getAllMedia(forceRefresh: true),
     );
-  }
-
-  @override
-  void dispose() {
-    _mediaObserver?.cancel();
-    _debounce?.cancel();
-    super.dispose();
   }
 }
 

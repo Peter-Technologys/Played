@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:appwrite/appwrite.dart';
+import 'package:appwrite/enums.dart';
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter/foundation.dart';
 import '../config/environment.dart';
