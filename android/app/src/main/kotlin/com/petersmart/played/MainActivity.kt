@@ -3,34 +3,48 @@ package com.petersmart.played
 import android.app.PictureInPictureParams
 import android.content.ContentUris
 import android.content.pm.PackageManager
+import android.database.ContentObserver
 import android.database.Cursor
 import android.graphics.Bitmap
+import android.media.MediaExtractor
+import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.media.MediaMuxer
 import android.net.Uri
 import android.os.Build
-import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import android.provider.MediaStore
+import android.util.Log
 import android.util.Rational
 import android.util.Size
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import java.io.File
 import java.io.FileOutputStream
+import java.nio.ByteBuffer
 
 class MainActivity : FlutterActivity() {
 
-    private val pipChannel   = "com.petersmart.played/pip"
-    private val mediaChannel = "com.petersmart.played/media_store"
-    private val fileChannel  = "com.petersmart.played/file_ops"
-    private val eqChannel    = "com.petersmart.played/equalizer"
-    private val phoneChannel = "com.petersmart.played/phone_state"
+    private val pipChannel     = "com.petersmart.played/pip"
+    private val mediaChannel   = "com.petersmart.played/media_store"
+    private val fileChannel    = "com.petersmart.played/file_ops"
+    private val eqChannel      = "com.petersmart.played/equalizer"
+    private val phoneChannel   = "com.petersmart.played/phone_state"
+    private val ffmpegChannel  = "com.petersmart.played/ffmpeg"
+    private val mediaEventCh   = "com.petersmart.played/media_events"
 
     private var equalizer: android.media.audiofx.Equalizer? = null
 
     @Suppress("DEPRECATION")
     private var phoneStateListener: android.telephony.PhoneStateListener? = null
     private var telephonyManager: android.telephony.TelephonyManager? = null
+
+    // MediaStore observer — fires whenever any media file is added/removed
+    private var mediaObserver: ContentObserver? = null
+    private var mediaEventSink: EventChannel.EventSink? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -53,8 +67,8 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, mediaChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "queryAudio" -> result.success(queryAudio())
-                    "queryVideo" -> result.success(queryVideo())
+                    "queryAudio"       -> result.success(queryAudio())
+                    "queryVideo"       -> result.success(queryVideo())
                     "getVideoThumbnail" -> {
                         val path = call.argument<String>("path") ?: ""
                         val id   = call.argument<String>("id") ?: ""
@@ -64,11 +78,33 @@ class MainActivity : FlutterActivity() {
                         val albumId = call.argument<String>("albumId") ?: ""
                         result.success(getAlbumArt(albumId))
                     }
+                    "triggerScan" -> {
+                        // Force MediaStore to re-index a specific path
+                        val path = call.argument<String>("path") ?: ""
+                        triggerMediaScan(path)
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
 
-        // ── Phone state (Pause During Calls) ───────────────────────────────────────
+        // ── Media change events (live scan) ──────────────────────────────
+        // Dart side listens to this stream; whenever MediaStore changes
+        // (file added via USB, file manager, SD card, AirDrop, etc.)
+        // Flutter gets notified and re-scans automatically.
+        EventChannel(flutterEngine.dartExecutor.binaryMessenger, mediaEventCh)
+            .setStreamHandler(object : EventChannel.StreamHandler {
+                override fun onListen(args: Any?, sink: EventChannel.EventSink?) {
+                    mediaEventSink = sink
+                    registerMediaObserver()
+                }
+                override fun onCancel(args: Any?) {
+                    unregisterMediaObserver()
+                    mediaEventSink = null
+                }
+            })
+
+        // ── Phone state (Pause During Calls) ─────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, phoneChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -82,7 +118,7 @@ class MainActivity : FlutterActivity() {
             }
         registerPhoneListener()
 
-        // ── Equalizer ─────────────────────────────────────────────────────────
+        // ── Equalizer ────────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, eqChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -101,7 +137,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // ── File operations ──────────────────────────────────────────────────
+        // ── File operations ──────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, fileChannel)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -117,13 +153,199 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // ── FFmpeg (offline trim + extract) ──────────────────────────────
+        // Uses Android's built-in MediaExtractor + MediaMuxer — no FFmpeg
+        // binary needed, works 100% offline on all Android versions.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ffmpegChannel)
+            .setMethodCallHandler { call, result ->
+                Thread {
+                    when (call.method) {
+                        "trimVideo" -> {
+                            val path    = call.argument<String>("path") ?: ""
+                            val startMs = call.argument<Int>("startMs") ?: 0
+                            val endMs   = call.argument<Int>("endMs") ?: 30000
+                            val out = trimVideo(path, startMs.toLong(), endMs.toLong())
+                            runOnUiThread { if (out != null) result.success(out) else result.error("TRIM_FAILED", "Trim failed", null) }
+                        }
+                        "extractAudio" -> {
+                            val path = call.argument<String>("path") ?: ""
+                            val out  = extractAudio(path)
+                            runOnUiThread { if (out != null) result.success(out) else result.error("EXTRACT_FAILED", "Extract failed", null) }
+                        }
+                        "cancel" -> runOnUiThread { result.success(null) }
+                        else    -> runOnUiThread { result.notImplemented() }
+                    }
+                }.start()
+            }
+    }
+
+    // ── MediaStore observer ───────────────────────────────────────────────
+    // Watches both audio and video URIs. When any file is added, removed,
+    // or modified (USB copy, file manager, SD card, AirDrop receive, etc.)
+    // the Dart side is notified and triggers a background re-scan.
+
+    private fun registerMediaObserver() {
+        val handler = Handler(Looper.getMainLooper())
+        val observer = object : ContentObserver(handler) {
+            override fun onChange(selfChange: Boolean) {
+                mediaEventSink?.success("changed")
+            }
+        }
+        contentResolver.registerContentObserver(
+            MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, true, observer)
+        contentResolver.registerContentObserver(
+            MediaStore.Video.Media.EXTERNAL_CONTENT_URI, true, observer)
+        // Also watch the Files URI to catch files not yet categorised
+        contentResolver.registerContentObserver(
+            MediaStore.Files.getContentUri("external"), true, observer)
+        mediaObserver = observer
+        Log.d("MediaObserver", "Registered")
+    }
+
+    private fun unregisterMediaObserver() {
+        mediaObserver?.let { contentResolver.unregisterContentObserver(it) }
+        mediaObserver = null
+    }
+
+    // Force MediaStore to index a newly added file immediately
+    private fun triggerMediaScan(path: String) {
+        try {
+            val values = android.content.ContentValues().apply {
+                put(MediaStore.Files.FileColumns.DATA, path)
+            }
+            contentResolver.insert(MediaStore.Files.getContentUri("external"), values)
+        } catch (_: Exception) {}
+        // Also use the broadcast approach for older Android
+        try {
+            sendBroadcast(android.content.Intent(
+                android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
+                Uri.fromFile(File(path))
+            ))
+        } catch (_: Exception) {}
+    }
+
+    // ── FFmpeg: Trim video (offline, uses MediaExtractor + MediaMuxer) ────
+
+    private fun trimVideo(inputPath: String, startMs: Long, endMs: Long): String? {
+        return try {
+            val outDir = File(getExternalFilesDir(null), "Trimmed")
+            outDir.mkdirs()
+            val outFile = File(outDir, "trimmed_${System.currentTimeMillis()}.mp4")
+
+            val extractor = MediaExtractor()
+            extractor.setDataSource(inputPath)
+
+            val muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
+            val trackMap = mutableMapOf<Int, Int>() // extractor track → muxer track
+            for (i in 0 until extractor.trackCount) {
+                val fmt = extractor.getTrackFormat(i)
+                val mime = fmt.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("audio/") || mime.startsWith("video/")) {
+                    trackMap[i] = muxer.addTrack(fmt)
+                }
+            }
+
+            muxer.start()
+
+            val buf = ByteBuffer.allocate(1024 * 1024)
+            val info = android.media.MediaCodec.BufferInfo()
+
+            for ((extTrack, muxTrack) in trackMap) {
+                extractor.selectTrack(extTrack)
+                extractor.seekTo(startMs * 1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+
+                while (true) {
+                    val size = extractor.readSampleData(buf, 0)
+                    if (size < 0) break
+                    val pts = extractor.sampleTime
+                    if (pts > endMs * 1000L) break
+
+                    info.offset        = 0
+                    info.size          = size
+                    info.presentationTimeUs = pts - (startMs * 1000L)
+                    info.flags         = extractor.sampleFlags
+                    muxer.writeSampleData(muxTrack, buf, info)
+                    extractor.advance()
+                }
+                extractor.unselectTrack(extTrack)
+            }
+
+            muxer.stop()
+            muxer.release()
+            extractor.release()
+
+            // Notify MediaStore so the file appears in Downloads
+            triggerMediaScan(outFile.absolutePath)
+            outFile.absolutePath
+        } catch (e: Exception) {
+            Log.e("FFmpeg", "trimVideo failed: ${e.message}")
+            null
+        }
+    }
+
+    // ── FFmpeg: Extract audio (offline, uses MediaExtractor + MediaMuxer) ─
+
+    private fun extractAudio(inputPath: String): String? {
+        return try {
+            val outDir = File(getExternalFilesDir(null), "Extracted")
+            outDir.mkdirs()
+            val outFile = File(outDir, "audio_${System.currentTimeMillis()}.m4a")
+
+            val extractor = MediaExtractor()
+            extractor.setDataSource(inputPath)
+
+            var audioTrack = -1
+            var audioFormat: MediaFormat? = null
+            for (i in 0 until extractor.trackCount) {
+                val fmt  = extractor.getTrackFormat(i)
+                val mime = fmt.getString(MediaFormat.KEY_MIME) ?: continue
+                if (mime.startsWith("audio/")) {
+                    audioTrack  = i
+                    audioFormat = fmt
+                    break
+                }
+            }
+            if (audioTrack < 0 || audioFormat == null) return null
+
+            extractor.selectTrack(audioTrack)
+
+            val muxer    = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            val muxTrack = muxer.addTrack(audioFormat)
+            muxer.start()
+
+            val buf  = ByteBuffer.allocate(512 * 1024)
+            val info = android.media.MediaCodec.BufferInfo()
+
+            while (true) {
+                val size = extractor.readSampleData(buf, 0)
+                if (size < 0) break
+                info.offset             = 0
+                info.size               = size
+                info.presentationTimeUs = extractor.sampleTime
+                info.flags              = extractor.sampleFlags
+                muxer.writeSampleData(muxTrack, buf, info)
+                extractor.advance()
+            }
+
+            muxer.stop()
+            muxer.release()
+            extractor.release()
+
+            triggerMediaScan(outFile.absolutePath)
+            outFile.absolutePath
+        } catch (e: Exception) {
+            Log.e("FFmpeg", "extractAudio failed: ${e.message}")
+            null
+        }
     }
 
     // ── Audio query ──────────────────────────────────────────────────────
 
     private fun queryAudio(): List<Map<String, Any?>> {
         val items = mutableListOf<Map<String, Any?>>()
-        val uri: Uri = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
+        val uri   = MediaStore.Audio.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Audio.Media._ID,
             MediaStore.Audio.Media.DISPLAY_NAME,
@@ -136,11 +358,8 @@ class MainActivity : FlutterActivity() {
             MediaStore.Audio.Media.ALBUM_ID,
         )
         val selection = "${MediaStore.Audio.Media.SIZE} >= 10240 AND ${MediaStore.Audio.Media.DURATION} > 0"
-        val cursor: Cursor? = contentResolver.query(
-            uri, projection, selection, null,
-            "${MediaStore.Audio.Media.DATE_ADDED} DESC"
-        )
-        cursor?.use {
+        contentResolver.query(uri, projection, selection, null,
+            "${MediaStore.Audio.Media.DATE_ADDED} DESC")?.use {
             val idCol      = it.getColumnIndexOrThrow(MediaStore.Audio.Media._ID)
             val nameCol    = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DISPLAY_NAME)
             val dataCol    = it.getColumnIndexOrThrow(MediaStore.Audio.Media.DATA)
@@ -173,7 +392,7 @@ class MainActivity : FlutterActivity() {
 
     private fun queryVideo(): List<Map<String, Any?>> {
         val items = mutableListOf<Map<String, Any?>>()
-        val uri: Uri = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
+        val uri   = MediaStore.Video.Media.EXTERNAL_CONTENT_URI
         val projection = arrayOf(
             MediaStore.Video.Media._ID,
             MediaStore.Video.Media.DISPLAY_NAME,
@@ -183,11 +402,8 @@ class MainActivity : FlutterActivity() {
             MediaStore.Video.Media.DATE_ADDED,
         )
         val selection = "${MediaStore.Video.Media.SIZE} >= 10240 AND ${MediaStore.Video.Media.DURATION} > 0"
-        val cursor: Cursor? = contentResolver.query(
-            uri, projection, selection, null,
-            "${MediaStore.Video.Media.DATE_ADDED} DESC"
-        )
-        cursor?.use {
+        contentResolver.query(uri, projection, selection, null,
+            "${MediaStore.Video.Media.DATE_ADDED} DESC")?.use {
             val idCol   = it.getColumnIndexOrThrow(MediaStore.Video.Media._ID)
             val nameCol = it.getColumnIndexOrThrow(MediaStore.Video.Media.DISPLAY_NAME)
             val dataCol = it.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
@@ -214,69 +430,50 @@ class MainActivity : FlutterActivity() {
     }
 
     // ── Video thumbnail ──────────────────────────────────────────────────
-    // Returns the path to a cached JPEG thumbnail for the given video.
-    // Uses MediaStore.Video.Thumbnails on API < 29, loadThumbnail on API 29+.
 
     private fun getVideoThumbnail(videoPath: String, videoId: String): String? {
         return try {
-            val cacheDir = File(cacheDir, "video_thumbs")
-            cacheDir.mkdirs()
-            val thumbFile = File(cacheDir, "$videoId.jpg")
+            val thumbDir  = File(cacheDir, "video_thumbs").also { it.mkdirs() }
+            val thumbFile = File(thumbDir, "$videoId.jpg")
             if (thumbFile.exists()) return thumbFile.absolutePath
-
             val bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 val uri = ContentUris.withAppendedId(
                     MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    videoId.toLongOrNull() ?: return null
-                )
+                    videoId.toLongOrNull() ?: return null)
                 contentResolver.loadThumbnail(uri, Size(320, 180), null)
             } else {
                 @Suppress("DEPRECATION")
                 MediaStore.Video.Thumbnails.getThumbnail(
-                    contentResolver,
-                    videoId.toLongOrNull() ?: return null,
-                    MediaStore.Video.Thumbnails.MINI_KIND,
-                    null
-                )
+                    contentResolver, videoId.toLongOrNull() ?: return null,
+                    MediaStore.Video.Thumbnails.MINI_KIND, null)
             }
-
             bitmap?.let {
-                FileOutputStream(thumbFile).use { out ->
-                    it.compress(Bitmap.CompressFormat.JPEG, 80, out)
-                }
+                FileOutputStream(thumbFile).use { out -> it.compress(Bitmap.CompressFormat.JPEG, 80, out) }
                 thumbFile.absolutePath
             }
         } catch (_: Exception) { null }
     }
 
     // ── Album art ────────────────────────────────────────────────────────
-    // Returns the path to a cached JPEG of the album art for the given albumId.
 
     private fun getAlbumArt(albumId: String): String? {
         return try {
-            val cacheDir = File(cacheDir, "album_art")
-            cacheDir.mkdirs()
-            val artFile = File(cacheDir, "$albumId.jpg")
+            val artDir  = File(cacheDir, "album_art").also { it.mkdirs() }
+            val artFile = File(artDir, "$albumId.jpg")
             if (artFile.exists()) return artFile.absolutePath
-
-            val artUri = Uri.parse("content://media/external/audio/albumart/$albumId")
+            val artUri  = Uri.parse("content://media/external/audio/albumart/$albumId")
             val bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                try {
-                    contentResolver.loadThumbnail(artUri, Size(300, 300), null)
-                } catch (_: Exception) { null }
+                try { contentResolver.loadThumbnail(artUri, Size(300, 300), null) }
+                catch (_: Exception) { null }
             } else {
-                val retriever = MediaMetadataRetriever()
+                val r = MediaMetadataRetriever()
                 try {
-                    retriever.setDataSource(artUri.toString())
-                    val art = retriever.embeddedPicture
-                    art?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
-                } catch (_: Exception) { null } finally { retriever.release() }
+                    r.setDataSource(artUri.toString())
+                    r.embeddedPicture?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
+                } catch (_: Exception) { null } finally { r.release() }
             }
-
             bitmap?.let {
-                FileOutputStream(artFile).use { out ->
-                    it.compress(Bitmap.CompressFormat.JPEG, 85, out)
-                }
+                FileOutputStream(artFile).use { out -> it.compress(Bitmap.CompressFormat.JPEG, 85, out) }
                 artFile.absolutePath
             }
         } catch (_: Exception) { null }
@@ -288,30 +485,36 @@ class MainActivity : FlutterActivity() {
         return try {
             val file = File(path)
             if (!file.exists()) return false
-            // Try MediaStore delete first (required on Android 10+)
             val deleted = contentResolver.delete(
                 MediaStore.Files.getContentUri("external"),
-                "${MediaStore.Files.FileColumns.DATA} = ?",
-                arrayOf(path)
-            ) > 0
+                "${MediaStore.Files.FileColumns.DATA} = ?", arrayOf(path)) > 0
             if (!deleted) file.delete() else true
         } catch (_: Exception) { false }
     }
+
+    private fun renameFile(path: String, newName: String): String? {
+        return try {
+            val file    = File(path)
+            if (!file.exists()) return null
+            val newFile = File(file.parent ?: return null, newName)
+            if (file.renameTo(newFile)) newFile.absolutePath else null
+        } catch (_: Exception) { null }
+    }
+
+    // ── Phone state ──────────────────────────────────────────────────────
 
     @Suppress("DEPRECATION")
     private fun registerPhoneListener() {
         if (phoneStateListener != null) return
         try {
-            telephonyManager = getSystemService(TELEPHONY_SERVICE)
-                as? android.telephony.TelephonyManager ?: return
+            telephonyManager = getSystemService(TELEPHONY_SERVICE) as? android.telephony.TelephonyManager ?: return
             phoneStateListener = object : android.telephony.PhoneStateListener() {
                 override fun onCallStateChanged(state: Int, phoneNumber: String?) {
                     val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
                     when (state) {
                         android.telephony.TelephonyManager.CALL_STATE_RINGING,
                         android.telephony.TelephonyManager.CALL_STATE_OFFHOOK ->
-                            am.requestAudioFocus(null,
-                                android.media.AudioManager.STREAM_MUSIC,
+                            am.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC,
                                 android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
                         android.telephony.TelephonyManager.CALL_STATE_IDLE ->
                             am.abandonAudioFocus(null)
@@ -320,75 +523,58 @@ class MainActivity : FlutterActivity() {
             }
             telephonyManager!!.listen(phoneStateListener,
                 android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
-        } catch (e: Exception) {
-            android.util.Log.w("PhoneState", "register failed: ${e.message}")
-        }
+        } catch (e: Exception) { Log.w("PhoneState", "register failed: ${e.message}") }
     }
 
     @Suppress("DEPRECATION")
     private fun unregisterPhoneListener() {
-        phoneStateListener?.let {
-            telephonyManager?.listen(it, android.telephony.PhoneStateListener.LISTEN_NONE)
-        }
+        phoneStateListener?.let { telephonyManager?.listen(it, android.telephony.PhoneStateListener.LISTEN_NONE) }
         phoneStateListener = null
     }
 
+    // ── Equalizer ────────────────────────────────────────────────────────
+
     private fun applyEqBands(gains: List<Double>) {
         try {
-            if (equalizer == null) {
-                equalizer = android.media.audiofx.Equalizer(0, 0).apply { enabled = true }
-            }
-            val eq = equalizer ?: return
+            if (equalizer == null) equalizer = android.media.audiofx.Equalizer(0, 0).apply { enabled = true }
+            val eq    = equalizer ?: return
             val range = eq.getBandLevelRange()
             gains.take(eq.numberOfBands.toInt()).forEachIndexed { i, gainDb ->
                 val mb = (gainDb * 100).toInt().toShort().coerceIn(range[0], range[1])
                 eq.setBandLevel(i.toShort(), mb)
             }
-        } catch (e: Exception) {
-            android.util.Log.w("Equalizer", "applyEqBands failed: ${e.message}")
-        }
+        } catch (e: Exception) { Log.w("Equalizer", "applyEqBands failed: ${e.message}") }
     }
 
-    private fun renameFile(path: String, newName: String): String? {
-        return try {
-            val file = File(path)
-            if (!file.exists()) return null
-            val newFile = File(file.parent ?: return null, newName)
-            if (file.renameTo(newFile)) newFile.absolutePath else null
-        } catch (_: Exception) { null }
-    }
+    // ── PiP ──────────────────────────────────────────────────────────────
 
-    // ── PiP helpers ──────────────────────────────────────────────────────
-
-    private fun isPipSupported(): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
-        } else false
-    }
+    private fun isPipSupported() = Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+        packageManager.hasSystemFeature(PackageManager.FEATURE_PICTURE_IN_PICTURE)
 
     private fun enterPipMode(width: Int, height: Int, result: MethodChannel.Result) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             try {
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(width, height)).build()
-                enterPictureInPictureMode(params)
+                enterPictureInPictureMode(
+                    PictureInPictureParams.Builder().setAspectRatio(Rational(width, height)).build())
                 result.success(true)
-            } catch (e: Exception) {
-                result.error("PIP_ERROR", e.message, null)
-            }
-        } else {
-            result.error("PIP_UNSUPPORTED", "PiP requires Android 8.0+", null)
-        }
+            } catch (e: Exception) { result.error("PIP_ERROR", e.message, null) }
+        } else result.error("PIP_UNSUPPORTED", "PiP requires Android 8.0+", null)
     }
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O && isPipSupported()) {
+        if (isPipSupported()) {
             try {
-                val params = PictureInPictureParams.Builder()
-                    .setAspectRatio(Rational(16, 9)).build()
-                enterPictureInPictureMode(params)
+                enterPictureInPictureMode(
+                    PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())
             } catch (_: Exception) {}
         }
+    }
+
+    override fun onDestroy() {
+        unregisterMediaObserver()
+        unregisterPhoneListener()
+        equalizer?.release()
+        super.onDestroy()
     }
 }
