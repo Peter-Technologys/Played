@@ -16,35 +16,41 @@ class MediaRepository {
   List<MediaItem>? get cachedItems => _cachedItems;
 
   /// Returns all scanned media items.
-  /// Filters out files that no longer exist on disk (deleted externally).
   /// Uses in-memory cache after first scan.
+  /// File-existence check is batched and non-blocking.
   Future<List<MediaItem>> getAllMedia({bool forceRefresh = false}) async {
     if (_cachedItems != null && !forceRefresh) return _cachedItems!;
 
     final scanned = await MediaScannerService.instance.scanAll();
 
-    // Guard: remove items whose file was deleted since last scan
-    final alive = <MediaItem>[];
-    for (final item in scanned) {
-      if (await File(item.filePath).exists()) {
-        alive.add(item);
-      }
-    }
+    // Guard: remove items whose file was deleted since last scan.
+    // Run checks concurrently (not sequentially) for speed.
+    final checks = await Future.wait(
+      scanned.map((item) => File(item.filePath).exists()),
+    );
+    final alive = <MediaItem>[
+      for (var i = 0; i < scanned.length; i++)
+        if (checks[i]) scanned[i],
+    ];
 
     _cachedItems = alive;
 
-    // Persist shelf caches
+    // Persist shelf caches (fire-and-forget)
     final bundle = ShelfSorter.buildAllShelves(alive);
-    await PlayedDatabase.instance.cacheShelf(
-        'cinema', bundle.cinemaShelf.map((e) => e.id).toList());
-    await PlayedDatabase.instance.cacheShelf(
-        'street', bundle.streetTapesShelf.map((e) => e.id).toList());
+    PlayedDatabase.instance
+        .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
+        .ignore();
+    PlayedDatabase.instance
+        .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
+        .ignore();
     return alive;
   }
 
   /// Returns recently played items, filtering out deleted files.
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
+    // Use existsSync here — this is already called from a background isolate
+    // context via compute(), so blocking is acceptable.
     final alive = history
         .where((item) => File(item.filePath).existsSync())
         .take(limit)

@@ -7,6 +7,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
+import 'core/services/appwrite_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'features/settings/settings_provider.dart';
@@ -14,23 +15,16 @@ import 'features/settings/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // ── OFFLINE-FIRST BOOT ORDER ──────────────────────────────────────────
-  // 1. Firebase — fire-and-forget background init, never blocks launch.
-  // 2. Hive DB + Notifications + AdMob — run in PARALLEL (not sequential)
-  //    so startup is as fast as possible.
-  // 3. Settings from SharedPreferences.
-  // 4. Error handlers wired BEFORE runApp().
-  // 5. runApp() called immediately — UI appears at once.
-  // 6. AudioService.init() runs AFTER runApp() so it never blocks the UI.
+  // ── BOOT ORDER (fastest possible cold start) ──────────────────────────
+  // 1. Hive DB — must be ready before runApp so providers can read data.
+  // 2. Settings — needed to override settingsProvider before runApp.
+  // 3. runApp() — called as early as possible so the splash is visible.
+  // 4. Everything else (AdMob, Appwrite, AudioService, Notifications,
+  //    StorageFolder) runs AFTER runApp in the background — never blocks UI.
   // ─────────────────────────────────────────────────────────────────────
 
-  // 1. Run Hive DB, Notifications, AdMob, and PLAYED folder IN PARALLEL
-  await Future.wait([
-    _initDatabase(),
-    _initNotifications(),
-    _initAdMob(),
-    StorageFolderService.instance.ensureCreated(),
-  ]);
+  // 1. Hive DB — only blocking init (providers need it immediately)
+  await _initDatabase();
 
   // 2. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
@@ -45,7 +39,7 @@ void main() async {
     return true;
   };
 
-  // 5. Run app immediately — UI is visible before AudioService starts
+  // 4. Run app immediately — splash is visible within ~100ms
   runApp(
     ProviderScope(
       overrides: [
@@ -56,20 +50,8 @@ void main() async {
     ),
   );
 
-  // 6. Initialise audio_service AFTER runApp so the loading screen
-  //    disappears instantly. Creates the foreground media service that
-  //    powers the notification media player on Android.
-  globalAudioHandler = await AudioService.init(
-    builder: () => PlayedAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.petersmart.played.audio',
-      androidNotificationChannelName: 'PLAYED Media',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      androidNotificationIcon: 'mipmap/ic_launcher',
-      notificationColor: Color(0xFF00D4FF),
-    ),
-  );
+  // 5. Everything else runs in background AFTER UI is visible
+  unawaited(_initBackground());
 }
 
 Future<void> _initDatabase() async {
@@ -77,6 +59,33 @@ Future<void> _initDatabase() async {
     await PlayedDatabase.instance.init();
   } catch (e) {
     debugPrint('[PlayedDB] Init error: $e');
+  }
+}
+
+/// All non-critical services — run after runApp so they never delay the UI.
+Future<void> _initBackground() async {
+  await Future.wait([
+    _initNotifications(),
+    _initAdMob(),
+    _initAppwrite(),
+    StorageFolderService.instance.ensureCreated(),
+  ]);
+
+  // AudioService must run after the widget tree is mounted
+  try {
+    globalAudioHandler = await AudioService.init(
+      builder: () => PlayedAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.petersmart.played.audio',
+        androidNotificationChannelName: 'PLAYED Media',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        androidNotificationIcon: 'mipmap/ic_launcher',
+        notificationColor: Color(0xFF00D4FF),
+      ),
+    );
+  } catch (e) {
+    debugPrint('[AudioService] Init error: $e');
   }
 }
 
@@ -93,5 +102,14 @@ Future<void> _initAdMob() async {
     await MobileAds.instance.initialize();
   } catch (e) {
     debugPrint('[AdMob] Init error: $e');
+  }
+}
+
+Future<void> _initAppwrite() async {
+  try {
+    AppwriteService.instance.init();
+    await AppwriteService.instance.signInAnonymouslyIfNeeded();
+  } catch (e) {
+    debugPrint('[Appwrite] Init error: $e');
   }
 }

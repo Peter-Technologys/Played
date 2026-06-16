@@ -27,28 +27,32 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       _backgroundRefresh();
       return cached;
     }
+
     // Phase 1b — Hive play-history as seed so UI is never blank
+    // This is instant (Hive is already open from main.dart)
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       _backgroundRefresh();
       return history;
     }
+
     // First install — foreground scan (one time only, shows shimmer)
     return MediaRepository.instance.getAllMedia(forceRefresh: true);
   }
 
-  /// Runs a fresh MediaStore scan via compute() (background isolate that
-  /// shares process memory), then silently replaces state. No spinner.
+  /// Runs a fresh MediaStore scan via compute() (background isolate),
+  /// then silently replaces state. No spinner shown to the user.
   Future<void> _backgroundRefresh() async {
     try {
       final fresh = await compute(_runScan, true);
-      if (fresh.isNotEmpty) state = AsyncData(fresh);
-    } catch (_) {
+      if (fresh.isNotEmpty && mounted) state = AsyncData(fresh);
+    } catch (e) {
+      debugPrint('[MediaLibrary] Background refresh failed: $e');
       // Keep cached data on error — never crash the UI
     }
   }
 
-  /// Manual refresh — brief loading state then update.
+  /// Manual pull-to-refresh — brief loading state then update.
   Future<void> refresh() async {
     MediaRepository.instance.invalidate();
     state = const AsyncLoading();
