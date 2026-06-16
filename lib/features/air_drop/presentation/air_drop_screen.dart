@@ -62,7 +62,7 @@ class AirDropNotifier extends StateNotifier<AirDropState> {
   }
 
   void _log(String msg) {
-    state = state.copyWith(log: [msg, ...state.log.take(19).toList()]);
+    state = state.copyWith(log: [msg, ...state.log.take(19)]);
   }
 
   // ── Advertise (receive mode) ───────────────────────────────────────────────
