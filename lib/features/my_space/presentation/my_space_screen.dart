@@ -13,7 +13,7 @@ import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
 import '../../player/presentation/queue_screen.dart';
-import '../../playlists/playlist_screen.dart' show PlaylistsScreen, playlistsProvider;
+import '../../playlists/playlist_screen.dart' show playlistsProvider;
 import 'file_management_sheet.dart';
 
 // ── Recently Played row ─────────────────────────────────────────────

@@ -74,7 +74,7 @@ class AppwriteService {
     _ensureInit();
     try {
       await _account.createOAuth2Session(
-        provider: OAuthProvider.google,
+        provider: 'google',
         success: 'appwrite-callback-${Environment.appwriteProjectId}:///',
         failure: 'appwrite-callback-${Environment.appwriteProjectId}:///failure',
       );

@@ -45,7 +45,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   Future<void> _backgroundRefresh() async {
     try {
       final fresh = await compute(_runScan, true);
-      if (fresh.isNotEmpty && mounted) state = AsyncData(fresh);
+      if (fresh.isNotEmpty) state = AsyncData(fresh);
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
       // Keep cached data on error — never crash the UI

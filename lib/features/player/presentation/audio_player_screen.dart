@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:audio_service/audio_service.dart' hide MediaItem;
+import 'package:audio_service/audio_service.dart' hide MediaItem; // ignore: unused_import
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';

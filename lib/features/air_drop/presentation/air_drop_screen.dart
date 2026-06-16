@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:path_provider/path_provider.dart';
@@ -132,7 +131,7 @@ class AirDropNotifier extends StateNotifier<AirDropState> {
         onConnectionInitiated: _onConnectionInitiated,
         onConnectionResult: (id, status) async {
           _onConnectionResult(id, status);
-          if (status.status == Status.CONNECTED) {
+          if (status == Status.CONNECTED) {
             await _sendFile(id, file);
           }
         },
@@ -169,14 +168,14 @@ class AirDropNotifier extends StateNotifier<AirDropState> {
 
   void _onConnectionResult(String id, Status status) {
     if (!mounted) return;
-    if (status.status == Status.CONNECTED) {
+    if (status == Status.CONNECTED) {
       final name = state.discoveredEndpoints[id] ?? id;
       final connected = Map<String, String>.from(state.connectedEndpoints)
         ..[id] = name;
       state = state.copyWith(connectedEndpoints: connected);
       _log('Connected to $name');
     } else {
-      _log('Connection failed: ${status.status}');
+      _log('Connection failed: $status');
     }
   }
 

@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import '../models/media_item.dart';
 
 /// Scans the device for all audio and video files.
@@ -238,7 +237,7 @@ class MediaScannerService {
     if (merged.isNotEmpty) return merged;
 
     // Last resort: full filesystem walk
-    return _filesystemScan(onProgress: onProgress);
+    return _filesystemScan();
   }
 
   /// Scans a single directory (used by folder browser).

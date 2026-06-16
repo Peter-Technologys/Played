@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/pro_service.dart';
 
