@@ -13,7 +13,7 @@ import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
 import '../../player/presentation/queue_screen.dart';
-import '../../playlists/playlist_screen.dart';
+import '../../playlists/playlist_screen.dart' show PlaylistsScreen, playlistsProvider;
 import 'file_management_sheet.dart';
 
 // ── Recently Played row ─────────────────────────────────────────────
@@ -1218,12 +1218,14 @@ class _FolderDetailPage extends ConsumerWidget {
 
 // ── Playlists tab ────────────────────────────────────────────────────
 
-class _PlaylistsTab extends StatelessWidget {
+class _PlaylistsTab extends ConsumerWidget {
   const _PlaylistsTab();
 
   @override
-  Widget build(BuildContext context) {
-    final playlists = PlayedDatabase.instance.getAllPlaylists();
+  Widget build(BuildContext context, WidgetRef ref) {
+    // Watch playlistsProvider so this tab rebuilds reactively whenever
+    // playlists are created, renamed, or deleted.
+    final playlists = ref.watch(playlistsProvider);
     if (playlists.isEmpty) {
       return Column(
         mainAxisAlignment: MainAxisAlignment.center,

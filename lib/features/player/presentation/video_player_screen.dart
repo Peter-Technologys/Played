@@ -21,10 +21,6 @@ final controlsVisibleProvider = StateProvider<bool>((_) => true);
 final brightnessProvider = StateProvider<double>((_) => 0.5);
 final volumeProvider = StateProvider<double>((_) => 0.8);
 
-// PiP preference key — set to true once the user manually enters PiP.
-// After that, PiP triggers automatically when the user leaves the app.
-const _kPipAutoKey = 'pip_auto_enabled';
-
 // ── Screen ────────────────────────────────────────────────────
 
 class VideoPlayerScreen extends ConsumerStatefulWidget {
@@ -445,8 +441,15 @@ class _VideoPlayerScreenState
               ),
             ),
 
-          // ── Brightness / Volume Indicators ──────────────────
-          _SwipeIndicators(),
+          // ── Brightness / Volume Indicators — hidden when controls are hidden
+          AnimatedOpacity(
+            opacity: controlsVisible ? 1.0 : 0.0,
+            duration: const Duration(milliseconds: 300),
+            child: IgnorePointer(
+              ignoring: !controlsVisible,
+              child: _SwipeIndicators(),
+            ),
+          ),
         ],
       ),
     );

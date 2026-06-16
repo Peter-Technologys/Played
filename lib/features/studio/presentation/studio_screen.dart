@@ -9,11 +9,11 @@ import '../../../app/theme/app_colors.dart';
 // ── Providers ──────────────────────────────────────────────
 
 enum StudioMode { karaoke, djDrop }
-enum StemStatus { idle, uploading, processing, ready, error }
+enum StemStatus { idle, uploading, processing, downloading, ready, error }
 
-final studioModeProvider = StateProvider<StudioMode>((_) => StudioMode.karaoke);
-final selectedFileProvider = StateProvider<File?>((_) => null);
-final vocalMixProvider    = StateProvider<double>((_) => 1.0);
+final studioModeProvider    = StateProvider<StudioMode>((_) => StudioMode.karaoke);
+final selectedFileProvider  = StateProvider<File?>((_) => null);
+final vocalMixProvider      = StateProvider<double>((_) => 1.0);
 final stemRepositoryProvider = Provider<StemRepository>((_) => StemRepository());
 final stemStateProvider = StateNotifierProvider<StemStateNotifier, StemState>(
   (ref) => StemStateNotifier(ref.read(stemRepositoryProvider)),
@@ -25,22 +25,25 @@ class StemState {
   final String? instrumentalPath;
   final String? errorMessage;
   final double progress;
+  final String statusLabel;
   const StemState({
     this.status = StemStatus.idle,
     this.vocalPath,
     this.instrumentalPath,
     this.errorMessage,
     this.progress = 0.0,
+    this.statusLabel = '',
   });
   StemState copyWith({
     StemStatus? status, String? vocalPath, String? instrumentalPath,
-    String? errorMessage, double? progress,
+    String? errorMessage, double? progress, String? statusLabel,
   }) => StemState(
     status: status ?? this.status,
     vocalPath: vocalPath ?? this.vocalPath,
     instrumentalPath: instrumentalPath ?? this.instrumentalPath,
     errorMessage: errorMessage ?? this.errorMessage,
     progress: progress ?? this.progress,
+    statusLabel: statusLabel ?? this.statusLabel,
   );
 }
 
@@ -49,15 +52,29 @@ class StemStateNotifier extends StateNotifier<StemState> {
   StemStateNotifier(this._repo) : super(const StemState());
 
   Future<void> splitTrack(File file) async {
-    state = state.copyWith(status: StemStatus.uploading, progress: 0.1);
+    state = state.copyWith(
+        status: StemStatus.uploading, progress: 0.05,
+        statusLabel: 'Uploading track...');
     try {
-      state = state.copyWith(status: StemStatus.processing, progress: 0.45);
-      final result = await _repo.splitAudio(file);
+      final result = await _repo.splitAudio(
+        file,
+        onProgress: (progress, label) {
+          if (!mounted) return;
+          final status = progress < 0.42
+              ? StemStatus.uploading
+              : progress < 0.92
+                  ? StemStatus.processing
+                  : StemStatus.downloading;
+          state = state.copyWith(
+              status: status, progress: progress, statusLabel: label);
+        },
+      );
       state = state.copyWith(
         status: StemStatus.ready,
         vocalPath: result.vocalPath,
         instrumentalPath: result.instrumentalPath,
         progress: 1.0,
+        statusLabel: 'Stems ready',
       );
     } catch (e) {
       state = state.copyWith(
@@ -84,42 +101,64 @@ class StudioScreen extends ConsumerWidget {
       body: SafeArea(
         child: CustomScrollView(
           slivers: [
-
-            // ── Header ───────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 24, 20, 0),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text('The Studio',
-                        style: TextStyle(
-                          fontSize: 28,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'SpaceGrotesk',
-                        )),
+                    Row(
+                      children: [
+                        const Text('The Studio',
+                            style: TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textPrimary,
+                              fontFamily: 'SpaceGrotesk',
+                            )),
+                        const Spacer(),
+                        // Cloudflare badge
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFF6821F).withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                                color: const Color(0xFFF6821F).withValues(alpha: 0.4)),
+                          ),
+                          child: const Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.cloud_done_rounded,
+                                  color: Color(0xFFF6821F), size: 13),
+                              SizedBox(width: 4),
+                              Text('Cloudflare',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Color(0xFFF6821F),
+                                  )),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
                     const SizedBox(height: 2),
                     const Text(
-                      'Split any track into vocals + instrumental.',
+                      'Split any track into vocals + instrumental.\nPowered by Cloudflare Workers & R2.',
                       style: TextStyle(
                           fontSize: 13, color: AppColors.textSecondary),
                     ),
                     const SizedBox(height: 24),
-
-                    // Mode toggle
                     _ModeToggle(currentMode: mode),
                     const SizedBox(height: 20),
-
-                    // File picker
                     _FilePicker(selectedFile: file),
                     const SizedBox(height: 24),
                   ],
                 ),
               ),
             ),
-
-            // ── Active panel ───────────────────────────────────
             SliverToBoxAdapter(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 300),
@@ -137,12 +176,9 @@ class StudioScreen extends ConsumerWidget {
                     : const _DjDropPanel(key: ValueKey('d')),
               ),
             ),
-
-            // ── Status / result ────────────────────────────────
             SliverToBoxAdapter(
               child: _StemStatusPanel(state: stemState),
             ),
-
             const SliverToBoxAdapter(child: SizedBox(height: 80)),
           ],
         ),
@@ -289,7 +325,7 @@ class _FilePicker extends ConsumerWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   if (hasFile)
-                    const Text('MP3 / WAV / AAC',
+                    const Text('MP3 / WAV / AAC · Processed in cloud',
                         style: TextStyle(
                             fontSize: 11, color: AppColors.textSecondary)),
                 ],
@@ -318,7 +354,8 @@ class _KaraokePanel extends ConsumerWidget {
     final file      = ref.watch(selectedFileProvider);
     final stemState = ref.watch(stemStateProvider);
     final busy = stemState.status == StemStatus.uploading ||
-        stemState.status == StemStatus.processing;
+        stemState.status == StemStatus.processing ||
+        stemState.status == StemStatus.downloading;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -328,21 +365,16 @@ class _KaraokePanel extends ConsumerWidget {
           _PanelHeader(
             icon: '\uD83C\uDFA4',
             title: 'Choir & Karaoke Mode',
-            subtitle:
-                'Fade out vocals and sing along to the pure instrumental.',
+            subtitle: 'Fade out vocals and sing along to the pure instrumental.',
           ),
           const SizedBox(height: 24),
-
-          // Vocal fade label
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('VOCAL FADE',
                   style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textSecondary,
-                    letterSpacing: 1.0,
+                    fontSize: 11, fontWeight: FontWeight.w600,
+                    color: AppColors.textSecondary, letterSpacing: 1.0,
                     fontFamily: 'SpaceGrotesk',
                   )),
               Text(
@@ -352,15 +384,12 @@ class _KaraokePanel extends ConsumerWidget {
                         ? '\uD83C\uDFA4 Full Vocals'
                         : '\uD83C\uDFB5 Blended',
                 style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.accent,
+                    fontSize: 12, color: AppColors.accent,
                     fontWeight: FontWeight.w600),
               ),
             ],
           ),
           const SizedBox(height: 10),
-
-          // Neon slider
           SliderTheme(
             data: SliderThemeData(
               trackHeight: 6,
@@ -368,13 +397,11 @@ class _KaraokePanel extends ConsumerWidget {
               inactiveTrackColor: AppColors.border,
               thumbColor: AppColors.accent,
               overlayColor: AppColors.accent.withValues(alpha: 0.15),
-              thumbShape:
-                  const RoundSliderThumbShape(enabledThumbRadius: 10),
+              thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
             ),
             child: Slider(
               value: vocalMix,
-              onChanged: (v) =>
-                  ref.read(vocalMixProvider.notifier).state = v,
+              onChanged: (v) => ref.read(vocalMixProvider.notifier).state = v,
             ),
           ),
           Padding(
@@ -383,19 +410,16 @@ class _KaraokePanel extends ConsumerWidget {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: const [
                 Text('Instrumental Only',
-                    style: TextStyle(
-                        fontSize: 10, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
                 Text('Full Vocals',
-                    style: TextStyle(
-                        fontSize: 10, color: AppColors.textSecondary)),
+                    style: TextStyle(fontSize: 10, color: AppColors.textSecondary)),
               ],
             ),
           ),
-
           const SizedBox(height: 28),
           _ActionButton(
-            label: 'Split & Practice',
-            icon: Icons.mic_external_on_rounded,
+            label: busy ? 'Processing...' : 'Split & Practice',
+            icon: busy ? Icons.cloud_sync_rounded : Icons.mic_external_on_rounded,
             enabled: file != null && !busy,
             onTap: file != null
                 ? () => ref.read(stemStateProvider.notifier).splitTrack(file)
@@ -418,7 +442,8 @@ class _DjDropPanel extends ConsumerWidget {
     final file      = ref.watch(selectedFileProvider);
     final stemState = ref.watch(stemStateProvider);
     final busy = stemState.status == StemStatus.uploading ||
-        stemState.status == StemStatus.processing;
+        stemState.status == StemStatus.processing ||
+        stemState.status == StemStatus.downloading;
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -428,12 +453,9 @@ class _DjDropPanel extends ConsumerWidget {
           _PanelHeader(
             icon: '\uD83C\uDF99',
             title: 'DJ Drop Mode',
-            subtitle:
-                'Strip the beat. Isolate a clean vocal stem for your mix.',
+            subtitle: 'Strip the beat. Isolate a clean vocal stem for your mix.',
           ),
           const SizedBox(height: 24),
-
-          // Visual flow diagram
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -456,11 +478,10 @@ class _DjDropPanel extends ConsumerWidget {
               ],
             ),
           ),
-
           const SizedBox(height: 28),
           _ActionButton(
-            label: 'Extract Vocal Drop',
-            icon: Icons.flash_on_rounded,
+            label: busy ? 'Processing...' : 'Extract Vocal Drop',
+            icon: busy ? Icons.cloud_sync_rounded : Icons.flash_on_rounded,
             enabled: file != null && !busy,
             onTap: file != null
                 ? () => ref.read(stemStateProvider.notifier).splitTrack(file)
@@ -506,18 +527,37 @@ class _StemStatusPanel extends StatelessWidget {
     switch (state.status) {
       case StemStatus.uploading:
       case StemStatus.processing:
+      case StemStatus.downloading:
+        final icon = state.status == StemStatus.uploading
+            ? Icons.cloud_upload_rounded
+            : state.status == StemStatus.downloading
+                ? Icons.cloud_download_rounded
+                : Icons.graphic_eq_rounded;
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              state.status == StemStatus.uploading
-                  ? 'Uploading track...'
-                  : 'Splitting stems...',
-              style: const TextStyle(
-                  color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w600,
-                  fontSize: 14,
-                  fontFamily: 'SpaceGrotesk'),
+            Row(
+              children: [
+                Icon(icon, color: AppColors.accent, size: 18),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    state.statusLabel.isNotEmpty
+                        ? state.statusLabel
+                        : 'Processing...',
+                    style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w600,
+                        fontSize: 14,
+                        fontFamily: 'SpaceGrotesk'),
+                  ),
+                ),
+                Text('${(state.progress * 100).toInt()}%',
+                    style: const TextStyle(
+                        color: AppColors.accent,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 13)),
+              ],
             ),
             const SizedBox(height: 12),
             ClipRRect(
@@ -531,9 +571,18 @@ class _StemStatusPanel extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            const Text('Powered by Spleeter · Cached locally after split',
-                style: TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary)),
+            const Row(
+              children: [
+                Icon(Icons.cloud_rounded,
+                    color: Color(0xFFF6821F), size: 12),
+                SizedBox(width: 4),
+                Text(
+                  'Cloudflare Workers · Demucs · Cached in R2',
+                  style: TextStyle(
+                      fontSize: 10, color: AppColors.textSecondary),
+                ),
+              ],
+            ),
           ],
         );
 
@@ -556,7 +605,8 @@ class _StemStatusPanel extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 14),
-            _StemRow(label: '\uD83C\uDFA4 Vocals', path: state.vocalPath),
+            _StemRow(label: '\uD83C\uDFA4 Vocals',
+                path: state.vocalPath),
             const SizedBox(height: 8),
             _StemRow(label: '\uD83C\uDFB8 Instrumental',
                 path: state.instrumentalPath),
@@ -641,16 +691,14 @@ class _PanelHeader extends StatelessWidget {
             children: [
               Text(title,
                   style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
+                    fontSize: 16, fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                     fontFamily: 'SpaceGrotesk',
                   )),
               const SizedBox(height: 3),
               Text(subtitle,
                   style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
+                      fontSize: 12, color: AppColors.textSecondary,
                       height: 1.4)),
             ],
           ),
@@ -693,10 +741,8 @@ class _ActionButton extends StatelessWidget {
   final bool enabled;
   final VoidCallback? onTap;
   const _ActionButton(
-      {required this.label,
-      required this.icon,
-      required this.enabled,
-      this.onTap});
+      {required this.label, required this.icon,
+       required this.enabled, this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -717,8 +763,7 @@ class _ActionButton extends StatelessWidget {
           boxShadow: enabled
               ? [BoxShadow(
                   color: AppColors.accent.withValues(alpha: 0.35),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4))]
+                  blurRadius: 16, offset: const Offset(0, 4))]
               : null,
         ),
         child: Row(
@@ -730,8 +775,7 @@ class _ActionButton extends StatelessWidget {
             const SizedBox(width: 10),
             Text(label,
                 style: TextStyle(
-                  fontSize: 15,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 15, fontWeight: FontWeight.w700,
                   color: enabled ? Colors.black : AppColors.textSecondary,
                   fontFamily: 'SpaceGrotesk',
                 )),

@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'package:audio_service/audio_service.dart';
+import 'package:audio_service/audio_service.dart' hide MediaItem;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -233,11 +233,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final settings = ref.read(settingsProvider);
+      // load() already calls PlayedDatabase.instance.recordPlay() internally
+      // — do not call it again here to avoid double-counting play history.
       ref.read(audioPlayerProvider.notifier).load(
         widget.mediaItem,
         settings: settings,
       );
-      PlayedDatabase.instance.recordPlay(widget.mediaItem);
     });
   }
 
@@ -577,7 +578,7 @@ class _AlbumArt extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: albumArtPath != null
+        child: albumArtPath != null && !albumArtPath!.startsWith('albumid:')
             ? Image.file(File(albumArtPath!),
                 fit: BoxFit.cover, width: double.infinity)
             : Container(

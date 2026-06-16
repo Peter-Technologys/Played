@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/appwrite_service.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/storage_folder_service.dart';
@@ -262,7 +263,26 @@ class SettingsScreen extends ConsumerWidget {
 
           const SizedBox(height: 32),
 
-          // ── 6. LIBRARY ────────────────────────────────────────────────
+          // ── 6. BACKUP & SYNC ──────────────────────────────────────────
+          const _SectionHeader(label: 'Backup & Sync'),
+          const SizedBox(height: 12),
+          _TappableTile(
+            icon: Icons.cloud_upload_rounded,
+            label: 'Back Up to Cloud',
+            subtitle: 'Save playlists & history to your account',
+            onTap: () => _runBackup(context),
+          ),
+          const SizedBox(height: 8),
+          _TappableTile(
+            icon: Icons.cloud_download_rounded,
+            label: 'Restore from Cloud',
+            subtitle: 'Restore playlists from your last backup',
+            onTap: () => _runRestore(context),
+          ),
+
+          const SizedBox(height: 32),
+
+          // ── 7. LIBRARY ────────────────────────────────────────────────
           const _SectionHeader(label: 'Library'),
           const SizedBox(height: 12),
           _TappableTile(
@@ -565,6 +585,97 @@ class SettingsScreen extends ConsumerWidget {
           content: Text('Cache cleared'),
           backgroundColor: AppColors.surface),
     );
+  }
+
+  // ── Backup / Restore ───────────────────────────────────────────────────
+
+  Future<void> _runBackup(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Row(
+        children: [
+          SizedBox(
+            width: 18, height: 18,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: AppColors.accent)),
+          SizedBox(width: 14),
+          Text('Backing up to cloud…'),
+        ],
+      ),
+      duration: Duration(seconds: 30),
+      backgroundColor: AppColors.surface,
+    ));
+    final ok = await AppwriteService.instance.backupAll();
+    messenger.hideCurrentSnackBar();
+    if (!context.mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(ok
+          ? '✅ Backup complete — playlists & history saved'
+          : '❌ Backup failed. Check your connection.'),
+      backgroundColor: ok ? AppColors.surface : AppColors.error,
+    ));
+  }
+
+  Future<void> _runRestore(BuildContext context) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Restore from Cloud?',
+            style: TextStyle(
+                color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
+        content: const Text(
+          'This will merge your cloud playlists with local ones. '
+          'No local data will be deleted.',
+          style: TextStyle(
+              color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Restore',
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Row(
+        children: [
+          SizedBox(
+            width: 18, height: 18,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: AppColors.accent)),
+          SizedBox(width: 14),
+          Text('Restoring from cloud…'),
+        ],
+      ),
+      duration: Duration(seconds: 30),
+      backgroundColor: AppColors.surface,
+    ));
+    final count = await AppwriteService.instance.restorePlaylists();
+    messenger.hideCurrentSnackBar();
+    if (!context.mounted) return;
+    messenger.showSnackBar(SnackBar(
+      content: Text(count >= 0
+          ? '✅ Restored $count playlist${count == 1 ? '' : 's'}'
+          : '❌ Restore failed. Check your connection.'),
+      backgroundColor: count >= 0 ? AppColors.surface : AppColors.error,
+    ));
   }
 
   Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
