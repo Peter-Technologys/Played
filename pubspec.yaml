@@ -29,10 +29,8 @@ dependencies:
   nearby_connections: ^4.3.0
 
   # Appwrite — cloud sync, auth, backup
-  # Appwrite 13.x pulls in flutter_web_auth_2 3.1.2 which breaks Kotlin 2.x.
-  # We override flutter_web_auth_2 to 4.x which is Kotlin 2.x compatible.
-  appwrite: ^13.0.0
-  flutter_web_auth_2: ^4.0.0
+  # v17.x uses flutter_web_auth_2 ^4.x which is Kotlin 2.x compatible
+  appwrite: ^17.1.0
 
   # Google Drive backup
   googleapis: ^12.0.0
