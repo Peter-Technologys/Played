@@ -85,10 +85,3 @@ dependencies {
     implementation 'androidx.window:window-java:1.2.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
 }
-
-// Force flutter_web_auth_2 to a version compatible with Kotlin 2.x
-configurations.all {
-    resolutionStrategy {
-        force 'com.linusu:flutter_web_auth_2:4.0.0'
-    }
-}
