@@ -18,6 +18,14 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
   PlayedAudioHandler() {
     // Forward just_audio state → audio_service playback state
     _player.playbackEventStream.map(_transformEvent).pipe(playbackState);
+    // Handle audio interruptions (calls, other apps) gracefully
+    _player.playerStateStream.listen((state) {
+      if (state.processingState == ProcessingState.completed) {
+        playbackState.add(playbackState.value.copyWith(
+          processingState: AudioProcessingState.completed,
+        ));
+      }
+    });
   }
 
   // ── Public API used by the Flutter UI ──────────────────────────────────────────
@@ -62,7 +70,15 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override Future<void> play()  => _player.play();
   @override Future<void> pause() => _player.pause();
-  @override Future<void> stop()  async { await _player.stop(); await super.stop(); }
+  @override Future<void> stop() async {
+    await _player.stop();
+    await super.stop();
+  }
+
+  /// Releases the player resources. Call only when the app is terminating.
+  Future<void> dispose() async {
+    await _player.dispose();
+  }
   @override Future<void> seek(Duration position) => _player.seek(position);
   @override Future<void> setSpeed(double speed)  => _player.setSpeed(speed);
 

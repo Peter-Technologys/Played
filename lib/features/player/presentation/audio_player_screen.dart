@@ -82,8 +82,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _player.positionStream.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
-      // Autosave seek position every 5 seconds
-      if (_currentItemId != null && p.inSeconds % 5 == 0 && p.inSeconds > 0) {
+      // Autosave seek position every 5 seconds (avoid saving at position 0)
+      if (_currentItemId != null && p.inSeconds > 0 && p.inSeconds % 5 == 0) {
         PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
       }
     });
@@ -151,17 +151,25 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   void skipNext() {
     if (_container == null) return;
+    // Save position of current track before skipping
+    if (_currentItemId != null) {
+      PlayedDatabase.instance.saveSeekPosition(_currentItemId!, state.position);
+    }
     _container!.read(queueProvider.notifier).next();
     final next = _container!.read(queueProvider).current;
     if (next != null) load(next);
   }
 
   void skipPrevious() {
+    // If more than 3s in, restart current track
     if (state.position.inSeconds > 3) {
       _handler.seek(Duration.zero);
       return;
     }
     if (_container == null) return;
+    if (_currentItemId != null) {
+      PlayedDatabase.instance.saveSeekPosition(_currentItemId!, Duration.zero);
+    }
     _container!.read(queueProvider.notifier).previous();
     final prev = _container!.read(queueProvider).current;
     if (prev != null) load(prev);

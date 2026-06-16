@@ -1,16 +1,17 @@
+import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'firestore_pro_service.dart';
+import 'appwrite_service.dart';
 
 /// Manages the user's Pro status.
 ///
 /// Offline-first strategy:
 ///   1. In-memory cache (60s TTL) — zero disk/network reads within a session.
 ///   2. SharedPreferences — always written, works 100% offline.
-///   3. Firestore — only consulted when the device is online AND local
+///   3. Appwrite — only consulted when the device is online AND local
 ///      Pro has expired (handles reinstall / multi-device restore).
 ///
-/// The app NEVER blocks on Firestore. If offline, Pro status comes
+/// The app NEVER blocks on Appwrite. If offline, Pro status comes
 /// entirely from SharedPreferences.
 class ProService {
   ProService._();
@@ -36,12 +37,11 @@ class ProService {
     final prefs = await SharedPreferences.getInstance();
     int expiry = prefs.getInt(_kProExpiry) ?? 0;
 
-    // 2. Only hit Firestore if local is expired AND device is online
+    // 2. Only hit Appwrite if local is expired AND device is online
     if (expiry <= now) {
       final online = await _isOnline();
       if (online) {
-        final remoteExpiry =
-            await FirestoreProService.instance.fetchProExpiry();
+        final remoteExpiry = await AppwriteService.instance.fetchProExpiry();
         if (remoteExpiry > expiry) {
           expiry = remoteExpiry;
           await prefs.setInt(_kProExpiry, expiry);
@@ -62,8 +62,8 @@ class ProService {
     await prefs.setInt(_kProExpiry, expiry);
     _cachedExpiryMs = expiry;
     _cacheTime = DateTime.now();
-    // Fire-and-forget Firestore sync — offline is fine
-    FirestoreProService.instance.saveProExpiry(expiry);
+    // Fire-and-forget Appwrite sync — offline is fine
+    unawaited(AppwriteService.instance.saveProExpiry(expiry));
   }
 
   Future<Duration> remainingProTime() async {
@@ -78,7 +78,7 @@ class ProService {
     await prefs.remove(_kProExpiry);
     _cachedExpiryMs = 0;
     _cacheTime = DateTime.now();
-    FirestoreProService.instance.clearProExpiry();
+    unawaited(AppwriteService.instance.clearProExpiry());
   }
 
   /// Returns true only when the device has an active network connection.

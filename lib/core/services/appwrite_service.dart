@@ -111,35 +111,31 @@ class AppwriteService {
     int synced = 0;
     for (final pl in playlists) {
       try {
-      try {
-        await _databases.updateDocument(
-          databaseId:   Environment.databaseId,
-          collectionId: Environment.playlistsCollection,
-          documentId:   pl.id,
-          data: {
-            'name':       pl.name,
-            'media_ids':  jsonEncode(pl.mediaIds),
-            'created_at': pl.createdAt.toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          },
-        );
-      } on AppwriteException catch (ae) {
-        if (ae.code == 404) {
-          await _databases.createDocument(
+        final data = {
+          'name':       pl.name,
+          'media_ids':  jsonEncode(pl.mediaIds),
+          'created_at': pl.createdAt.toIso8601String(),
+          'updated_at': DateTime.now().toIso8601String(),
+        };
+        try {
+          await _databases.updateDocument(
             databaseId:   Environment.databaseId,
             collectionId: Environment.playlistsCollection,
             documentId:   pl.id,
-            data: {
-              'name':       pl.name,
-              'media_ids':  jsonEncode(pl.mediaIds),
-              'created_at': pl.createdAt.toIso8601String(),
-              'updated_at': DateTime.now().toIso8601String(),
-            },
+            data:         data,
           );
-        } else {
-          rethrow;
+        } on AppwriteException catch (ae) {
+          if (ae.code == 404) {
+            await _databases.createDocument(
+              databaseId:   Environment.databaseId,
+              collectionId: Environment.playlistsCollection,
+              documentId:   pl.id,
+              data:         data,
+            );
+          } else {
+            rethrow;
+          }
         }
-      }
         synced++;
       } catch (e) {
         debugPrint('[Appwrite] Failed to sync playlist "${pl.name}": $e');
@@ -188,37 +184,32 @@ class AppwriteService {
     int synced = 0;
     for (final item in history) {
       try {
-      try {
-        await _databases.updateDocument(
-          databaseId:   Environment.databaseId,
-          collectionId: Environment.historyCollection,
-          documentId:   item.id,
-          data: {
-            'title':          item.title,
-            'artist':         item.artist ?? '',
-            'file_path':      item.filePath,
-            'is_video':       item.isVideo,
-            'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
-          },
-        );
-      } on AppwriteException catch (ae) {
-        if (ae.code == 404) {
-          await _databases.createDocument(
+        final data = {
+          'title':          item.title,
+          'artist':         item.artist ?? '',
+          'file_path':      item.filePath,
+          'is_video':       item.isVideo,
+          'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
+        };
+        try {
+          await _databases.updateDocument(
             databaseId:   Environment.databaseId,
             collectionId: Environment.historyCollection,
             documentId:   item.id,
-            data: {
-              'title':          item.title,
-              'artist':         item.artist ?? '',
-              'file_path':      item.filePath,
-              'is_video':       item.isVideo,
-              'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
-            },
+            data:         data,
           );
-        } else {
-          rethrow;
+        } on AppwriteException catch (ae) {
+          if (ae.code == 404) {
+            await _databases.createDocument(
+              databaseId:   Environment.databaseId,
+              collectionId: Environment.historyCollection,
+              documentId:   item.id,
+              data:         data,
+            );
+          } else {
+            rethrow;
+          }
         }
-      }
         synced++;
       } catch (e) {
         debugPrint('[Appwrite] Failed to sync history item: $e');
@@ -238,6 +229,65 @@ class AppwriteService {
       debugPrint('[Appwrite] Full backup failed: $e');
       return false;
     }
+  }
+
+  // ── Pro Status Sync ──────────────────────────────────────────────────────
+
+  /// Saves Pro expiry timestamp to Appwrite pro_status collection.
+  Future<void> saveProExpiry(int expiryMs) async {
+    _ensureInit();
+    final user = await getCurrentUser();
+    if (user == null) return;
+    final data = {
+      'expiry_ms':  expiryMs,
+      'updated_at': DateTime.now().toIso8601String(),
+    };
+    try {
+      try {
+        await _databases.updateDocument(
+          databaseId:   Environment.databaseId,
+          collectionId: Environment.proStatusCollection,
+          documentId:   user.$id,
+          data:         data,
+        );
+      } on AppwriteException catch (ae) {
+        if (ae.code == 404) {
+          await _databases.createDocument(
+            databaseId:   Environment.databaseId,
+            collectionId: Environment.proStatusCollection,
+            documentId:   user.$id,
+            data:         data,
+          );
+        } else {
+          rethrow;
+        }
+      }
+    } catch (e) {
+      debugPrint('[Appwrite] saveProExpiry failed (offline?): $e');
+    }
+  }
+
+  /// Fetches Pro expiry from Appwrite. Returns 0 if not found or offline.
+  Future<int> fetchProExpiry() async {
+    _ensureInit();
+    final user = await getCurrentUser();
+    if (user == null) return 0;
+    try {
+      final doc = await _databases.getDocument(
+        databaseId:   Environment.databaseId,
+        collectionId: Environment.proStatusCollection,
+        documentId:   user.$id,
+      );
+      return (doc.data['expiry_ms'] as int?) ?? 0;
+    } catch (e) {
+      debugPrint('[Appwrite] fetchProExpiry failed (offline?): $e');
+      return 0;
+    }
+  }
+
+  /// Clears Pro expiry in Appwrite (sets to 0).
+  Future<void> clearProExpiry() async {
+    await saveProExpiry(0);
   }
 
   // ── Helpers ──────────────────────────────────────────────────────────────
