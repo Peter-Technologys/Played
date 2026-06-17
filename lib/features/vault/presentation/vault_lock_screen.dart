@@ -11,6 +11,7 @@ import '../../player/presentation/queue_screen.dart';
 
 // ── PIN helpers ────────────────────────────────────────────────────
 import 'dart:convert';
+import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:local_auth/local_auth.dart';
@@ -386,13 +387,25 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
   }
 
   void _playItem(VaultItem item) {
-    // Reconstruct a MediaItem from vault metadata so the player can open it
+    // The vault stores a plain copy of the file in the app private directory.
+    // Use encryptedPath (the actual stored path) directly.
+    // Verify the file exists before attempting playback.
+    final vaultFile = File(item.encryptedPath);
+    if (!vaultFile.existsSync()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('File not found in vault. It may have been deleted.'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
     final media = MediaItem(
       id:            item.mediaId,
       title:         item.originalPath.split('/').last
                          .replaceAll(RegExp(r'\.[^.]+$'), ''),
       fileName:      item.originalPath.split('/').last,
-      filePath:      item.encryptedPath, // vault service decrypts on-the-fly
+      filePath:      item.encryptedPath,
       isVideo:       item.mediaType == 'video',
       addedAt:       DateTime.now(),
       fileSizeBytes: 0,

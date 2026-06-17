@@ -3,7 +3,7 @@ import '../../../core/models/media_item.dart';
 
 /// Data layer for Air-Drop — wraps the nearby_connections API.
 class NearbyRepository {
-  static const String _serviceId = 'com.played.airdrop';
+  static const String _serviceId = 'com.petersmartlink.otya.airdrop';
   static const String _userName = 'played_user';
 
   /// Starts advertising this device so others can discover it.

@@ -5,9 +5,15 @@ import '../database/played_database.dart';
 import '../models/vault_item.dart';
 import '../models/media_item.dart';
 
-/// Handles moving media files into and out of the encrypted Private Vault.
-/// Files are copied into a hidden app-private directory and registered
-/// in the AES-256 encrypted Hive vault box.
+/// Handles moving media files into and out of the Private Vault.
+/// Files are copied into a hidden app-private directory (not accessible
+/// to other apps or file managers) and registered in the AES-256
+/// encrypted Hive vault metadata box.
+///
+/// NOTE: The media file bytes themselves are stored as-is (not re-encrypted).
+/// Security comes from Android's app-private storage isolation —
+/// other apps cannot read files in getApplicationDocumentsDirectory()
+/// without root access. The Hive metadata box is AES-256 encrypted.
 class VaultService {
   VaultService._();
   static final VaultService instance = VaultService._();
@@ -27,7 +33,8 @@ class VaultService {
     final ext = item.fileName.split('.').last;
     final encryptedPath = '${dir.path}/${item.id}.$ext';
 
-    // Copy file into vault directory
+    // Copy file into app-private vault directory.
+    // Android prevents other apps from reading files here without root.
     final source = File(item.filePath);
     if (!await source.exists()) {
       throw Exception('Source file not found: ${item.filePath}');

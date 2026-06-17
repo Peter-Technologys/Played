@@ -141,7 +141,17 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
-    if (_handler == null) return;
+    // Wait up to 5 s for AudioService.init() to complete on cold launch.
+    if (_handler == null) {
+      for (var i = 0; i < 50; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (_handler != null) break;
+      }
+      if (_handler == null) {
+        debugPrint('[AudioPlayer] Handler not ready after 5s — aborting load');
+        return;
+      }
+    }
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;

@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 
 // Native channel for Android's built-in Equalizer AudioEffect.
-const _eqChannel = MethodChannel('com.petersmart.played/equalizer');
+const _eqChannel = MethodChannel('com.otyaplayer.app/equalizer');
 
 // ── Provider ───────────────────────────────────────────────
 
