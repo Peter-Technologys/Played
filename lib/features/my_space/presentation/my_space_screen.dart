@@ -1322,6 +1322,7 @@ class _FoldersTabState extends State<_FoldersTab> {
       },
     );
   }
+}
 
 class _FolderDetailPage extends ConsumerWidget {
   final String name;
