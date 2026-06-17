@@ -13,7 +13,6 @@ import '../../../shared/widgets/loading_shimmer.dart';
 import '../../../shared/widgets/played_logo.dart';
 import '../../../shared/widgets/empty_state.dart';
 import '../../../core/services/pinned_folders_service.dart';
-import '../../../core/services/shake_service.dart';
 import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
@@ -168,8 +167,6 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
     _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMediaPermission());
-    // Shake to shuffle — start listening when My Space is active
-    ShakeService.instance.start(_onShake);
   }
 
   /// Layer 5 — auto-refresh when app comes back to foreground.
@@ -180,37 +177,9 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
     }
   }
 
-  void _onShake() {
-    final items = ref.read(mediaLibraryProvider).valueOrNull ?? [];
-    if (items.isEmpty) return;
-    final songs = items.where((e) => !e.isVideo).toList()..shuffle();
-    if (songs.isEmpty) return;
-    HapticFeedback.mediumImpact();
-    ref.read(queueProvider.notifier).setQueue(songs);
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
-            children: [
-              Icon(Icons.shuffle_rounded, color: AppColors.accent, size: 16),
-              SizedBox(width: 8),
-              Text('Shuffling your library 🎵',
-                  style: TextStyle(color: AppColors.textPrimary)),
-            ],
-          ),
-          backgroundColor: AppColors.surfaceElevated,
-          behavior: SnackBarBehavior.floating,
-          duration: const Duration(seconds: 2),
-        ),
-      );
-      context.push('/player/audio', extra: songs.first);
-    }
-  }
-
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    ShakeService.instance.stop();
     _tabs.dispose();
     super.dispose();
   }
@@ -371,7 +340,7 @@ class _Header extends ConsumerWidget {
           _IconBtn(
             icon: Icons.settings_rounded,
             accent: true,
-            onTap: () => context.push('/settings'),
+            onTap: () => context.push('/profile'),
           ),
         ],
       ).animate().fadeIn(duration: 300.ms),

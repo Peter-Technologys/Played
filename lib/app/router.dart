@@ -14,7 +14,6 @@ import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../features/playlists/playlist_screen.dart';
 import '../core/models/media_item.dart';
-import '../core/services/auth_provider.dart';
 import '../app/theme/app_colors.dart';
 import '../shared/widgets/ad_banner_slot.dart';
 import '../shared/widgets/pro_gate.dart';
@@ -148,9 +147,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final isSignedIn  = ref.watch(isSignedInProvider);
-    final displayName = ref.watch(displayNameProvider);
-
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Column(
@@ -199,12 +195,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
                       label: 'Tools',
                       isActive: _currentIndex == 2,
                       onTap: () => _onTap(2),
-                    ),
-                    // Profile avatar (replaces Settings)
-                    _ProfileNavItem(
-                      isSignedIn: isSignedIn,
-                      displayName: displayName,
-                      onTap: () => GoRouter.of(context).push('/profile'),
                     ),
                   ],
                 ),
