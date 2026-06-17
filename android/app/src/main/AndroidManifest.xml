@@ -1,36 +1,24 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.petersmart.played">
+    package="com.otyaplayer.app">
 
-    <!-- ══════════════════════════════════════════════════════════
-         STORAGE / MEDIA  (most critical — app crashes without these)
-         ══════════════════════════════════════════════════════════ -->
-    <!-- Android ≤ 12 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="29" />
-    <!-- Android 13+ granular media permissions -->
+
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    <!-- Android 11+ full storage access (offline media player needs this
-         to index files across ALL folders including SD cards) -->
+
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <!-- Android 13+ media management (rename/delete scanned files) -->
     <uses-permission android:name="android.permission.MANAGE_MEDIA" />
 
-    <!-- ══════════════════════════════════════════════════════════
-         NETWORK
-         ══════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
-    <!-- ══════════════════════════════════════════════════════════
-         NEARBY / AIR-DROP
-         ══════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
@@ -42,41 +30,26 @@
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
 
-    <!-- ══════════════════════════════════════════════════════════
-         BIOMETRICS / VAULT
-         ══════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
 
-    <!-- ══════════════════════════════════════════════════════════
-         BACKGROUND PLAYBACK  (prevents OS from killing the player)
-         ══════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
-    <!-- Restart playback service after device reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- Battery optimisation exemption prompt (unrestricted background) -->
     <uses-permission
         android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
 
-    <!-- ══════════════════════════════════════════════════════════
-         OVERLAY / PiP  (floating player, Picture-in-Picture)
-         ══════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
-    <!-- ══════════════════════════════════════════════════════════
-         NOTIFICATIONS & ALARMS
-         ══════════════════════════════════════════════════════════ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- Exact alarm for sleep timer precision -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
     <application
-        android:label="PLAYED"
+        android:label="OTYA Player"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher"
@@ -101,7 +74,6 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Open video files directly from file manager -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -114,7 +86,6 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="audio/*" />
             </intent-filter>
-            <!-- Common explicit MIME types for file managers that send exact types -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -127,10 +98,6 @@
             </intent-filter>
         </activity>
 
-        <!-- ── Media playback foreground service ──────────────────────
-             foregroundServiceType="mediaPlayback" is required on Android 10+
-             for the OS to allow background audio without killing the process.
-             RECEIVE_BOOT_COMPLETED receiver restarts it after reboot. -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="true"
@@ -140,7 +107,6 @@
             </intent-filter>
         </service>
 
-        <!-- Restart background service after device reboot -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true"
@@ -151,7 +117,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- AdMob App ID -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-2517163652161686~2375986122" />
