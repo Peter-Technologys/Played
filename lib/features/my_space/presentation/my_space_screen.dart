@@ -159,16 +159,25 @@ class MySpaceScreen extends ConsumerStatefulWidget {
 }
 
 class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late final TabController _tabs;
 
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
+    WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMediaPermission());
     // Shake to shuffle — start listening when My Space is active
     ShakeService.instance.start(_onShake);
+  }
+
+  /// Layer 5 — auto-refresh when app comes back to foreground.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+    }
   }
 
   void _onShake() {
@@ -200,6 +209,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     ShakeService.instance.stop();
     _tabs.dispose();
     super.dispose();

@@ -136,6 +136,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   void attachContainer(ProviderContainer container) {
     _container = container;
+    // Wire notification / lock screen skip buttons to the in-app queue
+    _handler?.onSkipNext     = skipNext;
+    _handler?.onSkipPrevious = skipPrevious;
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
@@ -144,6 +147,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _attachStreams();
+
+    // Re-wire notification controls on every load so callbacks are always fresh
+    _handler!.onSkipNext     = skipNext;
+    _handler!.onSkipPrevious = skipPrevious;
 
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
     final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);
@@ -200,9 +207,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void skipPrevious() {
-    // If more than 3s in, restart current track
     if (state.position.inSeconds > 3) {
-      _handler.seek(Duration.zero);
+      _handler?.seek(Duration.zero);
       return;
     }
     if (_container == null) return;
