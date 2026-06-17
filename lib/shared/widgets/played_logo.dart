@@ -1,13 +1,17 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
-/// PLAYED branded logo — gradient ShaderMask text with neon glow border.
-/// Used on splash, onboarding, settings About card, and any screen that needs it.
+/// PLAYED branded logo — shows the real app icon (play_store_512.png)
+/// with the PLAYED gradient text beside it.
+///
+/// Falls back gracefully to gradient text only if the asset is missing.
 class PlayedLogo extends StatelessWidget {
   final double fontSize;
   final double letterSpacing;
   final double borderRadius;
   final EdgeInsets padding;
+  /// When true, shows only the icon image without the text box border.
+  final bool iconOnly;
 
   const PlayedLogo({
     super.key,
@@ -15,10 +19,20 @@ class PlayedLogo extends StatelessWidget {
     this.letterSpacing = 6,
     this.borderRadius = 16,
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    this.iconOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (iconOnly) {
+      return Image.asset(
+        'assets/icons/play_store_512.png',
+        width: fontSize * 1.4,
+        height: fontSize * 1.4,
+        errorBuilder: (_, __, ___) => _gradientText(),
+      );
+    }
+
     return Container(
       padding: padding,
       decoration: BoxDecoration(
@@ -43,21 +57,39 @@ class PlayedLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: ShaderMask(
-        shaderCallback: (bounds) => const LinearGradient(
-          colors: [AppColors.accent, AppColors.accentViolet],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ).createShader(bounds),
-        child: Text(
-          'PLAYED',
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            color: Colors.white, // ShaderMask overrides this with gradient
-            fontFamily: 'Inter',
-            letterSpacing: letterSpacing,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Real logo image
+          Image.asset(
+            'assets/icons/play_store_512.png',
+            width: fontSize * 1.1,
+            height: fontSize * 1.1,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
+          SizedBox(width: fontSize * 0.35),
+          // Gradient text
+          _gradientText(),
+        ],
+      ),
+    );
+  }
+
+  Widget _gradientText() {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [AppColors.accent, AppColors.accentViolet],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(bounds),
+      child: Text(
+        'PLAYED',
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+          fontFamily: 'Inter',
+          letterSpacing: letterSpacing,
         ),
       ),
     );

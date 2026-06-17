@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,25 +20,47 @@ class SleepTimerState {
 class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
   SleepTimerNotifier() : super(const SleepTimerState());
 
-  void start(Duration duration, VoidCallback onExpire) {
-    state = SleepTimerState(remaining: duration, isActive: true);
-    _tick(duration, onExpire);
-  }
+  Timer? _ticker;
+  VoidCallback? _onExpire;
+  // Fade callback — set by the audio player screen
+  Future<void> Function(double volume)? onSetVolume;
 
-  Future<void> _tick(Duration remaining, VoidCallback onExpire) async {
-    while (remaining.inSeconds > 0 && state.isActive) {
-      await Future.delayed(const Duration(seconds: 1));
-      if (!state.isActive) return;
+  void start(Duration duration, VoidCallback onExpire) {
+    _ticker?.cancel();
+    _onExpire = onExpire;
+    state = SleepTimerState(remaining: duration, isActive: true);
+    var remaining = duration;
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!state.isActive) { _ticker?.cancel(); return; }
       remaining -= const Duration(seconds: 1);
       state = SleepTimerState(remaining: remaining, isActive: true);
-    }
-    if (state.isActive) {
-      state = const SleepTimerState(isActive: false);
-      onExpire();
-    }
+
+      // Start 30-second volume fade before expiry
+      if (remaining.inSeconds <= 30 && remaining.inSeconds > 0) {
+        final fadeProgress = remaining.inSeconds / 30.0;
+        onSetVolume?.call(fadeProgress.clamp(0.0, 1.0));
+      }
+
+      if (remaining.inSeconds <= 0) {
+        _ticker?.cancel();
+        state = const SleepTimerState(isActive: false);
+        onSetVolume?.call(1.0); // restore volume
+        _onExpire?.call();
+      }
+    });
   }
 
-  void cancel() => state = const SleepTimerState(isActive: false);
+  void cancel() {
+    _ticker?.cancel();
+    onSetVolume?.call(1.0); // restore volume
+    state = const SleepTimerState(isActive: false);
+  }
+
+  @override
+  void dispose() {
+    _ticker?.cancel();
+    super.dispose();
+  }
 }
 
 // ── Sleep Timer Button ─────────────────────────────────────────────
@@ -81,19 +104,18 @@ class SleepTimerButton extends ConsumerWidget {
                   : AppColors.textSecondary,
               size: 16,
             ),
-            if (timer.isActive && timer.remaining != null) ...
-              [
-                const SizedBox(width: 5),
-                Text(
-                  _fmt(timer.remaining!),
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.accentViolet,
-                    fontFamily: 'Inter',
-                  ),
+            if (timer.isActive && timer.remaining != null) ...[
+              const SizedBox(width: 5),
+              Text(
+                _fmt(timer.remaining!),
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accentViolet,
+                  fontFamily: 'Inter',
                 ),
-              ],
+              ),
+            ],
           ],
         ),
       ),
@@ -144,22 +166,29 @@ class SleepTimerButton extends ConsumerWidget {
                   fontFamily: 'Inter',
                 )),
             const SizedBox(height: 4),
-            const Text('Audio fades out smoothly when timer ends.',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+            const Text(
+              'Audio fades out smoothly over 30 seconds before stopping.',
+              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 20),
             Wrap(
               spacing: 10,
               runSpacing: 10,
               children: options.map((d) {
-                final label = d.inHours >= 1 ? '${d.inHours}h' : '${d.inMinutes}m';
+                final label = d.inHours >= 1
+                    ? '${d.inHours}h'
+                    : '${d.inMinutes}m';
                 return GestureDetector(
                   onTap: () {
                     Navigator.pop(context);
                     HapticFeedback.mediumImpact();
-                    ref.read(sleepTimerProvider.notifier).start(d, onExpire);
+                    ref
+                        .read(sleepTimerProvider.notifier)
+                        .start(d, onExpire);
                   },
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
                     decoration: BoxDecoration(
                       color: AppColors.background,
                       borderRadius: BorderRadius.circular(12),

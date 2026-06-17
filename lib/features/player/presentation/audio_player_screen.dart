@@ -13,6 +13,7 @@ import '../../../core/database/played_database.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
+import '../../../core/services/speed_memory_service.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -125,7 +126,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _attachStreams();
 
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
-    final speed       = settings?.playbackSpeed ?? state.speed;
+    // Per-track speed memory: use saved speed for this track, else settings default
+    final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);
+    final speed       = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
     final skipSilence = settings?.skipSilence ?? false;
 
     final session = await AudioSession.instance;
@@ -191,6 +194,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void setSpeed(double s) {
     _handler?.setSpeed(s);
     state = state.copyWith(speed: s);
+    // Persist per-track speed memory
+    if (_currentItemId != null) {
+      SpeedMemoryService.instance.saveSpeed(_currentItemId!, s);
+    }
   }
 
   void toggleFavorite() {
