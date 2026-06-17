@@ -74,12 +74,16 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
+  /// Silent background refresh — never shows loading shimmer.
+  Future<void> backgroundRefresh() async {
+    MediaRepository.instance.invalidate();
+    await _backgroundRefresh();
+  }
+
+  /// refresh() also runs silently — shimmer only on true first load.
   Future<void> refresh() async {
     MediaRepository.instance.invalidate();
-    state = const AsyncLoading();
-    state = await AsyncValue.guard(
-      () => MediaRepository.instance.getAllMedia(forceRefresh: true),
-    );
+    await _backgroundRefresh();
   }
 }
 

@@ -91,6 +91,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
   int _currentIndex = 2;
 
   void _onTap(int index) {
+    HapticFeedback.selectionClick();
     if (index == 4) {
       GoRouter.of(context).push('/settings');
       return;
@@ -200,15 +201,15 @@ class _MainShellState extends ConsumerState<_MainShell> {
               color: AppColors.surface,
               border: Border(
                 top: BorderSide(
-                  color: AppColors.accent.withValues(alpha: 0.15),
+                  color: AppColors.accent.withValues(alpha: 0.20),
                   width: 1,
                 ),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.06),
-                  blurRadius: 20,
-                  offset: const Offset(0, -4),
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  blurRadius: 24,
+                  offset: const Offset(0, -6),
                 ),
               ],
             ),

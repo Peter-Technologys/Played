@@ -1,16 +1,12 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
-/// PLAYED branded logo — shows the real app icon (play_store_512.png)
-/// with the PLAYED gradient text beside it.
-///
-/// Falls back gracefully to gradient text only if the asset is missing.
+/// PLAYED branded logo — real app icon + gradient PLAYED text.
 class PlayedLogo extends StatelessWidget {
   final double fontSize;
   final double letterSpacing;
   final double borderRadius;
   final EdgeInsets padding;
-  /// When true, shows only the icon image without the text box border.
   final bool iconOnly;
 
   const PlayedLogo({
@@ -38,21 +34,21 @@ class PlayedLogo extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.accent.withValues(alpha: 0.08),
-            AppColors.accentViolet.withValues(alpha: 0.08),
+            AppColors.accent.withValues(alpha: 0.10),
+            AppColors.accentViolet.withValues(alpha: 0.06),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.5),
+          color: AppColors.accent.withValues(alpha: 0.55),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.18),
-            blurRadius: 20,
+            color: AppColors.accent.withValues(alpha: 0.22),
+            blurRadius: 24,
             spreadRadius: 0,
           ),
         ],
@@ -60,15 +56,13 @@ class PlayedLogo extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Real logo image
           Image.asset(
             'assets/icons/play_store_512.png',
-            width: fontSize * 1.1,
-            height: fontSize * 1.1,
+            width: fontSize * 1.15,
+            height: fontSize * 1.15,
             errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
           SizedBox(width: fontSize * 0.35),
-          // Gradient text
           _gradientText(),
         ],
       ),
@@ -96,7 +90,7 @@ class PlayedLogo extends StatelessWidget {
   }
 }
 
-/// "from PeterSmart Technologies" footer — shared across all screens.
+/// "from PeterSmart Technologies" footer.
 class PlayedFooter extends StatelessWidget {
   const PlayedFooter({super.key});
 

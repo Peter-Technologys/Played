@@ -176,6 +176,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
     if (items.isEmpty) return;
     final songs = items.where((e) => !e.isVideo).toList()..shuffle();
     if (songs.isEmpty) return;
+    HapticFeedback.mediumImpact();
     ref.read(queueProvider.notifier).setQueue(songs);
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -210,15 +211,9 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
       final granted =
           await PermissionHelper.showMediaPermissionRationale(context);
       if (granted && mounted) {
-        ref.read(mediaLibraryProvider.notifier).refresh();
+        ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
   }
 
   @override
@@ -235,8 +230,6 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
             _Header(
               libraryAsync: libraryAsync,
               sort: sort,
-              onRefresh: () =>
-                  ref.read(mediaLibraryProvider.notifier).refresh(),
             ),
 
             // ── Recently Played ──────────────────────────────────────
@@ -247,19 +240,34 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
 
             // ── Tab views ───────────────────────────────────────────
             Expanded(
-              child: RefreshIndicator(
-                color: AppColors.accent,
-                backgroundColor: AppColors.surface,
-                onRefresh: () =>
-                    ref.read(mediaLibraryProvider.notifier).refresh(),
-                child: libraryAsync.when(
-                  loading: () => const _FullShimmer(),
-                  error: (e, _) => _ErrorView(
-                    message: e.toString(),
-                    onRetry: () =>
-                        ref.read(mediaLibraryProvider.notifier).refresh(),
-                  ),
-                  data: (items) => _TabViews(
+              child: libraryAsync.when(
+                loading: () => libraryAsync.valueOrNull != null
+                    ? RefreshIndicator(
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.surface,
+                        onRefresh: () => ref
+                            .read(mediaLibraryProvider.notifier)
+                            .backgroundRefresh(),
+                        child: _TabViews(
+                          controller: _tabs,
+                          items: libraryAsync.valueOrNull!,
+                          sort: sort,
+                        ),
+                      )
+                    : const _FullShimmer(),
+                error: (e, _) => _ErrorView(
+                  message: e.toString(),
+                  onRetry: () =>
+                      ref.read(mediaLibraryProvider.notifier).refresh(),
+                ),
+                data: (items) => RefreshIndicator(
+                  color: AppColors.accent,
+                  backgroundColor: AppColors.surface,
+                  displacement: 20,
+                  onRefresh: () => ref
+                      .read(mediaLibraryProvider.notifier)
+                      .backgroundRefresh(),
+                  child: _TabViews(
                     controller: _tabs,
                     items: items,
                     sort: sort,
@@ -279,18 +287,16 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
 class _Header extends ConsumerWidget {
   final AsyncValue<List<MediaItem>> libraryAsync;
   final MediaSort sort;
-  final VoidCallback onRefresh;
 
   const _Header({
     required this.libraryAsync,
     required this.sort,
-    required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = libraryAsync.valueOrNull?.length ?? 0;
-    final isRefreshing = libraryAsync.isLoading;
+    final isScanning = libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -307,10 +313,25 @@ class _Header extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               ),
               const SizedBox(height: 4),
-              Text(
-                total == 0 ? 'Scanning...' : '$total files',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+              Row(
+                children: [
+                  Text(
+                    total == 0 ? 'Scanning...' : '$total files',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  if (isScanning) ...[
+                    const SizedBox(width: 6),
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -331,8 +352,10 @@ class _Header extends ConsumerWidget {
           _SortBtn(current: sort),
           const SizedBox(width: 8),
           _IconBtn(
-            icon: isRefreshing ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
-            onTap: isRefreshing ? () {} : onRefresh,
+            icon: Icons.refresh_rounded,
+            onTap: () => ref
+                .read(mediaLibraryProvider.notifier)
+                .backgroundRefresh(),
           ),
           const SizedBox(width: 8),
           _IconBtn(

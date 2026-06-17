@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 
 abstract class AppColors {
-  // ── Backgrounds — true deep dark with blue tint (matches logo) ──────────
-  static const Color background       = Color(0xFF050810); // near-black, blue-tinted
-  static const Color surface          = Color(0xFF0C1120); // card surface
-  static const Color surfaceElevated  = Color(0xFF131929); // elevated card
-  static const Color surfaceHighlight = Color(0xFF1A2235); // hover / selected state
-  static const Color border           = Color(0xFF1C2840); // subtle border
-  static const Color borderSubtle     = Color(0xFF111827); // very subtle divider
+  // ── Backgrounds — deep dark navy matching the logo background ──────────
+  static const Color background       = Color(0xFF04060D);
+  static const Color surface          = Color(0xFF090E1A);
+  static const Color surfaceElevated  = Color(0xFF0F1626);
+  static const Color surfaceHighlight = Color(0xFF162035);
+  static const Color border           = Color(0xFF1A2540);
+  static const Color borderSubtle     = Color(0xFF0D1422);
 
-  // ── Brand Accents — Electric Blue + Deep Violet (logo colours) ──────────
-  static const Color accent       = Color(0xFF00D4FF); // Electric Blue — primary
-  static const Color accentViolet = Color(0xFF7C3AED); // Deep Violet — secondary
-  static const Color accentPink   = Color(0xFFEC4899); // Hot Pink — tertiary
-  static const Color accentGreen  = Color(0xFF10B981); // Emerald — success
-  static const Color accentAmber  = Color(0xFFF59E0B); // Amber — warning
+  // ── Brand Accents — pulled directly from the logo ──────────────────
+  // Logo circle: Electric Cyan #00D4FF
+  // Logo play triangle: deep dark fill
+  static const Color accent       = Color(0xFF00D4FF); // Electric Cyan
+  static const Color accentViolet = Color(0xFF7C3AED); // Deep Violet
+  static const Color accentPink   = Color(0xFFEC4899);
+  static const Color accentGreen  = Color(0xFF10B981);
+  static const Color accentAmber  = Color(0xFFF59E0B);
 
-  // ── Glow colours (for BoxShadow) ────────────────────────────────────────
-  static const Color glowBlue   = Color(0x3300D4FF); // 20% accent
-  static const Color glowViolet = Color(0x337C3AED); // 20% violet
+  // ── Glow colours ───────────────────────────────────────────────────
+  static const Color glowBlue   = Color(0x4000D4FF);
+  static const Color glowViolet = Color(0x407C3AED);
 
-  // ── Gradient presets ─────────────────────────────────────────────────────
+  // ── Gradient presets ───────────────────────────────────────────────
   static const LinearGradient accentGradient = LinearGradient(
     colors: [accent, accentViolet],
     begin: Alignment.centerLeft,
@@ -32,22 +34,22 @@ abstract class AppColors {
     end: Alignment.bottomRight,
   );
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF0C1120), Color(0xFF131929)],
+    colors: [Color(0xFF090E1A), Color(0xFF0F1626)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient darkOverlay = LinearGradient(
-    colors: [Colors.transparent, Color(0xCC050810)],
+    colors: [Colors.transparent, Color(0xCC04060D)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
-  // ── Text ─────────────────────────────────────────────────────────────────
-  static const Color textPrimary   = Color(0xFFF0F6FF); // slightly blue-white
-  static const Color textSecondary = Color(0xFF6B7FA3); // blue-grey
-  static const Color textMuted     = Color(0xFF2D3A52); // very muted
+  // ── Text ─────────────────────────────────────────────────────────────
+  static const Color textPrimary   = Color(0xFFEEF4FF); // cool white, blue-tinted
+  static const Color textSecondary = Color(0xFF5E7399); // muted blue-grey
+  static const Color textMuted     = Color(0xFF283347); // very muted
 
-  // ── Status ───────────────────────────────────────────────────────────────
+  // ── Status ───────────────────────────────────────────────────────────
   static const Color success = Color(0xFF10B981);
   static const Color error   = Color(0xFFEF4444);
   static const Color warning = Color(0xFFF59E0B);
