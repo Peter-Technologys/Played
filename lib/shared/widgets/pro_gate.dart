@@ -346,8 +346,6 @@ class _ProPaywallState extends State<_ProPaywall> {
 
 final _proFeatures = [
   (Icons.equalizer_rounded,       'Equalizer & Audio Effects'),
-  (Icons.graphic_eq_rounded,      'Studio Stem Splitter'),
-  (Icons.lock_rounded,            'Private Vault'),
   (Icons.phone_android_rounded,   'WhatsApp Trimmer'),
   (Icons.speed_rounded,           'Playback Speed Control'),
   (Icons.block_rounded,           'Reduced Ads'),

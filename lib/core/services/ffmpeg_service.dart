@@ -13,7 +13,7 @@ class FfmpegService {
   FfmpegService._();
   static final FfmpegService instance = FfmpegService._();
 
-  static const _channel = MethodChannel('com.petersmart.played/ffmpeg');
+  static const _channel = MethodChannel('com.otyaplayer.app/ffmpeg');
 
   /// Extracts audio from a video file.
   /// Uses native MediaMetadataRetriever on Android (offline, no FFmpeg needed).

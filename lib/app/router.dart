@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../features/my_space/presentation/my_space_screen.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
-import '../features/studio/presentation/studio_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
 import '../features/player/presentation/equalizer_screen.dart';
@@ -28,16 +27,7 @@ class AppRouter {
         routes: [
           GoRoute(path: '/',        builder: (_, __) => const MySpaceScreen()),
           GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
-          // Studio is Pro — gated behind rewarded ad
-          GoRoute(
-            path: '/studio',
-            builder: (_, __) => const ProGate(
-              featureName: 'The Studio',
-              featureDescription:
-                  'Split any song into vocals and instrumental. Watch a short ad to unlock free for 24 hours.',
-              child: StudioScreen(),
-            ),
-          ),
+
         ],
       ),
       GoRoute(path: '/settings',      builder: (_, __) => const SettingsScreen()),
@@ -88,22 +78,22 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  // 0=AirDrop  1=Studio  2=MySpace(center)  3=Tools  4=Settings
-  int _currentIndex = 2;
+  // 0=AirDrop  1=MySpace(center)  2=Tools  3=Settings
+  int _currentIndex = 1;
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
-    if (index == 4) {
+    if (index == 3) {
       GoRouter.of(context).push('/settings');
       return;
     }
-    if (index == 3) {
+    if (index == 2) {
       _showToolsSheet();
       return;
     }
     if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
-    const routes = ['/airdrop', '/studio', '/', '', ''];
+    const routes = ['/airdrop', '/', '', ''];
     GoRouter.of(context).go(routes[index]);
   }
 
@@ -158,18 +148,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
                 );
               },
             ),
-            // Studio — Pro
-            _ToolTile(
-              icon: Icons.graphic_eq_rounded,
-              label: 'Studio — Stem Splitter',
-              subtitle: 'Split vocals & instrumental from any track',
-              color: AppColors.accentViolet,
-              isPro: true,
-              onTap: () {
-                Navigator.pop(context);
-                GoRouter.of(context).go('/studio');
-              },
-            ),
+
             // Browse by Folder — Free
             _ToolTile(
               icon: Icons.folder_open_rounded,
@@ -226,28 +205,22 @@ class _MainShellState extends ConsumerState<_MainShell> {
                       isActive: _currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
-                    _NavItem(
-                      icon: Icons.graphic_eq_rounded,
-                      label: 'Studio',
+                    _CenterNavItem(
                       isActive: _currentIndex == 1,
-                      isPro: true,
                       onTap: () => _onTap(1),
                     ),
-                    _CenterNavItem(
-                      isActive: _currentIndex == 2,
-                      onTap: () => _onTap(2),
-                    ),
+                
                     _NavItem(
                       icon: Icons.build_rounded,
                       label: 'Tools',
-                      isActive: _currentIndex == 3,
-                      onTap: () => _onTap(3),
+                      isActive: _currentIndex == 2,
+                      onTap: () => _onTap(2),
                     ),
                     _NavItem(
                       icon: Icons.settings_rounded,
                       label: 'Settings',
                       isActive: false,
-                      onTap: () => _onTap(4),
+                      onTap: () => _onTap(3),
                     ),
                   ],
                 ),

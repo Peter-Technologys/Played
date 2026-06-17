@@ -355,9 +355,16 @@ class _PlainView extends StatelessWidget {
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
       itemCount: lines.length,
       itemBuilder: (context, i) {
-        final approxLine = (position.inSeconds ~/
-                (lines.isEmpty ? 1 : 3))
-            .clamp(0, lines.length - 1);
+        // Estimate active line proportionally using playback position.
+        // We don't know total duration here, so we use a rolling 3-min
+        // assumption (180 s) which is reasonable for most songs.
+        // This is still an approximation — only LRC files give true sync.
+        final estimatedTotalSec = 180;
+        final fraction = lines.isEmpty
+            ? 0.0
+            : (position.inSeconds / estimatedTotalSec).clamp(0.0, 1.0);
+        final approxLine =
+            (fraction * (lines.length - 1)).round().clamp(0, lines.length - 1);
         final isActive = i == approxLine;
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
