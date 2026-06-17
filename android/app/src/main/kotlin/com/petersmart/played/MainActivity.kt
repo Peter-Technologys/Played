@@ -1,4 +1,4 @@
-package com.petersmart.played
+package com.otyaplayer.app
 
 import android.app.PictureInPictureParams
 import android.content.ContentUris
@@ -28,13 +28,13 @@ import java.nio.ByteBuffer
 
 class MainActivity : FlutterActivity() {
 
-    private val pipChannel     = "com.petersmart.played/pip"
-    private val mediaChannel   = "com.petersmart.played/media_store"
-    private val fileChannel    = "com.petersmart.played/file_ops"
-    private val eqChannel      = "com.petersmart.played/equalizer"
-    private val phoneChannel   = "com.petersmart.played/phone_state"
-    private val ffmpegChannel  = "com.petersmart.played/ffmpeg"
-    private val mediaEventCh   = "com.petersmart.played/media_events"
+    private val pipChannel     = "com.otyaplayer.app/pip"
+    private val mediaChannel   = "com.otyaplayer.app/media_store"
+    private val fileChannel    = "com.otyaplayer.app/file_ops"
+    private val eqChannel      = "com.otyaplayer.app/equalizer"
+    private val phoneChannel   = "com.otyaplayer.app/phone_state"
+    private val ffmpegChannel  = "com.otyaplayer.app/ffmpeg"
+    private val mediaEventCh   = "com.otyaplayer.app/media_events"
 
     private var equalizer: android.media.audiofx.Equalizer? = null
 

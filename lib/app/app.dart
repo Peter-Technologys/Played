@@ -5,14 +5,14 @@ import 'theme/app_theme.dart';
 import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 
-class PlayedApp extends StatefulWidget {
-  const PlayedApp({super.key});
+class OtyaPlayerApp extends StatefulWidget {
+  const OtyaPlayerApp({super.key});
 
   @override
-  State<PlayedApp> createState() => _PlayedAppState();
+  State<OtyaPlayerApp> createState() => _OtyaPlayerAppState();
 }
 
-class _PlayedAppState extends State<PlayedApp> {
+class _OtyaPlayerAppState extends State<OtyaPlayerApp> {
   bool _onboardingDone = false;
   bool _checking = true;
 
@@ -58,7 +58,7 @@ class _PlayedAppState extends State<PlayedApp> {
           backgroundColor: Color(0xFF050810),
           body: Center(
             child: CircularProgressIndicator(
-              color: Color(0xFF00D4FF),
+              color: Color(0xFF8A2BE2),
               strokeWidth: 2,
             ),
           ),
@@ -68,7 +68,7 @@ class _PlayedAppState extends State<PlayedApp> {
 
     if (!_onboardingDone) {
       return MaterialApp(
-        title: 'PLAYED',
+        title: 'OTYA Player',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         home: OnboardingScreen(onDone: _completeOnboarding),
@@ -77,7 +77,7 @@ class _PlayedAppState extends State<PlayedApp> {
 
     // No builder wrapper — permissions are requested contextually per feature.
     return MaterialApp.router(
-      title: 'PLAYED',
+      title: 'OTYA Player',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: AppRouter.router,
