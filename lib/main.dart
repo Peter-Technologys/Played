@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'app/app.dart';
+import 'app/app.dart'; // OtyaPlayerApp
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
 import 'core/services/appwrite_service.dart';
@@ -38,7 +38,7 @@ void main() async {
         settingsProvider.overrideWith(
             (ref) => SettingsNotifier(savedSettings)),
       ],
-      child: const PlayedApp(),
+      child: const OtyaPlayerApp(),
     ),
   );
 
@@ -71,12 +71,12 @@ Future<void> _initBackground() async {
     globalAudioHandler ??= await AudioService.init(
       builder: () => PlayedAudioHandler(),
       config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.petersmart.played.audio',
-        androidNotificationChannelName: 'PLAYED Media',
+        androidNotificationChannelId: 'com.otyaplayer.app.audio',
+        androidNotificationChannelName: 'OTYA Player Media',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
         androidNotificationIcon: 'mipmap/ic_launcher',
-        notificationColor: Color(0xFF00D4FF),
+        notificationColor: Color(0xFF8A2BE2),
       ),
     );
   } catch (e) {

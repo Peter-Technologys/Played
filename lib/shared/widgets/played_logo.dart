@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
-/// PLAYED branded logo — real app icon + gradient PLAYED text.
+/// OTYA Player branded logo — icon + gradient OTYA PLAYER text.
 class PlayedLogo extends StatelessWidget {
   final double fontSize;
   final double letterSpacing;
@@ -34,20 +34,20 @@ class PlayedLogo extends StatelessWidget {
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.accent.withValues(alpha: 0.10),
-            AppColors.accentViolet.withValues(alpha: 0.06),
+            AppColors.accentViolet.withValues(alpha: 0.12),
+            AppColors.accent.withValues(alpha: 0.06),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.55),
+          color: AppColors.accentViolet.withValues(alpha: 0.55),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.22),
+            color: AppColors.accentViolet.withValues(alpha: 0.22),
             blurRadius: 24,
             spreadRadius: 0,
           ),
@@ -72,12 +72,12 @@ class PlayedLogo extends StatelessWidget {
   Widget _gradientText() {
     return ShaderMask(
       shaderCallback: (bounds) => const LinearGradient(
-        colors: [AppColors.accent, AppColors.accentViolet],
+        colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
         begin: Alignment.centerLeft,
         end: Alignment.centerRight,
       ).createShader(bounds),
       child: Text(
-        'PLAYED',
+        'OTYA PLAYER',
         style: TextStyle(
           fontSize: fontSize,
           fontWeight: FontWeight.w800,
@@ -90,7 +90,7 @@ class PlayedLogo extends StatelessWidget {
   }
 }
 
-/// "from PeterSmart Technologies" footer.
+/// "from OTYA" footer.
 class PlayedFooter extends StatelessWidget {
   const PlayedFooter({super.key});
 
@@ -99,7 +99,7 @@ class PlayedFooter extends StatelessWidget {
     return const Padding(
       padding: EdgeInsets.only(bottom: 8),
       child: Text(
-        'from PeterSmart Technologies',
+        'OTYA Player — Otya? Play.',
         textAlign: TextAlign.center,
         style: TextStyle(
           fontSize: 11,

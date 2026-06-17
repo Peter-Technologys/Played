@@ -1,4 +1,4 @@
-package com.petersmart.played
+package com.otyaplayer.app
 
 import android.content.BroadcastReceiver
 import android.content.Context

@@ -16,7 +16,7 @@ def flutterVersionCode = localProperties.getProperty('flutter.versionCode') ?: '
 def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '1.0'
 
 android {
-    namespace 'com.petersmart.played'
+    namespace 'com.otyaplayer.app'
     compileSdk 36
     ndkVersion flutter.ndkVersion
 
@@ -35,7 +35,7 @@ android {
     }
 
     defaultConfig {
-        applicationId 'com.petersmart.played'
+        applicationId 'com.otyaplayer.app'
         minSdk 21
         targetSdk 36
         versionCode flutterVersionCode.toInteger()

@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────
-# Played — GitLab CI/CD Pipeline
+# OTYA Player — GitLab CI/CD Pipeline
 # ─────────────────────────────────────────────────────────────
 
 image: ghcr.io/cirruslabs/flutter:stable
@@ -8,22 +8,23 @@ variables:
   FLUTTER_VERSION: "stable"
   ANDROID_COMPILE_SDK: "34"
   ANDROID_BUILD_TOOLS: "34.0.0"
-  PUB_ENVIRONMENT: "bot.github"
+  PUB_ENVIRONMENT: "bot.gitlab"
+  PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
 
 stages:
+  - prepare
   - validate
   - test
   - build
 
+# ── Global cache — shared across ALL branches and jobs ───────────────
 cache:
-  key: "pub-$CI_COMMIT_REF_SLUG"
+  key: "pub-cache-v1"
   paths:
     - .pub-cache/
     - .dart_tool/
 
 # ── Shared script snippet: inject google-services.json ──────────────
-# GOOGLE_SERVICES_JSON must be set in GitLab → Settings → CI/CD → Variables
-# as a File variable OR a masked variable containing the raw JSON content.
 .inject_google_services: &inject_google_services |
   if [ -z "$GOOGLE_SERVICES_JSON" ]; then
     echo "ERROR: GOOGLE_SERVICES_JSON variable is not set."
@@ -33,12 +34,28 @@ cache:
   echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
   echo "google-services.json injected successfully."
 
-# ── Validate ────────────────────────────────────────────────────────
-analyze:
-  stage: validate
+# ── PREPARE — runs once, artifacts passed to all downstream jobs ─────
+prepare:
+  stage: prepare
   script:
     - flutter pub get
     - flutter pub run build_runner build --delete-conflicting-outputs
+  artifacts:
+    paths:
+      - .dart_tool/
+      - .pub-cache/
+      - lib/
+    expire_in: 1 hour
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
+
+# ── Validate ────────────────────────────────────────────────────────
+analyze:
+  stage: validate
+  needs: [prepare]
+  script:
     - flutter analyze --no-fatal-infos --no-fatal-warnings
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -46,8 +63,8 @@ analyze:
 
 format_check:
   stage: validate
+  needs: [prepare]
   script:
-    - flutter pub get
     - dart format --set-exit-if-changed lib/
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
@@ -56,9 +73,8 @@ format_check:
 # ── Test ──────────────────────────────────────────────────────────
 unit_test:
   stage: test
+  needs: [prepare]
   script:
-    - flutter pub get
-    - flutter pub run build_runner build --delete-conflicting-outputs
     - flutter test --coverage
   coverage: '/lines\s*:\s*(\d+\.\d+)%/'
   artifacts:
@@ -76,10 +92,9 @@ unit_test:
 # ── Build ──────────────────────────────────────────────────────────
 build_apk_debug:
   stage: build
+  needs: [prepare]
   script:
     - *inject_google_services
-    - flutter pub get
-    - flutter pub run build_runner build --delete-conflicting-outputs
     - flutter build apk --debug
   artifacts:
     paths:
@@ -89,9 +104,6 @@ build_apk_debug:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
 # Signed release build — runs on main branch pushes and version tags.
-# Produces:
-#   1. App Bundle (.aab) — for Play Store (smallest user download, ~30-40 MB)
-#   2. Split APKs       — for direct sideload / testing
 # Required CI/CD Variables (Settings → CI/CD → Variables, all Masked + Protected):
 #   GOOGLE_SERVICES_JSON — raw contents of google-services.json
 #   KEYSTORE_BASE64      — Base64-encoded .jks keystore file
@@ -100,10 +112,9 @@ build_apk_debug:
 #   KEY_PASSWORD         — Key password
 build_apk_release:
   stage: build
+  needs: [prepare]
   script:
     - *inject_google_services
-    - flutter pub get
-    - flutter pub run build_runner build --delete-conflicting-outputs
     - |
       if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
         echo "ERROR: One or more signing variables are not set."
@@ -112,12 +123,9 @@ build_apk_release:
       fi
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
     - export KEYSTORE_PATH="keystore.jks"
-    # App Bundle for Play Store — Google serves only the right ABI + resources
-    # This is what users actually download (~30-40 MB instead of 60-70 MB)
     - flutter build appbundle --release
         --obfuscate
         --split-debug-info=build/debug-info
-    # Split APKs for direct sideload / QA testing
     - flutter build apk --release --split-per-abi
         --obfuscate
         --split-debug-info=build/debug-info

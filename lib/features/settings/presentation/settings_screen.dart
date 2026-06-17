@@ -12,6 +12,7 @@ import '../../../core/services/auth_provider.dart';
 import '../../../core/services/auth_service.dart';
 import '../../../core/services/storage_folder_service.dart';
 import '../../../features/my_space/presentation/providers/my_space_provider.dart';
+import '../../../features/settings/presentation/privacy_policy_screen.dart';
 import '../../../shared/widgets/played_logo.dart';
 import '../../settings/settings_provider.dart';
 
@@ -241,7 +242,7 @@ class SettingsScreen extends ConsumerWidget {
           _SwitchTile(
             icon: Icons.lock_rounded,
             label: 'App Lock',
-            subtitle: 'Require biometrics to open PLAYED',
+            subtitle: 'Require biometrics to open OTYA Player',
             value: s.appLockEnabled,
             onChanged: (v) => sn.setAppLock(v),
           ),
@@ -333,7 +334,7 @@ class SettingsScreen extends ConsumerWidget {
                       borderRadius: 12,
                       padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8)),
                   const SizedBox(height: 12),
-                  const Text('Your media. Your rules.',
+                  const Text('Otya? Play. Your media, your rules.',
                       style: TextStyle(
                           fontSize: 13, color: AppColors.textSecondary,
                           fontFamily: 'Inter')),
@@ -346,8 +347,9 @@ class SettingsScreen extends ConsumerWidget {
                   const Divider(color: AppColors.border, height: 1),
                   const SizedBox(height: 16),
                   const Text(
-                    'A high-performance offline media player built for East Africa. '
-                    'Play, organise, and share your videos and music — no internet required.',
+                    'OTYA Player is a premium offline media player inspired by the Luganda word "Otya?". '
+                    'Play, organise, and share your local audio and video — no internet required.',
+                    // ignore: dead_code
                     textAlign: TextAlign.center,
                     style: TextStyle(
                         fontSize: 12, color: AppColors.textSecondary,
@@ -361,7 +363,7 @@ class SettingsScreen extends ConsumerWidget {
           _SettingsTile(
             icon: Icons.business_rounded,
             label: 'Developer',
-            trailing: const Text('PeterSmart Technologies',
+            trailing: const Text('OTYA Player Team',
                 style: TextStyle(
                     fontSize: 13, color: AppColors.textSecondary,
                     fontFamily: 'Inter')),
@@ -370,7 +372,7 @@ class SettingsScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.email_outlined,
             label: 'Contact Support',
-            subtitle: 'dev@petersmartlink.com',
+            subtitle: 'support@otyaplayer.com',
             onTap: () => _launchEmail(context),
           ),
           const SizedBox(height: 8),
@@ -386,16 +388,17 @@ class SettingsScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.privacy_tip_outlined,
             label: 'Privacy Policy',
-            onTap: () => _launchUrl(context,
-                'https://app.petersmartlink.com/played/privacy'),
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
+            ),
           ),
           const SizedBox(height: 8),
           _TappableTile(
             icon: Icons.star_outline_rounded,
-            label: 'Rate PLAYED',
+            label: 'Rate OTYA Player',
             subtitle: 'Enjoying the app? Leave a review!',
             onTap: () => _launchUrl(context,
-                'https://play.google.com/store/apps/details?id=com.petersmart.played'),
+                'https://play.google.com/store/apps/details?id=com.otyaplayer.app'),
           ),
           const SizedBox(height: 32),
           const Center(child: PlayedFooter()),
@@ -739,8 +742,8 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _launchEmail(BuildContext context) async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'dev@petersmartlink.com',
-      queryParameters: {'subject': 'PLAYED App Support'},
+      path: 'support@otyaplayer.com',
+      queryParameters: {'subject': 'OTYA Player Support'},
     );
     if (!await launchUrl(uri)) {
       if (context.mounted) {
