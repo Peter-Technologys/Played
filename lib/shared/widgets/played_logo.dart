@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
-/// PLAYED branded logo — gradient ShaderMask text with neon glow border.
-/// Used on splash, onboarding, settings About card, and any screen that needs it.
+/// PLAYED branded logo — real app icon + gradient PLAYED text.
 class PlayedLogo extends StatelessWidget {
   final double fontSize;
   final double letterSpacing;
   final double borderRadius;
   final EdgeInsets padding;
+  final bool iconOnly;
 
   const PlayedLogo({
     super.key,
@@ -15,56 +15,82 @@ class PlayedLogo extends StatelessWidget {
     this.letterSpacing = 6,
     this.borderRadius = 16,
     this.padding = const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+    this.iconOnly = false,
   });
 
   @override
   Widget build(BuildContext context) {
+    if (iconOnly) {
+      return Image.asset(
+        'assets/icons/play_store_512.png',
+        width: fontSize * 1.4,
+        height: fontSize * 1.4,
+        errorBuilder: (_, __, ___) => _gradientText(),
+      );
+    }
+
     return Container(
       padding: padding,
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.accent.withValues(alpha: 0.08),
-            AppColors.accentViolet.withValues(alpha: 0.08),
+            AppColors.accent.withValues(alpha: 0.10),
+            AppColors.accentViolet.withValues(alpha: 0.06),
           ],
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.5),
+          color: AppColors.accent.withValues(alpha: 0.55),
           width: 1.5,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.18),
-            blurRadius: 20,
+            color: AppColors.accent.withValues(alpha: 0.22),
+            blurRadius: 24,
             spreadRadius: 0,
           ),
         ],
       ),
-      child: ShaderMask(
-        shaderCallback: (bounds) => const LinearGradient(
-          colors: [AppColors.accent, AppColors.accentViolet],
-          begin: Alignment.centerLeft,
-          end: Alignment.centerRight,
-        ).createShader(bounds),
-        child: Text(
-          'PLAYED',
-          style: TextStyle(
-            fontSize: fontSize,
-            fontWeight: FontWeight.w800,
-            color: Colors.white, // ShaderMask overrides this with gradient
-            fontFamily: 'Inter',
-            letterSpacing: letterSpacing,
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Image.asset(
+            'assets/icons/play_store_512.png',
+            width: fontSize * 1.15,
+            height: fontSize * 1.15,
+            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
           ),
+          SizedBox(width: fontSize * 0.35),
+          _gradientText(),
+        ],
+      ),
+    );
+  }
+
+  Widget _gradientText() {
+    return ShaderMask(
+      shaderCallback: (bounds) => const LinearGradient(
+        colors: [AppColors.accent, AppColors.accentViolet],
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+      ).createShader(bounds),
+      child: Text(
+        'PLAYED',
+        style: TextStyle(
+          fontSize: fontSize,
+          fontWeight: FontWeight.w800,
+          color: Colors.white,
+          fontFamily: 'Inter',
+          letterSpacing: letterSpacing,
         ),
       ),
     );
   }
 }
 
-/// "from PeterSmart Technologies" footer — shared across all screens.
+/// "from PeterSmart Technologies" footer.
 class PlayedFooter extends StatelessWidget {
   const PlayedFooter({super.key});
 

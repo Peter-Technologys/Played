@@ -10,9 +10,11 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
+import 'package:flutter/foundation.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
+import '../../../core/services/speed_memory_service.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -104,7 +106,28 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void _onTrackComplete() {
-    // Handled by the screen via repeat/queue logic
+    if (_container == null) return;
+    final queue    = _container!.read(queueProvider);
+    final notifier = _container!.read(queueProvider.notifier);
+    switch (state.repeat) {
+      case RepeatState.one:
+        final current = queue.current;
+        if (current != null) load(current);
+        break;
+      case RepeatState.all:
+        notifier.next();
+        final nextAll = _container!.read(queueProvider).current;
+        if (nextAll != null) load(nextAll);
+        break;
+      case RepeatState.off:
+        final hasNext = queue.currentIndex < queue.items.length - 1;
+        if (hasNext) {
+          notifier.next();
+          final nextOff = _container!.read(queueProvider).current;
+          if (nextOff != null) load(nextOff);
+        }
+        break;
+    }
   }
 
   // Keep a reference to the ProviderContainer so load() can update
@@ -116,29 +139,32 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
-    if (_handler == null) return; // AudioService not yet initialised
+    if (_handler == null) return;
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;
-
-    // Attach stream listeners now that the handler is confirmed non-null
     _attachStreams();
 
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
-    final speed       = settings?.playbackSpeed ?? state.speed;
+    final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);
+    final speed       = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
     final skipSilence = settings?.skipSilence ?? false;
 
-    final session = await AudioSession.instance;
-    await session.configure(const AudioSessionConfiguration.music());
-
-    await _handler!.loadAndPlay(
-      item,
-      speed: speed,
-      skipSilence: skipSilence,
-      savedPosition: saved,
-    );
-    state = state.copyWith(speed: speed);
-    PlayedDatabase.instance.recordPlay(item);
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      await _handler!.loadAndPlay(
+        item,
+        speed: speed,
+        skipSilence: skipSilence,
+        savedPosition: saved,
+      );
+      state = state.copyWith(speed: speed, isLoading: false);
+      PlayedDatabase.instance.recordPlay(item);
+    } catch (e) {
+      debugPrint('[AudioPlayer] load error: $e');
+      state = state.copyWith(isLoading: false);
+    }
   }
 
   bool _loadFavorite(String id) {
@@ -191,6 +217,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void setSpeed(double s) {
     _handler?.setSpeed(s);
     state = state.copyWith(speed: s);
+    // Persist per-track speed memory
+    if (_currentItemId != null) {
+      SpeedMemoryService.instance.saveSpeed(_currentItemId!, s);
+    }
   }
 
   void toggleFavorite() {

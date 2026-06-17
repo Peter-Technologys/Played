@@ -87,6 +87,9 @@ dependencies:
   url_launcher: ^6.3.0
   shared_preferences: ^2.3.0
 
+  # Shake to shuffle
+  sensors_plus: ^5.0.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -99,6 +102,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/icons/
+    - assets/animations/
   fonts:
     - family: Inter
       fonts:

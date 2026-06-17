@@ -11,6 +11,9 @@ import '../../../core/permissions/permission_helper.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
 import '../../../shared/widgets/played_logo.dart';
+import '../../../shared/widgets/empty_state.dart';
+import '../../../core/services/pinned_folders_service.dart';
+import '../../../core/services/shake_service.dart';
 import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
@@ -164,6 +167,42 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
     super.initState();
     _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMediaPermission());
+    // Shake to shuffle — start listening when My Space is active
+    ShakeService.instance.start(_onShake);
+  }
+
+  void _onShake() {
+    final items = ref.read(mediaLibraryProvider).valueOrNull ?? [];
+    if (items.isEmpty) return;
+    final songs = items.where((e) => !e.isVideo).toList()..shuffle();
+    if (songs.isEmpty) return;
+    HapticFeedback.mediumImpact();
+    ref.read(queueProvider.notifier).setQueue(songs);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Row(
+            children: [
+              Icon(Icons.shuffle_rounded, color: AppColors.accent, size: 16),
+              SizedBox(width: 8),
+              Text('Shuffling your library 🎵',
+                  style: TextStyle(color: AppColors.textPrimary)),
+            ],
+          ),
+          backgroundColor: AppColors.surfaceElevated,
+          behavior: SnackBarBehavior.floating,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+      context.push('/player/audio', extra: songs.first);
+    }
+  }
+
+  @override
+  void dispose() {
+    ShakeService.instance.stop();
+    _tabs.dispose();
+    super.dispose();
   }
 
   Future<void> _ensureMediaPermission() async {
@@ -172,15 +211,9 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
       final granted =
           await PermissionHelper.showMediaPermissionRationale(context);
       if (granted && mounted) {
-        ref.read(mediaLibraryProvider.notifier).refresh();
+        ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
       }
     }
-  }
-
-  @override
-  void dispose() {
-    _tabs.dispose();
-    super.dispose();
   }
 
   @override
@@ -197,8 +230,6 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
             _Header(
               libraryAsync: libraryAsync,
               sort: sort,
-              onRefresh: () =>
-                  ref.read(mediaLibraryProvider.notifier).refresh(),
             ),
 
             // ── Recently Played ──────────────────────────────────────
@@ -210,16 +241,37 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
             // ── Tab views ───────────────────────────────────────────
             Expanded(
               child: libraryAsync.when(
-                loading: () => const _FullShimmer(),
+                loading: () => libraryAsync.valueOrNull != null
+                    ? RefreshIndicator(
+                        color: AppColors.accent,
+                        backgroundColor: AppColors.surface,
+                        onRefresh: () => ref
+                            .read(mediaLibraryProvider.notifier)
+                            .backgroundRefresh(),
+                        child: _TabViews(
+                          controller: _tabs,
+                          items: libraryAsync.valueOrNull!,
+                          sort: sort,
+                        ),
+                      )
+                    : const _FullShimmer(),
                 error: (e, _) => _ErrorView(
                   message: e.toString(),
                   onRetry: () =>
                       ref.read(mediaLibraryProvider.notifier).refresh(),
                 ),
-                data: (items) => _TabViews(
-                  controller: _tabs,
-                  items: items,
-                  sort: sort,
+                data: (items) => RefreshIndicator(
+                  color: AppColors.accent,
+                  backgroundColor: AppColors.surface,
+                  displacement: 20,
+                  onRefresh: () => ref
+                      .read(mediaLibraryProvider.notifier)
+                      .backgroundRefresh(),
+                  child: _TabViews(
+                    controller: _tabs,
+                    items: items,
+                    sort: sort,
+                  ),
                 ),
               ),
             ),
@@ -235,18 +287,16 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
 class _Header extends ConsumerWidget {
   final AsyncValue<List<MediaItem>> libraryAsync;
   final MediaSort sort;
-  final VoidCallback onRefresh;
 
   const _Header({
     required this.libraryAsync,
     required this.sort,
-    required this.onRefresh,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final total = libraryAsync.valueOrNull?.length ?? 0;
-    final isRefreshing = libraryAsync.isLoading;
+    final isScanning = libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
@@ -263,10 +313,25 @@ class _Header extends ConsumerWidget {
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               ),
               const SizedBox(height: 4),
-              Text(
-                total == 0 ? 'Scanning...' : '$total files',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+              Row(
+                children: [
+                  Text(
+                    total == 0 ? 'Scanning...' : '$total files',
+                    style: const TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                  if (isScanning) ...[
+                    const SizedBox(width: 6),
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 1.5,
+                        color: AppColors.accent,
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ],
           ),
@@ -287,8 +352,10 @@ class _Header extends ConsumerWidget {
           _SortBtn(current: sort),
           const SizedBox(width: 8),
           _IconBtn(
-            icon: isRefreshing ? Icons.hourglass_top_rounded : Icons.refresh_rounded,
-            onTap: isRefreshing ? () {} : onRefresh,
+            icon: Icons.refresh_rounded,
+            onTap: () => ref
+                .read(mediaLibraryProvider.notifier)
+                .backgroundRefresh(),
           ),
           const SizedBox(width: 8),
           _IconBtn(
@@ -1081,13 +1148,30 @@ class _VideoCard extends StatelessWidget {
 
 // ── Folders tab ──────────────────────────────────────────────────────
 
-class _FoldersTab extends StatelessWidget {
+class _FoldersTab extends StatefulWidget {
   final List<MediaItem> items;
   const _FoldersTab({required this.items});
+  @override
+  State<_FoldersTab> createState() => _FoldersTabState();
+}
+
+class _FoldersTabState extends State<_FoldersTab> {
+  List<String> _pinned = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPinned();
+  }
+
+  Future<void> _loadPinned() async {
+    final p = await PinnedFoldersService.instance.getPinned();
+    if (mounted) setState(() => _pinned = p);
+  }
 
   Map<String, List<MediaItem>> _buildFolders() {
     final map = <String, List<MediaItem>>{};
-    for (final item in items) {
+    for (final item in widget.items) {
       final parts = item.filePath.split('/');
       final folder = parts.length > 1
           ? parts.sublist(0, parts.length - 1).join('/')
@@ -1102,14 +1186,36 @@ class _FoldersTab extends StatelessWidget {
     return parts.lastWhere((p) => p.isNotEmpty, orElse: () => path);
   }
 
+  Future<void> _togglePin(String path) async {
+    if (_pinned.contains(path)) {
+      await PinnedFoldersService.instance.unpin(path);
+    } else {
+      await PinnedFoldersService.instance.pin(path);
+    }
+    await _loadPinned();
+  }
+
+  void _openFolder(String name, List<MediaItem> files) {
+    Navigator.of(context).push(MaterialPageRoute(
+      builder: (_) => _FolderDetailPage(name: name, items: files),
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (items.isEmpty) {
+    if (widget.items.isEmpty) {
       return const _EmptyState(
           icon: Icons.folder_open_rounded, label: 'No folders found');
     }
     final folders = _buildFolders();
-    final keys = folders.keys.toList()..sort();
+    // Sort: pinned first, then alphabetical
+    final keys = folders.keys.toList()
+      ..sort((a, b) {
+        final aPin = _pinned.contains(a) ? 0 : 1;
+        final bPin = _pinned.contains(b) ? 0 : 1;
+        if (aPin != bPin) return aPin - bPin;
+        return a.compareTo(b);
+      });
 
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
@@ -1120,16 +1226,23 @@ class _FoldersTab extends StatelessWidget {
         final name = _folderName(path);
         final audioCount = files.where((f) => !f.isVideo).length;
         final videoCount = files.where((f) => f.isVideo).length;
+        final isPinned = _pinned.contains(path);
 
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
             contentPadding:
                 const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            tileColor: AppColors.surface,
+            tileColor: isPinned
+                ? AppColors.accent.withValues(alpha: 0.05)
+                : AppColors.surface,
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.border),
+              side: BorderSide(
+                color: isPinned
+                    ? AppColors.accent.withValues(alpha: 0.4)
+                    : AppColors.border,
+              ),
             ),
             leading: Container(
               width: 44,
@@ -1138,8 +1251,11 @@ class _FoldersTab extends StatelessWidget {
                 color: AppColors.accent.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(Icons.folder_rounded,
-                  color: AppColors.accent, size: 24),
+              child: Icon(
+                isPinned ? Icons.folder_special_rounded : Icons.folder_rounded,
+                color: AppColors.accent,
+                size: 24,
+              ),
             ),
             title: Text(
               name,
@@ -1154,15 +1270,41 @@ class _FoldersTab extends StatelessWidget {
             ),
             subtitle: Text(
               [
-                if (audioCount > 0) '$audioCount song${audioCount == 1 ? '' : 's'}',
-                if (videoCount > 0) '$videoCount video${videoCount == 1 ? '' : 's'}',
+                if (isPinned) '📌 Pinned',
+                if (audioCount > 0)
+                  '$audioCount song${audioCount == 1 ? '' : 's'}',
+                if (videoCount > 0)
+                  '$videoCount video${videoCount == 1 ? '' : 's'}',
               ].join(' · '),
               style: const TextStyle(
                   fontSize: 11, color: AppColors.textSecondary),
             ),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
-            onTap: () => _openFolder(context, name, files),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _togglePin(path);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      isPinned
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
+                      color: isPinned
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary, size: 20),
+              ],
+            ),
+            onTap: () => _openFolder(name, files),
           ),
         );
       },
@@ -1174,6 +1316,17 @@ class _FoldersTab extends StatelessWidget {
     Navigator.of(context).push(MaterialPageRoute(
       builder: (_) => _FolderDetailPage(name: name, items: files),
     ));
+  }
+
+  Future<void> _togglePin(String folderPath, String name) async {
+    final pinned = await PinnedFoldersService.instance.isPinned(folderPath);
+    if (pinned) {
+      await PinnedFoldersService.instance.unpin(folderPath);
+    } else {
+      await PinnedFoldersService.instance.pin(folderPath);
+    }
+    // Rebuild by calling setState on the parent — trigger via a dummy state
+    // The FutureBuilder inside _FoldersTab handles this automatically.
   }
 }
 
@@ -1444,36 +1597,10 @@ class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              shape: BoxShape.circle,
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Icon(icon, color: AppColors.textSecondary, size: 32),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Files will appear here after scanning.',
-            style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
-          ),
-        ],
-      ),
+    return EmptyState(
+      icon: icon,
+      title: label,
+      subtitle: 'Files will appear here after scanning.',
     );
   }
 }
