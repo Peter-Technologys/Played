@@ -9,6 +9,11 @@ PlayedAudioHandler? globalAudioHandler;
 class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
   final AudioPlayer _player = AudioPlayer();
 
+  /// Callbacks wired by AudioPlayerNotifier so notification / lock screen
+  /// skip buttons advance the in-app queue automatically.
+  void Function()? onSkipNext;
+  void Function()? onSkipPrevious;
+
   PlayedAudioHandler() {
     _player.playbackEventStream
         .map(_transformEvent)
@@ -68,8 +73,8 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
   }
   @override Future<void> seek(Duration position) => _player.seek(position);
   @override Future<void> setSpeed(double speed)  => _player.setSpeed(speed);
-  @override Future<void> skipToNext()     async {}
-  @override Future<void> skipToPrevious() async {}
+  @override Future<void> skipToNext()     async => onSkipNext?.call();
+  @override Future<void> skipToPrevious() async => onSkipPrevious?.call();
 
   Future<void> disposePlayer() async {
     try { await _player.dispose(); } catch (_) {}

@@ -54,13 +54,17 @@ class QueueNotifier extends StateNotifier<QueueState> {
 
   void next() {
     if (state.items.isEmpty) return;
-    final next = state.shuffle
-        ? (state.currentIndex + 1 +
-                (state.items.length - 1) *
-                    (DateTime.now().millisecond % state.items.length)) %
-            state.items.length
-        : (state.currentIndex + 1) % state.items.length;
-    state = state.copyWith(currentIndex: next);
+    final int nextIndex;
+    if (state.shuffle) {
+      // True random — never repeat the same index consecutively
+      final pool = List.generate(state.items.length, (i) => i)
+        ..remove(state.currentIndex);
+      pool.shuffle();
+      nextIndex = pool.isEmpty ? state.currentIndex : pool.first;
+    } else {
+      nextIndex = (state.currentIndex + 1) % state.items.length;
+    }
+    state = state.copyWith(currentIndex: nextIndex);
   }
 
   void previous() {

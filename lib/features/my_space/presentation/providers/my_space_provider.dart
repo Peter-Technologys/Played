@@ -33,6 +33,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     // (USB, file manager, SD card, Xender, Bluetooth, WhatsApp, etc.)
     StreamSubscription<dynamic>? sub;
     Timer? debounce;
+    // Layer 3 — live MediaStore events
     try {
       sub = _mediaEventChannel.receiveBroadcastStream().listen((_) {
         debounce?.cancel();
@@ -41,10 +42,17 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     } catch (e) {
       debugPrint('[MediaLibrary] MediaObserver not available: $e');
     }
+
+    // Layer 4 — periodic fallback every 5 minutes for devices without MediaStore events
+    final periodicTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+      _backgroundRefresh();
+    });
+
     // AsyncNotifier uses ref.onDispose — no override needed
     ref.onDispose(() {
       debounce?.cancel();
       sub?.cancel();
+      periodicTimer.cancel();
     });
 
     // Phase 1a — in-memory cache (zero I/O, instant)
