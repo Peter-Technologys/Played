@@ -7,8 +7,10 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
+import '../../../core/permissions/permission_helper.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../shared/widgets/loading_shimmer.dart';
+import '../../../shared/widgets/played_logo.dart';
 import 'providers/my_space_provider.dart';
 import 'widgets/search_bar_widget.dart';
 import 'widgets/user_avatar_button.dart';
@@ -22,7 +24,12 @@ class _RecentlyPlayedRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final recent = PlayedDatabase.instance.getRecentlyPlayed(limit: 20);
+    List<MediaItem> recent;
+    try {
+      recent = PlayedDatabase.instance.getRecentlyPlayed(limit: 20);
+    } catch (_) {
+      recent = [];
+    }
     if (recent.isEmpty) return const SizedBox.shrink();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -156,6 +163,18 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
   void initState() {
     super.initState();
     _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
+    WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMediaPermission());
+  }
+
+  Future<void> _ensureMediaPermission() async {
+    final has = await PermissionHelper.hasMediaPermissions();
+    if (!has && mounted) {
+      final granted =
+          await PermissionHelper.showMediaPermissionRationale(context);
+      if (granted && mounted) {
+        ref.read(mediaLibraryProvider.notifier).refresh();
+      }
+    }
   }
 
   @override
@@ -237,15 +256,13 @@ class _Header extends ConsumerWidget {
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                'My Space',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                ),
+              const PlayedLogo(
+                fontSize: 20,
+                letterSpacing: 4,
+                borderRadius: 10,
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
               ),
+              const SizedBox(height: 4),
               Text(
                 total == 0 ? 'Scanning...' : '$total files',
                 style: const TextStyle(

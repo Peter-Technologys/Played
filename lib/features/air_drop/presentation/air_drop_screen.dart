@@ -3,8 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:nearby_connections/nearby_connections.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/permissions/permission_helper.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/data/media_repository.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
@@ -274,14 +274,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen> {
   }
 
   Future<void> _ensurePermissions() async {
-    await [
-      Permission.bluetooth,
-      Permission.bluetoothScan,
-      Permission.bluetoothAdvertise,
-      Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
-      Permission.nearbyWifiDevices,
-    ].request();
+    await PermissionHelper.requestAirDropPermissions();
   }
 
   @override

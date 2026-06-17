@@ -65,13 +65,19 @@ class AudioPlayerState {
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   // Route all playback through the audio_service handler.
-  // This gives us the notification media player for free.
-  PlayedAudioHandler get _handler => globalAudioHandler!;
-  AudioPlayer get _player => _handler.player;
+  // Guard against null — AudioService.init() runs in background after app start.
+  PlayedAudioHandler? get _handler => globalAudioHandler;
+  AudioPlayer? get _player => _handler?.player;
   String? _currentItemId;
+  bool _streamsAttached = false;
 
-  AudioPlayerNotifier() : super(const AudioPlayerState()) {
-    _player.playerStateStream.listen((s) {
+  AudioPlayerNotifier() : super(const AudioPlayerState());
+
+  /// Attach stream listeners once the handler is ready (called from load()).
+  void _attachStreams() {
+    if (_streamsAttached || _player == null) return;
+    _streamsAttached = true;
+    _player!.playerStateStream.listen((s) {
       if (!mounted) return;
       state = state.copyWith(
         isPlaying: s.playing,
@@ -79,20 +85,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
             s.processingState == ProcessingState.buffering,
       );
     });
-    _player.positionStream.listen((p) {
+    _player!.positionStream.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
-      // Autosave seek position every 5 seconds (avoid saving at position 0)
       if (_currentItemId != null && p.inSeconds > 0 && p.inSeconds % 5 == 0) {
         PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
       }
     });
-    _player.durationStream.listen((d) {
+    _player!.durationStream.listen((d) {
       if (!mounted) return;
       if (d != null) state = state.copyWith(duration: d);
     });
-    // Auto-advance to next track when current finishes
-    _player.processingStateStream.listen((ps) {
+    _player!.processingStateStream.listen((ps) {
       if (ps == ProcessingState.completed) {
         _onTrackComplete();
       }
@@ -112,9 +116,13 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
+    if (_handler == null) return; // AudioService not yet initialised
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;
+
+    // Attach stream listeners now that the handler is confirmed non-null
+    _attachStreams();
 
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
     final speed       = settings?.playbackSpeed ?? state.speed;
@@ -123,8 +131,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final session = await AudioSession.instance;
     await session.configure(const AudioSessionConfiguration.music());
 
-    // loadAndPlay goes through audio_service — creates the notification
-    await _handler.loadAndPlay(
+    await _handler!.loadAndPlay(
       item,
       speed: speed,
       skipSilence: skipSilence,
@@ -141,13 +148,19 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     return data;
   }
 
-  void togglePlay() => _player.playing ? _handler.pause() : _handler.play();
-  void pause()      => _handler.pause();
-  Future<void> seek(Duration p) => _handler.seek(p);
-  Future<void> skipForward() =>
-      _handler.seek(state.position + const Duration(seconds: 10));
-  Future<void> skipBack() =>
-      _handler.seek(state.position - const Duration(seconds: 10));
+  void togglePlay() {
+    if (_player?.playing == true) {
+      _handler?.pause();
+    } else {
+      _handler?.play();
+    }
+  }
+  void pause()      => _handler?.pause();
+  Future<void> seek(Duration p) async => _handler?.seek(p);
+  Future<void> skipForward() async =>
+      _handler?.seek(state.position + const Duration(seconds: 10));
+  Future<void> skipBack() async =>
+      _handler?.seek(state.position - const Duration(seconds: 10));
 
   void skipNext() {
     if (_container == null) return;
@@ -176,7 +189,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void setSpeed(double s) {
-    _handler.setSpeed(s);
+    _handler?.setSpeed(s);
     state = state.copyWith(speed: s);
   }
 
@@ -195,9 +208,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         (state.repeat.index + 1) % RepeatState.values.length];
     state = state.copyWith(repeat: next);
     switch (next) {
-      case RepeatState.off: _player.setLoopMode(LoopMode.off);
-      case RepeatState.one: _player.setLoopMode(LoopMode.one);
-      case RepeatState.all: _player.setLoopMode(LoopMode.all);
+      case RepeatState.off: _player?.setLoopMode(LoopMode.off);
+      case RepeatState.one: _player?.setLoopMode(LoopMode.one);
+      case RepeatState.all: _player?.setLoopMode(LoopMode.all);
     }
   }
 

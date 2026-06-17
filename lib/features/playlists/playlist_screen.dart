@@ -395,8 +395,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
           : ReorderableListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: tracks.length,
-              onReorderItem: (oldIndex, newIndex) {
-                // Reorder mediaIds in the playlist
+              onReorder: (oldIndex, newIndex) {
+                // Flutter requires this adjustment when moving items down
+                if (newIndex > oldIndex) newIndex--;
                 final ids = List<String>.from(playlist.mediaIds);
                 final id = ids.removeAt(oldIndex);
                 ids.insert(newIndex, id);
