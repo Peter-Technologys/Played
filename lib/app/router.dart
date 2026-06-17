@@ -196,9 +196,21 @@ class _MainShellState extends ConsumerState<_MainShell> {
           const MiniPlayer(),
           const AdBannerSlot(),
           Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFF111827),
-              border: Border(top: BorderSide(color: Color(0xFF1F2937), width: 1)),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              border: Border(
+                top: BorderSide(
+                  color: AppColors.accent.withValues(alpha: 0.15),
+                  width: 1,
+                ),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.06),
+                  blurRadius: 20,
+                  offset: const Offset(0, -4),
+                ),
+              ],
             ),
             child: SafeArea(
               child: Padding(

@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'router.dart';
-import '../core/permissions/permission_gate_screen.dart';
 import '../features/onboarding/onboarding_screen.dart';
 
 class PlayedApp extends StatefulWidget {
@@ -57,7 +56,7 @@ class _PlayedAppState extends State<PlayedApp> {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
-          backgroundColor: Color(0xFF0A0F1E),
+          backgroundColor: Color(0xFF050810),
           body: Center(
             child: CircularProgressIndicator(
               color: Color(0xFF00D4FF),
@@ -77,14 +76,12 @@ class _PlayedAppState extends State<PlayedApp> {
       );
     }
 
+    // No builder wrapper — permissions are requested contextually per feature.
     return MaterialApp.router(
       title: 'PLAYED',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: AppRouter.router,
-      builder: (context, child) => PermissionGateScreen(
-        child: child ?? const SizedBox.shrink(),
-      ),
     );
   }
 }

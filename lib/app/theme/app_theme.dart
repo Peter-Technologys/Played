@@ -18,6 +18,7 @@ class AppTheme {
         onPrimary: Colors.black,
         onSecondary: Colors.white,
         onSurface: AppColors.textPrimary,
+        surfaceContainerHighest: AppColors.surfaceHighlight,
       ),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.background,
@@ -26,6 +27,8 @@ class AppTheme {
         systemOverlayStyle: SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
+          systemNavigationBarColor: AppColors.background,
+          systemNavigationBarIconBrightness: Brightness.light,
         ),
         titleTextStyle: AppTextStyles.heading2,
         iconTheme: IconThemeData(color: AppColors.textPrimary),
@@ -57,7 +60,39 @@ class AppTheme {
           side: const BorderSide(color: AppColors.border),
         ),
       ),
-      // Ripple effect matches the dark theme
+      // Branded floating SnackBar
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: AppColors.surfaceElevated,
+        contentTextStyle: const TextStyle(
+          color: AppColors.textPrimary,
+          fontFamily: 'Inter',
+          fontSize: 13,
+        ),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        behavior: SnackBarBehavior.floating,
+        elevation: 0,
+      ),
+      // Branded dialog
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: AppColors.border),
+        ),
+        elevation: 0,
+      ),
+      // Branded bottom sheet
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        elevation: 0,
+      ),
+      // Ripple
       splashColor: AppColors.accent.withValues(alpha: 0.06),
       highlightColor: AppColors.accent.withValues(alpha: 0.04),
     );

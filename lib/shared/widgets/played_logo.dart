@@ -1,12 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
-/// Shared PLAYED branded logo box — used on splash, permission screen,
-/// settings About card, onboarding, and any other screen that needs it.
-///
-/// Usage:
-///   const PlayedLogo()              // default size
-///   const PlayedLogo(fontSize: 22)  // smaller variant for cards
+/// PLAYED branded logo — gradient ShaderMask text with neon glow border.
+/// Used on splash, onboarding, settings About card, and any screen that needs it.
 class PlayedLogo extends StatelessWidget {
   final double fontSize;
   final double letterSpacing;
@@ -26,21 +22,42 @@ class PlayedLogo extends StatelessWidget {
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        border: Border.all(
-          color: AppColors.accent.withValues(alpha: 0.35),
-          width: 1.5,
+        gradient: LinearGradient(
+          colors: [
+            AppColors.accent.withValues(alpha: 0.08),
+            AppColors.accentViolet.withValues(alpha: 0.08),
+          ],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
         ),
         borderRadius: BorderRadius.circular(borderRadius),
-        color: AppColors.accent.withValues(alpha: 0.05),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.accent.withValues(alpha: 0.18),
+            blurRadius: 20,
+            spreadRadius: 0,
+          ),
+        ],
       ),
-      child: Text(
-        'PLAYED',
-        style: TextStyle(
-          fontSize: fontSize,
-          fontWeight: FontWeight.w700,
-          color: AppColors.accent,
-          fontFamily: 'Inter',
-          letterSpacing: letterSpacing,
+      child: ShaderMask(
+        shaderCallback: (bounds) => const LinearGradient(
+          colors: [AppColors.accent, AppColors.accentViolet],
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+        ).createShader(bounds),
+        child: Text(
+          'PLAYED',
+          style: TextStyle(
+            fontSize: fontSize,
+            fontWeight: FontWeight.w800,
+            color: Colors.white, // ShaderMask overrides this with gradient
+            fontFamily: 'Inter',
+            letterSpacing: letterSpacing,
+          ),
         ),
       ),
     );
