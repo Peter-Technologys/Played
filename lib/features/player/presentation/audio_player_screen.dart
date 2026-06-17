@@ -10,7 +10,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
-import 'package:flutter/foundation.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
@@ -200,9 +199,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void skipPrevious() {
-    // If more than 3s in, restart current track
     if (state.position.inSeconds > 3) {
-      _handler.seek(Duration.zero);
+      _handler?.seek(Duration.zero);
       return;
     }
     if (_container == null) return;
