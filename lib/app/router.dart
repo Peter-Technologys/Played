@@ -9,11 +9,12 @@ import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
 import '../features/player/presentation/equalizer_screen.dart';
 import '../features/player/presentation/mini_player.dart';
-import '../features/settings/presentation/settings_screen.dart';
+import '../features/profile/profile_screen.dart';
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../features/playlists/playlist_screen.dart';
 import '../core/models/media_item.dart';
+import '../core/services/auth_provider.dart';
 import '../app/theme/app_colors.dart';
 import '../shared/widgets/ad_banner_slot.dart';
 import '../shared/widgets/pro_gate.dart';
@@ -27,21 +28,17 @@ class AppRouter {
         routes: [
           GoRoute(path: '/',        builder: (_, __) => const MySpaceScreen()),
           GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
-
         ],
       ),
-      GoRoute(path: '/settings',      builder: (_, __) => const SettingsScreen()),
-      GoRoute(path: '/tools/folders',  builder: (_, __) => const FolderBrowserScreen()),
-      GoRoute(path: '/playlists', builder: (_, __) => const PlaylistsScreen()),
-      // Vault is FREE — no ProGate
-      GoRoute(path: '/vault',    builder: (_, __) => const VaultLockScreen()),
-      // Equalizer is Pro
+      GoRoute(path: '/profile',      builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/tools/folders', builder: (_, __) => const FolderBrowserScreen()),
+      GoRoute(path: '/playlists',    builder: (_, __) => const PlaylistsScreen()),
+      GoRoute(path: '/vault',        builder: (_, __) => const VaultLockScreen()),
       GoRoute(
         path: '/player/equalizer',
         builder: (_, __) => const ProGate(
           featureName: 'Equalizer',
-          featureDescription:
-              'Fine-tune your audio with a 10-band equalizer and audio effects.',
+          featureDescription: 'Fine-tune your audio with a 5-band equalizer.',
           child: EqualizerScreen(),
         ),
       ),
@@ -53,13 +50,11 @@ class AppRouter {
         path: '/player/audio',
         builder: (_, s) => AudioPlayerScreen(mediaItem: s.extra as MediaItem),
       ),
-      // WhatsApp Trimmer is Pro
       GoRoute(
         path: '/tools/whatsapp',
         builder: (_, s) => ProGate(
           featureName: 'WhatsApp Trimmer',
-          featureDescription:
-              'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
+          featureDescription: 'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
           child: WhatsAppTrimmerScreen(mediaItem: s.extra as MediaItem),
         ),
       ),
@@ -67,7 +62,7 @@ class AppRouter {
   );
 }
 
-// ── Main Shell ─────────────────────────────────────────────────────
+// ── Main Shell ───────────────────────────────────────────────────────────────────
 
 class _MainShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -78,22 +73,15 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  // 0=AirDrop  1=MySpace(center)  2=Tools  3=Settings
+  // 0=AirDrop  1=MySpace(center)  2=Tools
   int _currentIndex = 1;
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
-    if (index == 3) {
-      GoRouter.of(context).push('/settings');
-      return;
-    }
-    if (index == 2) {
-      _showToolsSheet();
-      return;
-    }
+    if (index == 2) { _showToolsSheet(); return; }
     if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
-    const routes = ['/airdrop', '/', '', ''];
+    const routes = ['/airdrop', '/', ''];
     GoRouter.of(context).go(routes[index]);
   }
 
@@ -110,12 +98,10 @@ class _MainShellState extends ConsumerState<_MainShell> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
+              child: Container(width: 40, height: 4,
+                  decoration: BoxDecoration(
+                      color: AppColors.border,
+                      borderRadius: BorderRadius.circular(2))),
             ),
             const SizedBox(height: 20),
             const Text('Tools',
@@ -127,7 +113,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
             const Text('Quick utilities for your media',
                 style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
             const SizedBox(height: 20),
-            // WhatsApp Trimmer — Pro
             _ToolTile(
               icon: Icons.phone_android_rounded,
               label: 'WhatsApp Trimmer',
@@ -136,20 +121,14 @@ class _MainShellState extends ConsumerState<_MainShell> {
               isPro: true,
               onTap: () {
                 Navigator.pop(context);
-                // WhatsApp Trimmer requires a MediaItem — open a file first
-                // from My Space, then use the options menu to trim it.
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
-                    content: Text(
-                      'Open a file from My Space, then tap ⋮ → Trim for WhatsApp',
-                    ),
+                    content: Text('Open a file from My Space, then tap ⋮ → Trim for WhatsApp'),
                     duration: Duration(seconds: 3),
                   ),
                 );
               },
             ),
-
-            // Browse by Folder — Free
             _ToolTile(
               icon: Icons.folder_open_rounded,
               label: 'Browse by Folder',
@@ -169,6 +148,9 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
+    final isSignedIn  = ref.watch(isSignedInProvider);
+    final displayName = ref.watch(displayNameProvider);
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Column(
@@ -199,28 +181,30 @@ class _MainShellState extends ConsumerState<_MainShell> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
+                    // Air-Drop
                     _NavItem(
                       icon: Icons.wifi_tethering_rounded,
                       label: 'Air-Drop',
                       isActive: _currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
+                    // My Space (center)
                     _CenterNavItem(
                       isActive: _currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
-                
+                    // Tools
                     _NavItem(
                       icon: Icons.build_rounded,
                       label: 'Tools',
                       isActive: _currentIndex == 2,
                       onTap: () => _onTap(2),
                     ),
-                    _NavItem(
-                      icon: Icons.settings_rounded,
-                      label: 'Settings',
-                      isActive: false,
-                      onTap: () => _onTap(3),
+                    // Profile avatar (replaces Settings)
+                    _ProfileNavItem(
+                      isSignedIn: isSignedIn,
+                      displayName: displayName,
+                      onTap: () => GoRouter.of(context).push('/profile'),
                     ),
                   ],
                 ),
@@ -233,7 +217,72 @@ class _MainShellState extends ConsumerState<_MainShell> {
   }
 }
 
-// ── Center Nav Item (My Space) ─────────────────────────────────────────
+// ── Profile Nav Item ─────────────────────────────────────────────────────────────────
+
+class _ProfileNavItem extends StatelessWidget {
+  final bool isSignedIn;
+  final String? displayName;
+  final VoidCallback onTap;
+  const _ProfileNavItem({
+    required this.isSignedIn,
+    required this.displayName,
+    required this.onTap,
+  });
+
+  String get _initials {
+    if (!isSignedIn || displayName == null || displayName!.isEmpty) return '';
+    final parts = displayName!.trim().split(' ');
+    if (parts.length == 1) return parts[0][0].toUpperCase();
+    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (isSignedIn && _initials.isNotEmpty)
+              // Signed in: show initials avatar
+              Container(
+                width: 28, height: 28,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                alignment: Alignment.center,
+                child: Text(_initials,
+                    style: const TextStyle(
+                      fontSize: 11, fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                    )),
+              )
+            else
+              // Not signed in: show person icon
+              const Icon(Icons.person_rounded,
+                  color: Color(0xFF6B7280), size: 22),
+            const SizedBox(height: 3),
+            const Text('Profile',
+                style: TextStyle(
+                  fontSize: 10, fontWeight: FontWeight.w600,
+                  color: Color(0xFF6B7280),
+                )),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Center Nav Item (My Space) ─────────────────────────────────────────────────────────
 
 class _CenterNavItem extends StatelessWidget {
   final bool isActive;
@@ -253,36 +302,33 @@ class _CenterNavItem extends StatelessWidget {
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               gradient: const LinearGradient(
-                colors: [Color(0xFF00D4FF), Color(0xFF7C3AED)],
+                colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
               ),
               boxShadow: isActive
                   ? [BoxShadow(
-                      color: const Color(0xFF00D4FF).withValues(alpha: 0.45),
+                      color: const Color(0xFF8A2BE2).withValues(alpha: 0.45),
                       blurRadius: 18, spreadRadius: 2)]
                   : null,
             ),
-            child: const Icon(Icons.home_rounded, color: Colors.black, size: 26),
+            child: const Icon(Icons.home_rounded, color: Colors.white, size: 26),
           ),
           const SizedBox(height: 4),
-          Text(
-            'My Space',
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.w700,
-              color: isActive
-                  ? const Color(0xFF00D4FF)
-                  : const Color(0xFF6B7280),
-            ),
-          ),
+          Text('My Space',
+              style: TextStyle(
+                fontSize: 10, fontWeight: FontWeight.w700,
+                color: isActive
+                    ? const Color(0xFF8A2BE2)
+                    : const Color(0xFF6B7280),
+              )),
         ],
       ),
     );
   }
 }
 
-// ── Regular Nav Item ───────────────────────────────────────────────────
+// ── Regular Nav Item ───────────────────────────────────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
@@ -291,10 +337,8 @@ class _NavItem extends StatelessWidget {
   final bool isPro;
   final VoidCallback onTap;
   const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
+    required this.icon, required this.label,
+    required this.isActive, required this.onTap,
     this.isPro = false,
   });
 
@@ -308,7 +352,7 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF00D4FF).withValues(alpha: 0.1)
+              ? const Color(0xFF8A2BE2).withValues(alpha: 0.1)
               : Colors.transparent,
           borderRadius: BorderRadius.circular(12),
         ),
@@ -320,7 +364,7 @@ class _NavItem extends StatelessWidget {
               children: [
                 Icon(icon,
                     color: isActive
-                        ? const Color(0xFF00D4FF)
+                        ? const Color(0xFF8A2BE2)
                         : const Color(0xFF6B7280),
                     size: 22),
                 if (isPro)
@@ -341,10 +385,9 @@ class _NavItem extends StatelessWidget {
             const SizedBox(height: 3),
             Text(label,
                 style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 10, fontWeight: FontWeight.w600,
                   color: isActive
-                      ? const Color(0xFF00D4FF)
+                      ? const Color(0xFF8A2BE2)
                       : const Color(0xFF6B7280),
                 )),
           ],
@@ -354,7 +397,7 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ── Tools Sheet Tile ───────────────────────────────────────────────────
+// ── Tools Sheet Tile ───────────────────────────────────────────────────────────────────
 
 class _ToolTile extends StatelessWidget {
   final IconData icon;
@@ -364,12 +407,8 @@ class _ToolTile extends StatelessWidget {
   final bool isPro;
   final VoidCallback onTap;
   const _ToolTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-    this.isPro = false,
+    required this.icon, required this.label, required this.subtitle,
+    required this.color, required this.onTap, this.isPro = false,
   });
 
   @override
@@ -419,8 +458,7 @@ class _ToolTile extends StatelessWidget {
                           ),
                           child: const Text('PRO',
                               style: TextStyle(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w700,
+                                fontSize: 9, fontWeight: FontWeight.w700,
                                 color: AppColors.accent,
                               )),
                         ),
