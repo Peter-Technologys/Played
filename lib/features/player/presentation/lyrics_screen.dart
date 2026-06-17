@@ -153,21 +153,12 @@ class _LyricsSheetState extends ConsumerState<LyricsSheet> {
     super.dispose();
   }
 
-  /// Find the active LRC line index for the current playback position.
-  int _activeIndex(List<LrcLine> lines, Duration pos) {
-    int active = 0;
-    for (int i = 0; i < lines.length; i++) {
-      if (lines[i].timestamp <= pos) active = i;
-    }
-    return active;
-  }
-
   /// Auto-scroll to keep the active line centred.
   void _scrollToActive(int index) {
     if (!_scroll.hasClients) return;
     if (index == _lastActiveIndex) return;
     _lastActiveIndex = index;
-    final itemHeight = 52.0;
+    const itemHeight = 52.0;
     final target = (index * itemHeight) -
         (_scroll.position.viewportDimension / 2) +
         itemHeight / 2;
