@@ -1210,7 +1210,118 @@ class _FoldersTabState extends State<_FoldersTab> {
       builder: (_) => _FolderDetailPage(name: name, items: files),
     ));
   }
-}
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) {
+      return const _EmptyState(
+          icon: Icons.folder_open_rounded, label: 'No folders found');
+    }
+    final folders = _buildFolders();
+    // Sort: pinned first, then alphabetical
+    final keys = folders.keys.toList()
+      ..sort((a, b) {
+        final aPin = _pinned.contains(a) ? 0 : 1;
+        final bPin = _pinned.contains(b) ? 0 : 1;
+        if (aPin != bPin) return aPin - bPin;
+        return a.compareTo(b);
+      });
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      itemCount: keys.length,
+      itemBuilder: (context, i) {
+        final path = keys[i];
+        final files = folders[path]!;
+        final name = _folderName(path);
+        final audioCount = files.where((f) => !f.isVideo).length;
+        final videoCount = files.where((f) => f.isVideo).length;
+        final isPinned = _pinned.contains(path);
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            tileColor: isPinned
+                ? AppColors.accent.withValues(alpha: 0.05)
+                : AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: BorderSide(
+                color: isPinned
+                    ? AppColors.accent.withValues(alpha: 0.4)
+                    : AppColors.border,
+              ),
+            ),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                isPinned
+                    ? Icons.folder_special_rounded
+                    : Icons.folder_rounded,
+                color: AppColors.accent,
+                size: 24,
+              ),
+            ),
+            title: Text(
+              name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              [
+                if (isPinned) '📌 Pinned',
+                if (audioCount > 0)
+                  '$audioCount song${audioCount == 1 ? '' : 's'}',
+                if (videoCount > 0)
+                  '$videoCount video${videoCount == 1 ? '' : 's'}',
+              ].join(' · '),
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    _togglePin(path);
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.all(8),
+                    child: Icon(
+                      isPinned
+                          ? Icons.push_pin_rounded
+                          : Icons.push_pin_outlined,
+                      color: isPinned
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
+                      size: 18,
+                    ),
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded,
+                    color: AppColors.textSecondary, size: 20),
+              ],
+            ),
+            onTap: () => _openFolder(name, files),
+          ),
+        );
+      },
+    );
+  }
 
 class _FolderDetailPage extends ConsumerWidget {
   final String name;
