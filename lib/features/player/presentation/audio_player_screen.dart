@@ -364,12 +364,22 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   @override
   Widget build(BuildContext context) {
     final ps = ref.watch(audioPlayerProvider);
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmall = screenHeight < 700;
+    final artPadding = isSmall ? 16.0 : 36.0;
+    final playBtnSize = isSmall ? 60.0 : 68.0;
+    final skipIconSize = isSmall ? 26.0 : 30.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Column(
-          children: [
+        child: SingleChildScrollView(
+          physics: const ClampingScrollPhysics(),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: screenHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom),
+            child: IntrinsicHeight(
+              child: Column(
+                children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
@@ -402,14 +412,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
             ),
             Expanded(
               child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 8),
+                padding: EdgeInsets.symmetric(horizontal: artPadding, vertical: 8),
                 child: _AlbumArt(
                   albumArtPath: widget.mediaItem.albumArtPath,
                   isPlaying: ps.isPlaying,
                 ),
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: isSmall ? 8 : 16),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -515,14 +525,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.skip_previous_rounded,
-                        color: AppColors.textPrimary, size: 34),
+                    icon: Icon(Icons.skip_previous_rounded,
+                        color: AppColors.textPrimary, size: skipIconSize),
                     onPressed: () =>
                         ref.read(audioPlayerProvider.notifier).skipPrevious(),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.replay_10_rounded,
-                        color: AppColors.textPrimary, size: 34),
+                    icon: Icon(Icons.replay_10_rounded,
+                        color: AppColors.textPrimary, size: skipIconSize),
                     onPressed: () =>
                         ref.read(audioPlayerProvider.notifier).skipBack(),
                   ),
@@ -532,7 +542,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         ref.read(audioPlayerProvider.notifier).togglePlay(),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: 72, height: 72,
+                      width: playBtnSize, height: playBtnSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         gradient: const LinearGradient(
@@ -561,14 +571,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.forward_10_rounded,
-                        color: AppColors.textPrimary, size: 34),
+                    icon: Icon(Icons.forward_10_rounded,
+                        color: AppColors.textPrimary, size: skipIconSize),
                     onPressed: () =>
                         ref.read(audioPlayerProvider.notifier).skipForward(),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.skip_next_rounded,
-                        color: AppColors.textPrimary, size: 34),
+                    icon: Icon(Icons.skip_next_rounded,
+                        color: AppColors.textPrimary, size: skipIconSize),
                     onPressed: () =>
                         ref.read(audioPlayerProvider.notifier).skipNext(),
                   ),
@@ -607,8 +617,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 24),
-          ],
+            SizedBox(height: isSmall ? 12 : 24),
+                ],
+              ),
+            ),
+          ),
         ),
       ),
     );
