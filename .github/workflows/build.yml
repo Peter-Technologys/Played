@@ -91,11 +91,11 @@ jobs:
           path: coverage/
           retention-days: 7
 
-  # ── DEBUG APK — PR only ─────────────────────────────────────────────────────────────
+  # ── DEBUG APK — PR and main push ──────────────────────────────────────────────────
   build_debug:
     name: Build Debug APK
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
+    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: [analyze]
     steps:
       - uses: actions/checkout@v4
