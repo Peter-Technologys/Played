@@ -3,7 +3,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../shared/widgets/played_logo.dart';
 
-/// 3-screen onboarding shown only on first launch.
+/// 4-screen onboarding shown only on first launch.
 class OnboardingScreen extends StatefulWidget {
   final VoidCallback onDone;
   const OnboardingScreen({super.key, required this.onDone});
@@ -21,14 +21,14 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       emoji: '\uD83C\uDFAC',
       title: 'My Space',
       subtitle:
-          'All your videos and music in one place. Songs, Videos, Folders and Playlists — organised like PlayIt.',
+          'All your videos and music in one place. Songs, Videos, Folders and Playlists — organised beautifully.',
       color: AppColors.accent,
     ),
     _OnboardPage(
       emoji: '\uD83C\uDFA7',
       title: 'Audio & Video Player',
       subtitle:
-          'Shuffle, repeat, EQ, lyrics, sleep timer, car mode, PiP, screen lock and 2× speed boost.',
+          'Shuffle, repeat, EQ, lyrics, sleep timer, car mode, PiP and 2× speed boost.',
       color: AppColors.accentViolet,
     ),
     _OnboardPage(
@@ -42,15 +42,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       emoji: '\uD83D\uDCF6',
       title: 'Air-Drop',
       subtitle:
-          'Share any file with nearby phones using Wi-Fi Direct and Bluetooth. Zero internet data used.',
+          'Share any file with nearby phones using Wi-Fi Direct. Zero internet data used.',
       color: AppColors.accent,
-    ),
-    _OnboardPage(
-      emoji: '\uD83C\uDFA4',
-      title: 'The Studio',
-      subtitle:
-          'Split any song into vocals and instrumental. Practice karaoke or create DJ drops offline.',
-      color: AppColors.accentViolet,
     ),
   ];
 
@@ -73,6 +66,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+    final isSmall = screenHeight < 680;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -91,11 +87,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ).animate().fadeIn(duration: 400.ms),
 
             // Logo at top
-            const Padding(
-              padding: EdgeInsets.only(top: 8, bottom: 4),
+            Padding(
+              padding: EdgeInsets.only(top: isSmall ? 2 : 8, bottom: isSmall ? 2 : 4),
               child: Center(
-                child: PlayedLogo(fontSize: 22, letterSpacing: 4, borderRadius: 10,
-                    padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6)),
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: PlayedLogo(
+                    fontSize: 18,
+                    letterSpacing: 3,
+                    borderRadius: 10,
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                  ),
+                ),
               ),
             ).animate().fadeIn(duration: 500.ms),
 
@@ -106,7 +109,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 onPageChanged: (i) => setState(() => _page = i),
                 itemCount: _pages.length,
                 itemBuilder: (context, i) =>
-                    _PageView(page: _pages[i], index: i),
+                    _PageView(page: _pages[i], index: i, isSmall: isSmall),
               ),
             ),
 
@@ -130,7 +133,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ),
             ).animate().fadeIn(duration: 500.ms, delay: 200.ms),
 
-            const SizedBox(height: 32),
+            SizedBox(height: isSmall ? 16 : 32),
 
             // CTA button
             Padding(
@@ -140,7 +143,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 200),
                   width: double.infinity,
-                  height: 56,
+                  height: 52,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [_pages[_page].color, AppColors.accentViolet],
@@ -170,7 +173,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 .fadeIn(duration: 500.ms, delay: 300.ms)
                 .slideY(begin: 0.2, end: 0, curve: Curves.easeOut),
 
-            const SizedBox(height: 32),
+            SizedBox(height: isSmall ? 16 : 32),
 
             // Footer
             const PlayedFooter(),
@@ -184,77 +187,88 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 class _PageView extends StatelessWidget {
   final _OnboardPage page;
   final int index;
-  const _PageView({required this.page, required this.index});
+  final bool isSmall;
+  const _PageView({required this.page, required this.index, required this.isSmall});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          // Animated emoji icon — elastic pop in
-          Container(
-            width: 140,
-            height: 140,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: page.color.withValues(alpha: 0.1),
-              border: Border.all(
-                  color: page.color.withValues(alpha: 0.3), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: page.color.withValues(alpha: 0.2),
-                  blurRadius: 40,
-                  spreadRadius: 8,
-                ),
-              ],
-            ),
-            child: Center(
-              child: Text(page.emoji,
-                  style: const TextStyle(fontSize: 64)),
-            ),
-          )
-              .animate()
-              .scale(
-                begin: const Offset(0.7, 0.7),
-                end: const Offset(1, 1),
-                duration: 500.ms,
-                curve: Curves.elasticOut,
-              )
-              .fadeIn(duration: 300.ms),
+    final screenHeight = MediaQuery.of(context).size.height;
+    final iconSize = (screenHeight * 0.16).clamp(80.0, 120.0);
+    final emojiSize = (iconSize * 0.5).clamp(40.0, 60.0);
 
-          const SizedBox(height: 40),
+    return SingleChildScrollView(
+      physics: const ClampingScrollPhysics(),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            SizedBox(height: isSmall ? 12 : 24),
+            // Animated emoji icon
+            Container(
+              width: iconSize,
+              height: iconSize,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: page.color.withValues(alpha: 0.1),
+                border: Border.all(
+                    color: page.color.withValues(alpha: 0.3), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: page.color.withValues(alpha: 0.2),
+                    blurRadius: 40,
+                    spreadRadius: 8,
+                  ),
+                ],
+              ),
+              child: Center(
+                child: Text(page.emoji,
+                    style: TextStyle(fontSize: emojiSize)),
+              ),
+            )
+                .animate()
+                .scale(
+                  begin: const Offset(0.7, 0.7),
+                  end: const Offset(1, 1),
+                  duration: 500.ms,
+                  curve: Curves.elasticOut,
+                )
+                .fadeIn(duration: 300.ms),
 
-          // Title — fade + slide up
-          Text(
-            page.title,
-            style: TextStyle(
-              fontSize: 30,
-              fontWeight: FontWeight.w700,
-              color: page.color,
-            ),
-          )
-              .animate()
-              .fadeIn(duration: 400.ms, delay: 150.ms)
-              .slideY(begin: 0.15, end: 0, curve: Curves.easeOut),
+            SizedBox(height: isSmall ? 20 : 40),
 
-          const SizedBox(height: 16),
+            // Title
+            Text(
+              page.title,
+              style: TextStyle(
+                fontSize: isSmall ? 22 : 26,
+                fontWeight: FontWeight.w700,
+                color: page.color,
+              ),
+            )
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 150.ms)
+                .slideY(begin: 0.15, end: 0, curve: Curves.easeOut),
 
-          // Subtitle — fade + slide up (delayed)
-          Text(
-            page.subtitle,
-            textAlign: TextAlign.center,
-            style: const TextStyle(
-              fontSize: 15,
-              color: AppColors.textSecondary,
-              height: 1.6,
-            ),
-          )
-              .animate()
-              .fadeIn(duration: 400.ms, delay: 250.ms)
-              .slideY(begin: 0.15, end: 0, curve: Curves.easeOut),
-        ],
+            SizedBox(height: isSmall ? 10 : 16),
+
+            // Subtitle
+            Text(
+              page.subtitle,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: isSmall ? 13 : 15,
+                color: AppColors.textSecondary,
+                height: 1.6,
+              ),
+            )
+                .animate()
+                .fadeIn(duration: 400.ms, delay: 250.ms)
+                .slideY(begin: 0.15, end: 0, curve: Curves.easeOut),
+
+            SizedBox(height: isSmall ? 12 : 24),
+          ],
+        ),
       ),
     );
   }
