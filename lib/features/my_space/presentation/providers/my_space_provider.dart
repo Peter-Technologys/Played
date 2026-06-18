@@ -11,16 +11,14 @@ Future<List<MediaItem>> _runScan(bool _) =>
     MediaRepository.instance.getAllMedia(forceRefresh: true);
 
 /// Live media change event stream from Android MediaStore.
-/// Fires whenever any file is added/removed/modified on the device
-/// (USB copy, file manager, SD card, AirDrop receive, Xender, etc.)
 const _mediaEventChannel = EventChannel('com.petersmart.played/media_events');
 
 /// The full media library — all songs + all videos.
 ///
-/// Three-phase loading:
-///   Phase 1: in-memory cache or Hive seed → instant UI
-///   Phase 2: background compute() scan → silent update
-///   Phase 3: live MediaStore observer → auto-refresh on new files
+/// Loading strategy (offline-first):
+///   Phase 1: in-memory cache or Hive history seed -> instant UI (0 ms)
+///   Phase 2: background compute() scan -> silent update, no shimmer
+///   Phase 3: live MediaStore observer -> auto-refresh on new files
 final mediaLibraryProvider =
     AsyncNotifierProvider<MediaLibraryNotifier, List<MediaItem>>(
   MediaLibraryNotifier.new,
@@ -29,47 +27,47 @@ final mediaLibraryProvider =
 class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   @override
   Future<List<MediaItem>> build() async {
-    // Subscribe to live MediaStore changes — auto-refresh on any file add
-    // (USB, file manager, SD card, Xender, Bluetooth, WhatsApp, etc.)
     StreamSubscription<dynamic>? sub;
     Timer? debounce;
-    // Layer 3 — live MediaStore events
+
+    // Layer 3 — live MediaStore events (debounced 3 s)
     try {
       sub = _mediaEventChannel.receiveBroadcastStream().listen((_) {
         debounce?.cancel();
-        debounce = Timer(const Duration(milliseconds: 1500), _backgroundRefresh);
+        debounce = Timer(const Duration(seconds: 3), _backgroundRefresh);
       });
     } catch (e) {
       debugPrint('[MediaLibrary] MediaObserver not available: $e');
     }
 
-    // Layer 4 — periodic fallback every 5 minutes for devices without MediaStore events
-    final periodicTimer = Timer.periodic(const Duration(minutes: 5), (_) {
+    // Periodic fallback every 15 min (was 5 min — saves battery)
+    final periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       _backgroundRefresh();
     });
 
-    // AsyncNotifier uses ref.onDispose — no override needed
     ref.onDispose(() {
       debounce?.cancel();
       sub?.cancel();
       periodicTimer.cancel();
     });
 
-    // Phase 1a — in-memory cache (zero I/O, instant)
+    // Phase 1a — in-memory cache (zero I/O, truly instant)
     final cached = MediaRepository.instance.cachedItems;
     if (cached != null && cached.isNotEmpty) {
-      _backgroundRefresh();
+      Future.microtask(_backgroundRefresh);
       return cached;
     }
 
-    // Phase 1b — Hive play-history as seed so UI is never blank
+    // Phase 1b — Hive history seed so UI is never blank on cold start.
+    // Hive is already open (opened in main() before runApp), so this is
+    // a synchronous in-memory read — no disk I/O.
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
-      _backgroundRefresh();
+      Future.microtask(_backgroundRefresh);
       return history;
     }
 
-    // First install — foreground scan
+    // First install — no cache, no history: foreground scan (once ever)
     return MediaRepository.instance.getAllMedia(forceRefresh: true);
   }
 
@@ -88,7 +86,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     await _backgroundRefresh();
   }
 
-  /// refresh() also runs silently — shimmer only on true first load.
+  /// refresh() also runs silently.
   Future<void> refresh() async {
     MediaRepository.instance.invalidate();
     await _backgroundRefresh();
