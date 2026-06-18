@@ -65,7 +65,6 @@ class _VideoPlayerScreenState
     final savedPosition =
         PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id);
 
-    // Auto-detect subtitle file in same folder as video
     final subtitlePath = _findSubtitle(widget.mediaItem.filePath);
 
     _vlcController = VlcPlayerController.file(
@@ -80,7 +79,6 @@ class _VideoPlayerScreenState
           VlcVideoOptions.dropLateFrames(true),
           VlcVideoOptions.skipFrames(true),
         ]),
-        // Auto-load subtitle if found alongside the video
         extras: subtitlePath != null
             ? ['--sub-file=$subtitlePath']
             : [],
@@ -89,12 +87,16 @@ class _VideoPlayerScreenState
 
     _vlcController.addListener(_onPlayerStateChanged);
 
-    if (savedPosition != null) {
-      await Future.delayed(const Duration(milliseconds: 800));
-      _vlcController.seekTo(savedPosition);
+    // Set initialized immediately so the VLC surface widget is added to the
+    // tree and VLC can attach to it. Waiting caused a blank black screen.
+    if (mounted) setState(() => _isInitialized = true);
+
+    // Seek to saved position after VLC has had time to buffer
+    if (savedPosition != null && savedPosition.inSeconds > 0) {
+      await Future.delayed(const Duration(milliseconds: 600));
+      if (mounted) _vlcController.seekTo(savedPosition);
     }
 
-    if (mounted) setState(() => _isInitialized = true);
     _startControlsTimer();
   }
 

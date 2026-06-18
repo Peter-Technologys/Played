@@ -31,7 +31,15 @@ void main() async {
   // 2. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
 
-  // 3. Run app immediately — splash visible within ~100ms
+  // 4. AudioService — init BEFORE runApp so it is ready the moment
+  //    the user taps a song. Moving this to background was the #1 cause
+  //    of "nothing plays" on first tap.
+  await _initAudioService();
+
+  // 5. Pre-load persisted settings
+  final savedSettings = await AppSettings.load();
+
+  // 6. Run app
   runApp(
     ProviderScope(
       overrides: [
@@ -42,7 +50,7 @@ void main() async {
     ),
   );
 
-  // 4. Everything else in background — never blocks UI
+  // 7. Everything else in background
   unawaited(_initBackground());
 }
 
@@ -51,22 +59,13 @@ Future<void> _initDatabase() async {
     await PlayedDatabase.instance.init();
   } catch (e, st) {
     debugPrint('[PlayedDB] Init error: $e\n$st');
-    // If Hive is corrupted, delete and retry with fresh boxes
     try {
       await PlayedDatabase.instance.deleteAndReinit();
     } catch (_) {}
   }
 }
 
-Future<void> _initBackground() async {
-  await Future.wait([
-    _initNotifications(),
-    _initAdMob(),
-    _initAppwrite(),
-    StorageFolderService.instance.ensureCreated(),
-  ]);
-
-  // AudioService must run after the widget tree is mounted
+Future<void> _initAudioService() async {
   try {
     globalAudioHandler ??= await AudioService.init(
       builder: () => PlayedAudioHandler(),
@@ -79,9 +78,20 @@ Future<void> _initBackground() async {
         notificationColor: Color(0xFF8A2BE2),
       ),
     );
+    debugPrint('[AudioService] Ready.');
   } catch (e) {
     debugPrint('[AudioService] Init error: $e');
   }
+}
+
+Future<void> _initBackground() async {
+  await Future.wait([
+    _initNotifications(),
+    _initAdMob(),
+    _initAppwrite(),
+    StorageFolderService.instance.ensureCreated(),
+  ]);
+  // AudioService is already initialized before runApp — nothing to do here.
 }
 
 Future<void> _initNotifications() async {
