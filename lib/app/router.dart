@@ -208,46 +208,21 @@ class _MainShellState extends ConsumerState<_MainShell> {
   }
 }
 
-// ── Profile Nav Item ─────────────────────────────────────────────────────────────────
+// ── Center Nav Item (My Space) ─────────────────────────────────────────────────────────
 
-class _ProfileNavItem extends StatelessWidget {
-  final bool isSignedIn;
-  final String? displayName;
-  final VoidCallback onTap;
-  const _ProfileNavItem({
-    required this.isSignedIn,
-    required this.displayName,
-    required this.onTap,
-  });
-
-  String get _initials {
-    if (!isSignedIn || displayName == null || displayName!.isEmpty) return '';
-    final parts = displayName!.trim().split(' ');
-    if (parts.length == 1) return parts[0][0].toUpperCase();
-    return '${parts[0][0]}${parts[1][0]}'.toUpperCase();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (isSignedIn && _initials.isNotEmpty)
-              // Signed in: show initials avatar
-              Container(
-                width: 28, height: 28,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+class _CenterNavItemActual extends StatelessWidget {
+  // ignore: unused_element
+  const _CenterNavItemActual();
+  @override Widget build(BuildContext context) {
+    return Container(
+      width: 28, height: 28,
+      decoration: const BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: LinearGradient(
+          colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
                 ),
                 alignment: Alignment.center,
                 child: Text(_initials,
