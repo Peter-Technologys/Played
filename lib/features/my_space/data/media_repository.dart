@@ -17,15 +17,24 @@ class MediaRepository {
 
     final scanned = await MediaScannerService.instance.scanAll();
 
-    // Concurrent file-existence check — fast and non-blocking
-    final checks = await Future.wait(
-      scanned.map((item) => File(item.filePath).exists()
-          .catchError((_) => false)),
-    );
-    final alive = <MediaItem>[
-      for (var i = 0; i < scanned.length; i++)
-        if (checks[i]) scanned[i],
-    ];
+    // MediaStore items have albumArtPath set — they are already confirmed
+    // to exist by the OS. Skip File.exists() for them (saves thousands of
+    // async I/O calls on large libraries).
+    final mediaStoreItems = scanned.where((e) => e.albumArtPath != null).toList();
+    final supplemental    = scanned.where((e) => e.albumArtPath == null).toList();
+
+    final alive = <MediaItem>[...mediaStoreItems];
+
+    // Only verify supplemental (receive-dir) items
+    if (supplemental.isNotEmpty) {
+      final checks = await Future.wait(
+        supplemental.map((item) =>
+            File(item.filePath).exists().catchError((_) => false)),
+      );
+      for (var i = 0; i < supplemental.length; i++) {
+        if (checks[i]) alive.add(supplemental[i]);
+      }
+    }
 
     _cachedItems = alive;
 
@@ -44,6 +53,16 @@ class MediaRepository {
   }
 
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
+    // If cache is ready, filter from it — zero I/O
+    if (_cachedItems != null) {
+      final cachedPaths = {for (final e in _cachedItems!) e.filePath};
+      final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
+      return history
+          .where((item) => cachedPaths.contains(item.filePath))
+          .take(limit)
+          .toList();
+    }
+    // Fallback: synchronous file-existence check
     try {
       final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
       return history

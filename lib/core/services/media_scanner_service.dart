@@ -7,11 +7,10 @@ import '../models/media_item.dart';
 /// were added — USB, file manager, SD card copy, Xender, Bluetooth,
 /// WhatsApp, Telegram, ShareIt, AirDrop, Downloads, DCIM, etc.
 ///
-/// Strategy (runs in order, results merged):
-///   1. Native MediaStore query — fast, has full metadata.
-///   2. Direct scan of every known share/receive folder — catches files
-///      not yet indexed by MediaStore (can take minutes after copy).
-///   3. Full filesystem walk — last resort fallback.
+/// Strategy:
+///   1. Native MediaStore — audio + video queried in parallel (fast, full metadata).
+///   2. Receive dirs — all checked and scanned in parallel (not one by one).
+///   3. Full filesystem walk — last resort only if both above return nothing.
 class MediaScannerService {
   MediaScannerService._();
   static final MediaScannerService instance = MediaScannerService._();
@@ -33,9 +32,7 @@ class MediaScannerService {
     '.trash', 'lost+found', '.nomedia', 'tmp', 'temp',
   };
 
-  // Every folder where files can land from ANY sharing method
   static const List<String> _receiveDirs = [
-    // Standard locations
     '/storage/emulated/0/Download',
     '/storage/emulated/0/Downloads',
     '/storage/emulated/0/Music',
@@ -43,57 +40,39 @@ class MediaScannerService {
     '/storage/emulated/0/Video',
     '/storage/emulated/0/Videos',
     '/storage/emulated/0/DCIM',
-    '/storage/emulated/0/Ringtones',
-    '/storage/emulated/0/Notifications',
-    '/storage/emulated/0/Alarms',
-    '/storage/emulated/0/Podcasts',
-    '/storage/emulated/0/Audiobooks',
-    // Xender
-    '/storage/emulated/0/Xender',
-    '/storage/emulated/0/Xender/video',
-    '/storage/emulated/0/Xender/music',
-    '/storage/emulated/0/Xender/file',
-    // Bluetooth
     '/storage/emulated/0/Bluetooth',
     '/storage/emulated/0/bluetooth',
-    // WhatsApp (old + new scoped storage paths)
     '/storage/emulated/0/WhatsApp/Media/WhatsApp Audio',
     '/storage/emulated/0/WhatsApp/Media/WhatsApp Video',
-    '/storage/emulated/0/WhatsApp/Media/WhatsApp Documents',
     '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Audio',
     '/storage/emulated/0/Android/media/com.whatsapp/WhatsApp/Media/WhatsApp Video',
-    // WhatsApp Business
     '/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Audio',
     '/storage/emulated/0/Android/media/com.whatsapp.w4b/WhatsApp Business/Media/WhatsApp Video',
-    // Telegram
-    '/storage/emulated/0/Telegram',
     '/storage/emulated/0/Telegram/Telegram Audio',
     '/storage/emulated/0/Telegram/Telegram Video',
     '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Audio',
     '/storage/emulated/0/Android/media/org.telegram.messenger/Telegram/Telegram Video',
-    // ShareIt / SHAREit
+    '/storage/emulated/0/Xender/video',
+    '/storage/emulated/0/Xender/music',
     '/storage/emulated/0/ShareIt',
     '/storage/emulated/0/SHAREit',
-    '/storage/emulated/0/ShareIt/music',
-    '/storage/emulated/0/ShareIt/video',
-    // Send Anywhere
-    '/storage/emulated/0/Send Anywhere',
-    // Files by Google / Mi Drop / Zapya / InShare
     '/storage/emulated/0/Received',
     '/storage/emulated/0/MiDrop',
     '/storage/emulated/0/Zapya',
     '/storage/emulated/0/InShare',
-    // PLAYED own folder (AirDrop receive)
     '/storage/emulated/0/PLAYED',
     '/storage/emulated/0/Download/PLAYED',
   ];
 
-  // ── PRIMARY: Native MediaStore ────────────────────────────────────────
-
+  // PRIMARY: query audio + video in parallel
   Future<List<MediaItem>> _queryMediaStore() async {
     try {
-      final audioRaw = await _channel.invokeListMethod<Map>('queryAudio') ?? [];
-      final videoRaw = await _channel.invokeListMethod<Map>('queryVideo') ?? [];
+      final both = await Future.wait([
+        _channel.invokeListMethod<Map>('queryAudio'),
+        _channel.invokeListMethod<Map>('queryVideo'),
+      ]);
+      final audioRaw = both[0] ?? [];
+      final videoRaw = both[1] ?? [];
       final results  = <MediaItem>[];
       for (final raw in [...audioRaw, ...videoRaw]) {
         final path = raw['path'] as String? ?? '';
@@ -126,48 +105,62 @@ class MediaScannerService {
     }
   }
 
-  // ── SUPPLEMENTAL: Direct folder scan ─────────────────────────────────
-  // Catches files not yet indexed by MediaStore.
+  // SUPPLEMENTAL: all dirs checked + scanned in parallel
+  Future<List<MediaItem>> _scanReceiveDirs(Set<String> alreadySeen) async {
+    // Check all dirs exist simultaneously
+    final existChecks = await Future.wait(
+      _receiveDirs.map((p) => Directory(p).exists().catchError((_) => false)),
+    );
+    final existingDirs = [
+      for (var i = 0; i < _receiveDirs.length; i++)
+        if (existChecks[i]) _receiveDirs[i],
+    ];
+    if (existingDirs.isEmpty) return [];
 
-  Future<List<MediaItem>> _scanReceiveDirs() async {
+    // Scan all existing dirs simultaneously
+    final batches = await Future.wait(
+      existingDirs.map((d) => _scanSingleDir(d, alreadySeen)),
+    );
+    final merged = <MediaItem>[];
+    for (final b in batches) merged.addAll(b);
+    debugPrint('[Scanner] Receive dirs: ${merged.length} extra items.');
+    return merged;
+  }
+
+  Future<List<MediaItem>> _scanSingleDir(
+      String dirPath, Set<String> alreadySeen) async {
     final results = <MediaItem>[];
-    final seen    = <String>{};
-    for (final dirPath in _receiveDirs) {
-      final dir = Directory(dirPath);
-      if (!await dir.exists()) continue;
-      try {
-        await for (final entity in dir.list(recursive: true, followLinks: false)) {
-          if (entity is! File) continue;
-          final path = entity.path;
-          if (seen.contains(path)) continue;
-          final ext     = path.split('.').last.toLowerCase();
-          final isVideo = _videoExtensions.contains(ext);
-          final isAudio = _audioExtensions.contains(ext);
-          if (!isVideo && !isAudio) continue;
-          try {
-            final stat = await entity.stat();
-            if (stat.size < 10 * 1024) continue;
-            seen.add(path);
-            final fileName = path.split('/').last;
-            results.add(MediaItem(
-              id:            _stableId(path),
-              title:         fileName.replaceAll(RegExp(r'\.[^.]+$'), ''),
-              fileName:      fileName,
-              filePath:      path,
-              isVideo:       isVideo,
-              addedAt:       stat.modified,
-              fileSizeBytes: stat.size,
-            ));
-          } catch (_) {}
-        }
-      } catch (_) {}
-    }
-    debugPrint('[Scanner] Receive dirs: ${results.length} extra items.');
+    try {
+      await for (final entity
+          in Directory(dirPath).list(recursive: true, followLinks: false)) {
+        if (entity is! File) continue;
+        final path = entity.path;
+        if (alreadySeen.contains(path)) continue;
+        final ext = path.split('.').last.toLowerCase();
+        final isVideo = _videoExtensions.contains(ext);
+        final isAudio = _audioExtensions.contains(ext);
+        if (!isVideo && !isAudio) continue;
+        try {
+          final stat = await entity.stat();
+          if (stat.size < 10 * 1024) continue;
+          alreadySeen.add(path);
+          final fileName = path.split('/').last;
+          results.add(MediaItem(
+            id:            _stableId(path),
+            title:         fileName.replaceAll(RegExp(r'\.[^.]+$'), ''),
+            fileName:      fileName,
+            filePath:      path,
+            isVideo:       isVideo,
+            addedAt:       stat.modified,
+            fileSizeBytes: stat.size,
+          ));
+        } catch (_) {}
+      }
+    } catch (_) {}
     return results;
   }
 
-  // ── FALLBACK: Full filesystem walk ────────────────────────────────────
-
+  // FALLBACK: full filesystem walk
   Future<List<String>> _discoverRoots() async {
     final roots = <String>[];
     const internal = '/storage/emulated/0';
@@ -177,7 +170,7 @@ class MediaScannerService {
         if (e is Directory) {
           final name = e.path.split('/').last;
           if (name != 'emulated' && name != 'self' && name.contains('-')) {
-            roots.add(e.path); // SD card
+            roots.add(e.path);
           }
         }
       }
@@ -224,20 +217,16 @@ class MediaScannerService {
     } catch (_) {}
   }
 
-  // ── PUBLIC API ────────────────────────────────────────────────────────
+  // PUBLIC API
 
-  /// Full scan: MediaStore + all receive dirs + filesystem fallback.
-  /// Works 100% offline. No internet needed.
+  /// Full scan: MediaStore + receive dirs in parallel.
+  /// Falls back to filesystem walk only if both return nothing.
   Future<List<MediaItem>> scanAll() async {
-    final store  = await _queryMediaStore();
-    final extra  = await _scanReceiveDirs();
-
-    // Merge, deduplicate by path, prefer MediaStore entries (have metadata)
-    final seen   = <String>{};
-    final merged = <MediaItem>[];
-    for (final item in [...store, ...extra]) {
-      if (seen.add(item.filePath)) merged.add(item);
-    }
+    final storeItems = await _queryMediaStore();
+    // Pass MediaStore paths so receive-dir scan skips duplicates
+    final storePaths = storeItems.map((e) => e.filePath).toSet();
+    final extraItems = await _scanReceiveDirs(storePaths);
+    final merged = [...storeItems, ...extraItems];
     if (merged.isNotEmpty) return merged;
     return _filesystemScan();
   }
@@ -272,8 +261,6 @@ class MediaScannerService {
     } catch (_) {}
     return results;
   }
-
-  // ── Helpers ───────────────────────────────────────────────────────────
 
   String _stableId(String path) {
     var hash = 0;
