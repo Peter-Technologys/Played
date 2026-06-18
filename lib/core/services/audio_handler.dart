@@ -51,7 +51,12 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
             : null,
       ));
 
-      await _player.setFilePath(item.filePath);
+      // Use AudioSource.uri with a proper file:// URI.
+      // setFilePath() can silently fail on some Android versions.
+      await _player.setAudioSource(
+        AudioSource.uri(Uri.file(item.filePath)),
+        preload: true,
+      );
 
       if (savedPosition != null && savedPosition.inSeconds > 0) {
         await _player.seek(savedPosition);
@@ -61,7 +66,6 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
       await play();
     } catch (e) {
       debugPrint('[AudioHandler] loadAndPlay error: $e');
-      // Don't rethrow — let the UI show the error state gracefully
     }
   }
 
