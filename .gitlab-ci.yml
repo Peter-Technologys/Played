@@ -111,6 +111,7 @@ build_apk_debug:
     expire_in: 3 days
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
 
 build_release:
   stage: build
@@ -140,3 +141,4 @@ build_release:
     expire_in: 30 days
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+    - if: '$CI_COMMIT_BRANCH == "main"'
