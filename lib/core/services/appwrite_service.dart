@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:appwrite/appwrite.dart';
 import 'package:appwrite/enums.dart';
@@ -16,11 +17,11 @@ import '../models/playlist.dart';
 ///
 /// APPWRITE DASHBOARD SETUP (one-time):
 ///   1. Go to https://cloud.appwrite.io/console/project-6a3011f1003b1a6cc74d
-///   2. Auth → Settings → enable Google OAuth provider
+///   2. Auth -> Settings -> enable Google OAuth provider
 ///      (add your Google OAuth client ID + secret from Google Cloud Console)
-///   3. Platforms → Add Android platform:
+///   3. Platforms -> Add Android platform:
 ///        Package name: com.petersmartlink.otya
-///   4. Databases → Create database: ID = 'otya-db'
+///   4. Databases -> Create database: ID = 'otya-db'
 ///   5. Inside otya-db create 3 collections:
 ///        - 'playlists'    attributes: name(string), media_ids(string), created_at(string)
 ///        - 'play_history' attributes: title(string), artist(string), file_path(string),
@@ -40,10 +41,12 @@ class AppwriteService {
   final _authChangeCallbacks = <void Function()>[];
   void addAuthListener(void Function() cb) => _authChangeCallbacks.add(cb);
   void _notifyAuthChange() {
-    for (final cb in _authChangeCallbacks) cb();
+    for (final cb in _authChangeCallbacks) {
+      cb();
+    }
   }
 
-  // ── Init ───────────────────────────────────────────────────────────────────
+  // -- Init -------------------------------------------------------------------
 
   void init() {
     if (_initialized) return;
@@ -54,12 +57,14 @@ class AppwriteService {
     _account   = Account(_client);
     _databases = Databases(_client);
     _initialized = true;
-    debugPrint('[Appwrite] Initialized — project: ${Environment.appwriteProjectId}');
+    debugPrint('[Appwrite] Initialized -- project: ${Environment.appwriteProjectId}');
   }
 
-  void _ensureInit() { if (!_initialized) init(); }
+  void _ensureInit() {
+    if (!_initialized) init();
+  }
 
-  // ── Auth ────────────────────────────────────────────────────────────────────
+  // -- Auth -------------------------------------------------------------------
 
   /// Signs in with Google via Appwrite OAuth.
   /// After successful sign-in, automatically backs up all local data.
@@ -111,7 +116,7 @@ class AppwriteService {
     }
   }
 
-  // ── Playlist Backup ───────────────────────────────────────────────────────────
+  // -- Playlist Backup --------------------------------------------------------
 
   Future<void> backupPlaylists() async {
     _ensureInit();
@@ -120,6 +125,7 @@ class AppwriteService {
       debugPrint('[Appwrite] backupPlaylists: not signed in, skipping.');
       return;
     }
+    final userId = user.$id;
     final playlists = PlayedDatabase.instance.getAllPlaylists();
     int synced = 0;
     for (final pl in playlists) {
@@ -129,13 +135,13 @@ class AppwriteService {
           'media_ids':  jsonEncode(pl.mediaIds),
           'created_at': pl.createdAt.toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
-          'user_id':    user.\$id,
+          'user_id':    userId,
         };
         try {
           await _databases.updateDocument(
             databaseId:   Environment.databaseId,
             collectionId: Environment.playlistsCollection,
-            documentId:   '${user.\$id}_${pl.id}',
+            documentId:   '${userId}_${pl.id}',
             data:         data,
           );
         } on AppwriteException catch (ae) {
@@ -143,10 +149,12 @@ class AppwriteService {
             await _databases.createDocument(
               databaseId:   Environment.databaseId,
               collectionId: Environment.playlistsCollection,
-              documentId:   '${user.\$id}_${pl.id}',
+              documentId:   '${userId}_${pl.id}',
               data:         data,
             );
-          } else rethrow;
+          } else {
+            rethrow;
+          }
         }
         synced++;
       } catch (e) {
@@ -163,16 +171,17 @@ class AppwriteService {
     final user = await getCurrentUser();
     if (user == null) return -1;
     try {
+      final userId = user.$id;
       final result = await _databases.listDocuments(
         databaseId:   Environment.databaseId,
         collectionId: Environment.playlistsCollection,
-        queries:      [Query.equal('user_id', user.\$id)],
+        queries:      [Query.equal('user_id', userId)],
       );
       int restored = 0;
       for (final doc in result.documents) {
         final data = doc.data;
         final playlist = Playlist(
-          id:        doc.\$id.replaceFirst('${user.\$id}_', ''),
+          id:        doc.$id.replaceFirst('${userId}_', ''),
           name:      data['name'] as String,
           mediaIds:  List<String>.from(
               jsonDecode(data['media_ids'] as String) as List),
@@ -190,12 +199,13 @@ class AppwriteService {
     }
   }
 
-  // ── History Backup ─────────────────────────────────────────────────────────────
+  // -- History Backup ---------------------------------------------------------
 
   Future<void> backupHistory() async {
     _ensureInit();
     final user = await getCurrentUser();
     if (user == null) return;
+    final userId = user.$id;
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200);
     int synced = 0;
     for (final item in history) {
@@ -206,13 +216,13 @@ class AppwriteService {
           'file_path':      item.filePath,
           'is_video':       item.isVideo,
           'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
-          'user_id':        user.\$id,
+          'user_id':        userId,
         };
         try {
           await _databases.updateDocument(
             databaseId:   Environment.databaseId,
             collectionId: Environment.historyCollection,
-            documentId:   '${user.\$id}_${item.id}',
+            documentId:   '${userId}_${item.id}',
             data:         data,
           );
         } on AppwriteException catch (ae) {
@@ -220,10 +230,12 @@ class AppwriteService {
             await _databases.createDocument(
               databaseId:   Environment.databaseId,
               collectionId: Environment.historyCollection,
-              documentId:   '${user.\$id}_${item.id}',
+              documentId:   '${userId}_${item.id}',
               data:         data,
             );
-          } else rethrow;
+          } else {
+            rethrow;
+          }
         }
         synced++;
       } catch (e) {
@@ -233,7 +245,7 @@ class AppwriteService {
     debugPrint('[Appwrite] Synced $synced history items.');
   }
 
-  // ── Full Backup ─────────────────────────────────────────────────────────────────
+  // -- Full Backup ------------------------------------------------------------
 
   /// Backs up playlists + history. Returns true on success.
   Future<bool> backupAll() async {
@@ -246,12 +258,13 @@ class AppwriteService {
     }
   }
 
-  // ── Pro Status ─────────────────────────────────────────────────────────────────
+  // -- Pro Status -------------------------------------------------------------
 
   Future<void> saveProExpiry(int expiryMs) async {
     _ensureInit();
     final user = await getCurrentUser();
     if (user == null) return;
+    final userId = user.$id;
     final data = {
       'expiry_ms':  expiryMs,
       'updated_at': DateTime.now().toIso8601String(),
@@ -261,7 +274,7 @@ class AppwriteService {
         await _databases.updateDocument(
           databaseId:   Environment.databaseId,
           collectionId: Environment.proStatusCollection,
-          documentId:   user.\$id,
+          documentId:   userId,
           data:         data,
         );
       } on AppwriteException catch (ae) {
@@ -269,10 +282,12 @@ class AppwriteService {
           await _databases.createDocument(
             databaseId:   Environment.databaseId,
             collectionId: Environment.proStatusCollection,
-            documentId:   user.\$id,
+            documentId:   userId,
             data:         data,
           );
-        } else rethrow;
+        } else {
+          rethrow;
+        }
       }
     } catch (e) {
       debugPrint('[Appwrite] saveProExpiry failed: $e');
@@ -284,13 +299,16 @@ class AppwriteService {
     final user = await getCurrentUser();
     if (user == null) return 0;
     try {
+      final userId = user.$id;
       final doc = await _databases.getDocument(
         databaseId:   Environment.databaseId,
         collectionId: Environment.proStatusCollection,
-        documentId:   user.\$id,
+        documentId:   userId,
       );
       return (doc.data['expiry_ms'] as int?) ?? 0;
-    } catch (_) { return 0; }
+    } catch (_) {
+      return 0;
+    }
   }
 
   Future<void> clearProExpiry() async => saveProExpiry(0);

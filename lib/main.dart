@@ -103,14 +103,6 @@ Future<void> _initAdMob() async {
 Future<void> _initAppwrite() async {
   try {
     AppwriteService.instance.init();
-    // Fire-and-forget — never block startup on network
-    unawaited(
-      AppwriteService.instance.signInAnonymouslyIfNeeded()
-          .timeout(const Duration(seconds: 10))
-          .catchError((e) {
-        debugPrint('[Appwrite] Background init failed (offline?): $e');
-      }),
-    );
   } catch (e) {
     debugPrint('[Appwrite] Init error: $e');
   }
