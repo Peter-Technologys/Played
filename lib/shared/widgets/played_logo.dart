@@ -53,18 +53,21 @@ class PlayedLogo extends StatelessWidget {
           ),
         ],
       ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Image.asset(
-            'assets/icons/play_store_512.png',
-            width: fontSize * 1.15,
-            height: fontSize * 1.15,
-            errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-          ),
-          SizedBox(width: fontSize * 0.35),
-          _gradientText(),
-        ],
+      child: FittedBox(
+        fit: BoxFit.scaleDown,
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Image.asset(
+              'assets/icons/play_store_512.png',
+              width: fontSize * 1.15,
+              height: fontSize * 1.15,
+              errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+            ),
+            SizedBox(width: fontSize * 0.35),
+            _gradientText(),
+          ],
+        ),
       ),
     );
   }
