@@ -30,6 +30,7 @@ class AppRouter {
         ],
       ),
       GoRoute(path: '/profile',      builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/settings',     builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/tools/folders', builder: (_, __) => const FolderBrowserScreen()),
       GoRoute(path: '/playlists',    builder: (_, __) => const PlaylistsScreen()),
       GoRoute(path: '/vault',        builder: (_, __) => const VaultLockScreen()),

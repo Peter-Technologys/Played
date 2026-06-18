@@ -18,7 +18,7 @@ class UserAvatarButton extends ConsumerWidget {
     final initials    = _initials(isSignedIn ? displayName : null);
 
     return GestureDetector(
-      onTap: () => context.push('/profile'),
+      onTap: () => context.push('/settings'),
       child: Container(
         width: 38,
         height: 38,
