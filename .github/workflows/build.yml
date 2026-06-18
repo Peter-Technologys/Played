@@ -232,7 +232,7 @@ jobs:
       # Testers get an email with a direct download link — no Play Store needed.
       # Skip silently if FIREBASE_APP_ID secret is not configured yet.
       - name: Distribute to testers via Firebase
-        if: secrets.FIREBASE_APP_ID != ''
+        if: ${{ vars.FIREBASE_ENABLED == 'true' }}
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID }}
