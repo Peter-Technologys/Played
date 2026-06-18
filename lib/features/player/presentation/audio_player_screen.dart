@@ -141,23 +141,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
-    // Wait up to 5 s for AudioService.init() to complete on cold launch.
+    // AudioService is now initialized before runApp — handler is always ready.
+    // If somehow null (init failed), fail fast with a clear log.
     if (_handler == null) {
-      for (var i = 0; i < 50; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        if (_handler != null) break;
-      }
-      if (_handler == null) {
-        debugPrint('[AudioPlayer] Handler not ready after 5s — aborting load');
-        return;
-      }
+      debugPrint('[AudioPlayer] Handler is null — AudioService.init() failed at startup.');
+      state = state.copyWith(isLoading: false);
+      return;
     }
     _currentItemId = item.id;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _attachStreams();
 
-    // Re-wire notification controls on every load so callbacks are always fresh
     _handler!.onSkipNext     = skipNext;
     _handler!.onSkipPrevious = skipPrevious;
 
