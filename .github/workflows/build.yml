@@ -9,21 +9,21 @@
 #                    universal APK +
 #                    Firebase distribution  (version tags only: v1.x.x)
 #
-# To release:  git tag v1.2.1 && git push origin v1.2.1
-# (or create the tag in GitLab — it mirrors to GitHub automatically)
+# To release: create a tag in GitLab (mirrors to GitHub automatically)
+#   e.g. tag name: v1.2.1
 #
 # Required GitHub Secrets (Settings → Secrets and variables → Actions → Secrets):
 #   KEYSTORE_BASE64           — base64-encoded .jks keystore
 #   STORE_PASSWORD            — keystore password
 #   KEY_ALIAS                 — key alias
 #   KEY_PASSWORD              — key password
-#   FIREBASE_APP_ID           — Firebase App ID  (e.g. 1:123456789:android:abcdef)
-#   FIREBASE_SERVICE_ACCOUNT  — Firebase service account JSON (base64-encoded)
+#   FIREBASE_APP_ID           — Firebase App ID (optional)
+#   FIREBASE_SERVICE_ACCOUNT  — Firebase service account JSON (optional)
 #
 # Required GitHub Variables (Settings → Secrets and variables → Actions → Variables):
 #   GOOGLE_SERVICES_JSON      — raw contents of google-services.json
 #   FIREBASE_TESTERS          — comma-separated tester emails (optional)
-#                               e.g. friend@gmail.com,tester2@gmail.com
+#   FIREBASE_ENABLED          — set to 'true' to enable Firebase distribution
 # ───────────────────────────────────────────────────────────────
 
 name: Build & Test
@@ -33,11 +33,16 @@ on:
     branches: [main]
   push:
     branches: [main]
-    tags: ['v*']
+  # Tags use a separate trigger so concurrency never cancels a release
+  push:
+    tags:
+      - 'v*'
 
+# Concurrency only cancels duplicate runs on the same ref.
+# Tags get their own unique group so they are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref_type != 'tag' }}
 
 env:
   PUB_ENVIRONMENT: bot.github
@@ -48,6 +53,7 @@ jobs:
   analyze:
     name: Flutter Analyze
     runs-on: ubuntu-latest
+    if: github.ref_type == 'branch'
     steps:
       - uses: actions/checkout@v4
       - uses: subosito/flutter-action@v2
@@ -128,7 +134,7 @@ jobs:
   build_release:
     name: Build Signed Release
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: github.ref_type == 'tag'
     steps:
       - uses: actions/checkout@v4
 
@@ -176,7 +182,7 @@ jobs:
             --obfuscate \
             --split-debug-info=build/debug-info
 
-      # ── Universal APK (single file, share via Bluetooth/WhatsApp/Drive) ────────
+      # ── Universal APK (share via Bluetooth / WhatsApp / Drive) ───────────────
       - name: Build universal APK
         env:
           KEYSTORE_PATH: keystore.jks
@@ -187,7 +193,6 @@ jobs:
           flutter build apk --release \
             --obfuscate \
             --split-debug-info=build/debug-info
-          # Rename so it's clearly labelled
           mv build/app/outputs/flutter-apk/app-release.apk \
              build/app/outputs/flutter-apk/otya-player-${{ github.ref_name }}-universal.apk
 
@@ -227,12 +232,9 @@ jobs:
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 
-      # ── Firebase App Distribution ─────────────────────────────────────────────────
-      # Sends the universal APK to testers via Firebase App Distribution.
-      # Testers get an email with a direct download link — no Play Store needed.
-      # Skip silently if FIREBASE_APP_ID secret is not configured yet.
+      # ── Firebase App Distribution (optional) ─────────────────────────────────
       - name: Distribute to testers via Firebase
-        if: ${{ vars.FIREBASE_ENABLED == 'true' }}
+        if: vars.FIREBASE_ENABLED == 'true'
         uses: wzieba/Firebase-Distribution-Github-Action@v1
         with:
           appId: ${{ secrets.FIREBASE_APP_ID }}
@@ -241,5 +243,4 @@ jobs:
           file: build/app/outputs/flutter-apk/otya-player-${{ github.ref_name }}-universal.apk
           releaseNotes: |
             OTYA Player ${{ github.ref_name }}
-            ${{ github.event.head_commit.message }}
           testers: ${{ vars.FIREBASE_TESTERS }}
