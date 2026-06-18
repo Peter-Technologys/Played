@@ -33,10 +33,7 @@ on:
     branches: [main]
   push:
     branches: [main]
-  # Tags use a separate trigger so concurrency never cancels a release
-  push:
-    tags:
-      - 'v*'
+    tags: ['v*']
 
 # Concurrency only cancels duplicate runs on the same ref.
 # Tags get their own unique group so they are never cancelled.
