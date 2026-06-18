@@ -12,7 +12,7 @@ import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/storage_folder_service.dart';
 import '../../features/my_space/presentation/providers/my_space_provider.dart';
-import '../../features/settings/presentation/privacy_policy_screen.dart';
+import '../settings/presentation/privacy_policy_screen.dart';
 import '../../shared/widgets/played_logo.dart';
 import '../settings/settings_provider.dart';
 
