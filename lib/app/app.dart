@@ -28,7 +28,6 @@ class _OtyaPlayerAppState extends State<OtyaPlayerApp> {
       final done = prefs.getBool('onboarding_done') ?? false;
       if (mounted) setState(() { _onboardingDone = done; _checking = false; });
     } catch (_) {
-      // If SharedPreferences fails, skip onboarding and go straight to app
       if (mounted) setState(() { _onboardingDone = true; _checking = false; });
     }
   }
@@ -50,7 +49,6 @@ class _OtyaPlayerAppState extends State<OtyaPlayerApp> {
       ),
     );
 
-    // Show a dark splash while checking — never a white screen
     if (_checking) {
       return const MaterialApp(
         debugShowCheckedModeBanner: false,
@@ -66,21 +64,22 @@ class _OtyaPlayerAppState extends State<OtyaPlayerApp> {
       );
     }
 
-    if (!_onboardingDone) {
-      return MaterialApp(
-        title: 'OTYA Player',
-        debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
-        home: OnboardingScreen(onDone: _completeOnboarding),
-      );
-    }
-
-    // No builder wrapper — permissions are requested contextually per feature.
+    // Always load the full app router. Onboarding is shown as an overlay
+    // on top of the dashboard so the user can see the real app behind it.
     return MaterialApp.router(
       title: 'OTYA Player',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       routerConfig: AppRouter.router,
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            if (!_onboardingDone)
+              OnboardingOverlay(onDone: _completeOnboarding),
+          ],
+        );
+      },
     );
   }
 }
