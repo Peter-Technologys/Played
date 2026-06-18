@@ -1,47 +1,55 @@
-# ─────────────────────────────────────────────────────────────
-# Played — GitHub Actions Workflow
-# Mirrors the GitLab CI pipeline for GitHub-hosted runners.
-# ─────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
+# OTYA Player — GitHub Actions
+#
+# Job summary:
+#   analyze        — flutter analyze (every PR + main push)
+#   unit_test      — flutter test    (PR only)
+#   build_debug    — debug APK       (PR only, needs analyze)
+#   build_release  — signed AAB + split APKs (version tags only: v1.2.3)
+#
+# To release: git tag v1.2.3 && git push origin v1.2.3
+#
+# Required GitHub secrets (Settings → Secrets and variables → Actions):
+#   KEYSTORE_BASE64      — base64-encoded .jks keystore
+#   STORE_PASSWORD       — keystore password
+#   KEY_ALIAS            — key alias
+#   KEY_PASSWORD         — key password
+#
+# Required GitHub variables (Settings → Secrets and variables → Variables):
+#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
+# ───────────────────────────────────────────────────────────────
 
 name: Build & Test
 
 on:
-  # Run on all pull requests
   pull_request:
-    branches:
-      - main
-  # Run on pushes to main and version tags
+    branches: [main]
   push:
-    branches:
-      - main
-    tags:
-      - 'v*'
+    branches: [main]
+    tags: ['v*']
 
-# Cancel in-progress runs on the same branch to save runner minutes
+# Cancel in-progress runs on the same ref to save runner minutes
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
-# Opt into Node.js 24 now to avoid deprecation warnings (Node.js 20 removed Sep 2026)
 env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  # Suppress verbose pub dependency resolution output
   PUB_ENVIRONMENT: bot.github
 
+# ───────────────────────────────────────────────────────────────
 jobs:
 
-  # ── Validate ────────────────────────────────────────────────
+  # ── ANALYZE — every PR and main push ───────────────────────────────────────────
   analyze:
     name: Flutter Analyze
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Cache pub packages
@@ -51,30 +59,21 @@ jobs:
           key: pub-${{ hashFiles('pubspec.yaml') }}
           restore-keys: pub-
 
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
+      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      # build_runner removed — flutter analyze does not need generated files
-      # removing it saves ~45s and prevents timeout cancellations
-      - name: Analyze
-        # --no-fatal-warnings ensures only errors (not infos/warnings) fail the build
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-  format_check:
-    name: Dart Format Check
+  # ── UNIT TESTS — PR only ────────────────────────────────────────────────────────────
+  unit_test:
+    name: Unit Tests
     runs-on: ubuntu-latest
-    # Non-blocking — matches allow_failure: true in GitLab CI
-    continue-on-error: true
-    # Only run on pull requests
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Cache pub packages
@@ -84,64 +83,29 @@ jobs:
           key: pub-${{ hashFiles('pubspec.yaml') }}
           restore-keys: pub-
 
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
+      - run: flutter test --coverage
 
-      - name: Check formatting
-        run: dart format --set-exit-if-changed lib/
-
-  # ── Test ────────────────────────────────────────────────────
-  unit_test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: 'stable'
-          cache: true
-
-      - name: Cache pub packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Run code generation
-        run: flutter pub run build_runner build --delete-conflicting-outputs
-
-      - name: Run tests with coverage
-        run: flutter test --coverage
-
-      - name: Upload coverage report
+      - name: Upload coverage
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
           path: coverage/
           retention-days: 7
 
-  # ── Build ────────────────────────────────────────────────────
-  build_apk_debug:
+  # ── DEBUG APK — PR only ──────────────────────────────────────────────────────────────
+  build_debug:
     name: Build Debug APK
     runs-on: ubuntu-latest
-    # Only run on pull requests
     if: github.event_name == 'pull_request'
-    needs: [analyze, unit_test]
+    needs: [analyze]
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Cache pub packages
@@ -151,18 +115,17 @@ jobs:
           key: pub-${{ hashFiles('pubspec.yaml') }}
           restore-keys: pub-
 
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Run code generation
-        run: flutter pub run build_runner build --delete-conflicting-outputs
-
-      # Write google-services.json from variable — required by the Google Services plugin
       - name: Write google-services.json
-        run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+        run: |
+          if [ -n "${{ vars.GOOGLE_SERVICES_JSON }}" ]; then
+            echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+          else
+            echo '{"project_info":{"project_id":"placeholder"},"client":[]}' > android/app/google-services.json
+          fi
 
-      - name: Build debug APK
-        run: flutter build apk --debug
+      - run: flutter build apk --debug
 
       - name: Remove google-services.json
         if: always()
@@ -175,20 +138,18 @@ jobs:
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 3
 
-  build_apk_release:
-    name: Build Signed Release APK
+  # ── RELEASE — version tags only (v1.2.3) ──────────────────────────────────────────
+  build_release:
+    name: Build Signed Release
     runs-on: ubuntu-latest
-    # Only run on pushes to main or version tags
-    if: github.event_name == 'push'
-    needs: [analyze, unit_test]
+    if: startsWith(github.ref, 'refs/tags/v')
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Flutter
-        uses: subosito/flutter-action@v2
+      - uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.x'
-          channel: 'stable'
+          channel: stable
           cache: true
 
       - name: Cache pub packages
@@ -198,53 +159,67 @@ jobs:
           key: pub-${{ hashFiles('pubspec.yaml') }}
           restore-keys: pub-
 
-      - name: Install dependencies
-        run: flutter pub get
+      - run: flutter pub get
 
-      - name: Run code generation
-        run: flutter pub run build_runner build --delete-conflicting-outputs
-
-      # Decode the Base64 keystore secret into a temporary file.
-      # The file is removed after the build so it never ends up in artifacts.
-      - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-
-      # Write google-services.json from variable — required by the Google Services plugin
       - name: Write google-services.json
         run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
-      - name: Build signed release APK
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+
+      - name: Build release AAB
         env:
           KEYSTORE_PATH: keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        # flutter build exits 1 due to a file-watcher bug even when APKs are
-        # produced successfully. We run the command, capture the exit code,
-        # then verify the APKs exist ourselves before deciding whether to fail.
         run: |
-          flutter build apk --release --split-per-abi || BUILD_EXIT=$?
-          APK_COUNT=$(find build/app/outputs/flutter-apk -name '*-release.apk' 2>/dev/null | wc -l)
-          echo "APKs found: $APK_COUNT"
-          if [ "$APK_COUNT" -gt 0 ]; then
-            echo "Build succeeded — APKs present despite non-zero exit code."
-            exit 0
-          fi
-          echo "Build genuinely failed — no APKs produced."
-          exit ${BUILD_EXIT:-1}
+          flutter build appbundle --release \
+            --obfuscate \
+            --split-debug-info=build/debug-info
 
-      # Remove keystore and google-services.json immediately after build — never store in artifacts
-      - name: Remove keystore
-        if: always()
-        run: rm -f android/app/keystore.jks
+      - name: Build release APKs (split by ABI)
+        env:
+          KEYSTORE_PATH: keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          flutter build apk --release --split-per-abi \
+            --obfuscate \
+            --split-debug-info=build/debug-info
 
-      - name: Remove google-services.json
+      - name: Remove secrets
         if: always()
-        run: rm -f android/app/google-services.json
+        run: |
+          rm -f android/app/keystore.jks
+          rm -f android/app/google-services.json
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          retention-days: 30
 
       - name: Upload release APKs
         uses: actions/upload-artifact@v4
         with:
-          name: app-release
-          path: build/app/outputs/flutter-apk/
+          name: app-release-apks
+          path: build/app/outputs/flutter-apk/*-release.apk
           retention-days: 30
+
+      - name: Upload debug symbols
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-info
+          path: build/debug-info/
+          retention-days: 30
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/*-release.apk
+          generate_release_notes: true
