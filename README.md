@@ -1,37 +1,38 @@
 <div align="center">
 
-<img src="assets/icons/app_icon.png" alt="Played Logo" width="96" height="96" />
+<img src="assets/icons/play_store_512.png" alt="OTYA Player" width="96" height="96" />
 
-# PLAYED
+# OTYA Player
 
-**High-performance offline media player built for East Africa.**  
-Optimized for Android 9–14+ · 2 GB–4 GB RAM devices · 100% offline-first.
+**Premium offline media player — built for Android.**  
+Play any audio or video file, 100% offline. No account required.
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00D4FF.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)]()
-[![Architecture](https://img.shields.io/badge/Architecture-Clean%20%2B%20Feature--First-7C3AED)]()
+[![Version](https://img.shields.io/badge/Version-1.2.0-8A2BE2)]()
 
 </div>
 
 ---
 
-## ✨ Features
+## Features
 
 | Screen | What it does |
 |---|---|
-| 🏠 **My Space** | Unified media hub — Cinema shelf (45 min+ videos), Street Tapes shelf (DJ/mix audio), Recently Played timeline, sort & search |
-| 📡 **Air-Drop** | Zero-data file sharing via Wi-Fi Direct + Bluetooth (Nearby Connections API) |
-| 🎤 **Studio** | Choir/Karaoke mode + DJ Drop mode — splits any track into vocals & instrumental via Spleeter, cached offline |
-| 🔒 **Vault** | AES-256 encrypted private media vault with biometric + PIN unlock |
-| ▶️ **Audio Player** | Shuffle, repeat, speed, EQ, lyrics, queue, sleep timer, favorites, share |
-| 🎬 **Video Player** | Hardware-accelerated VLC, subtitles, aspect ratio, PiP, battery saver, gesture controls |
-| ⚙️ **Settings** | Appearance, playback, notifications, vault, privacy, storage, language |
+| **My Space** | Unified media hub — songs, videos, folders tabs, recently played, search, sort, pin folders |
+| **Audio Player** | Shuffle, repeat, speed (0.5×–2×), 5-band EQ, LRC lyrics, queue, sleep timer, share |
+| **Video Player** | Hardware-accelerated VLC, subtitles (.srt/.ass), aspect ratio, PiP, battery saver, gesture controls |
+| **Air-Drop** | Zero-data file sharing via Wi-Fi Direct + Bluetooth (Nearby Connections) |
+| **Vault** | Private media vault with biometric + PIN unlock |
+| **Playlists** | Create, rename, reorder, play playlists |
+| **Profile & Settings** | Google sign-in, cloud backup, appearance, audio, video, privacy, library |
+| **Tools** | WhatsApp Trimmer (trim to 30s / 16 MB), Browse by Folder |
 
 ---
 
-## 🏗 Architecture
+## Architecture
 
 ```
 Clean Architecture · Feature-First · Riverpod · Offline-First
@@ -45,112 +46,116 @@ lib/
 │   ├── router.dart         # go_router — all routes
 │   └── theme/              # AppColors, AppTextStyles, AppTheme
 ├── core/
+│   ├── config/             # Environment (Appwrite endpoints)
 │   ├── database/           # Hive setup, adapters
-│   ├── models/             # MediaItem, Playlist, VaultItem, StemCache
-│   ├── permissions/        # Permission gate screen
-│   ├── services/           # FFmpeg, MediaScanner, Notification, PiP, Vault
-│   └── utils/              # DurationFormatter, ShelfSorter
+│   ├── models/             # MediaItem, Playlist, VaultItem
+│   ├── permissions/        # Permission helper
+│   ├── services/           # Appwrite, Auth, FFmpeg, Notification, Vault
+│   └── utils/              # Formatters, helpers
 ├── features/
-│   ├── my_space/           # Home tab — shelves, search, sort
-│   ├── player/             # Audio + Video full-screen players, mini player
+│   ├── my_space/           # Home tab — media library
+│   ├── player/             # Audio + Video players, mini player, lyrics, EQ
 │   ├── air_drop/           # Nearby Connections file sharing
-│   ├── studio/             # Stem splitting (Karaoke + DJ Drop)
 │   ├── vault/              # Encrypted media vault
-│   ├── settings/           # All app preferences
-│   └── tools/              # WhatsApp trimmer
+│   ├── playlists/          # Playlist management
+│   ├── profile/            # Profile & Settings screen
+│   ├── settings/           # Settings provider, privacy policy
+│   └── tools/              # WhatsApp trimmer, folder browser
 └── shared/
     ├── extensions/         # BuildContext extensions
-    └── widgets/            # NeonButton, LoadingShimmer, AdBannerSlot
+    └── widgets/            # ProGate, AdBannerSlot, LoadingShimmer, Logo
 ```
 
 ---
 
-## 🛠 Tech Stack
+## Tech Stack
 
 | Layer | Library |
 |---|---|
 | Video playback | `flutter_vlc_player` — hardware-accelerated, MKV/AVI/4K |
-| Audio playback | `just_audio` + `audio_session` |
-| Processing | `ffmpeg_kit_flutter` — MP4→MP3 extraction, trimming |
-| Audio splitting | Spleeter/Demucs API + local stem cache |
+| Audio playback | `just_audio` + `audio_service` + `audio_session` |
+| Offline trim/extract | Android `MediaExtractor` + `MediaMuxer` (native, no FFmpeg binary) |
 | Database | `hive` — 100% offline, AES-256 encrypted vault box |
-| Sharing | `nearby_connections` — Wi-Fi Direct + Bluetooth |
-| State | `flutter_riverpod` |
+| Cloud auth & backup | `appwrite` — Google OAuth, playlist + history sync |
+| Nearby sharing | `nearby_connections` — Wi-Fi Direct + Bluetooth |
+| State management | `flutter_riverpod` |
 | Navigation | `go_router` |
-| UI / Animations | `flutter_animate`, AMOLED dark neon theme |
-| Auth | `local_auth` — biometrics + PIN |
+| UI / Animations | `flutter_animate`, AMOLED dark theme (violet + cyan) |
+| Biometrics | `local_auth` — fingerprint + PIN vault unlock |
+| Ads | `google_mobile_ads` |
 
 ---
 
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
 
-- Flutter `>=3.0.0`
-- Android SDK 21+ (Android 5.0 Lollipop minimum, 9.0 Pie recommended)
+- Flutter `>=3.0.0` (stable channel)
+- Android SDK 21+ (Android 5.0 minimum, 9.0+ recommended)
 - Java 17
 
 ### Setup
 
 ```bash
-# Clone the repo
 git clone https://gitlab.com/apk-v1/played.git
 cd played
-
-# Install dependencies
 flutter pub get
-
-# Generate Hive adapters & Riverpod code
-flutter pub run build_runner build --delete-conflicting-outputs
-
-# Run on a connected device
 flutter run
 ```
 
-### Build APK
+### Build
 
 ```bash
-# Split APKs per ABI (recommended — smaller download size)
-flutter build apk --release --split-per-abi
+# Debug APK (for testing)
+flutter build apk --debug
 
-# Universal APK
-flutter build apk --release
+# Release — split APKs per ABI (smaller download)
+flutter build apk --release --split-per-abi
 
 # App Bundle (Play Store)
 flutter build appbundle --release
 ```
 
-Output: `build/app/outputs/flutter-apk/`
+---
+
+## CI / CD
+
+Builds run on **GitHub Actions** (`.github/workflows/build.yml`).
+
+| Trigger | Jobs |
+|---|---|
+| Pull request | Analyze, Unit tests, Debug APK |
+| Push to `main` | Analyze only |
+| Version tag `v*` | Signed release AAB + split APKs → GitHub Release |
+
+**To publish a release:**
+```bash
+git tag v1.2.0
+git push origin v1.2.0
+```
 
 ---
 
-## 📋 Roadmap
+## Roadmap
 
-- [ ] iOS support
-- [ ] Playlist creation & management
 - [ ] Chromecast / Cast to device
-- [ ] Offline lyrics sync (LRC files)
-- [ ] Widget (home screen now-playing)
-- [ ] Background audio with Android Auto support
-- [ ] Cloud backup for Vault
+- [ ] Home screen now-playing widget
+- [ ] Android Auto support
+- [ ] iOS support
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 
----
-
-## 🔐 Security
+## Security
 
 See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
 
----
+## License
 
-## 📄 License
-
-This project is licensed under the **MIT License** — see [LICENSE](LICENSE) for details.
+MIT — see [LICENSE](LICENSE).
 
 ---
 

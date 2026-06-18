@@ -6,12 +6,10 @@
 .pub-cache/
 .pub/
 build/
-dart_tool/
 
-# Generated files
-*.g.dart
-*.freezed.dart
-lib/generated/
+# Generated files — committed to repo, do not delete
+# *.g.dart
+# *.freezed.dart
 
 # Android
 **/android/**/gradle-wrapper.jar
@@ -57,16 +55,15 @@ lib/generated_plugin_registrant.dart
 *.iml
 *.ipr
 *.iws
-.DS_Store
-Thumbs.db
 
-# Environment / Secrets
+# Environment / Secrets — NEVER commit these
 .env
 .env.*
 *.pem
 google-services.json
 GoogleService-Info.plist
 key.properties
+keystore.jks
 
 # Test coverage
 coverage/
@@ -82,3 +79,4 @@ lcov.info
 .Spotlight-V100
 .Trashes
 ehthumbs.db
+Thumbs.db
