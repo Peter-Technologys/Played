@@ -29,11 +29,11 @@ class AppRouter {
           GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
         ],
       ),
-      GoRoute(path: '/profile',      builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/settings',     builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/profile',       builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/settings',      builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/tools/folders', builder: (_, __) => const FolderBrowserScreen()),
-      GoRoute(path: '/playlists',    builder: (_, __) => const PlaylistsScreen()),
-      GoRoute(path: '/vault',        builder: (_, __) => const VaultLockScreen()),
+      GoRoute(path: '/playlists',     builder: (_, __) => const PlaylistsScreen()),
+      GoRoute(path: '/vault',         builder: (_, __) => const VaultLockScreen()),
       GoRoute(
         path: '/player/equalizer',
         builder: (_, __) => const ProGate(
@@ -62,7 +62,7 @@ class AppRouter {
   );
 }
 
-// ── Main Shell ───────────────────────────────────────────────────────────────────
+// ── Main Shell ─────────────────────────────────────────────────────────────────────────────
 
 class _MainShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -134,7 +134,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
               label: 'Browse by Folder',
               subtitle: 'Navigate files by directory',
               color: AppColors.accent,
-              isPro: false,
               onTap: () {
                 Navigator.pop(context);
                 GoRouter.of(context).push('/tools/folders');
@@ -178,19 +177,16 @@ class _MainShellState extends ConsumerState<_MainShell> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    // Air-Drop
                     _NavItem(
                       icon: Icons.wifi_tethering_rounded,
                       label: 'Air-Drop',
                       isActive: _currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
-                    // My Space (center)
                     _CenterNavItem(
                       isActive: _currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
-                    // Tools
                     _NavItem(
                       icon: Icons.build_rounded,
                       label: 'Tools',
@@ -208,47 +204,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
   }
 }
 
-// ── Center Nav Item (My Space) ─────────────────────────────────────────────────────────
-
-class _CenterNavItemActual extends StatelessWidget {
-  // ignore: unused_element
-  const _CenterNavItemActual();
-  @override Widget build(BuildContext context) {
-    return Container(
-      width: 28, height: 28,
-      decoration: const BoxDecoration(
-        shape: BoxShape.circle,
-        gradient: LinearGradient(
-          colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-                ),
-                alignment: Alignment.center,
-                child: Text(_initials,
-                    style: const TextStyle(
-                      fontSize: 11, fontWeight: FontWeight.w700,
-                      color: Colors.white,
-                    )),
-              )
-            else
-              // Not signed in: show person icon
-              const Icon(Icons.person_rounded,
-                  color: Color(0xFF6B7280), size: 22),
-            const SizedBox(height: 3),
-            const Text('Profile',
-                style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w600,
-                  color: Color(0xFF6B7280),
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Center Nav Item (My Space) ─────────────────────────────────────────────────────────
+// ── Center Nav Item (My Space) ─────────────────────────────────────────────────────────────────
 
 class _CenterNavItem extends StatelessWidget {
   final bool isActive;
@@ -294,18 +250,18 @@ class _CenterNavItem extends StatelessWidget {
   }
 }
 
-// ── Regular Nav Item ───────────────────────────────────────────────────────────────────
+// ── Regular Nav Item ───────────────────────────────────────────────────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final bool isActive;
-  final bool isPro;
   final VoidCallback onTap;
   const _NavItem({
-    required this.icon, required this.label,
-    required this.isActive, required this.onTap,
-    this.isPro = false,
+    required this.icon,
+    required this.label,
+    required this.isActive,
+    required this.onTap,
   });
 
   @override
@@ -325,29 +281,11 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Icon(icon,
-                    color: isActive
-                        ? const Color(0xFF8A2BE2)
-                        : const Color(0xFF6B7280),
-                    size: 22),
-                if (isPro)
-                  Positioned(
-                    top: -4, right: -6,
-                    child: Container(
-                      padding: const EdgeInsets.all(2),
-                      decoration: const BoxDecoration(
-                        color: AppColors.accent,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(Icons.workspace_premium_rounded,
-                          color: Colors.black, size: 8),
-                    ),
-                  ),
-              ],
-            ),
+            Icon(icon,
+                color: isActive
+                    ? const Color(0xFF8A2BE2)
+                    : const Color(0xFF6B7280),
+                size: 22),
             const SizedBox(height: 3),
             Text(label,
                 style: TextStyle(
@@ -363,7 +301,7 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ── Tools Sheet Tile ───────────────────────────────────────────────────────────────────
+// ── Tools Sheet Tile ───────────────────────────────────────────────────────────────────────────────────
 
 class _ToolTile extends StatelessWidget {
   final IconData icon;
@@ -373,8 +311,12 @@ class _ToolTile extends StatelessWidget {
   final bool isPro;
   final VoidCallback onTap;
   const _ToolTile({
-    required this.icon, required this.label, required this.subtitle,
-    required this.color, required this.onTap, this.isPro = false,
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.color,
+    required this.onTap,
+    this.isPro = false,
   });
 
   @override

@@ -1,13 +1,16 @@
-# ─────────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
 # OTYA Player — GitLab CI/CD Pipeline
-# ─────────────────────────────────────────────────────────────
+#
+# Stage summary:
+#   prepare  — pub get (once, shared via artifacts)
+#   validate — flutter analyze
+#   test     — unit tests (MR only)
+#   build    — debug APK on MR, release AAB+APK on tags only
+# ───────────────────────────────────────────────────────────────
 
 image: ghcr.io/cirruslabs/flutter:stable
 
 variables:
-  FLUTTER_VERSION: "stable"
-  ANDROID_COMPILE_SDK: "34"
-  ANDROID_BUILD_TOOLS: "34.0.0"
   PUB_ENVIRONMENT: "bot.gitlab"
   PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
 
@@ -17,41 +20,41 @@ stages:
   - test
   - build
 
-# ── Global cache — shared across ALL branches and jobs ───────────────
+# ── Global cache — shared across ALL branches and jobs ────────────────────────
 cache:
-  key: "pub-cache-v1"
+  key: "pub-cache-v2"
   paths:
     - .pub-cache/
     - .dart_tool/
 
-# ── Shared script snippet: inject google-services.json ──────────────
+# ── Shared: inject google-services.json ──────────────────────────────────────
 .inject_google_services: &inject_google_services |
   if [ -z "$GOOGLE_SERVICES_JSON" ]; then
     echo "ERROR: GOOGLE_SERVICES_JSON variable is not set."
-    echo "Go to GitLab → Settings → CI/CD → Variables and add it."
     exit 1
   fi
   echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-  echo "google-services.json injected successfully."
 
-# ── PREPARE — runs once, artifacts passed to all downstream jobs ─────
+# ───────────────────────────────────────────────────────────────
+# PREPARE — pub get only (no build_runner: no generated files change per push)
+# ───────────────────────────────────────────────────────────────
 prepare:
   stage: prepare
   script:
     - flutter pub get
-    - flutter pub run build_runner build --delete-conflicting-outputs
   artifacts:
     paths:
       - .dart_tool/
       - .pub-cache/
-      - lib/
     expire_in: 1 hour
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_TAG'
 
-# ── Validate ────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
+# VALIDATE
+# ───────────────────────────────────────────────────────────────
 analyze:
   stage: validate
   needs: [prepare]
@@ -61,16 +64,9 @@ analyze:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-format_check:
-  stage: validate
-  needs: [prepare]
-  script:
-    - dart format --set-exit-if-changed lib/
-  rules:
-    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-  allow_failure: true
-
-# ── Test ──────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
+# TEST — MR only (not on every main push)
+# ───────────────────────────────────────────────────────────────
 unit_test:
   stage: test
   needs: [prepare]
@@ -87,9 +83,22 @@ unit_test:
     expire_in: 7 days
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
-    - if: '$CI_COMMIT_BRANCH == "main"'
 
-# ── Build ──────────────────────────────────────────────────────────
+# ───────────────────────────────────────────────────────────────
+# BUILD
+#
+# Debug APK  — on every MR (fast, no signing needed, for quick testing)
+# Release    — ONLY on version tags (v1.2.3) to avoid slow builds on every push
+#
+# To trigger a release build: git tag v1.2.3 && git push origin v1.2.3
+#
+# Required CI/CD Variables (Settings → CI/CD → Variables, Masked + Protected):
+#   GOOGLE_SERVICES_JSON  — raw contents of google-services.json
+#   KEYSTORE_BASE64       — Base64-encoded .jks keystore
+#   STORE_PASSWORD        — Keystore password
+#   KEY_ALIAS             — Key alias
+#   KEY_PASSWORD          — Key password
+# ───────────────────────────────────────────────────────────────
 build_apk_debug:
   stage: build
   needs: [prepare]
@@ -103,14 +112,7 @@ build_apk_debug:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
-# Signed release build — runs on main branch pushes and version tags.
-# Required CI/CD Variables (Settings → CI/CD → Variables, all Masked + Protected):
-#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
-#   KEYSTORE_BASE64      — Base64-encoded .jks keystore file
-#   STORE_PASSWORD       — Keystore password
-#   KEY_ALIAS            — Key alias inside the keystore
-#   KEY_PASSWORD         — Key password
-build_apk_release:
+build_release:
   stage: build
   needs: [prepare]
   script:
@@ -122,7 +124,6 @@ build_apk_release:
         exit 1
       fi
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-    - export KEYSTORE_PATH="keystore.jks"
     - flutter build appbundle --release
         --obfuscate
         --split-debug-info=build/debug-info
@@ -138,5 +139,4 @@ build_apk_release:
       - build/debug-info/
     expire_in: 30 days
   rules:
-    - if: '$CI_COMMIT_BRANCH == "main"'
-    - if: '$CI_COMMIT_TAG'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'

@@ -359,7 +359,7 @@ class _PlainView extends StatelessWidget {
         // We don't know total duration here, so we use a rolling 3-min
         // assumption (180 s) which is reasonable for most songs.
         // This is still an approximation — only LRC files give true sync.
-        final estimatedTotalSec = 180;
+        const estimatedTotalSec = 180;
         final fraction = lines.isEmpty
             ? 0.0
             : (position.inSeconds / estimatedTotalSec).clamp(0.0, 1.0);
