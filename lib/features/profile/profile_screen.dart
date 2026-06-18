@@ -50,7 +50,7 @@ class ProfileScreen extends ConsumerWidget {
             )),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
 
           // ── 1. APPEARANCE ─────────────────────────────────────────────
@@ -110,7 +110,7 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 2. ACCOUNT ────────────────────────────────────────────────
           const _SectionHeader(label: 'Account'),
@@ -133,109 +133,117 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ],
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 3. AUDIO ──────────────────────────────────────────────────
           const _SectionHeader(label: 'Audio'),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.speed_rounded,
-            label: 'Default Playback Speed',
-            trailing: _ValueChip(
-              label: '${s.playbackSpeed}x',
-              onTap: () => _showSpeedPicker(context, sn, s.playbackSpeed),
-            ),
-          ),
           const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.queue_music_rounded,
-            label: 'Gapless Playback',
-            subtitle: 'No silence between tracks',
-            value: s.gaplessPlayback,
-            onChanged: sn.setGaplessPlayback,
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.swap_horiz_rounded,
-            label: 'Crossfade',
-            subtitle: 'Blend tracks smoothly',
-            value: s.crossfadeDuration > 0,
-            onChanged: (v) => sn.setCrossfade(v ? 3.0 : 0.0),
-          ),
-          if (s.crossfadeDuration > 0) ...[  
-            const SizedBox(height: 8),
-            _SettingsTile(
-              icon: Icons.timer_outlined,
-              label: 'Crossfade Duration',
-              trailing: _ValueChip(
-                label: '${s.crossfadeDuration.toInt()}s',
-                onTap: () => _showCrossfadePicker(context, sn, s.crossfadeDuration),
+          _CollapsibleSection(
+            children: [
+              _SettingsTile(
+                icon: Icons.speed_rounded,
+                label: 'Default Playback Speed',
+                trailing: _ValueChip(
+                  label: '${s.playbackSpeed}x',
+                  onTap: () => _showSpeedPicker(context, sn, s.playbackSpeed),
+                ),
               ),
-            ),
-          ],
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.skip_next_rounded,
-            label: 'Skip Silence',
-            subtitle: 'Auto-skip silent sections',
-            value: s.skipSilence,
-            onChanged: sn.setSkipSilence,
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.headphones_rounded,
-            label: 'Resume on Headset',
-            subtitle: 'Auto-play when headphones connect',
-            value: s.autoResume,
-            onChanged: sn.setAutoResume,
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.phone_in_talk_rounded,
-            label: 'Pause During Calls',
-            subtitle: 'Auto-pause when a call comes in',
-            value: s.pauseDuringCalls,
-            onChanged: sn.setPauseDuringCalls,
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.notifications_rounded,
-            label: 'Now Playing Notification',
-            subtitle: 'Show media controls in notification bar',
-            value: s.nowPlayingNotification,
-            onChanged: sn.setNowPlayingNotification,
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.queue_music_rounded,
+                label: 'Gapless Playback',
+                subtitle: 'No silence between tracks',
+                value: s.gaplessPlayback,
+                onChanged: sn.setGaplessPlayback,
+              ),
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.swap_horiz_rounded,
+                label: 'Crossfade',
+                subtitle: 'Blend tracks smoothly',
+                value: s.crossfadeDuration > 0,
+                onChanged: (v) => sn.setCrossfade(v ? 3.0 : 0.0),
+              ),
+              if (s.crossfadeDuration > 0) ...[  
+                const SizedBox(height: 6),
+                _SettingsTile(
+                  icon: Icons.timer_outlined,
+                  label: 'Crossfade Duration',
+                  trailing: _ValueChip(
+                    label: '${s.crossfadeDuration.toInt()}s',
+                    onTap: () => _showCrossfadePicker(context, sn, s.crossfadeDuration),
+                  ),
+                ),
+              ],
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.skip_next_rounded,
+                label: 'Skip Silence',
+                subtitle: 'Auto-skip silent sections',
+                value: s.skipSilence,
+                onChanged: sn.setSkipSilence,
+              ),
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.headphones_rounded,
+                label: 'Resume on Headset',
+                subtitle: 'Auto-play when headphones connect',
+                value: s.autoResume,
+                onChanged: sn.setAutoResume,
+              ),
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.phone_in_talk_rounded,
+                label: 'Pause During Calls',
+                subtitle: 'Auto-pause when a call comes in',
+                value: s.pauseDuringCalls,
+                onChanged: sn.setPauseDuringCalls,
+              ),
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.notifications_rounded,
+                label: 'Now Playing Notification',
+                subtitle: 'Show media controls in notification bar',
+                value: s.nowPlayingNotification,
+                onChanged: sn.setNowPlayingNotification,
+              ),
+            ],
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 4. VIDEO ──────────────────────────────────────────────────
           const _SectionHeader(label: 'Video'),
-          const SizedBox(height: 12),
-          _SwitchTile(
-            icon: Icons.battery_saver_rounded,
-            label: 'Battery Saver by Default',
-            subtitle: 'Start video player in audio-only mode',
-            value: s.defaultBatterySaver,
-            onChanged: sn.setDefaultBatterySaver,
-          ),
           const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.picture_in_picture_alt_rounded,
-            label: 'Auto Picture-in-Picture',
-            subtitle: 'Float video when you leave the app',
-            value: s.autoPip,
-            onChanged: sn.setAutoPip,
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.subtitles_rounded,
-            label: 'Auto-load Subtitles',
-            subtitle: 'Load .srt/.ass from same folder as video',
-            value: s.autoLoadSubtitles,
-            onChanged: sn.setAutoLoadSubtitles,
+          _CollapsibleSection(
+            children: [
+              _SwitchTile(
+                icon: Icons.battery_saver_rounded,
+                label: 'Battery Saver by Default',
+                subtitle: 'Start video player in audio-only mode',
+                value: s.defaultBatterySaver,
+                onChanged: sn.setDefaultBatterySaver,
+              ),
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.picture_in_picture_alt_rounded,
+                label: 'Auto Picture-in-Picture',
+                subtitle: 'Float video when you leave the app',
+                value: s.autoPip,
+                onChanged: sn.setAutoPip,
+              ),
+              const SizedBox(height: 6),
+              _SwitchTile(
+                icon: Icons.subtitles_rounded,
+                label: 'Auto-load Subtitles',
+                subtitle: 'Load .srt/.ass from same folder as video',
+                value: s.autoLoadSubtitles,
+                onChanged: sn.setAutoLoadSubtitles,
+              ),
+            ],
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 5. PRIVACY & SECURITY ─────────────────────────────────────
           const _SectionHeader(label: 'Privacy & Security'),
@@ -263,26 +271,50 @@ class ProfileScreen extends ConsumerWidget {
             onTap: openAppSettings,
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 6. BACKUP & SYNC ──────────────────────────────────────────
           const _SectionHeader(label: 'Backup & Sync'),
-          const SizedBox(height: 12),
+          const SizedBox(height: 8),
+          if (!isGoogle)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.warning.withValues(alpha: 0.3)),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.warning, size: 16),
+                    SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        'Sign in with Google above to enable cloud backup.',
+                        style: TextStyle(fontSize: 12, color: AppColors.warning, height: 1.4),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           _TappableTile(
             icon: Icons.cloud_upload_rounded,
             label: 'Back Up to Cloud',
-            subtitle: 'Save playlists & history to your account',
-            onTap: () => _runBackup(context),
+            subtitle: isGoogle ? 'Save playlists & history to your account' : 'Sign in with Google first',
+            onTap: () => isGoogle ? _runBackup(context) : _showSignInRequired(context),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 6),
           _TappableTile(
             icon: Icons.cloud_download_rounded,
             label: 'Restore from Cloud',
-            subtitle: 'Restore playlists from your last backup',
-            onTap: () => _runRestore(context),
+            subtitle: isGoogle ? 'Restore playlists from your last backup' : 'Sign in with Google first',
+            onTap: () => isGoogle ? _runRestore(context) : _showSignInRequired(context),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 7. LIBRARY ────────────────────────────────────────────────
           const _SectionHeader(label: 'Library'),
@@ -311,7 +343,7 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           _StorageSection(),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 20),
 
           // ── 8. ABOUT ──────────────────────────────────────────────────
           const _SectionHeader(label: 'About'),
@@ -331,9 +363,9 @@ class ProfileScreen extends ConsumerWidget {
               ),
               child: Column(
                 children: [
-                  const PlayedLogo(fontSize: 28, letterSpacing: 5,
-                      borderRadius: 12,
-                      padding: EdgeInsets.symmetric(horizontal: 18, vertical: 8)),
+                  const PlayedLogo(fontSize: 18, letterSpacing: 3,
+                      borderRadius: 10,
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6)),
                   const SizedBox(height: 12),
                   const Text('Otya? Play. Your media, your rules.',
                       style: TextStyle(
@@ -732,6 +764,15 @@ class ProfileScreen extends ConsumerWidget {
                 style: TextStyle(color: AppColors.error)),
           ),
         ],
+      ),
+    );
+  }
+
+  void _showSignInRequired(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Sign in with Google first to use cloud backup.'),
+        backgroundColor: AppColors.surface,
       ),
     );
   }
@@ -1241,6 +1282,60 @@ class _SettingsTile extends StatelessWidget {
   }
 }
 
+// ── Collapsible Section ────────────────────────────────────────────────────
+
+class _CollapsibleSection extends StatefulWidget {
+  final List<Widget> children;
+  const _CollapsibleSection({required this.children});
+
+  @override
+  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
+}
+
+class _CollapsibleSectionState extends State<_CollapsibleSection> {
+  bool _expanded = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _expanded = !_expanded),
+          child: Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Row(
+              children: [
+                Text(
+                  _expanded ? 'Collapse' : 'Expand',
+                  style: const TextStyle(
+                    fontSize: 11, color: AppColors.textSecondary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                  color: AppColors.textSecondary, size: 16,
+                ),
+              ],
+            ),
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: widget.children,
+          ),
+          secondChild: const SizedBox.shrink(),
+          crossFadeState: _expanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
+          duration: const Duration(milliseconds: 250),
+        ),
+      ],
+    );
+  }
+}
+
 class _SwitchTile extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -1255,7 +1350,7 @@ class _SwitchTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.circular(14),
