@@ -278,45 +278,50 @@ class _Header extends ConsumerWidget {
     final isScanning = libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const PlayedLogo(
-                fontSize: 20,
-                letterSpacing: 4,
-                borderRadius: 10,
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-              ),
-              const SizedBox(height: 4),
-              Row(
-                children: [
-                  Text(
-                    total == 0 ? 'Scanning...' : '$total files',
-                    style: const TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary),
+          Flexible(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const FittedBox(
+                  fit: BoxFit.scaleDown,
+                  child: PlayedLogo(
+                    fontSize: 17,
+                    letterSpacing: 3,
+                    borderRadius: 9,
+                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                   ),
-                  if (isScanning) ...[
-                    const SizedBox(width: 6),
-                    const SizedBox(
-                      width: 10,
-                      height: 10,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        color: AppColors.accent,
-                      ),
+                ),
+                const SizedBox(height: 3),
+                Row(
+                  children: [
+                    Text(
+                      total == 0 ? 'Scanning...' : '$total files',
+                      style: const TextStyle(
+                          fontSize: 11, color: AppColors.textSecondary),
                     ),
+                    if (isScanning) ...[
+                      const SizedBox(width: 6),
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ],
                   ],
-                ],
-              ),
-            ],
+                ),
+              ],
+            ),
           ),
-          const Spacer(),
-          const UserAvatarButton(),
           const SizedBox(width: 8),
+          const UserAvatarButton(),
+          const SizedBox(width: 6),
           _IconBtn(
             icon: Icons.search_rounded,
             onTap: () {
@@ -327,20 +332,67 @@ class _Header extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(width: 8),
-          _SortBtn(current: sort),
-          const SizedBox(width: 8),
-          _IconBtn(
-            icon: Icons.refresh_rounded,
-            onTap: () => ref
-                .read(mediaLibraryProvider.notifier)
-                .backgroundRefresh(),
-          ),
-          const SizedBox(width: 8),
-          _IconBtn(
-            icon: Icons.settings_rounded,
-            accent: true,
-            onTap: () => context.push('/profile'),
+          const SizedBox(width: 6),
+          PopupMenuButton<String>(
+            padding: EdgeInsets.zero,
+            icon: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: const Icon(Icons.more_vert_rounded,
+                  color: AppColors.textSecondary, size: 18),
+            ),
+            color: AppColors.surface,
+            shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14)),
+            onSelected: (value) {
+              if (value == 'sort') {
+                _SortBtn(current: sort).showSheet(context, ref);
+              } else if (value == 'refresh') {
+                ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+              } else if (value == 'settings') {
+                context.push('/profile');
+              }
+            },
+            itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'sort',
+                child: Row(children: [
+                  Icon(Icons.sort_rounded,
+                      color: AppColors.textSecondary, size: 18),
+                  SizedBox(width: 10),
+                  Text('Sort',
+                      style: TextStyle(
+                          color: AppColors.textPrimary, fontSize: 14)),
+                ]),
+              ),
+              const PopupMenuItem(
+                value: 'refresh',
+                child: Row(children: [
+                  Icon(Icons.refresh_rounded,
+                      color: AppColors.textSecondary, size: 18),
+                  SizedBox(width: 10),
+                  Text('Refresh',
+                      style: TextStyle(
+                          color: AppColors.textPrimary, fontSize: 14)),
+                ]),
+              ),
+              const PopupMenuItem(
+                value: 'settings',
+                child: Row(children: [
+                  Icon(Icons.settings_rounded,
+                      color: AppColors.accent, size: 18),
+                  SizedBox(width: 10),
+                  Text('Settings',
+                      style: TextStyle(
+                          color: AppColors.textPrimary, fontSize: 14)),
+                ]),
+              ),
+            ],
           ),
         ],
       ).animate().fadeIn(duration: 300.ms),
@@ -1010,8 +1062,8 @@ class _VideoGrid extends ConsumerWidget {
     }
     return GridView.builder(
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
         crossAxisSpacing: 12,
         mainAxisSpacing: 12,
         childAspectRatio: 16 / 11,
@@ -1450,11 +1502,11 @@ class _SortBtn extends ConsumerWidget {
     return _IconBtn(
       icon: Icons.sort_rounded,
       accent: current != MediaSort.dateAdded,
-      onTap: () => _showSheet(context, ref),
+      onTap: () => showSheet(context, ref),
     );
   }
 
-  void _showSheet(BuildContext context, WidgetRef ref) {
+  void showSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
       backgroundColor: AppColors.surface,
