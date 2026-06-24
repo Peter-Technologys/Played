@@ -31,15 +31,11 @@ void main() async {
   // 2. Pre-load persisted settings
   final savedSettings = await AppSettings.load();
 
-  // 4. AudioService — init BEFORE runApp so it is ready the moment
-  //    the user taps a song. Moving this to background was the #1 cause
-  //    of "nothing plays" on first tap.
+  // 3. AudioService — init BEFORE runApp so it is ready the moment
+  //    the user taps a song.
   await _initAudioService();
 
-  // 5. Pre-load persisted settings
-  final savedSettings = await AppSettings.load();
-
-  // 6. Run app
+  // 4. Run app
   runApp(
     ProviderScope(
       overrides: [
@@ -50,7 +46,7 @@ void main() async {
     ),
   );
 
-  // 7. Everything else in background
+  // 5. Everything else in background
   unawaited(_initBackground());
 }
 

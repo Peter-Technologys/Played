@@ -115,9 +115,11 @@ class _VideoPlayerScreenState
 
   void _onPlayerStateChanged() {
     final pos = _vlcController.value.position;
-    if (pos.inSeconds % 5 == 0 && pos.inSeconds > 0) {
+    if (pos.inSeconds > 0 && pos.inSeconds % 5 == 0) {
+      // Fire-and-forget — don't block the VLC listener thread
       PlayedDatabase.instance
-          .saveSeekPosition(widget.mediaItem.id, pos);
+          .saveSeekPosition(widget.mediaItem.id, pos)
+          .ignore();
     }
   }
 
@@ -268,6 +270,15 @@ class _VideoPlayerScreenState
   void dispose() {
     _controlsTimer?.cancel();
     _vlcController.removeListener(_onPlayerStateChanged);
+    // Save position before disposing so resume works next time
+    try {
+      final pos = _vlcController.value.position;
+      if (pos.inSeconds > 0) {
+        PlayedDatabase.instance
+            .saveSeekPosition(widget.mediaItem.id, pos)
+            .ignore();
+      }
+    } catch (_) {}
     _vlcController.dispose();
     _restoreOrientation();
     WidgetsBinding.instance.removeObserver(this);

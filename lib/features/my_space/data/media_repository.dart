@@ -25,14 +25,19 @@ class MediaRepository {
 
     final alive = <MediaItem>[...mediaStoreItems];
 
-    // Only verify supplemental (receive-dir) items
+    // Verify supplemental (receive-dir) items in batches of 50
+    // to avoid OOM on large libraries from one giant Future.wait()
     if (supplemental.isNotEmpty) {
-      final checks = await Future.wait(
-        supplemental.map((item) =>
-            File(item.filePath).exists().catchError((_) => false)),
-      );
-      for (var i = 0; i < supplemental.length; i++) {
-        if (checks[i]) alive.add(supplemental[i]);
+      const batchSize = 50;
+      for (var i = 0; i < supplemental.length; i += batchSize) {
+        final batch = supplemental.skip(i).take(batchSize).toList();
+        final checks = await Future.wait(
+          batch.map((item) =>
+              File(item.filePath).exists().catchError((_) => false)),
+        );
+        for (var j = 0; j < batch.length; j++) {
+          if (checks[j]) alive.add(batch[j]);
+        }
       }
     }
 
