@@ -56,7 +56,6 @@ class QueueNotifier extends StateNotifier<QueueState> {
     if (state.items.isEmpty) return;
     final int nextIndex;
     if (state.shuffle) {
-      // True random — never repeat the same index consecutively
       final pool = List.generate(state.items.length, (i) => i)
         ..remove(state.currentIndex);
       pool.shuffle();
@@ -186,9 +185,16 @@ class QueueScreen extends ConsumerWidget {
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: queue.items.length,
-                    onReorderItem: (old, newIdx) {
+                    // Fixed: correct callback is `onReorder`, not `onReorderItem`
+                    onReorder: (oldIndex, newIndex) {
                       HapticFeedback.mediumImpact();
-                      ref.read(queueProvider.notifier).reorder(old, newIdx);
+                      // ReorderableListView passes newIndex after removal;
+                      // adjust when moving downward
+                      final adjustedNew =
+                          newIndex > oldIndex ? newIndex - 1 : newIndex;
+                      ref
+                          .read(queueProvider.notifier)
+                          .reorder(oldIndex, adjustedNew);
                     },
                     itemBuilder: (context, i) {
                       final item = queue.items[i];

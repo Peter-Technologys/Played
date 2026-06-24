@@ -1,14 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Allows cleartext HTTP only for ad SDK domains (AdMob uses HTTP for some
-  ad requests). All other traffic uses HTTPS by default.
--->
 <network-security-config>
-    <base-config cleartextTrafficPermitted="false" />
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- Google AdMob / Mobile Ads -->
-        <domain includeSubdomains="true">googlesyndication.com</domain>
-        <domain includeSubdomains="true">doubleclick.net</domain>
-        <domain includeSubdomains="true">googleadservices.com</domain>
-    </domain-config>
+    <!-- Allow cleartext for local media and ad networks -->
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
 </network-security-config>

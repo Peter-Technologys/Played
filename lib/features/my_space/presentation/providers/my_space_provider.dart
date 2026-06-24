@@ -11,7 +11,8 @@ Future<List<MediaItem>> _runScan(bool _) =>
     MediaRepository.instance.getAllMedia(forceRefresh: true);
 
 /// Live media change event stream from Android MediaStore.
-const _mediaEventChannel = EventChannel('com.petersmart.played/media_events');
+/// Channel name MUST match the one registered in MainActivity.kt.
+const _mediaEventChannel = EventChannel('com.otyaplayer.app/media_events');
 
 /// The full media library — all songs + all videos.
 ///
@@ -40,7 +41,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       debugPrint('[MediaLibrary] MediaObserver not available: $e');
     }
 
-    // Periodic fallback every 15 min (was 5 min — saves battery)
+    // Periodic fallback every 15 min (saves battery)
     final periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       _backgroundRefresh();
     });
@@ -59,8 +60,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
 
     // Phase 1b — Hive history seed so UI is never blank on cold start.
-    // Hive is already open (opened in main() before runApp), so this is
-    // a synchronous in-memory read — no disk I/O.
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);

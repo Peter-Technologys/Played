@@ -87,7 +87,6 @@ Future<void> _initBackground() async {
     _initAppwrite(),
     StorageFolderService.instance.ensureCreated(),
   ]);
-  // AudioService is already initialized before runApp — nothing to do here.
 }
 
 Future<void> _initNotifications() async {
