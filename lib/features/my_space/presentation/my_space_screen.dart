@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -221,6 +222,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
             Expanded(
               child: libraryAsync.when(
                 loading: () => libraryAsync.valueOrNull != null
+                    // Already have data — show it, scanning badge in header
                     ? RefreshIndicator(
                         color: AppColors.accent,
                         backgroundColor: AppColors.surface,
@@ -233,6 +235,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
                           sort: sort,
                         ),
                       )
+                    // Truly first install — show row shimmer, not full screen
                     : const _FullShimmer(),
                 error: (e, _) => _ErrorView(
                   message: e.toString(),
@@ -506,7 +509,10 @@ class _TabViews extends StatelessWidget {
   }
 }
 
-// ── Songs tab — flat list like PlayIt ────────────────────────────────
+// ── Songs tab — professional aligned list ────────────────────────────────
+
+// Provider to track the currently playing item id for row highlight
+final _nowPlayingIdProvider = StateProvider<String?>((_) => null);
 
 class _SongList extends ConsumerWidget {
   final List<MediaItem> items;
@@ -519,7 +525,7 @@ class _SongList extends ConsumerWidget {
           icon: Icons.music_note_rounded, label: 'No songs found');
     }
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 100),
       itemCount: items.length,
       itemBuilder: (context, i) {
         final item = items[i];
@@ -529,6 +535,7 @@ class _SongList extends ConsumerWidget {
           onTap: () {
             HapticFeedback.lightImpact();
             ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+            ref.read(_nowPlayingIdProvider.notifier).state = item.id;
             context.push('/player/audio', extra: item);
           },
         );
@@ -545,78 +552,111 @@ class _SongRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final nowPlayingId = ref.watch(_nowPlayingIdProvider);
+    final isPlaying = nowPlayingId == item.id;
+
     return InkWell(
       onTap: onTap,
       onLongPress: () => _showContextMenu(context, ref),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        child: Row(
-          children: [
-            Container(
-              width: 48,
-              height: 48,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.accentViolet, AppColors.accent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        decoration: BoxDecoration(
+          color: isPlaying
+              ? AppColors.accent.withValues(alpha: 0.06)
+              : Colors.transparent,
+          border: isPlaying
+              ? const Border(
+                  left: BorderSide(color: AppColors.accent, width: 3))
+              : null,
+        ),
+        child: Padding(
+          padding: EdgeInsets.only(
+            left: isPlaying ? 13 : 16,
+            right: 12,
+            top: 8,
+            bottom: 8,
+          ),
+          child: Row(
+            children: [
+              // Track number — fixed 28 px column
+              SizedBox(
+                width: 28,
+                child: isPlaying
+                    ? const _MiniWave()
+                    : Text(
+                        '${index + 1}',
+                        textAlign: TextAlign.right,
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              // Album art — 44×44
+              _AlbumArtThumb(albumArtPath: item.albumArtPath),
+              const SizedBox(width: 12),
+              // Title + artist — flexible
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      item.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: isPlaying
+                            ? AppColors.accent
+                            : AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      item.artist != null &&
+                              item.artist!.isNotEmpty &&
+                              item.artist != '<unknown>'
+                          ? item.artist!
+                          : 'Unknown Artist',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.music_note_rounded,
-                color: Colors.white,
-                size: 22,
-              ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+              const SizedBox(width: 8),
+              // Duration — fixed 40 px column
+              SizedBox(
+                width: 40,
+                child: Text(
+                  item.formattedDuration,
+                  textAlign: TextAlign.right,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
                   ),
-                  const SizedBox(height: 3),
-                  Text(
-                    item.artist != null &&
-                            item.artist!.isNotEmpty &&
-                            item.artist != '<unknown>'
-                        ? item.artist!
-                        : item.formattedDuration,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ],
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              item.formattedDuration,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
+              const SizedBox(width: 4),
+              // Menu
+              GestureDetector(
+                onTap: () => _showContextMenu(context, ref),
+                child: const Padding(
+                  padding: EdgeInsets.all(4),
+                  child: Icon(Icons.more_vert_rounded,
+                      color: AppColors.textSecondary, size: 18),
+                ),
               ),
-            ),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () => _showContextMenu(context, ref),
-              child: const Icon(Icons.more_vert_rounded,
-                  color: AppColors.textSecondary, size: 18),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -629,6 +669,101 @@ class _SongRow extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => _SongContextMenu(item: item, ref: ref),
+    );
+  }
+}
+
+// ── Album art thumbnail (44×44) ───────────────────────────────────────────
+
+class _AlbumArtThumb extends StatefulWidget {
+  final String? albumArtPath;
+  const _AlbumArtThumb({this.albumArtPath});
+  @override
+  State<_AlbumArtThumb> createState() => _AlbumArtThumbState();
+}
+
+class _AlbumArtThumbState extends State<_AlbumArtThumb> {
+  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
+  String? _resolvedPath;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  Future<void> _resolve() async {
+    final raw = widget.albumArtPath;
+    if (raw == null) { if (mounted) setState(() => _loading = false); return; }
+    if (!raw.startsWith('albumid:')) {
+      if (mounted) setState(() { _resolvedPath = raw; _loading = false; });
+      return;
+    }
+    try {
+      final albumId = raw.substring('albumid:'.length);
+      final path = await _channel.invokeMethod<String>('getAlbumArt', {'albumId': albumId});
+      if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(8),
+      child: SizedBox(
+        width: 44, height: 44,
+        child: _loading
+            ? Container(color: AppColors.border)
+            : _resolvedPath != null
+                ? Image.file(File(_resolvedPath!), fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => _placeholder())
+                : _placeholder(),
+      ),
+    );
+  }
+
+  Widget _placeholder() => Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [AppColors.accentViolet, AppColors.accent],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: const Icon(Icons.music_note_rounded, color: Colors.white, size: 20),
+  );
+}
+
+// ── Mini waveform (3 animated bars shown when song is playing) ────────────
+
+class _MiniWave extends StatelessWidget {
+  const _MiniWave();
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: List.generate(3, (i) {
+        return Container(
+          width: 3,
+          margin: const EdgeInsets.only(left: 2),
+          decoration: BoxDecoration(
+            color: AppColors.accent,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        )
+            .animate(onPlay: (c) => c.repeat(reverse: true))
+            .scaleY(
+              begin: 0.3,
+              end: 1.0,
+              duration: Duration(milliseconds: 350 + i * 100),
+              curve: Curves.easeInOut,
+              alignment: Alignment.bottomCenter,
+            );
+      }),
     );
   }
 }
@@ -1048,7 +1183,7 @@ class _FileInfoSheet extends StatelessWidget {
   }
 }
 
-// ── Videos tab — grid like PlayIt ────────────────────────────────────
+// ── Videos tab — grid with real thumbnails ───────────────────────────────
 
 class _VideoGrid extends ConsumerWidget {
   final List<MediaItem> items;
@@ -1084,15 +1219,38 @@ class _VideoGrid extends ConsumerWidget {
   }
 }
 
-class _VideoCard extends StatelessWidget {
+class _VideoCard extends StatefulWidget {
   final MediaItem item;
   final VoidCallback onTap;
   const _VideoCard({required this.item, required this.onTap});
+  @override
+  State<_VideoCard> createState() => _VideoCardState();
+}
+
+class _VideoCardState extends State<_VideoCard> {
+  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
+  String? _thumbPath;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThumb();
+  }
+
+  Future<void> _loadThumb() async {
+    try {
+      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
+        'path': widget.item.filePath,
+        'id': widget.item.id,
+      });
+      if (mounted && path != null) setState(() => _thumbPath = path);
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
@@ -1109,44 +1267,37 @@ class _VideoCard extends StatelessWidget {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [AppColors.accent, AppColors.accentViolet],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                    ),
+                    // Real thumbnail or gradient placeholder
+                    _thumbPath != null
+                        ? Image.file(File(_thumbPath!), fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => _gradientBg())
+                        : _gradientBg(),
+                    // Play button overlay
                     Center(
                       child: Container(
-                        width: 44, height: 44,
+                        width: 40, height: 40,
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.35),
+                          color: Colors.black.withValues(alpha: 0.45),
                           shape: BoxShape.circle,
                         ),
-                        child: const Icon(
-                          Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 28,
-                        ),
+                        child: const Icon(Icons.play_arrow_rounded,
+                            color: Colors.white, size: 26),
                       ),
                     ),
+                    // Duration badge
                     Positioned(
-                      bottom: 6,
-                      right: 6,
+                      bottom: 6, right: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.7),
+                          color: Colors.black.withValues(alpha: 0.72),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          item.formattedDuration,
+                          widget.item.formattedDuration,
                           style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
+                            fontSize: 10, color: Colors.white,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
@@ -1159,12 +1310,10 @@ class _VideoCard extends StatelessWidget {
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
               child: Text(
-                item.title,
+                widget.item.title,
                 style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
+                  fontSize: 12, fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary, fontFamily: 'Inter',
                 ),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
@@ -1175,6 +1324,19 @@ class _VideoCard extends StatelessWidget {
       ),
     );
   }
+
+  Widget _gradientBg() => Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFF1a1a2e), AppColors.accentViolet],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: const Center(
+      child: Icon(Icons.movie_rounded, color: Colors.white38, size: 32),
+    ),
+  );
 }
 
 // ── Folders tab ──────────────────────────────────────────────────────
@@ -1625,14 +1787,32 @@ class _FullShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Column(
-        children: [
-          const MediaGridShimmer(count: 6),
-          const SizedBox(height: 16),
-          const MediaGridShimmer(count: 4),
-        ],
+    // Matches the song-row layout: number | art | title+artist | duration
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      itemCount: 12,
+      itemBuilder: (_, i) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 8),
+        child: Row(
+          children: [
+            const LoadingShimmer(width: 28, height: 14, borderRadius: 4),
+            const SizedBox(width: 12),
+            const LoadingShimmer(width: 44, height: 44, borderRadius: 8),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: const [
+                  LoadingShimmer(height: 14, borderRadius: 4),
+                  SizedBox(height: 6),
+                  LoadingShimmer(width: 100, height: 11, borderRadius: 4),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            const LoadingShimmer(width: 36, height: 11, borderRadius: 4),
+          ],
+        ),
       ),
     );
   }
