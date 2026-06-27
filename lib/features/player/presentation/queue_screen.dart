@@ -185,16 +185,11 @@ class QueueScreen extends ConsumerWidget {
                 : ReorderableListView.builder(
                     padding: const EdgeInsets.symmetric(vertical: 8),
                     itemCount: queue.items.length,
-                    // Fixed: correct callback is `onReorder`, not `onReorderItem`
-                    onReorder: (oldIndex, newIndex) {
+                    onReorderItem: (oldIndex, newIndex) {
                       HapticFeedback.mediumImpact();
-                      // ReorderableListView passes newIndex after removal;
-                      // adjust when moving downward
-                      final adjustedNew =
-                          newIndex > oldIndex ? newIndex - 1 : newIndex;
                       ref
                           .read(queueProvider.notifier)
-                          .reorder(oldIndex, adjustedNew);
+                          .reorder(oldIndex, newIndex);
                     },
                     itemBuilder: (context, i) {
                       final item = queue.items[i];
