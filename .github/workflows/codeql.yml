@@ -12,6 +12,13 @@
 #   - Every push to main
 #   - Every pull request targeting main
 #   - Weekly schedule (Sunday 02:00 UTC) for dormant-branch coverage
+#
+# Private repo safety:
+#   The job-level `if` checks github.event.repository.private.
+#   When the repo is private (and GitHub Advanced Security is not
+#   enabled), the entire job is skipped — no failure, no wasted
+#   minutes, no broken pipeline. When you make the repo public
+#   again, CodeQL resumes automatically with zero changes needed.
 # ───────────────────────────────────────────────────────────────
 
 name: CodeQL
@@ -28,6 +35,13 @@ jobs:
   analyze:
     name: Analyze (java-kotlin)
     runs-on: ubuntu-latest
+
+    # Skip the entire job when the repo is private.
+    # CodeQL SARIF upload requires a public repo or GitHub Advanced
+    # Security — running it on a private repo without that licence
+    # causes a hard failure. This condition makes the job a silent
+    # no-op when private, and resumes automatically when public.
+    if: ${{ !github.event.repository.private }}
 
     permissions:
       security-events: write   # required to upload SARIF results
