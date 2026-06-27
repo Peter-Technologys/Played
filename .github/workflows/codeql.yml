@@ -1,0 +1,100 @@
+# ───────────────────────────────────────────────────────────────
+# CodeQL Security Analysis — OTYA Player
+#
+# Replaces GitHub's default CodeQL auto-setup which fails on
+# Flutter projects because autobuild cannot resolve the Gradle
+# wrapper + Flutter-generated Android sources automatically.
+#
+# Languages analysed:
+#   - kotlin  (android/ native Kotlin sources)
+#
+# Runs on:
+#   - Every push to main
+#   - Every pull request targeting main
+#   - Weekly schedule (Sunday 02:00 UTC) for dormant-branch coverage
+# ───────────────────────────────────────────────────────────────
+
+name: CodeQL
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  schedule:
+    - cron: '0 2 * * 0'
+
+jobs:
+  analyze:
+    name: Analyze (java-kotlin)
+    runs-on: ubuntu-latest
+
+    permissions:
+      security-events: write   # required to upload SARIF results
+      actions: read
+      contents: read
+
+    steps:
+      # ── 1. Checkout ────────────────────────────────────────────────────────────
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # ── 2. Java 17 (required by the Android Gradle plugin) ─────────────────────
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      # ── 3. Flutter SDK (generates android/ build files & resolves plugins) ──────
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
+
+      # ── 4. Pub cache ────────────────────────────────────────────────────────────
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
+
+      # ── 5. Resolve Dart/Flutter dependencies ────────────────────────────────────
+      - name: flutter pub get
+        run: flutter pub get
+
+      # ── 6. Write a placeholder google-services.json so Gradle doesn't abort ─────
+      #       CodeQL only needs the Kotlin source to be compiled — Firebase
+      #       runtime config is irrelevant for static analysis.
+      - name: Write placeholder google-services.json
+        run: |
+          echo '{"project_info":{"project_id":"codeql-placeholder","project_number":"000000000000","firebase_url":"https://placeholder.firebaseio.com","storage_bucket":"placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.otyaplayer.app"}},"oauth_client":[],"api_key":[{"current_key":"placeholder"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' \
+            > android/app/google-services.json
+
+      # ── 7. Initialise CodeQL — must happen BEFORE the build step ────────────────
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v4
+        with:
+          languages: java-kotlin
+          # Queries: use the security-extended suite for broader vulnerability
+          # coverage beyond the default set (adds CWE-022, CWE-078, etc.)
+          queries: security-extended
+
+      # ── 8. Build — explicit Gradle invocation instead of autobuild ─────────────
+      #       We compile only the debug variant; CodeQL only needs bytecode/IR,
+      #       not a signed release APK. This is significantly faster.
+      - name: Build Android (debug) for CodeQL
+        run: flutter build apk --debug --no-tree-shake-icons
+
+      # ── 9. Cleanup secrets before upload ────────────────────────────────────────
+      - name: Remove placeholder google-services.json
+        if: always()
+        run: rm -f android/app/google-services.json
+
+      # ── 10. Run CodeQL analysis and upload SARIF to GitHub Security tab ─────────
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v4
+        with:
+          category: '/language:java-kotlin'
