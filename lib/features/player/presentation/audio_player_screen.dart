@@ -1,10 +1,9 @@
 import 'dart:io';
-import 'package:audio_service/audio_service.dart' hide MediaItem; // ignore: unused_import
+import 'package:audio_service/audio_service.dart' hide MediaItem;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
-import 'package:audio_session/audio_session.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
@@ -162,8 +161,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final skipSilence = settings?.skipSilence ?? false;
 
     try {
-      final session = await AudioSession.instance;
-      await session.configure(const AudioSessionConfiguration.music());
       await _handler!.loadAndPlay(
         item,
         speed: speed,
@@ -171,7 +168,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         savedPosition: saved,
       );
       state = state.copyWith(speed: speed, isLoading: false);
-      PlayedDatabase.instance.recordPlay(item);
+      // Fire-and-forget — don't block the UI on a DB write
+      PlayedDatabase.instance.recordPlay(item).ignore();
     } catch (e) {
       debugPrint('[AudioPlayer] load error: $e');
       state = state.copyWith(isLoading: false);

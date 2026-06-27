@@ -156,7 +156,8 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   Future<void> _update(AppSettings s) async {
     state = s;
-    await s.save();
+    // Persist in background — don't block the UI thread on every toggle
+    s.save().ignore();
   }
 
   void setThemeMode(AppThemeMode v)       => _update(state.copyWith(themeMode: v));

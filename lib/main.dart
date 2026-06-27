@@ -32,8 +32,7 @@ void main() async {
   final savedSettings = await AppSettings.load();
 
   // 3. AudioService — init BEFORE runApp so it is ready the moment
-  //    the user taps a song. Moving this to background was the #1 cause
-  //    of "nothing plays" on first tap.
+  //    the user taps a song.
   await _initAudioService();
 
   // 4. Run app
