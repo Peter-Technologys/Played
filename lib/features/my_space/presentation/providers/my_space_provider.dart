@@ -74,7 +74,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     try {
       final fresh = await compute(_runScan, true);
       // Only update state if we got results — never wipe existing library on error
-      if (fresh.isNotEmpty && mounted) state = AsyncData(fresh);
+      if (fresh.isNotEmpty) state = AsyncData(fresh);
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
       // Keep previous state — don't show error if we already have data

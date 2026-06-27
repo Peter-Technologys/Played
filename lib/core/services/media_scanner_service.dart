@@ -133,7 +133,7 @@ class MediaScannerService {
     try {
       await for (final entity
           in Directory(dirPath).list(recursive: true, followLinks: false)) {
-        if (entity is! File) continue;
+        if (entity is! File) { continue; }
         final path = entity.path;
         if (alreadySeen.contains(path)) continue;
         final ext = path.split('.').last.toLowerCase();
