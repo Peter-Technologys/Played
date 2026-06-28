@@ -395,10 +395,13 @@ class PlaylistDetailScreen extends ConsumerWidget {
           : ReorderableListView.builder(
               padding: const EdgeInsets.all(16),
               itemCount: tracks.length,
-              onReorderItem: (oldIndex, newIndex) {
+              onReorder: (oldIndex, newIndex) {
+                // ReorderableListView passes newIndex after removal;
+                // adjust when moving downward.
+                final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
                 final ids = List<String>.from(playlist.mediaIds);
                 final id = ids.removeAt(oldIndex);
-                ids.insert(newIndex, id);
+                ids.insert(adjusted, id);
                 final updated = Playlist(
                   id: playlist.id,
                   name: playlist.name,
