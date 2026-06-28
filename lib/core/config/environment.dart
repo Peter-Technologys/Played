@@ -19,5 +19,6 @@ abstract class Environment {
   static const String appName             = 'OTYA Player';
   static const String appVersion          = '1.2.0';
   static const String appPackageId        = 'com.otyaplayer.app';
-  static const String supportEmail        = 'support@petersmartlink.com';
+  static const String supportEmail = 'support@petersmartlink.com';
+  static const String websiteUrl   = 'https://petersmartlink.com';
 }

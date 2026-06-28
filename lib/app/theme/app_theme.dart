@@ -96,5 +96,66 @@ class AppTheme {
       splashColor: AppColors.accent.withValues(alpha: 0.06),
       highlightColor: AppColors.accent.withValues(alpha: 0.04),
     );
+    // Light theme — used when AppThemeMode.light is selected
+  static ThemeData get light {
+    return ThemeData(
+      useMaterial3: true,
+      brightness: Brightness.light,
+      scaffoldBackgroundColor: const Color(0xFFF5F7FA),
+      fontFamily: 'Inter',
+      colorScheme: const ColorScheme.light(
+        primary: AppColors.accent,
+        secondary: AppColors.accentViolet,
+        surface: Colors.white,
+        error: AppColors.error,
+        onPrimary: Colors.black,
+        onSecondary: Colors.white,
+        onSurface: Color(0xFF0D1422),
+      ),
+      appBarTheme: const AppBarTheme(
+        backgroundColor: Colors.white,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        titleTextStyle: TextStyle(
+          fontSize: 20, fontWeight: FontWeight.w700,
+          color: Color(0xFF0D1422), fontFamily: 'Inter',
+        ),
+        iconTheme: IconThemeData(color: Color(0xFF0D1422)),
+      ),
+      sliderTheme: SliderThemeData(
+        trackHeight: 4,
+        activeTrackColor: AppColors.accent,
+        inactiveTrackColor: const Color(0xFFE0E0E0),
+        thumbColor: AppColors.accent,
+        overlayColor: AppColors.accent.withValues(alpha: 0.2),
+      ),
+      dividerTheme: const DividerThemeData(
+        color: Color(0xFFE5E7EB), thickness: 1, space: 0,
+      ),
+      snackBarTheme: SnackBarThemeData(
+        backgroundColor: Colors.white,
+        contentTextStyle: const TextStyle(
+          color: Color(0xFF0D1422), fontFamily: 'Inter', fontSize: 13,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        behavior: SnackBarBehavior.floating,
+        elevation: 2,
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+        elevation: 2,
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        elevation: 2,
+      ),
+      splashColor: AppColors.accent.withValues(alpha: 0.06),
+      highlightColor: AppColors.accent.withValues(alpha: 0.04),
+    );
   }
+}
 }

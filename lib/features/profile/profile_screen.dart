@@ -404,7 +404,7 @@ class ProfileScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.email_outlined,
             label: 'Contact Support',
-            subtitle: 'support@otyaplayer.com',
+            subtitle: 'support@petersmartlink.com',
             onTap: () => _launchEmail(context),
           ),
           const SizedBox(height: 8),
@@ -780,7 +780,7 @@ class ProfileScreen extends ConsumerWidget {
   Future<void> _launchEmail(BuildContext context) async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'support@otyaplayer.com',
+      path: 'support@petersmartlink.com',
       queryParameters: {'subject': 'OTYA Player Support'},
     );
     if (!await launchUrl(uri)) {
@@ -796,8 +796,17 @@ class ProfileScreen extends ConsumerWidget {
 
   Future<void> _launchUrl(BuildContext context, String url) async {
     final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
+    // Try in-app browser first, fall back to external app
+    final launched = await launchUrl(
+      uri,
+      mode: LaunchMode.inAppBrowserView,
+    );
+    if (!launched) {
+      final fallback = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!fallback && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
               content: Text('Could not open link.'),

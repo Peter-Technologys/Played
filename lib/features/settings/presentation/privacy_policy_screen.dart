@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
 
-/// In-app Privacy Policy screen — required for Google Play compliance.
-/// Update the effective date and contact email before publishing.
+/// In-app Privacy Policy screen.
 class PrivacyPolicyScreen extends StatelessWidget {
   const PrivacyPolicyScreen({super.key});
 
@@ -21,10 +20,8 @@ class PrivacyPolicyScreen extends StatelessWidget {
         title: const Text(
           'Privacy Policy',
           style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-            fontFamily: 'Inter',
+            fontSize: 20, fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary, fontFamily: 'Inter',
           ),
         ),
       ),
@@ -51,9 +48,10 @@ class _PolicyBody extends StatelessWidget {
         _PolicySection(
           title: '1. Who We Are',
           body:
-              'OTYA Player is developed and maintained by the OTYA Player Team. '
+              'OTYA Player is developed and maintained by PeterSmart Link '
+              '(petersmartlink.com). '
               'If you have any questions about this policy, contact us at '
-              'support@otyaplayer.com.',
+              'support@petersmartlink.com.',
         ),
 
         _PolicySection(
@@ -65,7 +63,7 @@ class _PolicyBody extends StatelessWidget {
               '• Audio and video files — only to display and play your media.\n'
               '• Storage — to read, organise, and (optionally) write media files.\n'
               '• Biometric data — only to unlock the in-app Vault; never leaves your device.\n'
-              '• Network — only for optional cloud backup (Appwrite) and ad delivery (AdMob).\n\n'
+              '• Network — only for optional cloud backup (Appwrite) and ad delivery.\n\n'
               'No usage analytics, crash reports, or behavioural data are sent to us.',
         ),
 
@@ -85,11 +83,12 @@ class _PolicyBody extends StatelessWidget {
         _PolicySection(
           title: '4. Third-Party Services',
           body:
-              '• Google AdMob — displays ads. AdMob may collect device identifiers '
-              'per Google\'s Privacy Policy (policies.google.com/privacy).\n'
+              '• Google AdMob — displays ads on Google Play devices. AdMob may collect '
+              'device identifiers per Google\'s Privacy Policy (policies.google.com/privacy).\n'
+              '• Huawei Ads Kit — displays ads on Huawei AppGallery devices per Huawei\'s '
+              'Privacy Policy (consumer.huawei.com/en/privacy).\n'
               '• Appwrite — optional cloud backup. Data is stored on your own Appwrite '
-              'project and is not shared with us.\n'
-              '• Google Sign-In — optional account login for cloud sync.',
+              'project and is not shared with us.',
         ),
 
         _PolicySection(
@@ -118,13 +117,13 @@ class _PolicyBody extends StatelessWidget {
         _PolicySection(
           title: '8. Contact',
           body:
-              'Questions or concerns? Email us at support@otyaplayer.com.',
+              'Questions or concerns?\n'
+              'Email: support@petersmartlink.com\n'
+              'Website: https://petersmartlink.com',
         ),
 
         SizedBox(height: 32),
-        _PolicyText(
-          '© 2026 OTYA Player Team. All rights reserved.',
-        ),
+        _PolicyText('© 2026 PeterSmart Link. All rights reserved.'),
       ],
     );
   }
@@ -138,15 +137,11 @@ class _PolicyHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 4),
-      child: Text(
-        text,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.w800,
-          color: AppColors.textPrimary,
-          fontFamily: 'Inter',
-        ),
-      ),
+      child: Text(text,
+          style: const TextStyle(
+            fontSize: 18, fontWeight: FontWeight.w800,
+            color: AppColors.textPrimary, fontFamily: 'Inter',
+          )),
     );
   }
 }
@@ -163,25 +158,17 @@ class _PolicySection extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 15,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontFamily: 'Inter',
-            ),
-          ),
+          Text(title,
+              style: const TextStyle(
+                fontSize: 15, fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary, fontFamily: 'Inter',
+              )),
           const SizedBox(height: 6),
-          Text(
-            body,
-            style: const TextStyle(
-              fontSize: 13,
-              color: AppColors.textSecondary,
-              height: 1.65,
-              fontFamily: 'Inter',
-            ),
-          ),
+          Text(body,
+              style: const TextStyle(
+                fontSize: 13, color: AppColors.textSecondary,
+                height: 1.65, fontFamily: 'Inter',
+              )),
         ],
       ),
     );
@@ -194,14 +181,10 @@ class _PolicyText extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Text(
-      text,
-      style: const TextStyle(
-        fontSize: 12,
-        color: AppColors.textMuted,
-        fontFamily: 'Inter',
-        height: 1.5,
-      ),
-    );
+    return Text(text,
+        style: const TextStyle(
+          fontSize: 12, color: AppColors.textMuted,
+          fontFamily: 'Inter', height: 1.5,
+        ));
   }
 }
