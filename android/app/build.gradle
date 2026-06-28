@@ -60,7 +60,11 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            applicationIdSuffix '.debug'
+            // Do NOT use applicationIdSuffix here.
+            // audio_service registers its foreground service under the base
+            // applicationId (com.otyaplayer.app). If the debug build uses a
+            // different package (com.otyaplayer.app.debug), Android cannot
+            // find the service declaration and playback silently fails.
             debuggable true
         }
     }
