@@ -99,9 +99,14 @@ Future<void> _initNotifications() async {
 
 Future<void> _initAdMob() async {
   try {
+    // Guard against Huawei / non-GMS devices.
+    // google_mobile_ads requires Google Play Services at runtime.
+    // On Huawei HMS-only devices this throws a PlatformException;
+    // catching it here prevents a crash and simply disables ads.
     await MobileAds.instance.initialize();
-  } catch (e) {
-    debugPrint('[AdMob] Init error: $e');
+  } on Exception catch (e) {
+    // Expected on Huawei devices without GMS — ads are silently disabled.
+    debugPrint('[AdMob] Not available on this device (no GMS?): $e');
   }
 }
 

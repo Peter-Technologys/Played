@@ -127,11 +127,77 @@ jobs:
           path: build/app/outputs/flutter-apk/app-debug.apk
           retention-days: 3
 
+  # ── HUAWEI RELEASE — tags matching v*-huawei ──────────────────────────────────
+  # Produces a signed AAB using the 'huawei' product flavor.
+  # AdMob meta-data is replaced with a no-op ID so the app passes
+  # Huawei AppGallery review (no GMS runtime dependency).
+  #
+  # To trigger: create a tag like v1.2.0-huawei
+  build_huawei:
+    name: Build Huawei AppGallery AAB
+    runs-on: ubuntu-latest
+    if: github.ref_type == 'tag' && contains(github.ref_name, '-huawei')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
+
+      - run: flutter pub get
+
+      - name: Write google-services.json
+        run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+
+      - name: Build Huawei release AAB
+        env:
+          KEYSTORE_PATH: keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          flutter build appbundle --release \
+            --flavor huawei \
+            --obfuscate \
+            --split-debug-info=build/debug-info \
+            --target lib/main.dart
+
+      - name: Remove secrets
+        if: always()
+        run: |
+          rm -f android/app/keystore.jks
+          rm -f android/app/google-services.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app-huawei-aab
+          path: build/app/outputs/bundle/huaweiRelease/app-huawei-release.aab
+          retention-days: 7
+
+      - name: Create GitHub Release (Huawei)
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: build/app/outputs/bundle/huaweiRelease/app-huawei-release.aab
+
   # ── RELEASE — version tags only (v*) ───────────────────────────────────────────
   build_release:
     name: Build Signed Release
     runs-on: ubuntu-latest
-    if: github.ref_type == 'tag'
+    if: github.ref_type == 'tag' && !contains(github.ref_name, '-huawei')
     permissions:
       contents: write
     steps:

@@ -117,9 +117,13 @@
             </intent-filter>
         </receiver>
 
+        <!-- AdMob App ID — value is injected per flavor via manifestPlaceholders.
+             Standard flavor: real AdMob ID.
+             Huawei flavor:   no-op ID; AdMob.init() is guarded in Dart
+             so GMS is never called on HMS-only devices. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="ca-app-pub-2517163652161686~2375986122" />
+            android:value="${admobAppId}" />
 
         <meta-data
             android:name="flutterEmbedding"

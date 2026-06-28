@@ -43,6 +43,26 @@ android {
         multiDexEnabled true
     }
 
+    // ── Product flavors ──────────────────────────────────────────────────────
+    // 'standard' : Google Play / sideload — includes AdMob
+    // 'huawei'   : Huawei AppGallery — no GMS, AdMob meta-data removed via
+    //              manifest placeholder so the app doesn't crash on HMS devices
+    flavorDimensions 'store'
+    productFlavors {
+        standard {
+            dimension 'store'
+            // AdMob APPLICATION_ID is injected from the manifest directly
+            manifestPlaceholders = [admobAppId: 'ca-app-pub-2517163652161686~2375986122']
+        }
+        huawei {
+            dimension 'store'
+            // Use a no-op AdMob ID — AdMob SDK is present but init is
+            // guarded in Dart so it never actually calls GMS on Huawei.
+            // Huawei AppGallery review requires no GMS runtime calls.
+            manifestPlaceholders = [admobAppId: 'ca-app-pub-0000000000000000~0000000000']
+        }
+    }
+
     signingConfigs {
         release {
             storeFile file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
