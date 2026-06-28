@@ -15,7 +15,8 @@ class MediaScannerService {
   MediaScannerService._();
   static final MediaScannerService instance = MediaScannerService._();
 
-  static const _channel = MethodChannel('com.petersmart.played/media_store');
+  // Fix: channel name MUST match MainActivity.kt registration
+  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
 
   static const List<String> _videoExtensions = [
     'mp4', 'mkv', 'avi', 'mov', 'flv', 'ts', 'webm', 'wmv', '3gp', 'm4v',
@@ -131,8 +132,10 @@ class MediaScannerService {
       String dirPath, Set<String> alreadySeen) async {
     final results = <MediaItem>[];
     try {
+      // Use non-recursive listing — recursive: true on large dirs
+      // (e.g. WhatsApp) causes thousands of stat() calls and hangs the scan.
       await for (final entity
-          in Directory(dirPath).list(recursive: true, followLinks: false)) {
+          in Directory(dirPath).list(recursive: false, followLinks: false)) {
         if (entity is! File) { continue; }
         final path = entity.path;
         if (alreadySeen.contains(path)) continue;
@@ -219,15 +222,23 @@ class MediaScannerService {
 
   // PUBLIC API
 
-  /// Full scan: MediaStore + receive dirs in parallel.
-  /// Falls back to filesystem walk only if both return nothing.
+  /// Full scan: MediaStore first.
+  /// Supplemental receive-dir scan only runs if MediaStore returns < 10 items
+  /// (e.g. first install before MediaStore has indexed anything).
+  /// Filesystem walk is last resort only if both above return nothing.
   Future<List<MediaItem>> scanAll() async {
     final storeItems = await _queryMediaStore();
-    // Pass MediaStore paths so receive-dir scan skips duplicates
+
+    // MediaStore is authoritative on Android — if it found files, trust it.
+    // Only do the expensive receive-dir scan on first install or empty library.
+    if (storeItems.length >= 10) return storeItems;
+
+    // Supplemental scan for files not yet indexed by MediaStore
     final storePaths = storeItems.map((e) => e.filePath).toSet();
     final extraItems = await _scanReceiveDirs(storePaths);
     final merged = [...storeItems, ...extraItems];
     if (merged.isNotEmpty) return merged;
+
     return _filesystemScan();
   }
 

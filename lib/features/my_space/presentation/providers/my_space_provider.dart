@@ -16,10 +16,12 @@ const _mediaEventChannel = EventChannel('com.otyaplayer.app/media_events');
 
 /// The full media library — all songs + all videos.
 ///
-/// Loading strategy (offline-first):
-///   Phase 1: in-memory cache or Hive history seed -> instant UI (0 ms)
-///   Phase 2: background compute() scan -> silent update, no shimmer
-///   Phase 3: live MediaStore observer -> auto-refresh on new files
+/// Loading strategy (offline-first, instant UI):
+///   Phase 1a: in-memory cache          → 0 ms, truly instant
+///   Phase 1b: Hive history seed        → ~5 ms, never blank on cold start
+///   Phase 2:  background scan via      → silent update, no shimmer
+///             MediaStore (fast, ~200ms)
+///   Phase 3:  live MediaStore observer → auto-refresh on new files
 final mediaLibraryProvider =
     AsyncNotifierProvider<MediaLibraryNotifier, List<MediaItem>>(
   MediaLibraryNotifier.new,
@@ -31,7 +33,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     StreamSubscription<dynamic>? sub;
     Timer? debounce;
 
-    // Layer 3 — live MediaStore events (debounced 3 s)
+    // Phase 3 — live MediaStore events (debounced 3 s)
     try {
       sub = _mediaEventChannel.receiveBroadcastStream().listen((_) {
         debounce?.cancel();
@@ -55,29 +57,32 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     // Phase 1a — in-memory cache (zero I/O, truly instant)
     final cached = MediaRepository.instance.cachedItems;
     if (cached != null && cached.isNotEmpty) {
+      // Refresh in background without blocking UI
       Future.microtask(_backgroundRefresh);
       return cached;
     }
 
-    // Phase 1b — Hive history seed so UI is never blank on cold start.
+    // Phase 1b — Hive history seed so UI is never blank on cold start
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
       return history;
     }
 
-    // First install — no cache, no history: foreground scan (once ever)
+    // First install — no cache, no history.
+    // Run scan directly on this isolate (compute() overhead not worth it
+    // for a one-time first-install scan; MediaStore is fast ~200ms).
     return MediaRepository.instance.getAllMedia(forceRefresh: true);
   }
 
   Future<void> _backgroundRefresh() async {
     try {
+      // Run on a separate isolate so the UI thread is never blocked
       final fresh = await compute(_runScan, true);
-      // Only update state if we got results — never wipe existing library on error
       if (fresh.isNotEmpty) state = AsyncData(fresh);
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
-      // Keep previous state — don't show error if we already have data
+      // Keep previous state — never wipe library on error
     }
   }
 
