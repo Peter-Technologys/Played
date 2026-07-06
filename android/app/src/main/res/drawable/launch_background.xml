@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Branded splash shown by Android while the Flutter engine loads.
+     User sees OTYA colours from the very first millisecond instead
+     of a plain black window. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Deep dark navy background -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#FF04060D" />
+        </shape>
+    </item>
+
+    <!-- Subtle cyan glow behind the icon -->
+    <item
+        android:gravity="center"
+        android:width="240dp"
+        android:height="240dp">
+        <shape android:shape="oval">
+            <solid android:color="#1400D4FF" />
+        </shape>
+    </item>
+
+    <!-- App icon centred -->
+    <item android:gravity="center">
+        <bitmap
+            android:src="@mipmap/ic_launcher"
+            android:gravity="center"
+            android:tileMode="disabled" />
+    </item>
+
+</layer-list>

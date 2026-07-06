@@ -149,10 +149,17 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
-    // AudioService is now initialized before runApp — handler is always ready.
-    // If somehow null (init failed), fail fast with a clear log.
+    // AudioService initialises in the background after runApp.
+    // If the user taps a song before it is ready, retry for up to 4 s.
     if (_handler == null) {
-      debugPrint('[AudioPlayer] Handler is null — AudioService.init() failed at startup.');
+      debugPrint('[AudioPlayer] Waiting for AudioService to be ready...');
+      for (var i = 0; i < 8; i++) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (_handler != null) break;
+      }
+    }
+    if (_handler == null) {
+      debugPrint('[AudioPlayer] AudioService not ready after 4 s — giving up.');
       state = state.copyWith(isLoading: false);
       return;
     }
