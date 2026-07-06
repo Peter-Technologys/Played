@@ -25,9 +25,9 @@ class NotificationService {
     required int progress,
   }) async {
     final androidDetails = AndroidNotificationDetails(
-      'played_extraction',
-      'Audio Extraction',
-      channelDescription: 'Shows MP4 to MP3 extraction progress',
+      'com.otyaplayer.app.tools',
+      'OTYA Player Tools',
+      channelDescription: 'Audio extraction and video trim progress',
       importance: Importance.low,
       priority: Priority.low,
       showProgress: true,
@@ -50,8 +50,8 @@ class NotificationService {
     required String body,
   }) async {
     const androidDetails = AndroidNotificationDetails(
-      'played_extraction',
-      'Audio Extraction',
+      'com.otyaplayer.app.tools',
+      'OTYA Player Tools',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
@@ -70,8 +70,8 @@ class NotificationService {
     required String body,
   }) async {
     const androidDetails = AndroidNotificationDetails(
-      'played_extraction',
-      'Audio Extraction',
+      'com.otyaplayer.app.tools',
+      'OTYA Player Tools',
       importance: Importance.high,
       priority: Priority.high,
     );
