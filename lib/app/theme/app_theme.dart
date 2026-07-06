@@ -96,7 +96,9 @@ class AppTheme {
       splashColor: AppColors.accent.withValues(alpha: 0.06),
       highlightColor: AppColors.accent.withValues(alpha: 0.04),
     );
-    // Light theme — used when AppThemeMode.light is selected
+  }
+
+  // Light theme — used when AppThemeMode.light is selected
   static ThemeData get light {
     return ThemeData(
       useMaterial3: true,
@@ -157,5 +159,4 @@ class AppTheme {
       highlightColor: AppColors.accent.withValues(alpha: 0.04),
     );
   }
-}
 }
