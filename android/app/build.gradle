@@ -96,7 +96,10 @@ flutter {
 
 dependencies {
     implementation 'androidx.multidex:multidex:2.0.1'
-    implementation 'androidx.window:window:1.2.0'
-    implementation 'androidx.window:window-java:1.2.0'
+    // Bumped to match Updates-mavplayer AGP 8.3.1 requirements
+    implementation 'androidx.window:window:1.3.0'
+    implementation 'androidx.window:window-java:1.3.0'
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
+    // battery_plus — used by OtyaVideoPanel to show battery in fullscreen
+    implementation 'androidx.annotation:annotation:1.7.1'
 }

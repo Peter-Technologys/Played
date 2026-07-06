@@ -71,6 +71,18 @@ dependencies:
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.2
 
+  # fplayer — lightweight video-player plugin from Updates-mavplayer.
+  # Used for the advanced panel UI (brightness/volume swipe, speed, lock,
+  # battery indicator). flutter_vlc_player is kept as the actual decoder
+  # because VLC supports more codecs (MKV, TS, RMVB, etc.) than fplayer-core.
+  fplayer:
+    git:
+      url: https://gitlab.com/updates1793427/apk-v1/Updates-mavplayer.git
+      ref: main
+
+  # Battery — used by the fplayer panel to show battery level in fullscreen
+  battery_plus: ^6.2.1
+
   # Connectivity
   connectivity_plus: ^6.0.3
 
