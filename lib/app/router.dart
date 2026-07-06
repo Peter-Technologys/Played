@@ -15,8 +15,8 @@ import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../features/playlists/playlist_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
-import '../shared/widgets/ad_banner_slot.dart';
-import '../shared/widgets/pro_gate.dart';
+import '../shared/widgets/ad_banner_slot.dart'; // no-op stub while ads disabled
+import '../shared/widgets/pro_gate.dart'; // pass-through stub while ads disabled
 
 class AppRouter {
   static final GoRouter router = GoRouter(

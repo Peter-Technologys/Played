@@ -3,7 +3,8 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
+// ADS DISABLED — re-enable when listed on Play Store
+// import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'app/app.dart'; // OtyaPlayerApp
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
@@ -83,7 +84,7 @@ Future<void> _initAudioService() async {
 Future<void> _initBackground() async {
   await Future.wait([
     _initNotifications(),
-    _initAdMob(),
+    // _initAdMob(), // ADS DISABLED — re-enable when listed on Play Store
     _initAppwrite(),
     StorageFolderService.instance.ensureCreated(),
   ]);
@@ -97,18 +98,14 @@ Future<void> _initNotifications() async {
   }
 }
 
-Future<void> _initAdMob() async {
-  try {
-    // Guard against Huawei / non-GMS devices.
-    // google_mobile_ads requires Google Play Services at runtime.
-    // On Huawei HMS-only devices this throws a PlatformException;
-    // catching it here prevents a crash and simply disables ads.
-    await MobileAds.instance.initialize();
-  } on Exception catch (e) {
-    // Expected on Huawei devices without GMS — ads are silently disabled.
-    debugPrint('[AdMob] Not available on this device (no GMS?): $e');
-  }
-}
+// ADS DISABLED — re-enable when listed on Play Store
+// Future<void> _initAdMob() async {
+//   try {
+//     await MobileAds.instance.initialize();
+//   } on Exception catch (e) {
+//     debugPrint('[AdMob] Not available on this device (no GMS?): $e');
+//   }
+// }
 
 Future<void> _initAppwrite() async {
   try {
