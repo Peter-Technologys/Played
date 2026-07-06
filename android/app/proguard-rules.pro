@@ -40,6 +40,22 @@
 # -keep class com.google.android.gms.ads.** { *; }
 # -dontwarn com.google.android.gms.ads.**
 
+# Encrypt / Bouncy Castle (used by vault)
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+
+# Kotlin coroutines
+-keepnames class kotlinx.coroutines.internal.MainDispatcherFactory {}
+-keepnames class kotlinx.coroutines.CoroutineExceptionHandler {}
+-dontwarn kotlinx.coroutines.**
+
+# Remove all logging in release to shrink further
+-assumenosideeffects class android.util.Log {
+    public static int v(...);
+    public static int d(...);
+    public static int i(...);
+}
+
 # General
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
