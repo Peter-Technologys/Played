@@ -8,6 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/appwrite_service.dart';
+import '../../core/services/update_service.dart';
+import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/storage_folder_service.dart';
