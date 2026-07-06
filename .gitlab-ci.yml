@@ -1,26 +1,16 @@
-# ───────────────────────────────────────────────────────────────
-# OTYA Player — GitLab CI/CD Pipeline
+# OTYA Player - GitLab CI/CD Pipeline
 #
-# Stage summary:
-#   prepare  — pub get (once, shared via artifacts)
-#   validate — flutter analyze
-#   test     — unit tests (MR only)
-#   build    — debug APK on MR, release AAB+APK on tags only
-#   publish  — upload APKs + version.json to Cloudflare R2 (tags only)
-#              then notify Appwrite (releases collection + push if available)
+# Stages:
+#   prepare  - pub get
+#   validate - flutter analyze
+#   test     - unit tests (MR only)
+#   build    - debug APK on MR, release AAB+APK on tags
+#   publish  - upload APKs + version.json to Cloudflare R2 (tags only)
 #
-# Required CI/CD Variables (Settings → CI/CD → Variables, Masked + Protected):
-#   GOOGLE_SERVICES_JSON   — raw contents of google-services.json
-#   KEYSTORE_BASE64        — Base64-encoded .jks keystore
-#   STORE_PASSWORD         — Keystore password
-#   KEY_ALIAS              — Key alias
-#   KEY_PASSWORD           — Key password
-#   R2_ACCESS_KEY_ID       — Cloudflare R2 Access Key ID
-#   R2_SECRET_ACCESS_KEY   — Cloudflare R2 Secret Access Key
-#   APPWRITE_ENDPOINT      — e.g. https://nyc.cloud.appwrite.io/v1
-#   APPWRITE_PROJECT_ID    — Appwrite Project ID
-#   APPWRITE_API_KEY       — Appwrite Server API Key (with databases.write scope)
-# ───────────────────────────────────────────────────────────────
+# Required CI/CD Variables:
+#   GOOGLE_SERVICES_JSON, KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, APPWRITE_API_KEY (optional)
 
 image: ghcr.io/cirruslabs/flutter:stable
 
@@ -39,7 +29,6 @@ stages:
   - build
   - publish
 
-# ── Global cache ──────────────────────────────────────────────────────────────
 cache:
   - key: "pub-cache-v2"
     paths:
@@ -55,7 +44,6 @@ cache:
       - ~/.gradle/caches/modules-2/files-2.1/
       - ~/.gradle/caches/modules-2/metadata-2.1/
 
-# ── Shared anchors ────────────────────────────────────────────────────────────
 .free_disk_space: &free_disk_space |
   echo "=== Disk usage before cleanup ==="
   df -h
@@ -74,9 +62,6 @@ cache:
   fi
   echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
 
-# ───────────────────────────────────────────────────────────────
-# PREPARE
-# ───────────────────────────────────────────────────────────────
 prepare:
   stage: prepare
   script:
@@ -91,9 +76,6 @@ prepare:
     - if: '$CI_COMMIT_BRANCH == "main"'
     - if: '$CI_COMMIT_TAG'
 
-# ───────────────────────────────────────────────────────────────
-# VALIDATE
-# ───────────────────────────────────────────────────────────────
 analyze:
   stage: validate
   needs: [prepare]
@@ -103,9 +85,6 @@ analyze:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
 
-# ───────────────────────────────────────────────────────────────
-# TEST — MR only
-# ───────────────────────────────────────────────────────────────
 unit_test:
   stage: test
   needs: [prepare]
@@ -123,9 +102,6 @@ unit_test:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
 
-# ───────────────────────────────────────────────────────────────
-# BUILD — debug APK on MR, release on tags
-# ───────────────────────────────────────────────────────────────
 build_apk_debug:
   stage: build
   needs: [prepare]
@@ -166,163 +142,16 @@ build_release:
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/ && $GOOGLE_SERVICES_JSON'
 
-# ───────────────────────────────────────────────────────────────
-# PUBLISH — upload to R2, then notify Appwrite
-#
-# Upload order (CRITICAL — Worker must never point to missing files):
-#   1. Backup current files to releases/v<old>/ in R2
-#   2. Upload arm64 APK
-#   3. Upload arm32 APK
-#   4. Generate + upload version.json  ← last, so Worker is always consistent
-#   5. Notify Appwrite (create releases doc + optional push)
-#   6. Prune old backups (keep last 5)
-# ───────────────────────────────────────────────────────────────
 publish_to_r2:
   stage: publish
   image: python:3.12-alpine
   needs: [build_release]
   before_script:
     - pip install awscli --quiet
-    - apk add --no-cache curl jq bash
+    - apk add --no-cache curl bash
   script:
-    - |
-      set -euo pipefail
-
-      # ── 1. Extract version from tag ──────────────────────────────────
-      VERSION=${CI_COMMIT_TAG#v}
-      VERSION_CODE=$(echo "$VERSION" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
-      echo "Publishing version $VERSION (code $VERSION_CODE) to R2..."
-
-      # ── 2. Read changelog from CHANGELOG.md ──────────────────────────
-      # Extracts the top section between the first ## [...] heading and the next
-      CHANGELOG=$(awk '/^## \[/{found++} found==1{print} found==2{exit}' CHANGELOG.md \
-        | tail -n +2 | head -40 | tr '\n' ' ' | sed 's/  */ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
-      if [ -z "$CHANGELOG" ]; then
-        CHANGELOG="Bug fixes and improvements"
-      fi
-
-      # ── 3. Read SDK versions from android/app/build.gradle ───────────
-      MIN_SDK=$(grep 'minSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+')
-      TARGET_SDK=$(grep 'targetSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+')
-      MIN_SDK=${MIN_SDK:-21}
-      TARGET_SDK=${TARGET_SDK:-36}
-
-      # ── 4. Backup current version before overwriting ──────────────────
-      CURRENT_VERSION=$(aws s3 cp \
-        s3://$R2_BUCKET/version.json - \
-        --endpoint-url $R2_ENDPOINT 2>/dev/null \
-        | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
-
-      if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$VERSION" ]; then
-        echo "Backing up v$CURRENT_VERSION to releases/v$CURRENT_VERSION/..."
-        for KEY in app-arm64-v8a-standard-release.apk app-armeabi-v7a-standard-release.apk version.json; do
-          aws s3 cp \
-            s3://$R2_BUCKET/$KEY \
-            s3://$R2_BUCKET/releases/v$CURRENT_VERSION/$KEY \
-            --endpoint-url $R2_ENDPOINT 2>/dev/null || true
-        done
-      fi
-
-      # ── 5. Upload APKs (arm64 first, then arm32) ─────────────────────
-      echo "Uploading arm64 APK..."
-      aws s3 cp \
-        build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk \
-        s3://$R2_BUCKET/app-arm64-v8a-standard-release.apk \
-        --endpoint-url $R2_ENDPOINT \
-        --content-type application/vnd.android.package-archive \
-        --cache-control "public, max-age=31536000, immutable"
-
-      echo "Uploading arm32 APK..."
-      aws s3 cp \
-        build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk \
-        s3://$R2_BUCKET/app-armeabi-v7a-standard-release.apk \
-        --endpoint-url $R2_ENDPOINT \
-        --content-type application/vnd.android.package-archive \
-        --cache-control "public, max-age=31536000, immutable"
-
-      # ── 6. Generate version.json ──────────────────────────────────────
-      DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-      python3 - <<PYEOF
-import json, sys
-data = {
-    "version":     "$VERSION",
-    "versionCode": $VERSION_CODE,
-    "date":        "$DATE",
-    "arm64":       "app-arm64-v8a-standard-release.apk",
-    "arm32":       "app-armeabi-v7a-standard-release.apk",
-    "changelog":   "$CHANGELOG",
-    "minSdk":      $MIN_SDK,
-    "targetSdk":   $TARGET_SDK,
-    "workerUrl":   "$WORKER_URL"
-}
-with open('version.json', 'w') as f:
-    json.dump(data, f, indent=2)
-print(json.dumps(data, indent=2))
-PYEOF
-
-      # Validate JSON before uploading
-      python3 -c "import json; json.load(open('version.json'))" || { echo "ERROR: version.json is invalid JSON"; exit 1; }
-
-      # ── 7. Upload version.json LAST ───────────────────────────────────
-      echo "Uploading version.json..."
-      aws s3 cp \
-        version.json \
-        s3://$R2_BUCKET/version.json \
-        --endpoint-url $R2_ENDPOINT \
-        --content-type application/json \
-        --cache-control "public, max-age=300"
-
-      echo "✓ R2 upload complete."
-
-      # ── 8. Notify Appwrite — create releases document ─────────────────
-      if [ -n "${APPWRITE_ENDPOINT:-}" ] && [ -n "${APPWRITE_PROJECT_ID:-}" ] && [ -n "${APPWRITE_API_KEY:-}" ]; then
-        echo "Notifying Appwrite..."
-        DOC_BODY=$(python3 -c "
-import json
-print(json.dumps({
-    'documentId': 'v$VERSION'.replace('.', '-'),
-    'data': {
-        'version':     '$VERSION',
-        'versionCode': $VERSION_CODE,
-        'date':        '$DATE',
-        'changelog':   '$CHANGELOG',
-        'arm64Url':    '$WORKER_URL/apk/arm64',
-        'arm32Url':    '$WORKER_URL/apk/arm32',
-        'downloadUrl': '$WORKER_URL/download',
-        'minSdk':      $MIN_SDK,
-        'targetSdk':   $TARGET_SDK
-    }
-}))
-")
-        HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-          -X POST \
-          "${APPWRITE_ENDPOINT}/databases/otya-db/collections/releases/documents" \
-          -H "Content-Type: application/json" \
-          -H "X-Appwrite-Project: ${APPWRITE_PROJECT_ID}" \
-          -H "X-Appwrite-Key: ${APPWRITE_API_KEY}" \
-          -d "$DOC_BODY")
-        echo "Appwrite response: $HTTP_STATUS"
-        if [ "$HTTP_STATUS" = "201" ] || [ "$HTTP_STATUS" = "200" ]; then
-          echo "✓ Appwrite releases document created."
-        else
-          echo "⚠ Appwrite notify returned $HTTP_STATUS — continuing (non-fatal)."
-        fi
-      else
-        echo "⚠ APPWRITE_* variables not set — skipping Appwrite notification."
-      fi
-
-      # ── 9. Prune old backups — keep last 5 ───────────────────────────
-      echo "Pruning old backups (keep last 5)..."
-      VERSIONS=$(aws s3 ls s3://$R2_BUCKET/releases/ \
-        --endpoint-url $R2_ENDPOINT 2>/dev/null \
-        | awk '{print $2}' | sort -V | head -n -5)
-      for OLD in $VERSIONS; do
-        echo "Deleting old backup: $OLD"
-        aws s3 rm s3://$R2_BUCKET/releases/$OLD \
-          --endpoint-url $R2_ENDPOINT --recursive 2>/dev/null || true
-      done
-
-      echo "✓ Publish complete. Live at $WORKER_URL"
+    - chmod +x scripts/publish_r2.sh
+    - bash scripts/publish_r2.sh
   environment:
     name: production
     url: https://getotya.petersmartlink.com
