@@ -117,6 +117,7 @@ build_apk_debug:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event" && $GOOGLE_SERVICES_JSON'
     - if: '$CI_COMMIT_BRANCH == "main" && $GOOGLE_SERVICES_JSON'
+    - when: never
 
 build_release:
   stage: build
