@@ -151,7 +151,19 @@ jobs:
     if: github.ref_type == 'tag' && contains(github.ref_name, '-huawei')
     permissions:
       contents: write
+    env:
+      GRADLE_OPTS: "-Dorg.gradle.daemon=false"
     steps:
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
       - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
