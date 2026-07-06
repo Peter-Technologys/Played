@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,6 +7,7 @@ import 'theme/app_theme.dart';
 import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
+import '../core/widgets/update_dialog.dart';
 
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
@@ -22,6 +24,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
     _checkOnboarding();
+    // Check for updates after the first frame is drawn so it never
+    // delays the app startup. Shows a friendly dialog if a new version
+    // is available — max once per day.
+    SchedulerBinding.instance.addPostFrameCallback((_) {
+      if (mounted) UpdateDialog.checkAndShow(context);
+    });
   }
 
   Future<void> _checkOnboarding() async {

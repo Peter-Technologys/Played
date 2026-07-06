@@ -8,6 +8,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/appwrite_service.dart';
+import '../../core/services/update_service.dart';
+import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/storage_folder_service.dart';
@@ -345,7 +347,14 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 8. ABOUT ──────────────────────────────────────────────────
+          // ── 8. APP UPDATES ────────────────────────────────────────────
+          const _SectionHeader(label: 'App Updates'),
+          const SizedBox(height: 12),
+          const _UpdateCheckerTile(),
+
+          const SizedBox(height: 20),
+
+          // ── 9. ABOUT ──────────────────────────────────────────────────
           const _SectionHeader(label: 'About'),
           const SizedBox(height: 12),
           Container(
@@ -814,6 +823,108 @@ class ProfileScreen extends ConsumerWidget {
         );
       }
     }
+  }
+}
+
+// ── Update Checker Tile ────────────────────────────────────────────────────
+
+enum _UpdateState { idle, checking, upToDate, updateAvailable, error }
+
+class _UpdateCheckerTile extends StatefulWidget {
+  const _UpdateCheckerTile();
+
+  @override
+  State<_UpdateCheckerTile> createState() => _UpdateCheckerTileState();
+}
+
+class _UpdateCheckerTileState extends State<_UpdateCheckerTile> {
+  _UpdateState _state = _UpdateState.idle;
+
+  Future<void> _check() async {
+    setState(() => _state = _UpdateState.checking);
+    try {
+      final info = await UpdateService.instance.checkForUpdate(force: true);
+      if (!mounted) return;
+      if (info == null) {
+        setState(() => _state = _UpdateState.upToDate);
+      } else {
+        setState(() => _state = _UpdateState.updateAvailable);
+        if (mounted) await UpdateDialog.checkAndShow(context);
+      }
+    } catch (_) {
+      if (mounted) setState(() => _state = _UpdateState.error);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final icon = switch (_state) {
+      _UpdateState.idle            => Icons.system_update_outlined,
+      _UpdateState.checking        => Icons.sync_rounded,
+      _UpdateState.upToDate        => Icons.check_circle_outline_rounded,
+      _UpdateState.updateAvailable => Icons.new_releases_rounded,
+      _UpdateState.error           => Icons.wifi_off_rounded,
+    };
+    final subtitle = switch (_state) {
+      _UpdateState.idle            => 'Tap to check for a new version',
+      _UpdateState.checking        => 'Checking\u2026',
+      _UpdateState.upToDate        => 'You have the latest version \u2705',
+      _UpdateState.updateAvailable => 'New version available! Tap to update \ud83c\udf89',
+      _UpdateState.error           => 'Could not check. Make sure you have internet.',
+    };
+    final color = switch (_state) {
+      _UpdateState.upToDate        => AppColors.accentGreen,
+      _UpdateState.updateAvailable => AppColors.accent,
+      _UpdateState.error           => AppColors.error,
+      _                            => AppColors.textSecondary,
+    };
+
+    return GestureDetector(
+      onTap: _state == _UpdateState.checking ? null : _check,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: _state == _UpdateState.updateAvailable
+                ? AppColors.accent.withValues(alpha: 0.5)
+                : AppColors.border,
+          ),
+        ),
+        child: Row(
+          children: [
+            _state == _UpdateState.checking
+                ? const SizedBox(
+                    width: 20, height: 20,
+                    child: CircularProgressIndicator(
+                        strokeWidth: 2, color: AppColors.accent))
+                : Icon(icon, color: color, size: 20),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Check for Updates',
+                      style: TextStyle(
+                        fontSize: 14, color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500, fontFamily: 'Inter',
+                      )),
+                  const SizedBox(height: 2),
+                  Text(subtitle,
+                      style: TextStyle(
+                        fontSize: 11, color: color, fontFamily: 'Inter',
+                      )),
+                ],
+              ),
+            ),
+            if (_state != _UpdateState.checking)
+              const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textMuted, size: 20),
+          ],
+        ),
+      ),
+    );
   }
 }
 
