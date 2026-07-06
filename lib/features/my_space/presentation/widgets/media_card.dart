@@ -241,16 +241,25 @@ class _MediaCardState extends State<MediaCard>
 }
 
 class _GridPainter extends CustomPainter {
+  static List<Offset>? _dots;
+  static Size? _lastSize;
+
   @override
   void paint(Canvas canvas, Size size) {
-    final paint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = 1;
-    const spacing = 16.0;
-    for (double x = 0; x < size.width; x += spacing) {
-      for (double y = 0; y < size.height; y += spacing) {
-        canvas.drawCircle(Offset(x, y), 1, paint);
+    if (_lastSize != size || _dots == null) {
+      _lastSize = size;
+      const spacing = 16.0;
+      final dots = <Offset>[];
+      for (double x = 0; x < size.width; x += spacing) {
+        for (double y = 0; y < size.height; y += spacing) {
+          dots.add(Offset(x, y));
+        }
       }
+      _dots = dots;
+    }
+    final paint = Paint()..color = Colors.white..strokeWidth = 1;
+    for (final dot in _dots!) {
+      canvas.drawCircle(dot, 1, paint);
     }
   }
 

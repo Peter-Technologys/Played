@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -57,15 +58,28 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     setState(() => _dragOffset = 0);
   }
 
+  Widget _artFallback() => Container(
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [AppColors.accent, AppColors.accentViolet],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: const Icon(Icons.music_note_rounded, color: Colors.black, size: 28),
+  );
+
   @override
   Widget build(BuildContext context) {
     final item = ref.watch(miniPlayerItemProvider);
     final playerState = ref.watch(audioPlayerProvider);
 
     if (item != null && _lastItem == null) {
-      _slideCtrl.forward();
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) { if (mounted) _slideCtrl.forward(); });
     } else if (item == null && _lastItem != null) {
-      _slideCtrl.reverse();
+      WidgetsBinding.instance.addPostFrameCallback(
+          (_) { if (mounted) _slideCtrl.reverse(); });
     }
     _lastItem = item;
 
@@ -120,21 +134,21 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
               ),
               child: Row(
                 children: [
-                  // Album art
-                  Container(
-                    width: 68,
-                    height: 68,
-                    decoration: const BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [AppColors.accent, AppColors.accentViolet],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.horizontal(
-                          left: Radius.circular(18)),
+                  // Album art — real art when available, gradient fallback
+                  ClipRRect(
+                    borderRadius: const BorderRadius.horizontal(
+                        left: Radius.circular(18)),
+                    child: SizedBox(
+                      width: 68, height: 68,
+                      child: displayItem.albumArtPath != null &&
+                              !displayItem.albumArtPath!.startsWith('albumid:')
+                          ? Image.file(
+                              File(displayItem.albumArtPath!),
+                              fit: BoxFit.cover,
+                              errorBuilder: (_, __, ___) => _artFallback(),
+                            )
+                          : _artFallback(),
                     ),
-                    child: const Icon(Icons.music_note_rounded,
-                        color: Colors.black, size: 28),
                   ),
 
                   const SizedBox(width: 12),
