@@ -273,10 +273,15 @@ class MediaScannerService {
     return results;
   }
 
+  /// FNV-1a 32-bit hash — much lower collision rate than the old
+  /// polynomial hash, especially for paths that share long prefixes.
   String _stableId(String path) {
-    var hash = 0;
-    for (final c in path.codeUnits) {
-      hash = (hash * 31 + c) & 0x7FFFFFFF;
+    const fnvPrime  = 0x01000193;
+    const fnvOffset = 0x811c9dc5;
+    var hash = fnvOffset;
+    for (final byte in path.codeUnits) {
+      hash ^= byte;
+      hash = (hash * fnvPrime) & 0xFFFFFFFF;
     }
     return hash.toRadixString(16).padLeft(8, '0');
   }

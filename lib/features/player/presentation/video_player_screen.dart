@@ -38,6 +38,8 @@ class _VideoPlayerScreenState
   late VlcPlayerController _vlcController;
   Timer? _controlsTimer;
   bool _isInitialized = false;
+  // Debounce timer for seek-position saves to avoid write storms
+  Timer? _savePositionTimer;
 
   // PiP state
   bool _pipSupported = false;
@@ -114,13 +116,29 @@ class _VideoPlayerScreenState
   }
 
   void _onPlayerStateChanged() {
-    final pos = _vlcController.value.position;
-    if (pos.inSeconds > 0 && pos.inSeconds % 5 == 0) {
-      // Fire-and-forget — don't block the VLC listener thread
-      PlayedDatabase.instance
-          .saveSeekPosition(widget.mediaItem.id, pos)
-          .ignore();
-    }
+    // Debounce position saves to every 5 seconds of real time,
+    // not every time the VLC listener fires (which is ~every frame).
+    _savePositionTimer?.cancel();
+    _savePositionTimer = Timer(const Duration(seconds: 5), () {
+      if (!mounted) return;
+      final pos = _vlcController.value.position;
+      if (pos.inSeconds > 0) {
+        PlayedDatabase.instance
+            .saveSeekPosition(widget.mediaItem.id, pos)
+            .ignore();
+      }
+    });
+  }
+
+  void _saveCurrentPosition() {
+    try {
+      final pos = _vlcController.value.position;
+      if (pos.inSeconds > 0) {
+        PlayedDatabase.instance
+            .saveSeekPosition(widget.mediaItem.id, pos)
+            .ignore();
+      }
+    } catch (_) {}
   }
 
   void _startControlsTimer() {
@@ -235,10 +253,7 @@ class _VideoPlayerScreenState
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
       // Save position
-      PlayedDatabase.instance.saveSeekPosition(
-        widget.mediaItem.id,
-        _vlcController.value.position,
-      );
+      _saveCurrentPosition();
       // Auto-PiP: only if user has opted in by using it manually before
       if (_pipAutoEnabled && _pipSupported && !_isInPip) {
         PipService.instance.enterPip();
@@ -269,16 +284,10 @@ class _VideoPlayerScreenState
   @override
   void dispose() {
     _controlsTimer?.cancel();
+    _savePositionTimer?.cancel();
     _vlcController.removeListener(_onPlayerStateChanged);
     // Save position before disposing so resume works next time
-    try {
-      final pos = _vlcController.value.position;
-      if (pos.inSeconds > 0) {
-        PlayedDatabase.instance
-            .saveSeekPosition(widget.mediaItem.id, pos)
-            .ignore();
-      }
-    } catch (_) {}
+    _saveCurrentPosition();
     _vlcController.dispose();
     _restoreOrientation();
     WidgetsBinding.instance.removeObserver(this);
