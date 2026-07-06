@@ -16,6 +16,7 @@ import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
 import 'queue_screen.dart';
+// queueProvider and miniPlayerItemProvider are defined in queue_screen.dart
 import 'lyrics_screen.dart';
 import 'file_info_sheet.dart';
 import 'car_mode_screen.dart';
@@ -68,15 +69,24 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   PlayedAudioHandler? get _handler => globalAudioHandler;
   AudioPlayer? get _player => _handler?.player;
   String? _currentItemId;
+  // Track which player instance the streams are attached to.
+  // Reset to false whenever a new item is loaded so we re-attach
+  // to the (potentially new) player instance.
   bool _streamsAttached = false;
+  AudioPlayer? _attachedPlayer;
 
   AudioPlayerNotifier() : super(const AudioPlayerState());
 
   /// Attach stream listeners once the handler is ready (called from load()).
+  /// Re-attaches if the underlying AudioPlayer instance has changed.
   void _attachStreams() {
-    if (_streamsAttached || _player == null) return;
+    final player = _player;
+    if (player == null) return;
+    // If already attached to this exact player instance, skip.
+    if (_streamsAttached && identical(_attachedPlayer, player)) return;
     _streamsAttached = true;
-    _player!.playerStateStream.listen((s) {
+    _attachedPlayer = player;
+    player.playerStateStream.listen((s) {
       if (!mounted) return;
       state = state.copyWith(
         isPlaying: s.playing,
@@ -84,18 +94,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
             s.processingState == ProcessingState.buffering,
       );
     });
-    _player!.positionStream.listen((p) {
+    player.positionStream.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
       if (_currentItemId != null && p.inSeconds > 0 && p.inSeconds % 5 == 0) {
         PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
       }
     });
-    _player!.durationStream.listen((d) {
+    player.durationStream.listen((d) {
       if (!mounted) return;
       if (d != null) state = state.copyWith(duration: d);
     });
-    _player!.processingStateStream.listen((ps) {
+    player.processingStateStream.listen((ps) {
       if (ps == ProcessingState.completed) {
         _onTrackComplete();
       }
@@ -147,6 +157,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       return;
     }
     _currentItemId = item.id;
+    // Reset stream attachment flag so _attachStreams() re-wires on each load.
+    // This prevents stacked listeners when the user opens multiple tracks.
+    _streamsAttached = false;
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _attachStreams();
@@ -946,8 +959,9 @@ class _OptionsSheet extends ConsumerWidget {
                       fontFamily: 'Inter',
                     )),
                 onTap: () {
-                  if (o.onTap != null) { o.onTap!(); }
-                  else { Navigator.pop(context); }
+                  o.onTap?.call();
+                  // If no custom handler, just close the sheet
+                  if (o.onTap == null) Navigator.pop(context);
                 },
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                 dense: true,

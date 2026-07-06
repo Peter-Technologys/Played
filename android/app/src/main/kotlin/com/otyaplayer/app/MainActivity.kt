@@ -503,33 +503,65 @@ class MainActivity : FlutterActivity() {
 
     // ── Phone state ──────────────────────────────────────────────────────
 
+    // Modern TelephonyCallback (Android 12+ / API 31+) — avoids deprecation warning.
+    private var telephonyCallback: Any? = null // typed as Any to avoid API-level import issues
+
     @Suppress("DEPRECATION")
     private fun registerPhoneListener() {
-        if (phoneStateListener != null) return
-        try {
-            telephonyManager = getSystemService(TELEPHONY_SERVICE) as? android.telephony.TelephonyManager ?: return
-            phoneStateListener = object : android.telephony.PhoneStateListener() {
-                override fun onCallStateChanged(state: Int, phoneNumber: String?) {
-                    val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
-                    when (state) {
-                        android.telephony.TelephonyManager.CALL_STATE_RINGING,
-                        android.telephony.TelephonyManager.CALL_STATE_OFFHOOK ->
-                            am.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC,
-                                android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-                        android.telephony.TelephonyManager.CALL_STATE_IDLE ->
-                            am.abandonAudioFocus(null)
-                    }
+        telephonyManager = getSystemService(TELEPHONY_SERVICE) as? android.telephony.TelephonyManager ?: return
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            // API 31+ path — TelephonyCallback
+            val cb = object : android.telephony.TelephonyCallback(),
+                android.telephony.TelephonyCallback.CallStateListener {
+                override fun onCallStateChanged(state: Int) {
+                    handleCallState(state)
                 }
             }
-            telephonyManager!!.listen(phoneStateListener,
-                android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
-        } catch (e: Exception) { Log.w("PhoneState", "register failed: ${e.message}") }
+            telephonyCallback = cb
+            try {
+                telephonyManager!!.registerTelephonyCallback(
+                    mainExecutor, cb)
+            } catch (e: Exception) { Log.w("PhoneState", "TelephonyCallback register failed: ${e.message}") }
+        } else {
+            // Legacy path — PhoneStateListener (deprecated in API 31)
+            if (phoneStateListener != null) return
+            phoneStateListener = object : android.telephony.PhoneStateListener() {
+                override fun onCallStateChanged(state: Int, phoneNumber: String?) {
+                    handleCallState(state)
+                }
+            }
+            try {
+                telephonyManager!!.listen(phoneStateListener,
+                    android.telephony.PhoneStateListener.LISTEN_CALL_STATE)
+            } catch (e: Exception) { Log.w("PhoneState", "PhoneStateListener register failed: ${e.message}") }
+        }
+    }
+
+    private fun handleCallState(state: Int) {
+        val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+        when (state) {
+            android.telephony.TelephonyManager.CALL_STATE_RINGING,
+            android.telephony.TelephonyManager.CALL_STATE_OFFHOOK ->
+                am.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC,
+                    android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
+            android.telephony.TelephonyManager.CALL_STATE_IDLE ->
+                am.abandonAudioFocus(null)
+        }
     }
 
     @Suppress("DEPRECATION")
     private fun unregisterPhoneListener() {
-        phoneStateListener?.let { telephonyManager?.listen(it, android.telephony.PhoneStateListener.LISTEN_NONE) }
-        phoneStateListener = null
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            (telephonyCallback as? android.telephony.TelephonyCallback)?.let {
+                try { telephonyManager?.unregisterTelephonyCallback(it) } catch (_: Exception) {}
+            }
+            telephonyCallback = null
+        } else {
+            phoneStateListener?.let {
+                try { telephonyManager?.listen(it, android.telephony.PhoneStateListener.LISTEN_NONE) } catch (_: Exception) {}
+            }
+            phoneStateListener = null
+        }
     }
 
     // ── Equalizer ────────────────────────────────────────────────────────
@@ -563,7 +595,12 @@ class MainActivity : FlutterActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        if (isPipSupported()) {
+        // Only auto-enter PiP if the app is actively playing video.
+        // Entering PiP unconditionally (e.g. on the home screen) causes
+        // a jarring floating black window with no content.
+        val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+        val isAudioActive = am.isMusicActive
+        if (isPipSupported() && isAudioActive) {
             try {
                 enterPictureInPictureMode(
                     PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())

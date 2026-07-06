@@ -51,6 +51,12 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
             : null,
       ));
 
+      // Stop any currently playing track cleanly before loading a new one.
+      // This prevents audio bleed-through when switching tracks quickly.
+      if (_player.playing) {
+        await _player.stop();
+      }
+
       // Use AudioSource.uri with a proper file:// URI.
       // setFilePath() can silently fail on some Android versions.
       await _player.setAudioSource(
@@ -66,6 +72,12 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
       await play();
     } catch (e) {
       debugPrint('[AudioHandler] loadAndPlay error: $e');
+      // Emit an idle state so the UI stops showing a spinner
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.idle,
+        playing: false,
+      ));
+      rethrow; // Let AudioPlayerNotifier handle the error state
     }
   }
 
