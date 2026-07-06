@@ -527,6 +527,8 @@ class _SongList extends ConsumerWidget {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(0, 4, 0, 100),
       itemCount: items.length,
+      addAutomaticKeepAlives: false,
+      addRepaintBoundaries: false,
       itemBuilder: (context, i) {
         final item = items[i];
         return _SongRow(
@@ -687,6 +689,9 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
   String? _resolvedPath;
   bool _loading = true;
 
+  // Session-level cache: album art path resolved once per albumid per session
+  static final Map<String, String?> _cache = {};
+
   @override
   void initState() {
     super.initState();
@@ -700,11 +705,17 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
       if (mounted) setState(() { _resolvedPath = raw; _loading = false; });
       return;
     }
+    if (_cache.containsKey(raw)) {
+      if (mounted) setState(() { _resolvedPath = _cache[raw]; _loading = false; });
+      return;
+    }
     try {
       final albumId = raw.substring('albumid:'.length);
       final path = await _channel.invokeMethod<String>('getAlbumArt', {'albumId': albumId});
+      _cache[raw] = path;
       if (mounted) setState(() { _resolvedPath = path; _loading = false; });
     } catch (_) {
+      _cache[raw] = null;
       if (mounted) setState(() => _loading = false);
     }
   }
@@ -1203,6 +1214,7 @@ class _VideoGrid extends ConsumerWidget {
         mainAxisSpacing: 12,
         childAspectRatio: 16 / 11,
       ),
+      cacheExtent: 400,
       itemCount: items.length,
       itemBuilder: (context, i) {
         final item = items[i];
@@ -1231,6 +1243,9 @@ class _VideoCardState extends State<_VideoCard> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
   String? _thumbPath;
 
+  // Session-level thumbnail cache
+  static final Map<String, String?> _thumbCache = {};
+
   @override
   void initState() {
     super.initState();
@@ -1238,13 +1253,22 @@ class _VideoCardState extends State<_VideoCard> {
   }
 
   Future<void> _loadThumb() async {
+    final key = widget.item.id;
+    if (_thumbCache.containsKey(key)) {
+      final cached = _thumbCache[key];
+      if (mounted && cached != null) setState(() => _thumbPath = cached);
+      return;
+    }
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
         'id': widget.item.id,
       });
+      _thumbCache[key] = path;
       if (mounted && path != null) setState(() => _thumbPath = path);
-    } catch (_) {}
+    } catch (_) {
+      _thumbCache[key] = null;
+    }
   }
 
   @override
