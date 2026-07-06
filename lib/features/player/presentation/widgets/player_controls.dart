@@ -72,7 +72,9 @@ class _PlayerControlsState extends State<PlayerControls> {
 
   void _toggleSubtitles() {
     setState(() => _subtitlesOn = !_subtitlesOn);
-    widget.controller.setSpuTrack(_subtitlesOn ? 1 : -1);
+    // Track index 0 = first subtitle track; -1 = disabled.
+    // Using 1 was wrong — VLC track indices start at 0.
+    widget.controller.setSpuTrack(_subtitlesOn ? 0 : -1);
     HapticFeedback.selectionClick();
   }
 
@@ -236,8 +238,12 @@ class _PlayerControlsState extends State<PlayerControls> {
               const SizedBox(width: 16),
               _Btn(
                 icon: Icons.replay_10_rounded, size: 32,
-                onTap: () => widget.controller
-                    .seekTo(position - const Duration(seconds: 10)),
+                onTap: () {
+                  if (duration == Duration.zero) return;
+                  final target = position - const Duration(seconds: 10);
+                  widget.controller.seekTo(
+                      target < Duration.zero ? Duration.zero : target);
+                },
               ),
               const SizedBox(width: 20),
               _Btn(
@@ -252,8 +258,12 @@ class _PlayerControlsState extends State<PlayerControls> {
               const SizedBox(width: 20),
               _Btn(
                 icon: Icons.forward_10_rounded, size: 32,
-                onTap: () => widget.controller
-                    .seekTo(position + const Duration(seconds: 10)),
+                onTap: () {
+                  if (duration == Duration.zero) return;
+                  final target = position + const Duration(seconds: 10);
+                  widget.controller.seekTo(
+                      target > duration ? duration : target);
+                },
               ),
               const SizedBox(width: 16),
               _Btn(icon: Icons.skip_next_rounded, size: 28, onTap: () {}),
