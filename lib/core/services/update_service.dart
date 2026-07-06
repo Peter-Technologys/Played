@@ -1,31 +1,31 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/environment.dart';
+import 'update_notification_service.dart';
 
 /// Checks if a newer version of OTYA Player is available.
 ///
-/// Reads version.json from the Cloudflare Worker — updated automatically
-/// every time a new release is published. No manual changes needed.
+/// Compares server versionCode (integer) against BuildConfig.VERSION_CODE
+/// via package_info_plus — no hardcoded version strings.
+///
+/// WorkManager scheduling is handled by UpdateCheckWorker (Kotlin side).
+/// This service is called both from WorkManager and on app foreground.
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
-  // The Worker endpoint — returns { version, date } JSON
-  static const String _versionUrl =
-      'https://getotya.download.apk.petersmartlink.com/version';
+  static const String _prefLastCheck      = 'update_last_check';
+  static const String _prefSkippedCode    = 'update_skipped_code';
+  static const String _prefDeviceId       = 'update_device_id';
 
-  // The smart download page — picks the right APK for the user's phone
-  static const String _downloadUrl =
-      'https://petersmartlink.com/download/otya-player';
-
-  static const String _prefLastCheck = 'update_last_check';
-  static const String _prefSkippedVersion = 'update_skipped_version';
-
-  String get downloadUrl => _downloadUrl;
+  String get downloadUrl => Environment.downloadUrl;
 
   /// Returns [UpdateInfo] if a newer version is available, null otherwise.
-  /// Checks at most once per day to avoid hammering the server.
+  /// Checks at most once per 24 hours unless [force] is true.
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -35,37 +35,57 @@ class UpdateService {
         final lastCheck = prefs.getInt(_prefLastCheck) ?? 0;
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - lastCheck < const Duration(hours: 24).inMilliseconds) {
+          debugPrint('[UpdateService] Skipping check — checked within 24h.');
           return null;
         }
       }
 
       // Fetch version info from Cloudflare Worker
       final response = await http
-          .get(Uri.parse(_versionUrl))
-          .timeout(const Duration(seconds: 8));
+          .get(Uri.parse(Environment.versionUrl))
+          .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode != 200) return null;
+      if (response.statusCode != 200) {
+        debugPrint('[UpdateService] HTTP ${response.statusCode} from version endpoint.');
+        return null;
+      }
 
       final data = jsonDecode(response.body) as Map<String, dynamic>;
-      final latestVersion = data['version'] as String? ?? '';
-      if (latestVersion.isEmpty) return null;
+      final serverVersionCode = (data['versionCode'] as num?)?.toInt() ?? 0;
+      final serverVersion     = data['version'] as String? ?? '';
+      final changelog         = data['changelog'] as String? ?? '';
+
+      if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
 
       // Save the time we last checked
-      await prefs.setInt(
-          _prefLastCheck, DateTime.now().millisecondsSinceEpoch);
+      await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
 
-      // Compare with the installed version
-      const installedVersion = '1.2.0'; // matches pubspec.yaml version
-      if (!_isNewer(latestVersion, installedVersion)) return null;
+      // Get installed versionCode from the OS (not a hardcoded string)
+      final packageInfo = await PackageInfo.fromPlatform();
+      final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      // Check if user already said "remind me later" for this version
-      final skipped = prefs.getString(_prefSkippedVersion) ?? '';
-      if (skipped == latestVersion) return null;
+      debugPrint('[UpdateService] Installed: $installedCode  Server: $serverVersionCode');
+
+      if (serverVersionCode <= installedCode) return null;
+
+      // Check if user already dismissed this exact version
+      final skippedCode = prefs.getInt(_prefSkippedCode) ?? 0;
+      if (skippedCode >= serverVersionCode) return null;
+
+      // Determine ABI for direct download link
+      final abi = _detectAbi();
+      final directUrl = abi == 'arm64'
+          ? Environment.arm64DownloadUrl
+          : Environment.arm32DownloadUrl;
 
       return UpdateInfo(
-        latestVersion: latestVersion,
-        releaseDate: data['date'] as String? ?? '',
-        downloadUrl: _downloadUrl,
+        version:         serverVersion,
+        versionCode:     serverVersionCode,
+        installedCode:   installedCode,
+        changelog:       changelog,
+        downloadUrl:     Environment.downloadUrl,
+        directUrl:       directUrl,
+        releaseDate:     data['date'] as String? ?? '',
       );
     } catch (e) {
       debugPrint('[UpdateService] Check failed: $e');
@@ -73,38 +93,120 @@ class UpdateService {
     }
   }
 
-  /// User tapped "Remind me later" — skip this version until next app open.
-  Future<void> remindLater(String version) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_prefSkippedVersion, version);
+  /// Called by WorkManager worker — checks and shows notification if update found.
+  Future<void> checkAndNotify() async {
+    final info = await checkForUpdate();
+    if (info != null) {
+      await UpdateNotificationService.instance.showUpdateNotification(info);
+    }
   }
 
-  /// Compares two version strings like "1.2.0" and "1.3.0".
-  bool _isNewer(String latest, String installed) {
+  /// User tapped "Later" — skip this version code until next app open.
+  Future<void> remindLater(int versionCode) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_prefSkippedCode, versionCode);
+  }
+
+  /// Register this device in Appwrite devices collection on first launch.
+  /// Safe to call multiple times — uses upsert pattern.
+  Future<void> registerDevice() async {
     try {
-      final l = latest.split('.').map(int.parse).toList();
-      final i = installed.split('.').map(int.parse).toList();
-      for (var idx = 0; idx < 3; idx++) {
-        final lv = idx < l.length ? l[idx] : 0;
-        final iv = idx < i.length ? i[idx] : 0;
-        if (lv > iv) return true;
-        if (lv < iv) return false;
+      final prefs = await SharedPreferences.getInstance();
+      String? deviceId = prefs.getString(_prefDeviceId);
+      if (deviceId == null) {
+        deviceId = _generateDeviceId();
+        await prefs.setString(_prefDeviceId, deviceId);
       }
-      return false;
-    } catch (_) {
-      return false;
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
+      final abi = _detectAbi();
+      final now = DateTime.now().toUtc().toIso8601String();
+
+      // POST to Appwrite REST — no SDK needed, avoids auth requirement
+      final url = '${Environment.appwriteEndpoint}/databases/${Environment.databaseId}'
+          '/collections/${Environment.devicesCollection}/documents';
+
+      final body = jsonEncode({
+        'documentId': deviceId,
+        'data': {
+          'deviceId':      deviceId,
+          'appVersion':    packageInfo.version,
+          'versionCode':   installedCode,
+          'abi':           abi,
+          'platform':      'android',
+          'registeredAt':  now,
+          'lastSeenAt':    now,
+        },
+      });
+
+      // Try update first, then create
+      final updateRes = await http.patch(
+        Uri.parse('$url/$deviceId'),
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Appwrite-Project': Environment.appwriteProjectId,
+        },
+        body: jsonEncode({'data': {
+          'appVersion':  packageInfo.version,
+          'versionCode': installedCode,
+          'lastSeenAt':  now,
+        }}),
+      ).timeout(const Duration(seconds: 8));
+
+      if (updateRes.statusCode == 404) {
+        // Device not registered yet — create it
+        await http.post(
+          Uri.parse(url),
+          headers: {
+            'Content-Type': 'application/json',
+            'X-Appwrite-Project': Environment.appwriteProjectId,
+          },
+          body: body,
+        ).timeout(const Duration(seconds: 8));
+      }
+
+      debugPrint('[UpdateService] Device registered: $deviceId');
+    } catch (e) {
+      debugPrint('[UpdateService] registerDevice failed (non-fatal): $e');
     }
+  }
+
+  String _detectAbi() {
+    try {
+      // On Android, check supported ABIs
+      if (Platform.isAndroid) {
+        // arm64-v8a devices report this in the process environment
+        final arch = Platform.environment['PROCESSOR_ARCHITECTURE'] ?? '';
+        if (arch.contains('64') || arch.contains('aarch64')) return 'arm64';
+      }
+    } catch (_) {}
+    return 'arm64'; // default to arm64 (most modern devices)
+  }
+
+  String _generateDeviceId() {
+    final timestamp = DateTime.now().millisecondsSinceEpoch;
+    final random = (timestamp * 31 + timestamp.hashCode).abs();
+    return 'device_${random.toRadixString(16)}';
   }
 }
 
 class UpdateInfo {
-  final String latestVersion;
-  final String releaseDate;
+  final String version;
+  final int    versionCode;
+  final int    installedCode;
+  final String changelog;
   final String downloadUrl;
+  final String directUrl;
+  final String releaseDate;
 
   const UpdateInfo({
-    required this.latestVersion,
-    required this.releaseDate,
+    required this.version,
+    required this.versionCode,
+    required this.installedCode,
+    required this.changelog,
     required this.downloadUrl,
+    required this.directUrl,
+    required this.releaseDate,
   });
 }

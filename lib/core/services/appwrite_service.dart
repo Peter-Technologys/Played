@@ -13,21 +13,39 @@ import '../models/playlist.dart';
 /// Auth: Google OAuth only (no email/password).
 /// On sign-in, all local data (playlists + history) is automatically
 /// backed up to the user's Appwrite account.
-/// On sign-out, local data is kept on device.
 ///
 /// APPWRITE DASHBOARD SETUP (one-time):
 ///   1. Go to https://cloud.appwrite.io/console/project-6a3011f1003b1a6cc74d
-///   2. Auth -> Settings -> enable Google OAuth provider
-///      (add your Google OAuth client ID + secret from Google Cloud Console)
-///   3. Platforms -> Add Android platform:
-///        Package name: com.petersmartlink.otya
-///   4. Databases -> Create database: ID = 'otya-db'
-///   5. Inside otya-db create 3 collections:
-///        - 'playlists'    attributes: name(string), media_ids(string), created_at(string)
-///        - 'play_history' attributes: title(string), artist(string), file_path(string),
-///                                     is_video(boolean), last_played_at(string)
-///        - 'pro_status'   attributes: expiry_ms(integer), updated_at(string)
-///   6. Each collection permissions: role:user (read, write)
+///   2. Auth → Settings → enable Google OAuth provider
+///   3. Platforms → Add Android platform: com.otyaplayer.app
+///   4. Databases → Create database: ID = 'otya-db'
+///   5. Inside otya-db create 5 collections:
+///
+///      'playlists'
+///        name(string, required), media_ids(string, required),
+///        created_at(string), updated_at(string), user_id(string, required)
+///        Permissions: role:user (read, write)
+///
+///      'play_history'
+///        title(string), artist(string), file_path(string, required),
+///        is_video(boolean), last_played_at(string), user_id(string, required)
+///        Permissions: role:user (read, write)
+///
+///      'pro_status'
+///        expiry_ms(integer), updated_at(string)
+///        Permissions: role:user (read, write)
+///
+///      'releases'  ← written by CI/CD server API key, read by anyone
+///        version(string, required), versionCode(integer, required),
+///        date(string), changelog(string), arm64Url(string), arm32Url(string),
+///        downloadUrl(string), minSdk(integer), targetSdk(integer)
+///        Permissions: role:any (read), role:users (write)
+///
+///      'devices'  ← written by app on first launch (no auth required)
+///        deviceId(string, required), userId(string), appVersion(string),
+///        versionCode(integer), abi(string), platform(string),
+///        registeredAt(string), lastSeenAt(string)
+///        Permissions: role:any (create, read), role:users (update)
 class AppwriteService {
   AppwriteService._();
   static final AppwriteService instance = AppwriteService._();
@@ -57,7 +75,7 @@ class AppwriteService {
     _account   = Account(_client);
     _databases = Databases(_client);
     _initialized = true;
-    debugPrint('[Appwrite] Initialized -- project: ${Environment.appwriteProjectId}');
+    debugPrint('[Appwrite] Initialized — project: ${Environment.appwriteProjectId}');
   }
 
   void _ensureInit() {
@@ -66,8 +84,6 @@ class AppwriteService {
 
   // -- Auth -------------------------------------------------------------------
 
-  /// Signs in with Google via Appwrite OAuth.
-  /// After successful sign-in, automatically backs up all local data.
   Future<void> signInWithGoogle() async {
     _ensureInit();
     try {
@@ -77,7 +93,6 @@ class AppwriteService {
         failure: 'appwrite-callback-${Environment.appwriteProjectId}:///failure',
       );
       _notifyAuthChange();
-      // Auto-backup after sign-in so user's data is immediately safe
       unawaited(_backupAfterSignIn());
     } catch (e) {
       debugPrint('[Appwrite] Google sign-in failed: $e');
@@ -94,7 +109,6 @@ class AppwriteService {
     }
   }
 
-  /// Returns the current signed-in user, or null if not signed in.
   Future<models.User?> getCurrentUser() async {
     _ensureInit();
     try {
@@ -104,7 +118,6 @@ class AppwriteService {
     }
   }
 
-  /// Signs out and notifies listeners.
   Future<void> signOut() async {
     _ensureInit();
     try {
@@ -113,6 +126,29 @@ class AppwriteService {
       debugPrint('[Appwrite] Signed out.');
     } catch (e) {
       debugPrint('[Appwrite] Sign out failed: $e');
+    }
+  }
+
+  // -- Releases (read-only from app) -----------------------------------------
+
+  /// Fetches the latest release document from Appwrite.
+  /// Returns null if unavailable — app falls back to Worker /version endpoint.
+  Future<Map<String, dynamic>?> fetchLatestRelease() async {
+    _ensureInit();
+    try {
+      final result = await _databases.listDocuments(
+        databaseId:   Environment.databaseId,
+        collectionId: Environment.releasesCollection,
+        queries:      [
+          Query.orderDesc('versionCode'),
+          Query.limit(1),
+        ],
+      );
+      if (result.documents.isEmpty) return null;
+      return result.documents.first.data;
+    } catch (e) {
+      debugPrint('[Appwrite] fetchLatestRelease failed: $e');
+      return null;
     }
   }
 
@@ -164,8 +200,6 @@ class AppwriteService {
     debugPrint('[Appwrite] Synced $synced/${playlists.length} playlists.');
   }
 
-  /// Downloads this user's playlists from Appwrite and merges into local DB.
-  /// Returns number of playlists restored, or -1 on failure.
   Future<int> restorePlaylists() async {
     _ensureInit();
     final user = await getCurrentUser();
@@ -247,7 +281,6 @@ class AppwriteService {
 
   // -- Full Backup ------------------------------------------------------------
 
-  /// Backs up playlists + history. Returns true on success.
   Future<bool> backupAll() async {
     try {
       await Future.wait([backupPlaylists(), backupHistory()]);

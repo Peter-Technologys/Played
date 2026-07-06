@@ -28,17 +28,11 @@ dependencies:
   # Nearby Sharing
   nearby_connections: ^4.3.0
 
-  # Appwrite — cloud sync, auth, backup
+  # Appwrite — cloud sync, auth, backup, release tracking
   # v17.x uses flutter_web_auth_2 ^4.x which is Kotlin 2.x compatible
   appwrite: ^17.1.0
 
-  # Google Drive backup — removed (not wired to UI)
-  # googleapis: ^12.0.0
-  # googleapis_auth: ^1.6.0
-  # google_sign_in: ^6.2.1
-
-  # Audio Separation API — removed (Studio feature deleted)
-  # http and dio kept for lyrics fetching only
+  # HTTP
   http: ^1.1.0
 
   # State Management
@@ -54,8 +48,9 @@ dependencies:
   shimmer: ^3.0.0
   sliding_up_panel: ^2.0.0+1
 
-  # Device info
+  # Device info — used for ABI detection + update checker
   device_info_plus: ^10.1.0
+  package_info_plus: ^8.0.0
 
   # File System
   path_provider: ^2.1.2
@@ -65,8 +60,8 @@ dependencies:
   # Notifications
   flutter_local_notifications: ^17.0.0
 
-  # Ads — disabled until Play Store launch (re-enable when listed)
-  # google_mobile_ads: ^4.0.0
+  # Background update checks (WorkManager wrapper)
+  workmanager: ^0.5.2
 
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.2

@@ -3,15 +3,27 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-// ADS DISABLED — re-enable when listed on Play Store
-// import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
 import 'core/services/appwrite_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/storage_folder_service.dart';
+import 'core/services/update_notification_service.dart';
+import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
+
+/// WorkManager callback dispatcher — must be a top-level function.
+@pragma('vm:entry-point')
+void callbackDispatcher() {
+  Workmanager().executeTask((taskName, inputData) async {
+    if (taskName == 'otya_update_check') {
+      await UpdateService.instance.checkAndNotify();
+    }
+    return Future.value(true);
+  });
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,19 +38,9 @@ void main() async {
   };
 
   // ── Fast path: only the minimum before runApp ─────────────────────
-  // Target: first frame < 200 ms on mid-range Android.
-  //
-  // 1. Hive DB — must be open before providers read from it (~30 ms).
   await _initDatabase();
-
-  // 2. Settings — SharedPreferences read (~5 ms).
   final savedSettings = await AppSettings.load();
 
-  // 3. runApp IMMEDIATELY — do NOT await AudioService here.
-  //    AudioService.init() binds to an Android foreground service which
-  //    takes 300–800 ms. Blocking runApp on it means the user stares at
-  //    the splash for that entire time before seeing any UI.
-  //    AudioPlayerNotifier retries up to 4 s if the handler is null.
   runApp(
     ProviderScope(
       overrides: [
@@ -49,7 +51,7 @@ void main() async {
     ),
   );
 
-  // 4. Everything else after the first frame is on screen.
+  // ── Background init after first frame ─────────────────────────────
   unawaited(_initBackground());
 }
 
@@ -65,14 +67,17 @@ Future<void> _initDatabase() async {
 }
 
 Future<void> _initBackground() async {
-  // AudioService, notifications, Appwrite all run in parallel after
-  // the first frame so they never delay what the user sees.
   await Future.wait([
     _initAudioService(),
     _initNotifications(),
     _initAppwrite(),
+    _initWorkManager(),
     StorageFolderService.instance.ensureCreated(),
   ]);
+
+  // Register device + run immediate update check after everything is ready
+  unawaited(UpdateService.instance.registerDevice());
+  unawaited(UpdateService.instance.checkAndNotify());
 }
 
 Future<void> _initAudioService() async {
@@ -97,18 +102,38 @@ Future<void> _initAudioService() async {
 Future<void> _initNotifications() async {
   try {
     await NotificationService.instance.init();
+    await UpdateNotificationService.instance.init();
   } catch (e) {
     debugPrint('[Notifications] Init error: $e');
   }
 }
-
-// ADS DISABLED — re-enable when listed on Play Store
-// Future<void> _initAdMob() async { ... }
 
 Future<void> _initAppwrite() async {
   try {
     AppwriteService.instance.init();
   } catch (e) {
     debugPrint('[Appwrite] Init error: $e');
+  }
+}
+
+Future<void> _initWorkManager() async {
+  try {
+    await Workmanager().initialize(
+      callbackDispatcher,
+      isInDebugMode: kDebugMode,
+    );
+    // Register periodic update check — KEEP policy, won't duplicate
+    await Workmanager().registerPeriodicTask(
+      'otya_update_check',
+      'otya_update_check',
+      frequency: const Duration(hours: 24),
+      constraints: Constraints(
+        networkType: NetworkType.connected,
+      ),
+      existingWorkPolicy: ExistingWorkPolicy.keep,
+    );
+    debugPrint('[WorkManager] Update check scheduled (24h).');
+  } catch (e) {
+    debugPrint('[WorkManager] Init error: $e');
   }
 }

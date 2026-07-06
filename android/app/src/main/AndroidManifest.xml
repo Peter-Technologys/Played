@@ -48,9 +48,6 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
 
-    <!-- url_launcher: required on Android 11+ (API 30+) to query
-         which apps can handle http/https/mailto intents.
-         Without this block, launchUrl() silently returns false. -->
     <queries>
         <intent>
             <action android:name="android.intent.action.VIEW" />
@@ -92,12 +89,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
+            <!-- Open-with: video files -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="video/*" />
             </intent-filter>
+            <!-- Open-with: audio files -->
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -116,6 +115,7 @@
             </intent-filter>
         </activity>
 
+        <!-- Audio playback foreground service -->
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="true"
@@ -125,6 +125,7 @@
             </intent-filter>
         </service>
 
+        <!-- Boot receiver — restarts background service after reboot -->
         <receiver
             android:name=".BootReceiver"
             android:exported="true"
@@ -135,15 +136,21 @@
             </intent-filter>
         </receiver>
 
-        <!-- AdMob App ID — value is injected per flavor via manifestPlaceholders.
-             Standard flavor: real AdMob ID.
-             Huawei flavor:   no-op ID; AdMob.init() is guarded in Dart
-             so GMS is never called on HMS-only devices. -->
-        <!-- ADS DISABLED — re-enable when listed on Play Store
-        <meta-data
-            android:name="com.google.android.gms.ads.APPLICATION_ID"
-            android:value="${admobAppId}" />
-        -->
+        <!-- Update notification dismiss receiver -->
+        <receiver
+            android:name=".NotificationDismissReceiver"
+            android:exported="false" />
+
+        <!-- WorkManager initializer (required for WorkManager 2.6+) -->
+        <provider
+            android:name="androidx.startup.InitializationProvider"
+            android:authorities="${applicationId}.androidx-startup"
+            android:exported="false"
+            tools:node="merge">
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup" />
+        </provider>
 
         <meta-data
             android:name="flutterEmbedding"

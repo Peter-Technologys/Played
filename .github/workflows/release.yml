@@ -1,0 +1,278 @@
+# ───────────────────────────────────────────────────────────────
+# OTYA Player — GitHub Actions Release Pipeline
+#
+# Triggers on v* tags (e.g. v1.2.3).
+# Builds signed APKs, uploads to Cloudflare R2, notifies Appwrite.
+#
+# Required GitHub Secrets (Settings → Secrets and variables → Actions → Secrets):
+#   KEYSTORE_BASE64        — base64-encoded .jks keystore
+#   STORE_PASSWORD         — keystore password
+#   KEY_ALIAS              — key alias
+#   KEY_PASSWORD           — key password
+#   R2_ACCESS_KEY_ID       — Cloudflare R2 Access Key ID
+#   R2_SECRET_ACCESS_KEY   — Cloudflare R2 Secret Access Key
+#   APPWRITE_API_KEY       — Appwrite Server API Key
+#
+# Required GitHub Variables (Settings → Secrets and variables → Actions → Variables):
+#   GOOGLE_SERVICES_JSON   — raw contents of google-services.json
+#   R2_ENDPOINT            — https://6c76d2a9e5f95d5f9b393e97374d9afb.r2.cloudflarestorage.com
+#   R2_BUCKET              — otya-player-releases
+#   APPWRITE_ENDPOINT      — https://nyc.cloud.appwrite.io/v1
+#   APPWRITE_PROJECT_ID    — your Appwrite project ID
+#   WORKER_URL             — https://getotya.petersmartlink.com
+# ───────────────────────────────────────────────────────────────
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v[0-9]+.[0-9]+.[0-9]+'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Version tag to release (e.g. v1.2.3)'
+        required: true
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PUB_ENVIRONMENT: bot.github
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+
+jobs:
+  build_and_publish:
+    name: Build, Upload to R2 & Notify Appwrite
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      # ── Setup ──────────────────────────────────────────────────────────
+      - name: Free disk space
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: false
+          android: false
+          dotnet: true
+          haskell: true
+          large-packages: true
+          docker-images: true
+          swap-storage: true
+
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
+
+      - name: Install AWS CLI
+        run: pip install awscli --quiet
+
+      - run: flutter pub get
+
+      # ── Inject secrets ─────────────────────────────────────────────────
+      - name: Write google-services.json
+        run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+
+      - name: Decode keystore
+        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+
+      # ── Build ──────────────────────────────────────────────────────────
+      - name: Build release AAB
+        env:
+          KEYSTORE_PATH: keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          flutter build appbundle --release \
+            --obfuscate \
+            --split-debug-info=build/debug-info
+
+      - name: Build split APKs (arm64 + arm32)
+        env:
+          KEYSTORE_PATH: keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: |
+          flutter build apk --release --split-per-abi \
+            --target-platform android-arm,android-arm64 \
+            --obfuscate \
+            --split-debug-info=build/debug-info
+
+      - name: Remove secrets
+        if: always()
+        run: |
+          rm -f android/app/keystore.jks
+          rm -f android/app/google-services.json
+
+      # ── Publish to R2 ──────────────────────────────────────────────────
+      - name: Publish to Cloudflare R2
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          APPWRITE_ENDPOINT: ${{ vars.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT_ID: ${{ vars.APPWRITE_PROJECT_ID }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+        run: |
+          set -euo pipefail
+
+          VERSION=${GITHUB_REF_NAME#v}
+          VERSION_CODE=$(echo "$VERSION" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
+          echo "Publishing version $VERSION (code $VERSION_CODE)"
+
+          # Read changelog
+          CHANGELOG=$(awk '/^## \[/{found++} found==1{print} found==2{exit}' CHANGELOG.md \
+            | tail -n +2 | head -40 | tr '\n' ' ' | sed 's/  */ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
+          [ -z "$CHANGELOG" ] && CHANGELOG="Bug fixes and improvements"
+
+          # Read SDK versions
+          MIN_SDK=$(grep 'minSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+')
+          TARGET_SDK=$(grep 'targetSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+')
+          MIN_SDK=${MIN_SDK:-21}
+          TARGET_SDK=${TARGET_SDK:-36}
+
+          # Backup current version
+          CURRENT_VERSION=$(aws s3 cp \
+            s3://$R2_BUCKET/version.json - \
+            --endpoint-url $R2_ENDPOINT 2>/dev/null \
+            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
+
+          if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$VERSION" ]; then
+            echo "Backing up v$CURRENT_VERSION..."
+            for KEY in app-arm64-v8a-standard-release.apk app-armeabi-v7a-standard-release.apk version.json; do
+              aws s3 cp \
+                s3://$R2_BUCKET/$KEY \
+                s3://$R2_BUCKET/releases/v$CURRENT_VERSION/$KEY \
+                --endpoint-url $R2_ENDPOINT 2>/dev/null || true
+            done
+          fi
+
+          # Upload APKs
+          aws s3 cp \
+            build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk \
+            s3://$R2_BUCKET/app-arm64-v8a-standard-release.apk \
+            --endpoint-url $R2_ENDPOINT \
+            --content-type application/vnd.android.package-archive \
+            --cache-control "public, max-age=31536000, immutable"
+
+          aws s3 cp \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk \
+            s3://$R2_BUCKET/app-armeabi-v7a-standard-release.apk \
+            --endpoint-url $R2_ENDPOINT \
+            --content-type application/vnd.android.package-archive \
+            --cache-control "public, max-age=31536000, immutable"
+
+          # Generate version.json
+          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          python3 - <<PYEOF
+          import json
+          data = {
+              "version":     "$VERSION",
+              "versionCode": $VERSION_CODE,
+              "date":        "$DATE",
+              "arm64":       "app-arm64-v8a-standard-release.apk",
+              "arm32":       "app-armeabi-v7a-standard-release.apk",
+              "changelog":   "$CHANGELOG",
+              "minSdk":      $MIN_SDK,
+              "targetSdk":   $TARGET_SDK,
+              "workerUrl":   "$WORKER_URL"
+          }
+          with open('version.json', 'w') as f:
+              json.dump(data, f, indent=2)
+          print(json.dumps(data, indent=2))
+          PYEOF
+
+          python3 -c "import json; json.load(open('version.json'))" || { echo "Invalid JSON"; exit 1; }
+
+          # Upload version.json LAST
+          aws s3 cp \
+            version.json \
+            s3://$R2_BUCKET/version.json \
+            --endpoint-url $R2_ENDPOINT \
+            --content-type application/json \
+            --cache-control "public, max-age=300"
+
+          echo "✓ R2 upload complete."
+
+          # Notify Appwrite
+          if [ -n "${APPWRITE_ENDPOINT:-}" ] && [ -n "${APPWRITE_PROJECT_ID:-}" ] && [ -n "${APPWRITE_API_KEY:-}" ]; then
+            DOC_BODY=$(python3 -c "
+import json
+print(json.dumps({
+    'documentId': 'v$VERSION'.replace('.', '-'),
+    'data': {
+        'version':     '$VERSION',
+        'versionCode': $VERSION_CODE,
+        'date':        '$DATE',
+        'changelog':   '$CHANGELOG',
+        'arm64Url':    '$WORKER_URL/apk/arm64',
+        'arm32Url':    '$WORKER_URL/apk/arm32',
+        'downloadUrl': '$WORKER_URL/download',
+        'minSdk':      $MIN_SDK,
+        'targetSdk':   $TARGET_SDK
+    }
+}))
+")
+            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X POST \
+              "${APPWRITE_ENDPOINT}/databases/otya-db/collections/releases/documents" \
+              -H "Content-Type: application/json" \
+              -H "X-Appwrite-Project: ${APPWRITE_PROJECT_ID}" \
+              -H "X-Appwrite-Key: ${APPWRITE_API_KEY}" \
+              -d "$DOC_BODY")
+            echo "Appwrite response: $HTTP_STATUS"
+          fi
+
+          # Prune old backups (keep last 5)
+          VERSIONS=$(aws s3 ls s3://$R2_BUCKET/releases/ \
+            --endpoint-url $R2_ENDPOINT 2>/dev/null \
+            | awk '{print $2}' | sort -V | head -n -5)
+          for OLD in $VERSIONS; do
+            aws s3 rm s3://$R2_BUCKET/releases/$OLD \
+              --endpoint-url $R2_ENDPOINT --recursive 2>/dev/null || true
+          done
+
+          echo "✓ Publish complete."
+
+      # ── GitHub Release ─────────────────────────────────────────────────
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          generate_release_notes: true
+          files: |
+            build/app/outputs/bundle/release/app-release.aab
+            build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk
+            version.json
+
+      # ── Upload artifacts ───────────────────────────────────────────────
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-apks
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk
+          retention-days: 30
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: debug-info
+          path: build/debug-info/
+          retention-days: 30

@@ -17,6 +17,33 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.2.1] — 2026-07-06
+
+### Added
+- **Automated release pipeline** — GitLab CI/CD + GitHub Actions upload APKs to Cloudflare R2 on every `v*` tag
+- **WorkManager update checker** — background check every 24 hours, no Firebase required
+- **Update notifications** — high-priority local notification with "Download Now" / "Later" actions
+- **Appwrite releases collection** — CI/CD writes release metadata; app reads it for update info
+- **Device registration** — app registers device ID, ABI, and version in Appwrite on first launch
+- **Rollback support** — previous 5 versions archived in R2 under `releases/v<version>/`
+- **version.json generator script** — `scripts/generate_version_json.sh`
+- **Rollback script** — `scripts/rollback.sh <version>`
+- **versionCode comparison** — update checker now uses integer versionCode (not string) for reliable comparison
+- **package_info_plus** — installed version read from OS, not hardcoded
+
+### Changed
+- `update_service.dart` — uses `package_info_plus` for installed versionCode; no more hardcoded `'1.2.0'`
+- `environment.dart` — added Worker URL constants, releases + devices collection IDs
+- `main.dart` — WorkManager initialized on startup; device registration + immediate update check run after first frame
+- `pubspec.yaml` — added `workmanager`, `package_info_plus`
+
+### Fixed
+- `version.json` in CI now includes full shape: `versionCode`, `changelog`, `minSdk`, `targetSdk`
+- GitLab pipeline: `version.json` uploaded AFTER APKs (Worker never points to missing files)
+- GitHub Actions: dedicated `release.yml` with R2 upload (was missing from `build.yml`)
+
+---
+
 ## [1.2.0] — 2026-06-18
 
 ### Added
@@ -25,7 +52,7 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - **Cloud restore** — merge cloud playlists back to device
 - **Profile & Settings screen** — unified screen behind the top-right avatar icon:
   Appearance, Account, Audio, Video, Privacy & Security, Backup & Sync, Library, About
-- **What’s New screen** — in-app release notes viewer
+- **What's New screen** — in-app release notes viewer
 - **Rebrand to OTYA Player** — new name, icon, gradient logo, package ID `com.otyaplayer.app`
 - **Video thumbnails** — real frames extracted via `MediaMetadataRetriever`
 - **Album art** — real cover art from MediaStore
@@ -112,7 +139,8 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://gitlab.com/apk-v1/played/-/compare/v1.2.0...HEAD
-[1.2.0]: https://gitlab.com/apk-v1/played/-/compare/v1.1.0...v1.2.0
-[1.1.0]: https://gitlab.com/apk-v1/played/-/compare/v1.0.0...v1.1.0
-[1.0.0]: https://gitlab.com/apk-v1/played/-/tags/v1.0.0
+[Unreleased]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.2.1...HEAD
+[1.2.1]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.2.0...v1.2.1
+[1.2.0]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.1.0...v1.2.0
+[1.1.0]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.0.0...v1.1.0
+[1.0.0]: https://gitlab.com/updates1793427/apk-v1/played/-/tags/v1.0.0
