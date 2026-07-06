@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 // ADS DISABLED — re-enable when listed on Play Store
 // import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'app/app.dart'; // OtyaPlayerApp
+import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
 import 'core/services/appwrite_service.dart';
@@ -16,27 +16,29 @@ import 'features/settings/settings_provider.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Wire error handlers first — catch anything that happens during init
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[FlutterError] ${details.summary}');
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
-    return true; // prevent crash
+    return true;
   };
 
-  // 1. Hive DB — only blocking init (providers need it immediately)
+  // ── Fast path: only the minimum before runApp ─────────────────────
+  // Target: first frame < 200 ms on mid-range Android.
+  //
+  // 1. Hive DB — must be open before providers read from it (~30 ms).
   await _initDatabase();
 
-  // 2. Pre-load persisted settings
+  // 2. Settings — SharedPreferences read (~5 ms).
   final savedSettings = await AppSettings.load();
 
-  // 3. AudioService — init BEFORE runApp so it is ready the moment
-  //    the user taps a song.
-  await _initAudioService();
-
-  // 4. Run app
+  // 3. runApp IMMEDIATELY — do NOT await AudioService here.
+  //    AudioService.init() binds to an Android foreground service which
+  //    takes 300–800 ms. Blocking runApp on it means the user stares at
+  //    the splash for that entire time before seeing any UI.
+  //    AudioPlayerNotifier retries up to 4 s if the handler is null.
   runApp(
     ProviderScope(
       overrides: [
@@ -47,7 +49,7 @@ void main() async {
     ),
   );
 
-  // 5. Everything else in background
+  // 4. Everything else after the first frame is on screen.
   unawaited(_initBackground());
 }
 
@@ -60,6 +62,17 @@ Future<void> _initDatabase() async {
       await PlayedDatabase.instance.deleteAndReinit();
     } catch (_) {}
   }
+}
+
+Future<void> _initBackground() async {
+  // AudioService, notifications, Appwrite all run in parallel after
+  // the first frame so they never delay what the user sees.
+  await Future.wait([
+    _initAudioService(),
+    _initNotifications(),
+    _initAppwrite(),
+    StorageFolderService.instance.ensureCreated(),
+  ]);
 }
 
 Future<void> _initAudioService() async {
@@ -81,15 +94,6 @@ Future<void> _initAudioService() async {
   }
 }
 
-Future<void> _initBackground() async {
-  await Future.wait([
-    _initNotifications(),
-    // _initAdMob(), // ADS DISABLED — re-enable when listed on Play Store
-    _initAppwrite(),
-    StorageFolderService.instance.ensureCreated(),
-  ]);
-}
-
 Future<void> _initNotifications() async {
   try {
     await NotificationService.instance.init();
@@ -99,13 +103,7 @@ Future<void> _initNotifications() async {
 }
 
 // ADS DISABLED — re-enable when listed on Play Store
-// Future<void> _initAdMob() async {
-//   try {
-//     await MobileAds.instance.initialize();
-//   } on Exception catch (e) {
-//     debugPrint('[AdMob] Not available on this device (no GMS?): $e');
-//   }
-// }
+// Future<void> _initAdMob() async { ... }
 
 Future<void> _initAppwrite() async {
   try {

@@ -33,7 +33,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     StreamSubscription<dynamic>? sub;
     Timer? debounce;
 
-    // Phase 3 — live MediaStore events (debounced 3 s)
     try {
       sub = _mediaEventChannel.receiveBroadcastStream().listen((_) {
         debounce?.cancel();
@@ -43,7 +42,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       debugPrint('[MediaLibrary] MediaObserver not available: $e');
     }
 
-    // Periodic fallback every 15 min (saves battery)
     final periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
       _backgroundRefresh();
     });
@@ -57,12 +55,13 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     // Phase 1a — in-memory cache (zero I/O, truly instant)
     final cached = MediaRepository.instance.cachedItems;
     if (cached != null && cached.isNotEmpty) {
-      // Refresh in background without blocking UI
       Future.microtask(_backgroundRefresh);
       return cached;
     }
 
-    // Phase 1b — Hive history seed so UI is never blank on cold start
+    // Phase 1b — Hive history seed (< 5 ms).
+    // Returns recently played files immediately so the user sees their
+    // library at once. Full scan runs silently in the background.
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
@@ -70,9 +69,10 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
 
     // First install — no cache, no history.
-    // Run scan directly on this isolate (compute() overhead not worth it
-    // for a one-time first-install scan; MediaStore is fast ~200ms).
-    return MediaRepository.instance.getAllMedia(forceRefresh: true);
+    // Return empty immediately so the UI renders (shimmer covers it),
+    // then populate via background scan.
+    Future.microtask(_backgroundRefresh);
+    return const [];
   }
 
   Future<void> _backgroundRefresh() async {
