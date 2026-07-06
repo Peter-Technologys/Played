@@ -84,6 +84,7 @@ analyze:
   rules:
     - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
     - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG'
 
 unit_test:
   stage: test
@@ -140,7 +141,7 @@ build_release:
       - build/debug-info/
     expire_in: 30 days
   rules:
-    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/ && $GOOGLE_SERVICES_JSON'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
 
 publish_to_r2:
   stage: publish
