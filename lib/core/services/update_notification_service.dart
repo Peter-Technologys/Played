@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart' show Color;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'update_service.dart';
@@ -52,7 +53,7 @@ class UpdateNotificationService {
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
-      color: const android.Color(0xFF8A2BE2),
+      color: const Color(0xFF8A2BE2),
       styleInformation: BigTextStyleInformation(
         changelog,
         contentTitle: 'OTYA Player ${info.version} is available',

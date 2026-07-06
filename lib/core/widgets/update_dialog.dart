@@ -57,7 +57,7 @@ class UpdateDialog extends StatelessWidget {
 
             // Plain-language message
             Text(
-              'A newer version of OTYA Player (v${info.latestVersion}) '
+              'A newer version of OTYA Player (v${info.version}) '
               'is ready for you.\n\n'
               'Tap "Update Now" and we will open the download page. '
               'Your phone will automatically get the right file — '
@@ -114,7 +114,7 @@ class UpdateDialog extends StatelessWidget {
               child: TextButton(
                 onPressed: () async {
                   await UpdateService.instance
-                      .remindLater(info.latestVersion);
+                      .remindLater(info.versionCode);
                   if (context.mounted) Navigator.of(context).pop();
                 },
                 style: TextButton.styleFrom(
