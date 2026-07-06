@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App name shown on launcher and Google Play Store.
+         Must match brand name exactly to avoid Play Store rejection. -->
+    <string name="app_name">OTYA Player</string>
+
+    <!-- Notification channel names (Android Settings > Notifications) -->
+    <string name="otya_media_channel_name">OTYA Player Media</string>
+    <string name="otya_media_channel_desc">Now playing controls and media session</string>
+    <string name="otya_tools_channel_name">OTYA Player Tools</string>
+    <string name="otya_tools_channel_desc">Audio extraction and video trim progress</string>
+</resources>
