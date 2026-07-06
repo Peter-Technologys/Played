@@ -13,6 +13,9 @@ image: ghcr.io/cirruslabs/flutter:stable
 variables:
   PUB_ENVIRONMENT: "bot.gitlab"
   PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
+  # Disable Gradle daemon in CI — prevents long-lived processes
+  # from holding onto disk and memory between tasks.
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
 
 stages:
   - prepare
@@ -22,10 +25,32 @@ stages:
 
 # ── Global cache — shared across ALL branches and jobs ────────────────────────
 cache:
-  key: "pub-cache-v2"
-  paths:
-    - .pub-cache/
-    - .dart_tool/
+  - key: "pub-cache-v2"
+    paths:
+      - .pub-cache/
+      - .dart_tool/
+  - key: "gradle-cache-v1-$CI_COMMIT_REF_SLUG"
+    fallback_keys:
+      - "gradle-cache-v1-main"
+      - "gradle-cache-v1"
+    paths:
+      - android/.gradle/
+      - ~/.gradle/wrapper/
+      - ~/.gradle/caches/modules-2/files-2.1/
+      - ~/.gradle/caches/modules-2/metadata-2.1/
+
+# ── Shared: free disk space before Android builds ────────────────────────────
+.free_disk_space: &free_disk_space |
+  echo "=== Disk usage before cleanup ==="
+  df -h
+  # Remove large pre-installed tools not needed for Flutter/Android builds
+  sudo rm -rf /usr/local/lib/android/sdk/ndk || true
+  sudo rm -rf /usr/share/dotnet || true
+  sudo rm -rf /usr/local/share/powershell || true
+  sudo rm -rf /usr/share/swift || true
+  sudo apt-get clean -y || true
+  echo "=== Disk usage after cleanup ==="
+  df -h
 
 # ── Shared: inject google-services.json ──────────────────────────────────────
 .inject_google_services: &inject_google_services |
@@ -103,8 +128,9 @@ build_apk_debug:
   stage: build
   needs: [prepare]
   script:
+    - *free_disk_space
     - *inject_google_services
-    - flutter build apk --debug
+    - flutter build apk --debug --no-pub
   artifacts:
     paths:
       - build/app/outputs/flutter-apk/app-debug.apk
@@ -119,6 +145,7 @@ build_release:
   stage: build
   needs: [prepare]
   script:
+    - *free_disk_space
     - *inject_google_services
     - |
       if [ -z "$KEYSTORE_BASE64" ] || [ -z "$STORE_PASSWORD" ] || [ -z "$KEY_ALIAS" ] || [ -z "$KEY_PASSWORD" ]; then
@@ -127,10 +154,10 @@ build_release:
         exit 1
       fi
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-    - flutter build appbundle --release
+    - flutter build appbundle --release --no-pub
         --obfuscate
         --split-debug-info=build/debug-info
-    - flutter build apk --release --split-per-abi
+    - flutter build apk --release --split-per-abi --no-pub
         --obfuscate
         --split-debug-info=build/debug-info
     - rm -f android/app/keystore.jks
