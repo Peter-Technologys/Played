@@ -301,11 +301,14 @@ class _Header extends ConsumerWidget {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    Text(
-                      total == 0 ? 'Scanning...' : '$total files',
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary),
-                    ),
+                    // Only show file count once files are loaded.
+                    // Never show the word "Scanning" to users.
+                    if (total > 0)
+                      Text(
+                        '$total files',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary),
+                      ),
                     if (isScanning) ...[
                       const SizedBox(width: 6),
                       const SizedBox(
