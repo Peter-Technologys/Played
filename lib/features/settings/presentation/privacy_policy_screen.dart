@@ -83,10 +83,6 @@ class _PolicyBody extends StatelessWidget {
         _PolicySection(
           title: '4. Third-Party Services',
           body:
-              '• Google AdMob — displays ads on Google Play devices. AdMob may collect '
-              'device identifiers per Google\'s Privacy Policy (policies.google.com/privacy).\n'
-              '• Huawei Ads Kit — displays ads on Huawei AppGallery devices per Huawei\'s '
-              'Privacy Policy (consumer.huawei.com/en/privacy).\n'
               '• Appwrite — optional cloud backup. Data is stored on your own Appwrite '
               'project and is not shared with us.',
         ),

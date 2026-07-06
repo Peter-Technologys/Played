@@ -36,9 +36,9 @@
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
 -dontwarn com.dexterous.flutterlocalnotifications.**
 
-# Google Mobile Ads
--keep class com.google.android.gms.ads.** { *; }
--dontwarn com.google.android.gms.ads.**
+# Google Mobile Ads — disabled until Play Store launch
+# -keep class com.google.android.gms.ads.** { *; }
+# -dontwarn com.google.android.gms.ads.**
 
 # General
 -keepattributes *Annotation*

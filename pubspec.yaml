@@ -65,8 +65,8 @@ dependencies:
   # Notifications
   flutter_local_notifications: ^17.0.0
 
-  # Ads
-  google_mobile_ads: ^4.0.0
+  # Ads — disabled until Play Store launch (re-enable when listed)
+  # google_mobile_ads: ^4.0.0
 
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.2
