@@ -130,7 +130,7 @@ Future<void> _initWorkManager() async {
       constraints: Constraints(
         networkType: NetworkType.connected,
       ),
-      existingWorkPolicy: ExistingWorkPolicy.keep,
+      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
     );
     debugPrint('[WorkManager] Update check scheduled (24h).');
   } catch (e) {
