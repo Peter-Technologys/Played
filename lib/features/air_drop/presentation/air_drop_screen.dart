@@ -1,617 +1,635 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:nearby_connections/nearby_connections.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/permissions/permission_helper.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/media_scanner_service.dart';
+import '../../../core/widgets/modern_aura_background.dart';
+import '../../../core/widgets/modern_glass_container.dart';
+import '../../../core/theme/app_spacing.dart';
 import '../../my_space/data/media_repository.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
+import '../data/media_sender.dart';
+import '../data/media_receiver.dart';
 
-// ── Providers ─────────────────────────────────────────────────────────────────
+// ── State ─────────────────────────────────────────────────────────────────────
 
-enum AirDropRole { idle, advertising, discovering }
+enum _Tab { send, receive }
+enum _SendStep { idle, serving }
+enum _ReceiveStep { scanning, downloading, done, error }
 
-class AirDropState {
-  final AirDropRole role;
-  final Map<String, String> discoveredEndpoints; // endpointId → name
-  final Map<String, String> connectedEndpoints;  // endpointId → name
+class _AirDropState {
+  final _Tab         tab;
+  final _SendStep    sendStep;
+  final _ReceiveStep receiveStep;
+  final String?      serverUrl;
+  final MediaItem?   selectedItem;
+  final double       progress;
+  final String?      receivedPath;
+  final String?      errorMessage;
   final List<String> log;
-  final bool isTransferring;
-  final double transferProgress;
-  final String? lastReceivedPath;
 
-  const AirDropState({
-    this.role = AirDropRole.idle,
-    this.discoveredEndpoints = const {},
-    this.connectedEndpoints = const {},
-    this.log = const [],
-    this.isTransferring = false,
-    this.transferProgress = 0,
-    this.lastReceivedPath,
+  const _AirDropState({
+    this.tab          = _Tab.send,
+    this.sendStep     = _SendStep.idle,
+    this.receiveStep  = _ReceiveStep.scanning,
+    this.serverUrl,
+    this.selectedItem,
+    this.progress     = 0,
+    this.receivedPath,
+    this.errorMessage,
+    this.log          = const [],
   });
 
-  AirDropState copyWith({
-    AirDropRole? role,
-    Map<String, String>? discoveredEndpoints,
-    Map<String, String>? connectedEndpoints,
+  _AirDropState copyWith({
+    _Tab?         tab,
+    _SendStep?    sendStep,
+    _ReceiveStep? receiveStep,
+    String?       serverUrl,
+    MediaItem?    selectedItem,
+    double?       progress,
+    String?       receivedPath,
+    String?       errorMessage,
     List<String>? log,
-    bool? isTransferring,
-    double? transferProgress,
-    String? lastReceivedPath,
-  }) => AirDropState(
-    role: role ?? this.role,
-    discoveredEndpoints: discoveredEndpoints ?? this.discoveredEndpoints,
-    connectedEndpoints: connectedEndpoints ?? this.connectedEndpoints,
-    log: log ?? this.log,
-    isTransferring: isTransferring ?? this.isTransferring,
-    transferProgress: transferProgress ?? this.transferProgress,
-    lastReceivedPath: lastReceivedPath ?? this.lastReceivedPath,
+  }) => _AirDropState(
+    tab:          tab          ?? this.tab,
+    sendStep:     sendStep     ?? this.sendStep,
+    receiveStep:  receiveStep  ?? this.receiveStep,
+    serverUrl:    serverUrl    ?? this.serverUrl,
+    selectedItem: selectedItem ?? this.selectedItem,
+    progress:     progress     ?? this.progress,
+    receivedPath: receivedPath ?? this.receivedPath,
+    errorMessage: errorMessage ?? this.errorMessage,
+    log:          log          ?? this.log,
   );
 }
 
-class AirDropNotifier extends StateNotifier<AirDropState> {
-  static const _serviceId = 'com.petersmart.played.airdrop';
-  static const _strategy  = Strategy.P2P_CLUSTER;
+// ── Notifier ──────────────────────────────────────────────────────────────────
 
-  String _myName = 'PLAYED Device';
+class _AirDropNotifier extends StateNotifier<_AirDropState> {
+  _AirDropNotifier() : super(const _AirDropState());
 
-  AirDropNotifier() : super(const AirDropState()) {
-    _myName = 'PLAYED-${DateTime.now().millisecondsSinceEpoch % 9999}';
-  }
+  final _sender   = MediaSender();
+  final _receiver = MediaReceiver();
 
-  void _log(String msg) {
-    state = state.copyWith(log: [msg, ...state.log.take(19)]);
-  }
+  void _log(String msg) =>
+      state = state.copyWith(log: [msg, ...state.log.take(29)]);
 
-  // ── Advertise (receive mode) ───────────────────────────────────────────────
-
-  Future<void> startAdvertising() async {
-    await _stopAll();
-    state = state.copyWith(role: AirDropRole.advertising);
-    _log('Waiting for nearby devices...');
-    try {
-      await Nearby().startAdvertising(
-        _myName,
-        _strategy,
-        onConnectionInitiated: _onConnectionInitiated,
-        onConnectionResult: _onConnectionResult,
-        onDisconnected: _onDisconnected,
-        serviceId: _serviceId,
-      );
-    } catch (e) {
-      _log('Advertise error: $e');
-      state = state.copyWith(role: AirDropRole.idle);
-    }
-  }
-
-  // ── Discover (send mode) ─────────────────────────────────────────────────
-
-  Future<void> startDiscovering() async {
-    await _stopAll();
+  void switchTab(_Tab tab) {
+    stopSending();
     state = state.copyWith(
-      role: AirDropRole.discovering,
-      discoveredEndpoints: {},
-    );
-    _log('Scanning for nearby devices...');
+        tab: tab, sendStep: _SendStep.idle,
+        receiveStep: _ReceiveStep.scanning, log: []);
+  }
+
+  // ── Send ───────────────────────────────────────────────────────────────────
+
+  Future<void> startServing(MediaItem item) async {
+    state = state.copyWith(selectedItem: item, sendStep: _SendStep.serving, serverUrl: null);
+    _log('Starting server for “${item.title}”…');
     try {
-      await Nearby().startDiscovery(
-        _myName,
-        _strategy,
-        onEndpointFound: (id, name, serviceId) {
+      final url = await _sender.startServing(item.filePath);
+      state = state.copyWith(serverUrl: url);
+      _log('Ready. Show QR to receiver.');
+    } catch (e) {
+      _log('Error: $e');
+      state = state.copyWith(sendStep: _SendStep.idle);
+    }
+  }
+
+  Future<void> shareApk() async {
+    state = state.copyWith(sendStep: _SendStep.serving, serverUrl: null);
+    _log('Preparing APK…');
+    try {
+      final url = await _sender.startServingApk();
+      if (url == null) { _log('APK not found.'); state = state.copyWith(sendStep: _SendStep.idle); return; }
+      state = state.copyWith(serverUrl: url);
+      _log('APK ready. Show QR.');
+    } catch (e) { _log('APK error: $e'); state = state.copyWith(sendStep: _SendStep.idle); }
+  }
+
+  void stopSending() {
+    _sender.stop();
+    state = state.copyWith(sendStep: _SendStep.idle, serverUrl: null);
+  }
+
+  // ── Receive ───────────────────────────────────────────────────────────────
+
+  Future<void> onQrScanned(String url) async {
+    if (state.receiveStep == _ReceiveStep.downloading) return;
+    state = state.copyWith(
+        receiveStep: _ReceiveStep.downloading, progress: 0, errorMessage: null);
+    _log('Connecting to $url…');
+    try {
+      final dir     = await getExternalStorageDirectory() ??
+                      await getApplicationDocumentsDirectory();
+      final saveDir = Directory('${dir.path}/OTYA_Received');
+      await saveDir.create(recursive: true);
+      final fileName = url.split('/').last.contains('.')
+          ? url.split('/').last
+          : 'received_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final file = await _receiver.download(
+        url: url,
+        savePath: '${saveDir.path}/$fileName',
+        onProgress: (dl, total) {
           if (!mounted) return;
-          final updated = Map<String, String>.from(state.discoveredEndpoints)
-            ..[id] = name;
-          state = state.copyWith(discoveredEndpoints: updated);
-          _log('Found: $name');
+          state = state.copyWith(progress: total > 0 ? dl / total : 0.0);
         },
-        onEndpointLost: (id) {
-          if (!mounted) return;
-          final updated = Map<String, String>.from(state.discoveredEndpoints)
-            ..remove(id);
-          state = state.copyWith(discoveredEndpoints: updated);
-        },
-        serviceId: _serviceId,
       );
-    } catch (e) {
-      _log('Discover error: $e');
-      state = state.copyWith(role: AirDropRole.idle);
-    }
-  }
-
-  // ── Connect & send ────────────────────────────────────────────────────────
-
-  Future<void> connectAndSend(String endpointId, MediaItem file) async {
-    _log('Connecting to ${state.discoveredEndpoints[endpointId]}...');
-    try {
-      await Nearby().requestConnection(
-        _myName,
-        endpointId,
-        onConnectionInitiated: _onConnectionInitiated,
-        onConnectionResult: (id, status) async {
-          _onConnectionResult(id, status);
-          if (status == Status.CONNECTED) {
-            await _sendFile(id, file);
-          }
-        },
-        onDisconnected: _onDisconnected,
-      );
-    } catch (e) {
-      _log('Connect error: $e');
-    }
-  }
-
-  Future<void> _sendFile(String endpointId, MediaItem file) async {
-    state = state.copyWith(isTransferring: true, transferProgress: 0);
-    _log('Sending ${file.title}...');
-    try {
-      await Nearby().sendFilePayload(endpointId, file.filePath);
-      _log('Sent ${file.title} ✔');
-    } catch (e) {
-      _log('Send error: $e');
-    } finally {
-      if (mounted) state = state.copyWith(isTransferring: false);
-    }
-  }
-
-  // ── Connection callbacks ──────────────────────────────────────────────────
-
-  void _onConnectionInitiated(String id, ConnectionInfo info) {
-    _log('Connection from ${info.endpointName} — accepting...');
-    Nearby().acceptConnection(
-      id,
-      onPayLoadRecieved: _onPayloadReceived,
-      onPayloadTransferUpdate: _onPayloadTransferUpdate,
-    );
-  }
-
-  void _onConnectionResult(String id, Status status) {
-    if (!mounted) return;
-    if (status == Status.CONNECTED) {
-      final name = state.discoveredEndpoints[id] ?? id;
-      final connected = Map<String, String>.from(state.connectedEndpoints)
-        ..[id] = name;
-      state = state.copyWith(connectedEndpoints: connected);
-      _log('Connected to $name');
-    } else {
-      _log('Connection failed: $status');
-    }
-  }
-
-  void _onDisconnected(String id) {
-    if (!mounted) return;
-    final connected = Map<String, String>.from(state.connectedEndpoints)
-      ..remove(id);
-    state = state.copyWith(connectedEndpoints: connected);
-    _log('Disconnected: $id');
-  }
-
-  void _onPayloadReceived(String endpointId, Payload payload) async {
-    if (payload.type == PayloadType.FILE) {
-      _log('Receiving file...');
-      state = state.copyWith(isTransferring: true, transferProgress: 0);
-      // File is saved to the app’s cache dir by nearby_connections
-      // Move it to Downloads after transfer completes
-    }
-  }
-
-  void _onPayloadTransferUpdate(
-      String endpointId, PayloadTransferUpdate update) async {
-    if (!mounted) return;
-    final progress = update.bytesTransferred / (update.totalBytes == 0 ? 1 : update.totalBytes);
-    state = state.copyWith(transferProgress: progress);
-
-    if (update.status == PayloadStatus.SUCCESS) {
-      _log('Transfer complete ✔');
-      state = state.copyWith(isTransferring: false, transferProgress: 1.0);
-      // Move received file to Downloads and trigger media scan
-      await _moveReceivedFile(update.id);
-    } else if (update.status == PayloadStatus.FAILURE) {
-      _log('Transfer failed ✘');
-      state = state.copyWith(isTransferring: false);
-    }
-  }
-
-  Future<void> _moveReceivedFile(int payloadId) async {
-    try {
-      // nearby_connections saves files to cache dir with payload ID as name
-      final cacheDir = await getTemporaryDirectory();
-      final received = File('${cacheDir.path}/$payloadId');
-      if (!await received.exists()) return;
-
-      final downloadsDir = Directory('/storage/emulated/0/Download/PLAYED');
-      await downloadsDir.create(recursive: true);
-      final dest = File('${downloadsDir.path}/${received.path.split('/').last}');
-      await received.copy(dest.path);
-      await received.delete();
-
-      state = state.copyWith(lastReceivedPath: dest.path);
-      _log('Saved to ${dest.path}');
-
-      // Trigger MediaStore scan so the file appears in My Space immediately
       MediaRepository.instance.invalidate();
+      await MediaScannerService.instance.scanDirectory(saveDir.path);
+      state = state.copyWith(
+          receiveStep: _ReceiveStep.done, receivedPath: file.path, progress: 1.0);
+      _log('Saved: ${file.path} ✔');
     } catch (e) {
-      _log('Save error: $e');
+      _log('Error: $e');
+      state = state.copyWith(receiveStep: _ReceiveStep.error, errorMessage: e.toString());
     }
   }
 
-  Future<void> stop() => _stopAll();
+  void resetReceive() => state = state.copyWith(
+      receiveStep: _ReceiveStep.scanning, progress: 0,
+      receivedPath: null, errorMessage: null);
 
-  Future<void> _stopAll() async {
-    try { await Nearby().stopAdvertising(); } catch (_) {}
-    try { await Nearby().stopDiscovery(); } catch (_) {}
-    try { await Nearby().stopAllEndpoints(); } catch (_) {}
-    if (mounted) state = state.copyWith(role: AirDropRole.idle);
-  }
+  void cancelDownload() { _receiver.cancel(); resetReceive(); _log('Cancelled.'); }
 
   @override
-  void dispose() {
-    _stopAll();
-    super.dispose();
-  }
+  void dispose() { _sender.stop(); super.dispose(); }
 }
 
-final airDropProvider =
-    StateNotifierProvider<AirDropNotifier, AirDropState>(
-  (_) => AirDropNotifier(),
-);
+final _airDropProvider =
+    StateNotifierProvider.autoDispose<_AirDropNotifier, _AirDropState>(
+  (_) => _AirDropNotifier());
 
-// ── Screen ───────────────────────────────────────────────────────────────────────────
+// ── Screen ────────────────────────────────────────────────────────────────────
 
 class AirDropScreen extends ConsumerStatefulWidget {
   const AirDropScreen({super.key});
-
   @override
   ConsumerState<AirDropScreen> createState() => _AirDropScreenState();
 }
 
-class _AirDropScreenState extends ConsumerState<AirDropScreen> {
+class _AirDropScreenState extends ConsumerState<AirDropScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabCtrl;
+  final _scanCtrl = MobileScannerController();
+
   @override
   void initState() {
     super.initState();
-    _ensurePermissions();
-  }
-
-  Future<void> _ensurePermissions() async {
-    await PermissionHelper.requestAirDropPermissions();
+    _tabCtrl = TabController(length: 2, vsync: this);
+    _tabCtrl.addListener(() {
+      if (!_tabCtrl.indexIsChanging)
+        ref.read(_airDropProvider.notifier)
+            .switchTab(_tabCtrl.index == 0 ? _Tab.send : _Tab.receive);
+    });
   }
 
   @override
+  void dispose() { _tabCtrl.dispose(); _scanCtrl.dispose(); super.dispose(); }
+
+  @override
   Widget build(BuildContext context) {
-    final s   = ref.watch(airDropProvider);
+    final s   = ref.watch(_airDropProvider);
     final lib = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        backgroundColor: AppColors.surface,
-        elevation: 0,
-        title: const Text('Air-Drop',
-            style: TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontFamily: 'Inter',
-            )),
-        centerTitle: true,
-        actions: [
-          if (s.role != AirDropRole.idle)
-            TextButton(
-              onPressed: () => ref.read(airDropProvider.notifier).stop(),
-              child: const Text('Stop',
-                  style: TextStyle(color: AppColors.error, fontSize: 13)),
+    return ModernAuraBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          title: const Text('Flash Share',
+              style: TextStyle(color: AppColors.textPrimary,
+                  fontWeight: FontWeight.w800, fontFamily: 'Inter', fontSize: 18)),
+          centerTitle: true,
+          actions: [
+            if (s.sendStep == _SendStep.serving)
+              TextButton(
+                onPressed: () => ref.read(_airDropProvider.notifier).stopSending(),
+                child: const Text('Stop',
+                    style: TextStyle(color: AppColors.error, fontFamily: 'Inter')),
+              ),
+          ],
+        ),
+        body: Column(
+          children: [
+            // Tab bar
+            Container(
+              margin: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+              decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(14)),
+              child: TabBar(
+                controller: _tabCtrl,
+                indicator: BoxDecoration(
+                    gradient: AppColors.accentGradient,
+                    borderRadius: BorderRadius.circular(12)),
+                indicatorSize: TabBarIndicatorSize.tab,
+                dividerColor: Colors.transparent,
+                labelColor: Colors.black,
+                unselectedLabelColor: AppColors.textSecondary,
+                labelStyle: const TextStyle(
+                    fontWeight: FontWeight.w700, fontFamily: 'Inter', fontSize: 13),
+                tabs: const [Tab(text: '📤  Send'), Tab(text: '📥  Receive')],
+              ),
             ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // ── Mode buttons ─────────────────────────────────────────────────────────────────
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _ModeBtn(
-                    icon: Icons.download_rounded,
-                    label: 'Receive',
-                    subtitle: 'Wait for files',
-                    active: s.role == AirDropRole.advertising,
-                    onTap: s.role == AirDropRole.idle
-                        ? () => ref.read(airDropProvider.notifier).startAdvertising()
-                        : null,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: _ModeBtn(
-                    icon: Icons.upload_rounded,
-                    label: 'Send',
-                    subtitle: 'Find nearby devices',
-                    active: s.role == AirDropRole.discovering,
-                    onTap: s.role == AirDropRole.idle
-                        ? () => ref.read(airDropProvider.notifier).startDiscovering()
-                        : null,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // ── Transfer progress ─────────────────────────────────────────────────────────────
-          if (s.isTransferring)
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            Expanded(
+              child: TabBarView(
+                controller: _tabCtrl,
+                physics: const NeverScrollableScrollPhysics(),
                 children: [
-                  const Text('Transferring...',
-                      style: TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary)),
-                  const SizedBox(height: 6),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(6),
-                    child: LinearProgressIndicator(
-                      value: s.transferProgress,
-                      backgroundColor: AppColors.border,
-                      valueColor: const AlwaysStoppedAnimation(AppColors.accent),
-                      minHeight: 6,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
+                  _SendView(state: s, library: lib),
+                  _ReceiveView(state: s, scanCtrl: _scanCtrl),
                 ],
               ),
             ),
-
-          // ── Discovered devices (send mode) ─────────────────────────────────────────────
-          if (s.role == AirDropRole.discovering &&
-              s.discoveredEndpoints.isNotEmpty) ...
-            [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 0, 16, 8),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('NEARBY DEVICES',
-                      style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary, letterSpacing: 1.2,
-                      )),
-                ),
-              ),
-              ...s.discoveredEndpoints.entries.map((e) => _DeviceTile(
-                    name: e.value,
-                    onSend: () => _pickAndSend(context, ref, e.key, lib),
-                  )),
-            ],
-
-          // ── Activity log ─────────────────────────────────────────────────────────────────────
-          if (s.log.isNotEmpty) ...
-            [
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 8, 16, 6),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text('ACTIVITY',
-                      style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w700,
-                        color: AppColors.textSecondary, letterSpacing: 1.2,
-                      )),
-                ),
-              ),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  itemCount: s.log.length,
-                  itemBuilder: (_, i) => Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 3),
-                    child: Text(
-                      s.log[i],
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
-                    ),
+            // Activity log
+            if (s.log.isNotEmpty)
+              Container(
+                height: 80,
+                margin: const EdgeInsets.fromLTRB(
+                    AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
+                child: ModernGlassContainer(
+                  padding: const EdgeInsets.all(AppSpacing.sm),
+                  child: ListView.builder(
+                    reverse: true,
+                    itemCount: s.log.length,
+                    itemBuilder: (_, i) => Text(s.log[i],
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary,
+                            fontFamily: 'Inter')),
                   ),
                 ),
               ),
-            ]
-          else
-            Expanded(
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Container(
-                      width: 80, height: 80,
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Send View ─────────────────────────────────────────────────────────────────
+
+class _SendView extends ConsumerWidget {
+  final _AirDropState   state;
+  final List<MediaItem> library;
+  const _SendView({required this.state, required this.library});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final n = ref.read(_airDropProvider.notifier);
+    return SingleChildScrollView(
+      padding: AppSpacing.screenPadding.copyWith(top: AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // QR panel
+          if (state.serverUrl != null) ...[
+            ModernGlassContainer(
+              child: Column(
+                children: [
+                  const Text('Scan on the receiving device',
+                      style: TextStyle(fontSize: 13,
+                          color: AppColors.textSecondary, fontFamily: 'Inter')),
+                  AppSpacing.vMd,
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.all(AppSpacing.sm),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: 0.1),
-                        shape: BoxShape.circle,
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(16)),
+                      child: QrImageView(
+                        data: state.serverUrl!,
+                        version: QrVersions.auto,
+                        size: 200,
+                        backgroundColor: Colors.white,
                       ),
-                      child: const Icon(Icons.wifi_tethering_rounded,
-                          color: AppColors.accent, size: 40),
                     ),
-                    const SizedBox(height: 16),
-                    const Text('100% Offline — No Internet Needed',
-                        style: TextStyle(
-                          fontSize: 15, fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                        )),
-                    const SizedBox(height: 6),
-                    const Text(
-                      'Uses Wi-Fi Direct + Bluetooth.\nTap Receive on one device, Send on the other.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary, height: 1.5),
-                    ),
+                  ),
+                  AppSpacing.vSm,
+                  GestureDetector(
+                    onTap: () {
+                      Clipboard.setData(ClipboardData(text: state.serverUrl!));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('URL copied')));
+                    },
+                    child: Text(state.serverUrl!,
+                        style: const TextStyle(fontSize: 11,
+                            color: AppColors.accent, fontFamily: 'Inter',
+                            decoration: TextDecoration.underline),
+                        textAlign: TextAlign.center),
+                  ),
+                  if (state.selectedItem != null) ...[
+                    AppSpacing.vSm,
+                    Text('🎥 ${state.selectedItem!.title}  •  ${state.selectedItem!.formattedSize}',
+                        style: const TextStyle(fontSize: 12,
+                            color: AppColors.textSecondary, fontFamily: 'Inter'),
+                        textAlign: TextAlign.center),
                   ],
-                ),
+                ],
               ),
             ),
+            AppSpacing.vMd,
+          ],
+          // Share APK
+          _GlassButton(
+            icon: Icons.install_mobile_rounded,
+            label: 'Share OTYA Player APK',
+            subtitle: 'Let friends install without internet',
+            color: AppColors.accentViolet,
+            onTap: () => n.shareApk(),
+          ),
+          AppSpacing.vSm,
+          // File list
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            child: Text('PICK A FILE TO SEND',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
+                    letterSpacing: 1.2, fontFamily: 'Inter')),
+          ),
+          ...library.take(50).map((item) => _FileTile(
+            item: item,
+            isSelected: state.selectedItem?.id == item.id,
+            onTap: () => n.startServing(item),
+          )),
+          if (library.isEmpty)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(AppSpacing.xl),
+                child: Text('No media files found.',
+                    style: TextStyle(
+                        color: AppColors.textSecondary, fontFamily: 'Inter')),
+              ),
+            ),
+          AppSpacing.vXxl,
         ],
       ),
     );
   }
+}
 
-  void _pickAndSend(
-      BuildContext context, WidgetRef ref, String endpointId,
-      List<MediaItem> library) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => DraggableScrollableSheet(
-        expand: false,
-        initialChildSize: 0.6,
-        builder: (_, ctrl) => Column(
-          children: [
-            const SizedBox(height: 12),
-            Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2)),
+// ── Receive View ─────────────────────────────────────────────────────────────
+
+class _ReceiveView extends ConsumerWidget {
+  final _AirDropState          state;
+  final MobileScannerController scanCtrl;
+  const _ReceiveView({required this.state, required this.scanCtrl});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final n = ref.read(_airDropProvider.notifier);
+    return Padding(
+      padding: AppSpacing.screenPadding.copyWith(top: AppSpacing.md),
+      child: switch (state.receiveStep) {
+        _ReceiveStep.scanning    => _scanner(n),
+        _ReceiveStep.downloading => _downloading(n),
+        _ReceiveStep.done        => _done(n),
+        _ReceiveStep.error       => _error(n),
+      },
+    );
+  }
+
+  Widget _scanner(_AirDropNotifier n) {
+    bool scanned = false;
+    return Column(
+      children: [
+        const Text('Point camera at the sender’s QR code',
+            style: TextStyle(fontSize: 13,
+                color: AppColors.textSecondary, fontFamily: 'Inter')),
+        AppSpacing.vMd,
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: MobileScanner(
+              controller: scanCtrl,
+              onDetect: (capture) {
+                if (scanned) return;
+                final url = capture.barcodes.firstOrNull?.rawValue;
+                if (url != null && url.startsWith('http')) {
+                  scanned = true;
+                  HapticFeedback.mediumImpact();
+                  n.onQrScanned(url);
+                }
+              },
             ),
-            const SizedBox(height: 12),
-            const Text('Pick a file to send',
-                style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                )),
-            const SizedBox(height: 8),
-            Expanded(
-              child: ListView.builder(
-                controller: ctrl,
-                itemCount: library.length,
-                itemBuilder: (_, i) {
-                  final item = library[i];
-                  return ListTile(
-                    leading: Icon(
-                      item.isVideo
-                          ? Icons.videocam_rounded
-                          : Icons.music_note_rounded,
-                      color: AppColors.accent,
-                    ),
-                    title: Text(item.title,
-                        style: const TextStyle(
-                            color: AppColors.textPrimary, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
-                    subtitle: Text(item.formattedSize,
-                        style: const TextStyle(
-                            color: AppColors.textSecondary, fontSize: 11)),
-                    onTap: () {
-                      Navigator.pop(context);
-                      ref
-                          .read(airDropProvider.notifier)
-                          .connectAndSend(endpointId, item);
-                    },
-                  );
-                },
+          ),
+        ),
+        AppSpacing.vMd,
+      ],
+    );
+  }
+
+  Widget _downloading(_AirDropNotifier n) => Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      const Icon(Icons.download_rounded, color: AppColors.accent, size: 56),
+      AppSpacing.vMd,
+      const Text('Downloading…',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary, fontFamily: 'Inter')),
+      AppSpacing.vMd,
+      ModernGlassContainer(
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: state.progress > 0 ? state.progress : null,
+                backgroundColor: AppColors.border,
+                valueColor: const AlwaysStoppedAnimation(AppColors.accent),
+                minHeight: 8,
               ),
             ),
+            AppSpacing.vSm,
+            Text(
+              state.progress > 0
+                  ? '${(state.progress * 100).toStringAsFixed(1)}%'
+                  : 'Connecting…',
+              style: const TextStyle(color: AppColors.textSecondary,
+                  fontFamily: 'Inter', fontSize: 13),
+            ),
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Sub-widgets ───────────────────────────────────────────────────────────────────────────
-
-class _ModeBtn extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final bool active;
-  final VoidCallback? onTap;
-  const _ModeBtn({
-    required this.icon, required this.label,
-    required this.subtitle, required this.active,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(vertical: 18),
-        decoration: BoxDecoration(
-          gradient: active
-              ? const LinearGradient(
-                  colors: [AppColors.accent, AppColors.accentViolet])
-              : null,
-          color: active ? null : AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: active ? Colors.transparent : AppColors.border),
-          boxShadow: active
-              ? [BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.3),
-                  blurRadius: 16, offset: const Offset(0, 4))]
-              : null,
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon,
-                color: active ? Colors.black : AppColors.accent, size: 28),
-            const SizedBox(height: 6),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w700,
-                  color: active ? Colors.black : AppColors.textPrimary,
-                )),
-            Text(subtitle,
-                style: TextStyle(
-                  fontSize: 11,
-                  color: active
-                      ? Colors.black.withValues(alpha: 0.7)
-                      : AppColors.textSecondary,
-                )),
-          ],
-        ),
+      AppSpacing.vLg,
+      TextButton(
+        onPressed: n.cancelDownload,
+        child: const Text('Cancel',
+            style: TextStyle(color: AppColors.error, fontFamily: 'Inter')),
       ),
-    );
-  }
-}
+    ],
+  );
 
-class _DeviceTile extends StatelessWidget {
-  final String name;
-  final VoidCallback onSend;
-  const _DeviceTile({required this.name, required this.onSend});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 40, height: 40,
+  Widget _done(_AirDropNotifier n) => Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      Container(
+        width: 80, height: 80,
         decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.1),
-          shape: BoxShape.circle,
-        ),
-        child: const Icon(Icons.phone_android_rounded,
-            color: AppColors.accent, size: 20),
+            color: AppColors.accentGreen.withValues(alpha: 0.15),
+            shape: BoxShape.circle),
+        child: const Icon(Icons.check_rounded,
+            color: AppColors.accentGreen, size: 44),
       ),
-      title: Text(name,
-          style: const TextStyle(
-              color: AppColors.textPrimary,
-              fontWeight: FontWeight.w600,
-              fontSize: 14)),
-      subtitle: const Text('Tap to send a file',
-          style: TextStyle(color: AppColors.textSecondary, fontSize: 11)),
-      trailing: ElevatedButton(
-        onPressed: onSend,
+      AppSpacing.vMd,
+      const Text('File received! ✔',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary, fontFamily: 'Inter')),
+      AppSpacing.vSm,
+      if (state.receivedPath != null)
+        Text(state.receivedPath!.split('/').last,
+            style: const TextStyle(color: AppColors.textSecondary,
+                fontFamily: 'Inter', fontSize: 12),
+            textAlign: TextAlign.center),
+      AppSpacing.vSm,
+      const Text('Added to your media library.',
+          style: TextStyle(color: AppColors.accentGreen,
+              fontFamily: 'Inter', fontSize: 13)),
+      AppSpacing.vLg,
+      ElevatedButton(
+        onPressed: n.resetReceive,
         style: ElevatedButton.styleFrom(
-          backgroundColor: AppColors.accent,
-          foregroundColor: Colors.black,
-          shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(10)),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          backgroundColor: AppColors.accent, foregroundColor: Colors.black,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.xl, vertical: AppSpacing.sm + 4),
         ),
-        child: const Text('Send',
-            style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13)),
+        child: const Text('Receive Another',
+            style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter')),
       ),
-    );
-  }
+    ],
+  );
+
+  Widget _error(_AirDropNotifier n) => Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+      const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 56),
+      AppSpacing.vMd,
+      const Text('Download failed',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary, fontFamily: 'Inter')),
+      AppSpacing.vSm,
+      if (state.errorMessage != null)
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          child: Text(state.errorMessage!,
+              style: const TextStyle(color: AppColors.textSecondary,
+                  fontFamily: 'Inter', fontSize: 12),
+              textAlign: TextAlign.center),
+        ),
+      AppSpacing.vLg,
+      ElevatedButton(
+        onPressed: n.resetReceive,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.error, foregroundColor: Colors.white,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        ),
+        child: const Text('Try Again',
+            style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+      ),
+    ],
+  );
+}
+
+// ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+class _GlassButton extends StatelessWidget {
+  final IconData icon; final String label, subtitle;
+  final Color color; final VoidCallback onTap;
+  const _GlassButton({required this.icon, required this.label,
+      required this.subtitle, required this.color, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: ModernGlassContainer(
+      child: Row(
+        children: [
+          Container(
+            width: 44, height: 44,
+            decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(12)),
+            child: Icon(icon, color: color, size: 22),
+          ),
+          AppSpacing.hMd,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(label, style: const TextStyle(fontSize: 14,
+                    fontWeight: FontWeight.w700, color: AppColors.textPrimary,
+                    fontFamily: 'Inter')),
+                Text(subtitle, style: const TextStyle(fontSize: 11,
+                    color: AppColors.textSecondary, fontFamily: 'Inter')),
+              ],
+            ),
+          ),
+          const Icon(Icons.chevron_right_rounded,
+              color: AppColors.textSecondary, size: 20),
+        ],
+      ),
+    ),
+  );
+}
+
+class _FileTile extends StatelessWidget {
+  final MediaItem item; final bool isSelected; final VoidCallback onTap;
+  const _FileTile({required this.item, required this.isSelected, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) => GestureDetector(
+    onTap: onTap,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),
+      decoration: BoxDecoration(
+        color: isSelected
+            ? AppColors.accent.withValues(alpha: 0.12)
+            : AppColors.surfaceElevated,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: isSelected ? AppColors.accent : AppColors.border,
+          width: isSelected ? 1.5 : 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            item.isVideo ? Icons.videocam_rounded : Icons.music_note_rounded,
+            color: isSelected ? AppColors.accent : AppColors.textSecondary,
+            size: 20,
+          ),
+          AppSpacing.hSm,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(item.title,
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                        color: isSelected ? AppColors.accent : AppColors.textPrimary,
+                        fontFamily: 'Inter'),
+                    maxLines: 1, overflow: TextOverflow.ellipsis),
+                Text(item.formattedSize,
+                    style: const TextStyle(fontSize: 11,
+                        color: AppColors.textSecondary, fontFamily: 'Inter')),
+              ],
+            ),
+          ),
+          if (isSelected)
+            const Icon(Icons.wifi_tethering_rounded,
+                color: AppColors.accent, size: 18),
+        ],
+      ),
+    ),
+  );
 }
