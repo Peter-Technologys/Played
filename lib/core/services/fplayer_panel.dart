@@ -1,11 +1,9 @@
-// Adapted from Updates-mavplayer/lib/style/panel2.dart
-// Changes:
-//   - All Chinese UI strings translated to English
-//   - Removed fplayer-specific FPlayer / FState / FData types
-//   - Replaced with a thin [VideoPlayerAdapter] interface so the panel
-//     works with flutter_vlc_player (VlcPlayerController) or any backend
-//   - Integrated with AppColors for consistent OTYA Player branding
-//   - Removed dead connectivity_plus code (commented out in original)
+// fplayer_panel.dart is kept for reference only.
+// The active video engine is now MediaKitEngine in media_kit_engine.dart.
+// This file will be removed in a future cleanup pass.
+// ignore_for_file: unused_element, dead_code
+
+// Original content preserved below for migration reference.
 
 import 'dart:async';
 import 'dart:math';
