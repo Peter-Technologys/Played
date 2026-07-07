@@ -1,0 +1,11 @@
+name = "small-paper-5a45"
+main = "worker.js"
+compatibility_date = "2024-01-01"
+
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "otya-player-releases"
+
+[routes]
+pattern = "getotya.petersmartlink.com/*"
+custom_domain = true

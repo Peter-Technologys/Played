@@ -1,32 +1,26 @@
 /**
- * OTYA Player — Cloudflare Worker
+ * OTYA Player — Cloudflare Worker (small-paper-5a45)
  *
- * Serves the correct APK from R2 based on the user's device.
- * Version is read live from version.json in R2 — fully automatic.
+ * Serves APKs from a PRIVATE R2 bucket via R2 binding.
+ * The bucket is never publicly accessible — all downloads go through this Worker.
  *
  * Routes:
- *   /                   → redirect to download page on website
- *   /download           → smart redirect to correct APK for this phone
- *   /download?abi=arm64 → force arm64 APK
- *   /download?abi=arm32 → force arm32 APK
- *   /version            → returns version.json (used by in-app update checker)
- *   /latest             → returns full release info JSON
- *   /apk/arm64          → direct arm64 APK link
- *   /apk/arm32          → direct arm32 APK link
+ *   /           → redirect to website download page
+ *   /version    → raw version.json from R2 (used by in-app update checker)
+ *   /latest     → structured JSON with version, changelog, download URLs
+ *   /download   → auto-detect ABI, stream correct APK from R2
+ *   /apk/arm64  → stream arm64 APK directly from R2
+ *   /apk/arm32  → stream arm32 APK directly from R2
  */
 
-// Public R2 bucket URL — this is the custom domain on your R2 bucket
-const R2_BASE = 'https://getotya.petersmartlink.com/r2'
 const WEBSITE = 'https://petersmartlink.com/download/otya-player'
 
-// CORS headers — needed so the Flutter app can call /version
 const CORS = {
   'Access-Control-Allow-Origin':  '*',
   'Access-Control-Allow-Methods': 'GET, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 }
 
-// Detect which ABI the user's phone needs
 function detectAbi(request) {
   const url   = new URL(request.url)
   const param = url.searchParams.get('abi')
@@ -46,57 +40,63 @@ function detectAbi(request) {
   return 'arm64' // safe default — covers 99%+ of phones made after 2015
 }
 
-// Fetch version.json from R2 root with a 5-minute edge cache
-async function getVersionInfo() {
+// Read version.json from R2 via binding (no public access needed)
+async function getVersionInfo(env) {
   try {
-    const res = await fetch(R2_BASE + '/version.json', {
-      cf: { cacheTtl: 300, cacheEverything: true },
-    })
-    if (!res.ok) return null
-    return await res.json()
+    const obj = await env.R2.get('version.json')
+    if (!obj) return null
+    return await obj.json()
   } catch {
     return null
   }
 }
 
-// Build APK URLs from version info (versioned folder structure)
-function getApkUrls(info) {
-  if (!info || !info.tag) {
-    // Fallback to latest symlink if version info unavailable
-    return {
-      arm64: R2_BASE + '/latest/otya-player-latest-arm64.apk',
-      arm32: R2_BASE + '/latest/otya-player-latest-arm32.apk',
-    }
+// Build the R2 object key for an APK
+function buildApkKey(info, abi) {
+  if (!info || !info.tag) return null
+  const filename = abi === 'arm64'
+    ? (info.arm64 || `otya-player-${info.tag}-arm64.apk`)
+    : (info.arm32 || `otya-player-${info.tag}-arm32.apk`)
+  return `releases/${info.tag}/${filename}`
+}
+
+// Stream an APK from R2 directly to the client
+async function serveApk(env, key) {
+  const obj = await env.R2.get(key)
+  if (!obj) {
+    return new Response(`APK not found: ${key}`, { status: 404 })
   }
-  const tag = info.tag
-  return {
-    arm64: `${R2_BASE}/releases/${tag}/otya-player-${tag}-arm64.apk`,
-    arm32: `${R2_BASE}/releases/${tag}/otya-player-${tag}-arm32.apk`,
-  }
+  const headers = new Headers()
+  obj.writeHttpMetadata(headers)
+  headers.set('etag', obj.httpEtag)
+  headers.set('Content-Type', 'application/vnd.android.package-archive')
+  headers.set('Content-Disposition', `attachment; filename="${key.split('/').pop()}"`)
+  headers.set('Cache-Control', 'public, max-age=300')
+  // Allow Flutter app to read response
+  Object.entries(CORS).forEach(([k, v]) => headers.set(k, v))
+  return new Response(obj.body, { headers })
 }
 
 export default {
-  async fetch(request) {
+  async fetch(request, env) {
     const url  = new URL(request.url)
     const path = url.pathname.replace(/\/+$/, '') || '/'
 
-    // OPTIONS preflight for CORS
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: CORS })
     }
-
     if (request.method !== 'GET') {
       return new Response('Method not allowed', { status: 405 })
     }
 
-    // / → send to website download page
+    // / → website
     if (path === '' || path === '/') {
       return Response.redirect(WEBSITE, 302)
     }
 
-    // /version → return version.json (called by the in-app update checker)
+    // /version → raw version.json
     if (path === '/version') {
-      const info = await getVersionInfo()
+      const info = await getVersionInfo(env)
       if (!info) {
         return new Response(
           JSON.stringify({ error: 'version info not available yet' }),
@@ -104,53 +104,55 @@ export default {
         )
       }
       return new Response(JSON.stringify(info), {
-        headers: {
-          'Content-Type':  'application/json',
-          'Cache-Control': 'public, max-age=300',
-          ...CORS,
-        },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', ...CORS },
       })
     }
 
-    // /download → detect phone type and redirect to correct APK
-    if (path === '/download') {
-      const info = await getVersionInfo()
-      const apks = getApkUrls(info)
-      const abi  = detectAbi(request)
-      return Response.redirect(apks[abi], 302)
-    }
-
-    // /apk/arm64 and /apk/arm32 → direct links
-    if (path === '/apk/arm64' || path === '/apk/arm32') {
-      const info = await getVersionInfo()
-      const apks = getApkUrls(info)
-      const abi  = path === '/apk/arm64' ? 'arm64' : 'arm32'
-      return Response.redirect(apks[abi], 302)
-    }
-
-    // /latest → full release info JSON
+    // /latest → structured release info
     if (path === '/latest') {
-      const info = await getVersionInfo()
-      const apks = getApkUrls(info)
+      const info = await getVersionInfo(env)
+      const host = url.hostname
       const payload = {
-        version:   info?.version   ?? 'unknown',
+        version:     info?.version     ?? 'unknown',
         versionCode: info?.versionCode ?? 0,
-        date:      info?.date      ?? null,
-        changelog: info?.changelog ?? '',
-        tag:       info?.tag       ?? null,
+        tag:         info?.tag         ?? null,
+        date:        info?.date        ?? null,
+        changelog:   info?.changelog   ?? '',
         downloads: {
-          auto:  'https://' + url.hostname + '/download',
-          arm64: apks.arm64,
-          arm32: apks.arm32,
+          auto:  `https://${host}/download`,
+          arm64: `https://${host}/apk/arm64`,
+          arm32: `https://${host}/apk/arm32`,
         },
       }
       return new Response(JSON.stringify(payload), {
-        headers: {
-          'Content-Type':  'application/json',
-          'Cache-Control': 'public, max-age=300',
-          ...CORS,
-        },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'public, max-age=300', ...CORS },
       })
+    }
+
+    // /download → auto-detect ABI and stream APK
+    if (path === '/download') {
+      const abi  = detectAbi(request)
+      const info = await getVersionInfo(env)
+      if (!info) {
+        return new Response(JSON.stringify({ error: 'version info not available' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } })
+      }
+      const key = buildApkKey(info, abi)
+      if (!key) return new Response('Could not determine APK path', { status: 500 })
+      return serveApk(env, key)
+    }
+
+    // /apk/arm64 and /apk/arm32 → stream specific APK
+    if (path === '/apk/arm64' || path === '/apk/arm32') {
+      const abi  = path === '/apk/arm64' ? 'arm64' : 'arm32'
+      const info = await getVersionInfo(env)
+      if (!info) {
+        return new Response(JSON.stringify({ error: 'version info not available' }),
+          { status: 503, headers: { 'Content-Type': 'application/json' } })
+      }
+      const key = buildApkKey(info, abi)
+      if (!key) return new Response('Could not determine APK path', { status: 500 })
+      return serveApk(env, key)
     }
 
     return new Response('Not found', { status: 404 })
