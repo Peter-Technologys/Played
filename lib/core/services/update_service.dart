@@ -18,15 +18,30 @@ class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
-  static const String _prefLastCheck      = 'update_last_check';
-  static const String _prefSkippedCode    = 'update_skipped_code';
-  static const String _prefDeviceId       = 'update_device_id';
+  static const String _prefLastCheck   = 'update_last_check';
+  static const String _prefSkippedCode = 'update_skipped_code';
+  static const String _prefDeviceId    = 'update_device_id';
+
+  // Guard against concurrent SharedPreferences access
+  bool _checkInProgress      = false;
+  bool _registerInProgress   = false;
 
   String get downloadUrl => Environment.downloadUrl;
 
   /// Returns [UpdateInfo] if a newer version is available, null otherwise.
   /// Checks at most once per 24 hours unless [force] is true.
+  /// Guards against concurrent calls.
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
+    if (_checkInProgress) return null;
+    _checkInProgress = true;
+    try {
+      return await _doCheckForUpdate(force: force);
+    } finally {
+      _checkInProgress = false;
+    }
+  }
+
+  Future<UpdateInfo?> _doCheckForUpdate({bool force = false}) async {
     try {
       final prefs = await SharedPreferences.getInstance();
 
@@ -107,9 +122,18 @@ class UpdateService {
     await prefs.setInt(_prefSkippedCode, versionCode);
   }
 
-  /// Register this device in Appwrite devices collection on first launch.
-  /// Safe to call multiple times — uses upsert pattern.
+  /// Register this device on first launch. Guards against concurrent calls.
   Future<void> registerDevice() async {
+    if (_registerInProgress) return;
+    _registerInProgress = true;
+    try {
+      await _doRegisterDevice();
+    } finally {
+      _registerInProgress = false;
+    }
+  }
+
+  Future<void> _doRegisterDevice() async {
     try {
       final prefs = await SharedPreferences.getInstance();
       String? deviceId = prefs.getString(_prefDeviceId);
@@ -174,14 +198,18 @@ class UpdateService {
 
   String _detectAbi() {
     try {
-      // On Android, check supported ABIs
       if (Platform.isAndroid) {
-        // arm64-v8a devices report this in the process environment
-        final arch = Platform.environment['PROCESSOR_ARCHITECTURE'] ?? '';
-        if (arch.contains('64') || arch.contains('aarch64')) return 'arm64';
+        // Read the CPU ABI from /proc/cpuinfo — reliable on all Android versions
+        final cpuinfo = File('/proc/cpuinfo').readAsStringSync();
+        if (cpuinfo.contains('aarch64') || cpuinfo.contains('arm64')) {
+          return 'arm64';
+        }
+        if (cpuinfo.contains('armv7') || cpuinfo.contains('armeabi')) {
+          return 'arm32';
+        }
       }
     } catch (_) {}
-    return 'arm64'; // default to arm64 (most modern devices)
+    return 'arm64'; // safe default — covers 99%+ of modern devices
   }
 
   String _generateDeviceId() {
