@@ -69,6 +69,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // Icon
             Container(
               width: 64, height: 64,
               decoration: BoxDecoration(
@@ -94,6 +95,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   ?.copyWith(color: Colors.grey[600], height: 1.5),
               textAlign: TextAlign.center,
             ),
+
+            // Changelog
             if (changelog.isNotEmpty) ...[
               const SizedBox(height: 12),
               Align(
@@ -114,6 +117,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ),
               ),
             ],
+
+            // Progress bar
             if (_downloading) ...[
               const SizedBox(height: 16),
               ClipRRect(
@@ -121,7 +126,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 child: LinearProgressIndicator(
                   value: _progress,
                   minHeight: 6,
-                  backgroundColor: purple.withOpacity(0.15),
+                  backgroundColor: purple.withValues(alpha: 0.15),
                   valueColor: const AlwaysStoppedAnimation(purple),
                 ),
               ),
@@ -129,24 +134,39 @@ class _UpdateDialogState extends State<UpdateDialog> {
               Text(
                 _progress != null
                     ? 'Downloading… ${(_progress! * 100).toStringAsFixed(0)}%'
-                    : 'Preparing…',
-                style: theme.textTheme.bodySmall,
+                    : 'Starting download…',
+                style: theme.textTheme.bodySmall
+                    ?.copyWith(color: Colors.grey[500]),
               ),
             ],
+
+            // Error box with retry
             if (_error != null) ...[
               const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(10),
+                padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: theme.colorScheme.errorContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                child: Text(_error!,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onErrorContainer)),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline_rounded,
+                        color: theme.colorScheme.onErrorContainer, size: 18),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(_error!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                              color: theme.colorScheme.onErrorContainer)),
+                    ),
+                  ],
+                ),
               ),
             ],
+
             const SizedBox(height: 20),
+
+            // Download / Retry button
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
@@ -156,18 +176,29 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         width: 16, height: 16,
                         child: CircularProgressIndicator(
                             strokeWidth: 2, color: Colors.white))
-                    : const Icon(Icons.download_rounded, size: 18),
-                label: Text(_downloading ? 'Downloading…' : 'Update Now'),
+                    : Icon(
+                        _error != null
+                            ? Icons.refresh_rounded
+                            : Icons.download_rounded,
+                        size: 18),
+                label: Text(
+                  _downloading
+                      ? 'Downloading…'
+                      : _error != null ? 'Retry' : 'Update Now',
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: purple,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                   shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14)),
+                  elevation: 0,
                 ),
               ),
             ),
             const SizedBox(height: 8),
+
+            // Remind later
             if (!_downloading)
               SizedBox(
                 width: double.infinity,
@@ -179,30 +210,32 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   child: const Text('Remind me later'),
                 ),
               ),
+
             const Divider(height: 24),
-            // Rate Us and Report Problem — open the full in-app sheets
+
+            // Rate Us / Report Problem
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
                 TextButton.icon(
                   onPressed: () => RateUsSheet.show(context),
                   icon: const Icon(Icons.star_rounded,
-                      color: Color(0xFFFFC107)),
+                      color: Color(0xFFFFC107), size: 18),
                   label: const Text('Rate Us',
                       style: TextStyle(
                           color: Color(0xFFFFC107),
                           fontWeight: FontWeight.w600,
-                          fontFamily: 'Inter')),
+                          fontFamily: 'Inter', fontSize: 13)),
                 ),
                 TextButton.icon(
                   onPressed: () => ReportProblemSheet.show(context),
                   icon: const Icon(Icons.bug_report_rounded,
-                      color: Colors.redAccent),
+                      color: Colors.redAccent, size: 18),
                   label: const Text('Report Problem',
                       style: TextStyle(
                           color: Colors.redAccent,
                           fontWeight: FontWeight.w600,
-                          fontFamily: 'Inter')),
+                          fontFamily: 'Inter', fontSize: 13)),
                 ),
               ],
             ),

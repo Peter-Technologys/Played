@@ -6,7 +6,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 /// Downloads an APK from the Cloudflare Worker and triggers the Android installer.
-/// The Worker streams the APK from the private R2 bucket — the app never touches R2 directly.
 class ApkDownloader {
   ApkDownloader._();
   static final ApkDownloader instance = ApkDownloader._();
@@ -30,7 +29,8 @@ class ApkDownloader {
     try {
       if (!await _requestInstallPermission()) {
         onError?.call(
-          'Permission needed. Go to Settings and allow \'Install unknown apps\' for OTYA Player.',
+          "Permission needed. Go to Settings → Apps → OTYA Player → "
+          "Install unknown apps and allow it.",
         );
         return;
       }
@@ -38,6 +38,8 @@ class ApkDownloader {
       final dir      = await getTemporaryDirectory();
       final savePath = '${dir.path}/otya-player-$version.apk';
       final file     = File(savePath);
+
+      // Always delete a stale partial download before starting.
       if (await file.exists()) await file.delete();
 
       _cancelToken = CancelToken();
@@ -56,20 +58,34 @@ class ApkDownloader {
       );
 
       _cancelToken = null;
-      debugPrint('[ApkDownloader] Saved to $savePath');
+
+      // Verify the file was actually written and is non-empty.
+      if (!await file.exists() || await file.length() < 1024) {
+        onError?.call('Download incomplete. Please try again.');
+        return;
+      }
+
+      debugPrint('[ApkDownloader] Saved to $savePath (${await file.length()} bytes)');
 
       final result = await OpenFilex.open(
         savePath,
         type: 'application/vnd.android.package-archive',
       );
       if (result.type != ResultType.done) {
-        onError?.call('Could not open installer: ${result.message}');
+        onError?.call(
+          'Could not open the installer. '
+          'Try opening the file manually from your Downloads folder.',
+        );
       }
     } on DioException catch (e) {
       _cancelToken = null;
       if (!CancelToken.isCancel(e)) {
-        debugPrint('[ApkDownloader] Error: $e');
-        onError?.call('Download failed. Check your internet and try again.');
+        debugPrint('[ApkDownloader] DioException: $e');
+        final msg = e.type == DioExceptionType.connectionTimeout ||
+                e.type == DioExceptionType.receiveTimeout
+            ? 'Download timed out. Check your internet connection and try again.'
+            : 'Download failed. Check your internet and try again.';
+        onError?.call(msg);
       }
     } catch (e) {
       _cancelToken = null;
@@ -85,8 +101,11 @@ class ApkDownloader {
 
   Future<bool> _requestInstallPermission() async {
     if (!Platform.isAndroid) return false;
+    // REQUEST_INSTALL_PACKAGES is only needed on Android 8+ (API 26+).
+    // On older versions the permission is granted at install time.
     final status = await Permission.requestInstallPackages.status;
     if (status.isGranted) return true;
-    return (await Permission.requestInstallPackages.request()).isGranted;
+    final result = await Permission.requestInstallPackages.request();
+    return result.isGranted;
   }
 }

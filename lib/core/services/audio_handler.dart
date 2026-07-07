@@ -14,13 +14,18 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
   void Function()? onSkipNext;
   void Function()? onSkipPrevious;
 
+  // Guard against concurrent loadAndPlay calls (e.g. rapid track switching).
+  bool _loading = false;
+
   PlayedAudioHandler() {
     _player.playbackEventStream
         .map(_transformEvent)
         .pipe(playbackState)
-        .catchError((e) {
+        .catchError((Object e) {
       debugPrint('[AudioHandler] playbackEventStream error: $e');
+      return playbackState.value; // keep last known state
     });
+
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         playbackState.add(playbackState.value.copyWith(
@@ -38,6 +43,12 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
     bool skipSilence = false,
     Duration? savedPosition,
   }) async {
+    // Prevent overlapping loads — drop the call if one is already in progress.
+    if (_loading) {
+      debugPrint('[AudioHandler] loadAndPlay skipped — already loading.');
+      return;
+    }
+    _loading = true;
     try {
       mediaItem.add(MediaItem(
         id:       item.id,
@@ -51,14 +62,9 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
             : null,
       ));
 
-      // Stop any currently playing track cleanly before loading a new one.
-      // This prevents audio bleed-through when switching tracks quickly.
-      if (_player.playing) {
-        await _player.stop();
-      }
+      // Stop cleanly before loading a new source to prevent audio bleed-through.
+      if (_player.playing) await _player.stop();
 
-      // Use AudioSource.uri with a proper file:// URI.
-      // setFilePath() can silently fail on some Android versions.
       await _player.setAudioSource(
         AudioSource.uri(Uri.file(item.filePath)),
         preload: true,
@@ -72,12 +78,13 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
       await play();
     } catch (e) {
       debugPrint('[AudioHandler] loadAndPlay error: $e');
-      // Emit an idle state so the UI stops showing a spinner
       playbackState.add(playbackState.value.copyWith(
         processingState: AudioProcessingState.idle,
         playing: false,
       ));
-      rethrow; // Let AudioPlayerNotifier handle the error state
+      rethrow;
+    } finally {
+      _loading = false;
     }
   }
 
@@ -97,13 +104,13 @@ class PlayedAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   PlaybackState _transformEvent(PlaybackEvent event) {
-    final processingState = {
-      ProcessingState.idle:      AudioProcessingState.idle,
-      ProcessingState.loading:   AudioProcessingState.loading,
-      ProcessingState.buffering: AudioProcessingState.buffering,
-      ProcessingState.ready:     AudioProcessingState.ready,
-      ProcessingState.completed: AudioProcessingState.completed,
-    }[_player.processingState] ?? AudioProcessingState.idle;
+    final processingState = switch (_player.processingState) {
+      ProcessingState.idle      => AudioProcessingState.idle,
+      ProcessingState.loading   => AudioProcessingState.loading,
+      ProcessingState.buffering => AudioProcessingState.buffering,
+      ProcessingState.ready     => AudioProcessingState.ready,
+      ProcessingState.completed => AudioProcessingState.completed,
+    };
 
     return PlaybackState(
       controls: [
