@@ -2,22 +2,28 @@
 # OTYA Player — GitHub Actions
 #
 # Triggers on version tags (e.g. v1.2.1):
-#   - Builds signed split APKs (arm64 + arm32)
-#   - Uploads APKs to Cloudflare R2
-#   - Creates a GitHub Release
+#   1. Builds signed split APKs (arm64 + arm32)
+#   2. Uploads APKs + version.json to Cloudflare R2
+#   3. Writes release document to Appwrite (triggers push notifications)
+#   4. Creates a GitHub Release
 #
 # Required GitHub Secrets:
-#   KEYSTORE_BASE64      — base64-encoded .jks keystore
-#   STORE_PASSWORD       — keystore password
-#   KEY_ALIAS            — key alias
-#   KEY_PASSWORD         — key password
-#   R2_ACCESS_KEY_ID     — Cloudflare R2 access key ID
-#   R2_SECRET_ACCESS_KEY — Cloudflare R2 secret access key
-#   R2_BUCKET            — R2 bucket name
-#   R2_ENDPOINT          — https://<account_id>.r2.cloudflarestorage.com
+#   KEYSTORE_BASE64        — base64-encoded .jks keystore
+#   STORE_PASSWORD         — keystore password
+#   KEY_ALIAS              — key alias
+#   KEY_PASSWORD           — key password
+#   R2_ACCESS_KEY_ID       — Cloudflare R2 access key ID
+#   R2_SECRET_ACCESS_KEY   — Cloudflare R2 secret access key
+#   R2_BUCKET              — R2 bucket name
+#   R2_ENDPOINT            — https://<account_id>.r2.cloudflarestorage.com
+#   APPWRITE_API_KEY       — Appwrite server API key (with databases.write scope)
 #
 # Required GitHub Variables:
-#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
+#   GOOGLE_SERVICES_JSON   — raw contents of google-services.json
+#   APPWRITE_ENDPOINT      — e.g. https://nyc.cloud.appwrite.io/v1
+#   APPWRITE_PROJECT_ID    — your Appwrite project ID
+#   APPWRITE_DATABASE_ID   — your Appwrite database ID
+#   APPWRITE_RELEASES_COLLECTION — collection ID for releases
 # ───────────────────────────────────────────────────────────────
 
 name: Build & Test
@@ -94,15 +100,35 @@ jobs:
           rm -f android/app/keystore.jks
           rm -f android/app/google-services.json
 
-      - name: Upload APKs to Cloudflare R2
+      # ── Extract version info from pubspec.yaml ─────────────────────────────────────
+      - name: Extract version info
+        id: version
+        run: |
+          TAG=${{ github.ref_name }}
+          # pubspec version format: 1.2.1+4  (name+buildNumber)
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}')
+          VERSION_NAME=$(echo $PUBSPEC_VERSION | cut -d'+' -f1)
+          VERSION_CODE=$(echo $PUBSPEC_VERSION | cut -d'+' -f2)
+          echo "tag=$TAG"             >> $GITHUB_OUTPUT
+          echo "name=$VERSION_NAME"   >> $GITHUB_OUTPUT
+          echo "code=$VERSION_CODE"   >> $GITHUB_OUTPUT
+
+      # ── Upload APKs + version.json to Cloudflare R2 ──────────────────────────
+      - name: Upload to Cloudflare R2
         env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
           R2_BUCKET: ${{ secrets.R2_BUCKET }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
           pip install awscli --quiet
-          TAG=${{ github.ref_name }}
+          TAG=${{ steps.version.outputs.tag }}
+          VERSION=${{ steps.version.outputs.name }}
+          CODE=${{ steps.version.outputs.code }}
+          DATE=$(date -u +%Y-%m-%d)
+
+          # Upload APKs to versioned folder
           aws s3 cp \
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             s3://$R2_BUCKET/releases/$TAG/otya-player-$TAG-arm64.apk \
@@ -112,6 +138,82 @@ jobs:
             s3://$R2_BUCKET/releases/$TAG/otya-player-$TAG-arm32.apk \
             --endpoint-url $R2_ENDPOINT
 
+          # Write version.json to R2 root — this is what the Worker and app read
+          cat > /tmp/version.json << EOF
+          {
+            "version": "$VERSION",
+            "versionCode": $CODE,
+            "tag": "$TAG",
+            "date": "$DATE",
+            "changelog": "See https://github.com/${{ github.repository }}/releases/tag/$TAG for full changelog."
+          }
+          EOF
+          aws s3 cp /tmp/version.json \
+            s3://$R2_BUCKET/version.json \
+            --endpoint-url $R2_ENDPOINT \
+            --content-type application/json \
+            --cache-control 'public, max-age=300'
+
+      # ── Write release to Appwrite — triggers in-app update notifications ──────
+      - name: Publish release to Appwrite
+        env:
+          APPWRITE_ENDPOINT: ${{ vars.APPWRITE_ENDPOINT }}
+          APPWRITE_PROJECT_ID: ${{ vars.APPWRITE_PROJECT_ID }}
+          APPWRITE_DATABASE_ID: ${{ vars.APPWRITE_DATABASE_ID }}
+          APPWRITE_RELEASES_COLLECTION: ${{ vars.APPWRITE_RELEASES_COLLECTION }}
+          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+        run: |
+          TAG=${{ steps.version.outputs.tag }}
+          VERSION=${{ steps.version.outputs.name }}
+          CODE=${{ steps.version.outputs.code }}
+          DATE=$(date -u +%Y-%m-%d)
+
+          # Upsert the release document — document ID = tag (e.g. v1.2.1)
+          # Try update first, then create if not found
+          HTTP_STATUS=$(curl -s -o /tmp/appwrite_resp.json -w "%{http_code}" \
+            -X PATCH \
+            "$APPWRITE_ENDPOINT/databases/$APPWRITE_DATABASE_ID/collections/$APPWRITE_RELEASES_COLLECTION/documents/$TAG" \
+            -H "Content-Type: application/json" \
+            -H "X-Appwrite-Project: $APPWRITE_PROJECT_ID" \
+            -H "X-Appwrite-Key: $APPWRITE_API_KEY" \
+            -d "{
+              \"data\": {
+                \"version\": \"$VERSION\",
+                \"versionCode\": $CODE,
+                \"tag\": \"$TAG\",
+                \"date\": \"$DATE\",
+                \"arm64Url\": \"https://getotya.petersmartlink.com/apk/arm64\",
+                \"arm32Url\": \"https://getotya.petersmartlink.com/apk/arm32\",
+                \"downloadUrl\": \"https://getotya.petersmartlink.com/download\"
+              }
+            }")
+
+          if [ "$HTTP_STATUS" = "404" ]; then
+            echo "Document not found, creating..."
+            curl -s -f \
+              -X POST \
+              "$APPWRITE_ENDPOINT/databases/$APPWRITE_DATABASE_ID/collections/$APPWRITE_RELEASES_COLLECTION/documents" \
+              -H "Content-Type: application/json" \
+              -H "X-Appwrite-Project: $APPWRITE_PROJECT_ID" \
+              -H "X-Appwrite-Key: $APPWRITE_API_KEY" \
+              -d "{
+                \"documentId\": \"$TAG\",
+                \"data\": {
+                  \"version\": \"$VERSION\",
+                  \"versionCode\": $CODE,
+                  \"tag\": \"$TAG\",
+                  \"date\": \"$DATE\",
+                  \"arm64Url\": \"https://getotya.petersmartlink.com/apk/arm64\",
+                  \"arm32Url\": \"https://getotya.petersmartlink.com/apk/arm32\",
+                  \"downloadUrl\": \"https://getotya.petersmartlink.com/download\"
+                }
+              }"
+          else
+            echo "Release document updated: $TAG"
+            cat /tmp/appwrite_resp.json
+          fi
+
+      # ── GitHub Release ───────────────────────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
