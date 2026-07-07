@@ -35,6 +35,12 @@ class PlayedAudioHandler extends BaseAudioHandler
   int                 _queueIndex = 0;
   bool                _loading    = false;
 
+  // Public callbacks — wired by AudioPlayerNotifier so notification /
+  // lock-screen skip buttons advance the in-app queue automatically.
+  // Restored: accidentally removed in the !62 QueueHandler rewrite.
+  void Function()? onSkipNext;
+  void Function()? onSkipPrevious;
+
   // Playback settings carried across track changes
   double _speed       = 1.0;
   bool   _skipSilence = false;
