@@ -223,7 +223,7 @@ class MediaScannerService {
   // PUBLIC API
 
   /// Full scan: MediaStore first.
-  /// Supplemental receive-dir scan only runs if MediaStore returns < 10 items
+  /// Supplemental receive-dir scan only runs if MediaStore returns < 3 items
   /// (e.g. first install before MediaStore has indexed anything).
   /// Filesystem walk is last resort only if both above return nothing.
   Future<List<MediaItem>> scanAll() async {
@@ -231,7 +231,7 @@ class MediaScannerService {
 
     // MediaStore is authoritative on Android — if it found files, trust it.
     // Only do the expensive receive-dir scan on first install or empty library.
-    if (storeItems.length >= 10) return storeItems;
+    if (storeItems.length >= 3) return storeItems;
 
     // Supplemental scan for files not yet indexed by MediaStore
     final storePaths = storeItems.map((e) => e.filePath).toSet();
