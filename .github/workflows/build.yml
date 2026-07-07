@@ -1,227 +1,43 @@
 # ───────────────────────────────────────────────────────────────
 # OTYA Player — GitHub Actions
 #
-# Job summary:
-#   analyze        — flutter analyze        (every PR + main push)
-#   unit_test      — flutter test           (PR only)
-#   build_debug    — debug APK              (PR only)
-#   build_release  — signed AAB + APKs +
-#                    universal APK +
-#                    Firebase distribution  (version tags only: v1.x.x)
+# Triggers on version tags (e.g. v1.2.1):
+#   - Builds signed split APKs (arm64 + arm32)
+#   - Uploads APKs to Cloudflare R2
+#   - Creates a GitHub Release
 #
-# To release: create a tag in GitLab (mirrors to GitHub automatically)
-#   e.g. tag name: v1.2.1
+# Required GitHub Secrets:
+#   KEYSTORE_BASE64      — base64-encoded .jks keystore
+#   STORE_PASSWORD       — keystore password
+#   KEY_ALIAS            — key alias
+#   KEY_PASSWORD         — key password
+#   R2_ACCESS_KEY_ID     — Cloudflare R2 access key ID
+#   R2_SECRET_ACCESS_KEY — Cloudflare R2 secret access key
+#   R2_BUCKET            — R2 bucket name
+#   R2_ENDPOINT          — https://<account_id>.r2.cloudflarestorage.com
 #
-# Required GitHub Secrets (Settings → Secrets and variables → Actions → Secrets):
-#   KEYSTORE_BASE64           — base64-encoded .jks keystore
-#   STORE_PASSWORD            — keystore password
-#   KEY_ALIAS                 — key alias
-#   KEY_PASSWORD              — key password
-#   FIREBASE_APP_ID           — Firebase App ID (optional)
-#   FIREBASE_SERVICE_ACCOUNT  — Firebase service account JSON (optional)
-#
-# Required GitHub Variables (Settings → Secrets and variables → Actions → Variables):
-#   GOOGLE_SERVICES_JSON      — raw contents of google-services.json
-#   FIREBASE_TESTERS          — comma-separated tester emails (optional)
-#   FIREBASE_ENABLED          — set to 'true' to enable Firebase distribution
+# Required GitHub Variables:
+#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
 # ───────────────────────────────────────────────────────────────
 
 name: Build & Test
 
 on:
-  pull_request:
-    branches: [main]
   push:
-    branches: [main]
     tags: ['v*']
 
-# Concurrency only cancels duplicate runs on the same ref.
-# Tags get their own unique group so they are never cancelled.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref_type != 'tag' }}
+  cancel-in-progress: false
 
 env:
   PUB_ENVIRONMENT: bot.github
 
 jobs:
 
-  # ── ANALYZE — every PR and main push ───────────────────────────────────────────
-  analyze:
-    name: Flutter Analyze
-    runs-on: ubuntu-latest
-    if: github.ref_type == 'branch'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: stable
-          cache: true
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
-      - run: flutter pub get
-      - run: flutter analyze --no-fatal-infos --no-fatal-warnings
-
-  # ── UNIT TESTS — PR only ───────────────────────────────────────────────────────────
-  unit_test:
-    name: Unit Tests
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: stable
-          cache: true
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
-      - run: flutter pub get
-      - run: flutter test --coverage
-      - uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: coverage/
-          retention-days: 7
-
-  # ── DEBUG APK — PR and main push ──────────────────────────────────────────────────
-  build_debug:
-    name: Build Debug APK
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [analyze]
-    env:
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false"
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: false
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-      - uses: actions/checkout@v4
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: stable
-          cache: true
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
-      - run: flutter pub get
-      - name: Write google-services.json
-        run: |
-          if [ -n "${{ vars.GOOGLE_SERVICES_JSON }}" ]; then
-            echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
-          else
-            echo '{"project_info":{"project_id":"placeholder"},"client":[]}' > android/app/google-services.json
-          fi
-      - run: flutter build apk --debug
-      - name: Remove google-services.json
-        if: always()
-        run: rm -f android/app/google-services.json
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-debug
-          path: build/app/outputs/flutter-apk/app-debug.apk
-          retention-days: 3
-
-  # ── HUAWEI RELEASE — tags matching v*-huawei ──────────────────────────────────
-  # Produces a signed AAB using the 'huawei' product flavor.
-  # AdMob meta-data is replaced with a no-op ID so the app passes
-  # Huawei AppGallery review (no GMS runtime dependency).
-  #
-  # To trigger: create a tag like v1.2.0-huawei
-  build_huawei:
-    name: Build Huawei AppGallery AAB
-    runs-on: ubuntu-latest
-    if: github.ref_type == 'tag' && contains(github.ref_name, '-huawei')
-    permissions:
-      contents: write
-    env:
-      GRADLE_OPTS: "-Dorg.gradle.daemon=false"
-    steps:
-      - name: Free disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          tool-cache: false
-          android: false
-          dotnet: true
-          haskell: true
-          large-packages: true
-          docker-images: true
-          swap-storage: true
-      - uses: actions/checkout@v4
-
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.x'
-          channel: stable
-          cache: true
-
-      - uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
-
-      - run: flutter pub get
-
-      - name: Write google-services.json
-        run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
-
-      - name: Decode keystore
-        run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
-
-      - name: Build Huawei release AAB
-        env:
-          KEYSTORE_PATH: keystore.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          flutter build appbundle --release \
-            --flavor huawei \
-            --obfuscate \
-            --split-debug-info=build/debug-info \
-            --target lib/main.dart
-
-      - name: Remove secrets
-        if: always()
-        run: |
-          rm -f android/app/keystore.jks
-          rm -f android/app/google-services.json
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-huawei-aab
-          path: build/app/outputs/bundle/huaweiRelease/app-huawei-release.aab
-          retention-days: 7
-
-      - name: Create GitHub Release (Huawei)
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: build/app/outputs/bundle/huaweiRelease/app-huawei-release.aab
-
-  # ── RELEASE — version tags only (v*) ───────────────────────────────────────────
   build_release:
     name: Build Signed Release
     runs-on: ubuntu-latest
-    if: github.ref_type == 'tag' && !contains(github.ref_name, '-huawei')
     permissions:
       contents: write
     env:
@@ -237,6 +53,7 @@ jobs:
           large-packages: true
           docker-images: true
           swap-storage: true
+
       - uses: actions/checkout@v4
 
       - uses: subosito/flutter-action@v2
@@ -259,21 +76,6 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
-      # ── AAB (Play Store) ───────────────────────────────────────────────────────────
-      - name: Build release AAB
-        env:
-          KEYSTORE_PATH: keystore.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          flutter build appbundle --release \
-            --obfuscate \
-            --split-debug-info=build/debug-info
-
-      # ── Split APKs (arm64 + arm32 only — covers 99%+ of Android devices) ────
-      # --target-platform restricts native libs to only these two ABIs,
-      # significantly reducing per-APK size vs building all four platforms.
       - name: Build split APKs
         env:
           KEYSTORE_PATH: keystore.jks
@@ -292,38 +94,6 @@ jobs:
           rm -f android/app/keystore.jks
           rm -f android/app/google-services.json
 
-      # ── Upload artifacts ──────────────────────────────────────────────────────────────
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-release-aab
-          path: build/app/outputs/bundle/release/app-release.aab
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: app-release-apks
-          path: |
-            build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk
-            build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: debug-info
-          path: build/debug-info/
-          retention-days: 7
-
-      # ── GitHub Release ──────────────────────────────────────────────────────────────
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          generate_release_notes: true
-          files: |
-            build/app/outputs/bundle/release/app-release.aab
-            build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk
-            build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk
-
-      # ── Upload APKs to Cloudflare R2 ───────────────────────────────────────────
       - name: Upload APKs to Cloudflare R2
         env:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -334,23 +104,18 @@ jobs:
           pip install awscli --quiet
           TAG=${{ github.ref_name }}
           aws s3 cp \
-            build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             s3://$R2_BUCKET/releases/$TAG/otya-player-$TAG-arm64.apk \
             --endpoint-url $R2_ENDPOINT
           aws s3 cp \
-            build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
             s3://$R2_BUCKET/releases/$TAG/otya-player-$TAG-arm32.apk \
             --endpoint-url $R2_ENDPOINT
 
-      # ── Firebase App Distribution (optional) ─────────────────────────────────
-      - name: Distribute to testers via Firebase
-        if: vars.FIREBASE_ENABLED == 'true'
-        uses: wzieba/Firebase-Distribution-Github-Action@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
-          appId: ${{ secrets.FIREBASE_APP_ID }}
-          serviceCredentialsFileContent: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
-          groups: testers
-          file: build/app/outputs/flutter-apk/otya-player-${{ github.ref_name }}-universal.apk
-          releaseNotes: |
-            OTYA Player ${{ github.ref_name }}
-          testers: ${{ vars.FIREBASE_TESTERS }}
+          generate_release_notes: true
+          files: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
