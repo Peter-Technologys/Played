@@ -36,6 +36,11 @@ class MainActivity : FlutterActivity() {
     private val ffmpegChannel  = "com.otyaplayer.app/ffmpeg"
     private val mediaEventCh   = "com.otyaplayer.app/media_events"
 
+    // Tracks whether the video player is actively playing — used by
+    // onUserLeaveHint() to decide whether to auto-enter PiP.
+    // Set via MethodChannel from Flutter when playback state changes.
+    @Volatile private var isVideoPlaying: Boolean = false
+
     private var equalizer: android.media.audiofx.Equalizer? = null
 
     @Suppress("DEPRECATION")
@@ -59,6 +64,12 @@ class MainActivity : FlutterActivity() {
                         enterPipMode(w, h, result)
                     }
                     "isPipSupported" -> result.success(isPipSupported())
+                    // Flutter calls this whenever video playback starts or stops
+                    // so onUserLeaveHint() knows whether to auto-enter PiP.
+                    "setVideoPlaying" -> {
+                        isVideoPlaying = call.argument<Boolean>("playing") ?: false
+                        result.success(null)
+                    }
                     else -> result.notImplemented()
                 }
             }
@@ -240,7 +251,7 @@ class MainActivity : FlutterActivity() {
 
             val trackMap = mutableMapOf<Int, Int>() // extractor track → muxer track
             for (i in 0 until extractor.trackCount) {
-                val fmt = extractor.getTrackFormat(i)
+                val fmt  = extractor.getTrackFormat(i)
                 val mime = fmt.getString(MediaFormat.KEY_MIME) ?: continue
                 if (mime.startsWith("audio/") || mime.startsWith("video/")) {
                     trackMap[i] = muxer.addTrack(fmt)
@@ -249,11 +260,19 @@ class MainActivity : FlutterActivity() {
 
             muxer.start()
 
-            val buf = ByteBuffer.allocate(1024 * 1024)
+            val buf  = ByteBuffer.allocate(1024 * 1024)
             val info = android.media.MediaCodec.BufferInfo()
 
+            // Fix: seek each track independently from a clean state.
+            // Previously the extractor's position was shared across tracks,
+            // causing audio/video desync in multi-track files.
             for ((extTrack, muxTrack) in trackMap) {
+                // Unselect all tracks first so seekTo operates on a clean state
+                for (i in 0 until extractor.trackCount) {
+                    try { extractor.unselectTrack(i) } catch (_: Exception) {}
+                }
                 extractor.selectTrack(extTrack)
+                // Seek to the trim start for THIS track independently
                 extractor.seekTo(startMs * 1000L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
 
                 while (true) {
@@ -262,14 +281,13 @@ class MainActivity : FlutterActivity() {
                     val pts = extractor.sampleTime
                     if (pts > endMs * 1000L) break
 
-                    info.offset        = 0
-                    info.size          = size
+                    info.offset             = 0
+                    info.size               = size
                     info.presentationTimeUs = pts - (startMs * 1000L)
-                    info.flags         = extractor.sampleFlags
+                    info.flags              = extractor.sampleFlags
                     muxer.writeSampleData(muxTrack, buf, info)
                     extractor.advance()
                 }
-                extractor.unselectTrack(extTrack)
             }
 
             muxer.stop()
@@ -466,9 +484,12 @@ class MainActivity : FlutterActivity() {
                 try { contentResolver.loadThumbnail(artUri, Size(300, 300), null) }
                 catch (_: Exception) { null }
             } else {
+                // Fix: use setDataSource(context, uri) overload — passing uri.toString()
+                // to the single-arg overload does not work for content:// URIs on
+                // Android 9 and below, causing silent null returns.
                 val r = MediaMetadataRetriever()
                 try {
-                    r.setDataSource(artUri.toString())
+                    r.setDataSource(this, artUri)
                     r.embeddedPicture?.let { android.graphics.BitmapFactory.decodeByteArray(it, 0, it.size) }
                 } catch (_: Exception) { null } finally { r.release() }
             }
@@ -537,15 +558,51 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // Audio focus request — kept as a field so we can abandon the exact same
+    // request object, which is required by the API 26+ AudioFocusRequest API.
+    private var audioFocusRequest: android.media.AudioFocusRequest? = null
+
     private fun handleCallState(state: Int) {
         val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
         when (state) {
             android.telephony.TelephonyManager.CALL_STATE_RINGING,
-            android.telephony.TelephonyManager.CALL_STATE_OFFHOOK ->
-                am.requestAudioFocus(null, android.media.AudioManager.STREAM_MUSIC,
-                    android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT)
-            android.telephony.TelephonyManager.CALL_STATE_IDLE ->
-                am.abandonAudioFocus(null)
+            android.telephony.TelephonyManager.CALL_STATE_OFFHOOK -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    // API 26+ — use AudioFocusRequest with a proper listener so
+                    // playback resumes automatically when the call ends.
+                    val req = android.media.AudioFocusRequest.Builder(
+                        android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                    ).apply {
+                        setAudioAttributes(
+                            android.media.AudioAttributes.Builder()
+                                .setUsage(android.media.AudioAttributes.USAGE_MEDIA)
+                                .setContentType(android.media.AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build()
+                        )
+                        setOnAudioFocusChangeListener({ focusChange ->
+                            Log.d("AudioFocus", "Focus changed: $focusChange")
+                        }, Handler(Looper.getMainLooper()))
+                    }.build()
+                    audioFocusRequest = req
+                    am.requestAudioFocus(req)
+                } else {
+                    @Suppress("DEPRECATION")
+                    am.requestAudioFocus(
+                        null,
+                        android.media.AudioManager.STREAM_MUSIC,
+                        android.media.AudioManager.AUDIOFOCUS_GAIN_TRANSIENT
+                    )
+                }
+            }
+            android.telephony.TelephonyManager.CALL_STATE_IDLE -> {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    audioFocusRequest?.let { am.abandonAudioFocusRequest(it) }
+                    audioFocusRequest = null
+                } else {
+                    @Suppress("DEPRECATION")
+                    am.abandonAudioFocus(null)
+                }
+            }
         }
     }
 
@@ -595,12 +652,10 @@ class MainActivity : FlutterActivity() {
 
     override fun onUserLeaveHint() {
         super.onUserLeaveHint()
-        // Only auto-enter PiP if the app is actively playing video.
-        // Entering PiP unconditionally (e.g. on the home screen) causes
-        // a jarring floating black window with no content.
-        val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
-        val isAudioActive = am.isMusicActive
-        if (isPipSupported() && isAudioActive) {
+        // Only auto-enter PiP when Flutter has signalled that video is actively
+        // playing. Using isMusicActive was wrong — it reflects audio focus, not
+        // video playback, so muted or silent videos never triggered PiP.
+        if (isPipSupported() && isVideoPlaying) {
             try {
                 enterPictureInPictureMode(
                     PictureInPictureParams.Builder().setAspectRatio(Rational(16, 9)).build())

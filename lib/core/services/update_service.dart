@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../config/environment.dart';
 import 'update_notification_service.dart';
 
@@ -214,9 +215,9 @@ class UpdateService {
   }
 
   String _generateDeviceId() {
-    final timestamp = DateTime.now().millisecondsSinceEpoch;
-    final random = (timestamp * 31 + timestamp.hashCode).abs();
-    return 'device_${random.toRadixString(16)}';
+    // Use UUID v4 for a cryptographically random, globally unique device ID.
+    // The uuid package is already declared in pubspec.yaml.
+    return const Uuid().v4();
   }
 }
 
