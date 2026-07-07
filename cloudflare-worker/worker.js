@@ -19,8 +19,8 @@ const R2_BASE  = 'https://getotya.download.apk.petersmartlink.com'
 const WEBSITE  = 'https://petersmartlink.com/download/otya-player'
 
 const APKS = {
-  arm64: R2_BASE + '/app-arm64-v8a-standard-release.apk',
-  arm32: R2_BASE + '/app-armeabi-v7a-standard-release.apk',
+  arm64: R2_BASE + '/app-arm64-v8a-release.apk',
+  arm32: R2_BASE + '/app-armeabi-v7a-release.apk',
 }
 
 // CORS headers — needed so the Flutter app can call /version
