@@ -100,4 +100,8 @@ dependencies {
     coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:2.1.4'
     // battery_plus — used by OtyaVideoPanel to show battery in fullscreen
     implementation 'androidx.annotation:annotation:1.7.1'
+    // WorkManager — required by UpdateCheckWorker
+    implementation 'androidx.work:work-runtime-ktx:2.9.1'
+    // Coroutines — required by CoroutineWorker in UpdateCheckWorker
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3'
 }
