@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -16,24 +17,41 @@ class FeedbackService {
   static const String _prefDeviceId      = 'update_device_id';
   static const String _prefRatePromptKey = 'rate_prompt_shown_version';
 
+  // Cache to avoid repeated async calls within the same session.
+  PackageInfo?      _cachedPkg;
+  SharedPreferences? _cachedPrefs;
+
+  Future<PackageInfo> _pkg() async =>
+      _cachedPkg ??= await PackageInfo.fromPlatform();
+
+  Future<SharedPreferences> _prefs() async =>
+      _cachedPrefs ??= await SharedPreferences.getInstance();
+
   // ── Shared helpers ────────────────────────────────────────────────────────
 
   Future<Map<String, String>> _deviceInfo() async {
-    final pkg    = await PackageInfo.fromPlatform();
-    final prefs  = await SharedPreferences.getInstance();
-    final device = prefs.getString(_prefDeviceId) ?? 'unknown';
+    final pkg    = await _pkg();
+    final prefs  = await _prefs();
     return {
       'version':     pkg.version,
       'buildNumber': pkg.buildNumber,
-      'deviceId':    device,
+      'deviceId':    prefs.getString(_prefDeviceId) ?? 'unknown',
     };
   }
 
+  /// Checks connectivity via connectivity_plus, then falls back to a real
+  /// HTTP probe so we don't show the prompt on captive-portal Wi-Fi.
   Future<bool> _hasConnection() async {
     try {
       final result = await Connectivity().checkConnectivity();
-      return result != ConnectivityResult.none;
+      if (result == ConnectivityResult.none) return false;
+      // Secondary probe — connectivity_plus can return non-none on captive portals.
+      final probe = await http
+          .get(Uri.parse('https://clients3.google.com/generate_204'))
+          .timeout(const Duration(seconds: 4));
+      return probe.statusCode == 204;
     } catch (_) {
+      // If the probe itself fails, assume no usable connection.
       return false;
     }
   }
@@ -74,23 +92,20 @@ class FeedbackService {
 
   // ── Rate Us ───────────────────────────────────────────────────────────────
 
-  /// Returns true if the Rate Us sheet should be shown:
-  ///   1. Device has an active internet connection.
-  ///   2. The sheet has not already been shown for this app version.
-  /// Call this on app foreground / home screen load.
+  /// Returns true only when:
+  ///   1. Device has a real internet connection (not just Wi-Fi with no internet).
+  ///   2. The prompt has not already been shown for the current app version.
   Future<bool> shouldShowRatePrompt() async {
     if (!await _hasConnection()) return false;
-    final pkg    = await PackageInfo.fromPlatform();
-    final prefs  = await SharedPreferences.getInstance();
-    final shown  = prefs.getString(_prefRatePromptKey) ?? '';
-    return shown != pkg.version;
+    final pkg   = await _pkg();
+    final prefs = await _prefs();
+    return (prefs.getString(_prefRatePromptKey) ?? '') != pkg.version;
   }
 
-  /// Mark the Rate Us prompt as shown for the current version so it
-  /// does not pop up again until the next app update.
+  /// Persists the shown state for the current version.
   Future<void> markRatePromptShown() async {
-    final pkg   = await PackageInfo.fromPlatform();
-    final prefs = await SharedPreferences.getInstance();
+    final pkg   = await _pkg();
+    final prefs = await _prefs();
     await prefs.setString(_prefRatePromptKey, pkg.version);
   }
 
@@ -102,7 +117,6 @@ class FeedbackService {
     final info = await _deviceInfo();
     final now  = DateTime.now().toUtc().toIso8601String();
 
-    // 1. Post to Appwrite (fire-and-forget)
     _postToAppwrite('ratings', {
       'deviceId':    info['deviceId'],
       'appVersion':  info['version'],
@@ -112,7 +126,6 @@ class FeedbackService {
       'createdAt':   now,
     }).ignore();
 
-    // 2. Open email
     final starEmoji = List.filled(stars, '⭐').join();
     final subject   = 'OTYA Player Rating — $stars stars';
     final body =
@@ -135,7 +148,6 @@ class FeedbackService {
     final info = await _deviceInfo();
     final now  = DateTime.now().toUtc().toIso8601String();
 
-    // 1. Post to Appwrite (fire-and-forget)
     _postToAppwrite('feedback', {
       'deviceId':    info['deviceId'],
       'appVersion':  info['version'],
@@ -146,7 +158,6 @@ class FeedbackService {
       if (userEmail != null && userEmail.isNotEmpty) 'email': userEmail,
     }).ignore();
 
-    // 2. Open email
     final categoryLabel = category[0].toUpperCase() + category.substring(1);
     final subject = 'OTYA Player Problem Report — $categoryLabel';
     final body =

@@ -15,6 +15,7 @@ class SettingsScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: AppColors.background,
         elevation: 0,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded,
               color: AppColors.textPrimary, size: 20),
@@ -29,92 +30,33 @@ class SettingsScreen extends StatelessWidget {
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.only(bottom: 32),
         children: [
           // ── Support ──────────────────────────────────────────────────────
           _SectionHeader('Support'),
-          ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-            leading: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFC107).withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.star_rounded,
-                  color: Color(0xFFFFC107), size: 20),
-            ),
-            title: const Text('Rate OTYA Player',
-                style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            subtitle: const Text('Tell us what you think',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                )),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
+          _SettingsTile(
+            icon: Icons.star_rounded,
+            iconColor: const Color(0xFFFFC107),
+            title: 'Rate OTYA Player',
+            subtitle: 'Tell us what you think',
             onTap: () => RateUsSheet.show(context),
           ),
-          ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-            leading: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: Colors.redAccent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.bug_report_rounded,
-                  color: Colors.redAccent, size: 20),
-            ),
-            title: const Text('Report a Problem',
-                style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            subtitle: const Text('Something not working? Let us know',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                )),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
+          const _Divider(),
+          _SettingsTile(
+            icon: Icons.bug_report_rounded,
+            iconColor: Colors.redAccent,
+            title: 'Report a Problem',
+            subtitle: 'Something not working? Let us know',
             onTap: () => ReportProblemSheet.show(context),
           ),
 
           // ── Legal ─────────────────────────────────────────────────────────
           _SectionHeader('Legal'),
-          ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-            leading: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.privacy_tip_rounded,
-                  color: AppColors.accent, size: 20),
-            ),
-            title: const Text('Privacy Policy',
-                style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            subtitle: const Text('How we handle your data',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                )),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
+          _SettingsTile(
+            icon: Icons.privacy_tip_rounded,
+            iconColor: AppColors.accent,
+            title: 'Privacy Policy',
+            subtitle: 'How we handle your data',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(
                   builder: (_) => const PrivacyPolicyScreen()),
@@ -123,31 +65,11 @@ class SettingsScreen extends StatelessWidget {
 
           // ── About ─────────────────────────────────────────────────────────
           _SectionHeader('About'),
-          ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 20, vertical: 2),
-            leading: Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: AppColors.textSecondary.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.info_outline_rounded,
-                  color: AppColors.textSecondary, size: 20),
-            ),
-            title: const Text('OTYA Player',
-                style: TextStyle(
-                  fontSize: 14, fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            subtitle: const Text('Version info and credits',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                )),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
+          _SettingsTile(
+            icon: Icons.info_outline_rounded,
+            iconColor: AppColors.textSecondary,
+            title: 'OTYA Player',
+            subtitle: 'Version info and credits',
             onTap: () => showAboutDialog(
               context: context,
               applicationName: 'OTYA Player',
@@ -167,15 +89,68 @@ class _SectionHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 20, 20, 6),
+      padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(
           fontSize: 11, fontWeight: FontWeight.w700,
           color: AppColors.textSecondary,
-          letterSpacing: 1.2, fontFamily: 'Inter',
+          letterSpacing: 1.4, fontFamily: 'Inter',
         ),
       ),
+    );
+  }
+}
+
+class _Divider extends StatelessWidget {
+  const _Divider();
+  @override
+  Widget build(BuildContext context) => const Divider(
+    height: 1, indent: 72, endIndent: 20,
+    color: AppColors.borderSubtle,
+  );
+}
+
+class _SettingsTile extends StatelessWidget {
+  final IconData icon;
+  final Color    iconColor;
+  final String   title;
+  final String   subtitle;
+  final VoidCallback onTap;
+
+  const _SettingsTile({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+      leading: Container(
+        width: 40, height: 40,
+        decoration: BoxDecoration(
+          color: iconColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Icon(icon, color: iconColor, size: 20),
+      ),
+      title: Text(title,
+          style: const TextStyle(
+            fontSize: 14, fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary, fontFamily: 'Inter',
+          )),
+      subtitle: Text(subtitle,
+          style: const TextStyle(
+            fontSize: 12, color: AppColors.textSecondary,
+            fontFamily: 'Inter',
+          )),
+      trailing: const Icon(Icons.chevron_right_rounded,
+          color: AppColors.textSecondary, size: 20),
+      onTap: onTap,
     );
   }
 }
