@@ -1,4 +1,6 @@
+import 'dart:convert';
 import 'dart:io';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
@@ -273,16 +275,13 @@ class MediaScannerService {
     return results;
   }
 
-  /// FNV-1a 32-bit hash — much lower collision rate than the old
-  /// polynomial hash, especially for paths that share long prefixes.
+  /// SHA-256 stable ID — collision-free for any realistic library size.
+  /// Uses the full file path so two different paths always produce different IDs,
+  /// even when they share long common prefixes.
   String _stableId(String path) {
-    const fnvPrime  = 0x01000193;
-    const fnvOffset = 0x811c9dc5;
-    var hash = fnvOffset;
-    for (final byte in path.codeUnits) {
-      hash ^= byte;
-      hash = (hash * fnvPrime) & 0xFFFFFFFF;
-    }
-    return hash.toRadixString(16).padLeft(8, '0');
+    final bytes  = utf8.encode(path);
+    final digest = sha256.convert(bytes);
+    // First 16 hex chars (64 bits) — astronomically low collision probability.
+    return digest.toString().substring(0, 16);
   }
 }

@@ -81,6 +81,12 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters)
     }
 
     override suspend fun doWork(): Result {
+        // Ensure the notification channel exists before we try to post.
+        // Creating it here is safe and idempotent — Android ignores duplicate
+        // channel creation. This guarantees the channel is ready even if the
+        // worker runs before the app has been opened after a fresh install.
+        createNotificationChannel()
+
         return try {
             val versionInfo = fetchVersionInfo() ?: return Result.success()
             val serverCode  = versionInfo.optInt("versionCode", 0)
