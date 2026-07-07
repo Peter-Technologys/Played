@@ -25,8 +25,10 @@ dependencies:
   crypto: ^3.0.3
   local_auth: ^2.1.8
 
-  # Nearby Sharing
-  nearby_connections: ^4.3.0
+  # Flash Share (pure Dart HTTP — replaces nearby_connections which required
+  # CMake native compilation and caused CI runner timeouts)
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^5.2.3
 
   # Appwrite — cloud sync, auth, backup, release tracking
   # v17.x uses flutter_web_auth_2 ^4.x which is Kotlin 2.x compatible

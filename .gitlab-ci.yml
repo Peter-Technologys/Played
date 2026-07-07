@@ -17,7 +17,8 @@ image: ghcr.io/cirruslabs/flutter:stable
 variables:
   PUB_ENVIRONMENT: "bot.gitlab"
   PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=false"
+  # Parallel builds + 4 GB heap. Daemon disabled (stateless CI runners).
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=4 -Xmx4g -Dkotlin.incremental=false"
   R2_ENDPOINT: "https://6c76d2a9e5f95d5f9b393e97374d9afb.r2.cloudflarestorage.com"
   R2_BUCKET: "otya-player-releases"
   WORKER_URL: "https://getotya.petersmartlink.com"
@@ -30,19 +31,24 @@ stages:
   - publish
 
 cache:
-  - key: "pub-cache-v2"
+  - key: "pub-v4-$CI_COMMIT_REF_SLUG"
+    fallback_keys:
+      - "pub-v4-main"
+      - "pub-v4"
     paths:
       - .pub-cache/
       - .dart_tool/
-  - key: "gradle-cache-v1-$CI_COMMIT_REF_SLUG"
+  - key: "gradle-v3-$CI_COMMIT_REF_SLUG"
     fallback_keys:
-      - "gradle-cache-v1-main"
-      - "gradle-cache-v1"
+      - "gradle-v3-main"
+      - "gradle-v3"
     paths:
       - android/.gradle/
       - ~/.gradle/wrapper/
       - ~/.gradle/caches/modules-2/files-2.1/
       - ~/.gradle/caches/modules-2/metadata-2.1/
+      # Cache the Android SDK CMake install so it is not re-downloaded every run
+      - /usr/local/lib/android/sdk/cmake/
 
 .free_disk_space: &free_disk_space |
   echo "=== Disk usage before cleanup ==="
@@ -51,6 +57,7 @@ cache:
   sudo rm -rf /usr/share/dotnet || true
   sudo rm -rf /usr/local/share/powershell || true
   sudo rm -rf /usr/share/swift || true
+  sudo rm -rf /opt/hostedtoolcache/CodeQL || true
   sudo apt-get clean -y || true
   echo "=== Disk usage after cleanup ==="
   df -h
@@ -122,6 +129,7 @@ build_apk_debug:
 build_release:
   stage: build
   needs: [prepare]
+  timeout: 45 minutes
   script:
     - *free_disk_space
     - *inject_google_services
