@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import '../services/apk_downloader.dart';
-import '../services/feedback_service.dart';
 import '../services/update_service.dart';
+import 'rate_us_sheet.dart';
+import 'report_problem_sheet.dart';
 
 /// In-app update dialog with download progress, Rate Us, and Report Problem.
 class UpdateDialog extends StatefulWidget {
@@ -88,7 +89,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             const SizedBox(height: 8),
             Text(
               'OTYA Player v${widget.info.version} is ready.\n'
-              'Tap “Update Now” — we will download the right file for your phone automatically.',
+              'Tap "Update Now" — we will download the right file for your phone automatically.',
               style: theme.textTheme.bodySmall
                   ?.copyWith(color: Colors.grey[600], height: 1.5),
               textAlign: TextAlign.center,
@@ -179,140 +180,34 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ),
               ),
             const Divider(height: 24),
+            // Rate Us and Report Problem — open the full in-app sheets
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                _FeedbackButton(
-                  icon: Icons.star_rounded,
-                  label: 'Rate Us',
-                  color: const Color(0xFFFFC107),
-                  onTap: () => FeedbackService.instance.rateApp(),
+                TextButton.icon(
+                  onPressed: () => RateUsSheet.show(context),
+                  icon: const Icon(Icons.star_rounded,
+                      color: Color(0xFFFFC107)),
+                  label: const Text('Rate Us',
+                      style: TextStyle(
+                          color: Color(0xFFFFC107),
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter')),
                 ),
-                _FeedbackButton(
-                  icon: Icons.bug_report_rounded,
-                  label: 'Report Problem',
-                  color: Colors.redAccent,
-                  onTap: () => _showReportSheet(context),
+                TextButton.icon(
+                  onPressed: () => ReportProblemSheet.show(context),
+                  icon: const Icon(Icons.bug_report_rounded,
+                      color: Colors.redAccent),
+                  label: const Text('Report Problem',
+                      style: TextStyle(
+                          color: Colors.redAccent,
+                          fontWeight: FontWeight.w600,
+                          fontFamily: 'Inter')),
                 ),
               ],
             ),
           ],
         ),
-      ),
-    );
-  }
-
-  void _showReportSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => const _ReportSheet(),
-    );
-  }
-}
-
-class _FeedbackButton extends StatelessWidget {
-  final IconData icon;
-  final String   label;
-  final Color    color;
-  final VoidCallback onTap;
-  const _FeedbackButton({
-    required this.icon, required this.label,
-    required this.color, required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: color, size: 22),
-            const SizedBox(height: 4),
-            Text(label,
-                style: TextStyle(
-                    fontSize: 11, color: color, fontWeight: FontWeight.w600)),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _ReportSheet extends StatefulWidget {
-  const _ReportSheet();
-  @override
-  State<_ReportSheet> createState() => _ReportSheetState();
-}
-
-class _ReportSheetState extends State<_ReportSheet> {
-  final _controller = TextEditingController();
-  bool _sending = false;
-
-  @override
-  void dispose() { _controller.dispose(); super.dispose(); }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.only(
-        left: 20, right: 20, top: 20,
-        bottom: MediaQuery.of(context).viewInsets.bottom + 20,
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const Text('Report a Problem',
-              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 4),
-          Text('Describe what went wrong. We will reply on WhatsApp.',
-              style: TextStyle(fontSize: 12, color: Colors.grey[600])),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _controller,
-            maxLines: 4,
-            decoration: InputDecoration(
-              hintText: 'e.g. The app crashes when I open a video…',
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12)),
-              contentPadding: const EdgeInsets.all(12),
-            ),
-          ),
-          const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton(
-              onPressed: _sending ? null : () async {
-                if (_controller.text.trim().isEmpty) return;
-                setState(() => _sending = true);
-                await FeedbackService.instance.submitReport(
-                  description: _controller.text.trim(),
-                );
-                if (context.mounted) Navigator.of(context).pop();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 14),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _sending
-                  ? const SizedBox(
-                      width: 18, height: 18,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, color: Colors.white))
-                  : const Text('Send via WhatsApp'),
-            ),
-          ),
-        ],
       ),
     );
   }
