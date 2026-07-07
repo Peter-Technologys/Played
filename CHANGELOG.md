@@ -17,6 +17,41 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.3.0] — 2026-07-07
+
+### Added
+- **Flash Share** — pure Dart HTTP P2P file sharing over local Wi-Fi, no Google Play Services or CMake required. QR code send/receive with real-time progress ring.
+- **Web Mirror** — phone-to-PC browser streaming gateway on port 8085. Full HTML dashboard with search, stream, and download from any browser on the same Wi-Fi.
+- **Vault XOR obfuscation** — header byte-shift (XOR first 512 bytes) runs in a background Isolate. Corrupts file format signatures so gallery apps cannot scan vault files.
+- **Storage Analyzer** — multi-segment CustomPainter ring chart showing Videos, Audio, Cache, Other, and Free space. One-tap cache purge with bytes-freed confirmation.
+- **Real-time Storage Watcher** — Directory.watch() stream with per-path debounce. Library auto-refreshes when files are added or removed by external apps.
+- **Neon UI Toolkit** — ModernNeonContainer (4-layer BoxShadow glow), ModernNeonText (ShaderMask gradient), GlowingNeonProgressRing (CustomPainter SweepGradient), NeonMediaDashboard.
+- **2027 MediaPlaybackHandler** — BaseAudioHandler with QueueHandler + SeekHandler. Full queue management, auto-advance, notification metadata updates before track load.
+- **P2P Chat Service** — TCP socket chat on port 9091 with broadcast StreamController. ChatMessage model with typed factory constructors.
+- **Glass Notification Banner** — Overlay floating banner with BackdropFilter blur, 4-second auto-dismiss, ChatNotificationMixin for zero-boilerplate integration.
+- **Seasonal Theme Engine** — auto-detects Christmas, Halloween, New Year from DateTime. CustomThemeManager persists wallpaper to app sandbox.
+- **Local TCP Event Pipeline** — LocalEventServer + LocalEventClient for device-to-device state sync.
+- **Google Drive Backup** — pure http package, no native plugin. Multipart/related upload + PATCH overwrite.
+- **Settings Service** — pure dart:io JSON serializer with atomic write (temp file + rename). IntentLauncher via Process.run('am', [...]) — no url_launcher plugin.
+- **Settings Screen** — profile name, skip silence, lyrics toggle, default speed, storage analyzer, support links, legal.
+
+### Fixed
+- Vault OOM crash on large files: stream in 4 MB chunks instead of readAsBytesSync()
+- Storage purge ConcurrentModificationError: collect entities before deleting
+- df parsing failure on some Android versions
+- Storage watcher single shared debounce replaced with per-path Map<String,Timer>
+- Settings data loss on kill-mid-write: atomic write via temp file + rename
+- Web Mirror path traversal vulnerability: validate path before serving
+- nearby_connections removed: eliminated CMake native compilation CI timeout
+- open_filex upgraded to ^4.7.0 (1.x was yanked from pub.dev)
+
+### Changed
+- Air-Drop screen renamed to Flash Share
+- pubspec: nearby_connections replaced with qr_flutter + mobile_scanner
+- CI: parallel Gradle builds, CMake cached, 45-minute build timeout
+
+---
+
 ## [1.2.1] — 2026-07-06
 
 ### Added
