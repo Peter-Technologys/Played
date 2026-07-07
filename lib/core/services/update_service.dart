@@ -55,9 +55,9 @@ class UpdateService {
         }
       }
 
-      // Fetch version info from Cloudflare Worker
+      // Use /latest — returns structured JSON with downloads object
       final response = await http
-          .get(Uri.parse(Environment.versionUrl))
+          .get(Uri.parse(Environment.latestUrl))
           .timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
@@ -65,10 +65,11 @@ class UpdateService {
         return null;
       }
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final data              = jsonDecode(response.body) as Map<String, dynamic>;
       final serverVersionCode = (data['versionCode'] as num?)?.toInt() ?? 0;
-      final serverVersion     = data['version'] as String? ?? '';
+      final serverVersion     = data['version']   as String? ?? '';
       final changelog         = data['changelog'] as String? ?? '';
+      final downloads         = data['downloads'] as Map<String, dynamic>? ?? {};
 
       if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
 
@@ -87,20 +88,20 @@ class UpdateService {
       final skippedCode = prefs.getInt(_prefSkippedCode) ?? 0;
       if (skippedCode >= serverVersionCode) return null;
 
-      // Determine ABI for direct download link
-      final abi = _detectAbi();
+      // Use ABI-specific URL from Worker response
+      final abi       = _detectAbi();
       final directUrl = abi == 'arm64'
-          ? Environment.arm64DownloadUrl
-          : Environment.arm32DownloadUrl;
+          ? (downloads['arm64'] as String? ?? Environment.arm64DownloadUrl)
+          : (downloads['arm32'] as String? ?? Environment.arm32DownloadUrl);
 
       return UpdateInfo(
-        version:         serverVersion,
-        versionCode:     serverVersionCode,
-        installedCode:   installedCode,
-        changelog:       changelog,
-        downloadUrl:     Environment.downloadUrl,
-        directUrl:       directUrl,
-        releaseDate:     data['date'] as String? ?? '',
+        version:       serverVersion,
+        versionCode:   serverVersionCode,
+        installedCode: installedCode,
+        changelog:     changelog,
+        downloadUrl:   downloads['auto'] as String? ?? Environment.downloadUrl,
+        directUrl:     directUrl,
+        releaseDate:   data['date'] as String? ?? '',
       );
     } catch (e) {
       debugPrint('[UpdateService] Check failed: $e');

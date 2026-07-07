@@ -32,6 +32,7 @@ abstract class Environment {
   // ── Cloudflare Worker ─────────────────────────────────────────────────────────
   static const String workerUrl           = 'https://getotya.petersmartlink.com';
   static const String versionUrl          = '$workerUrl/version';
+  static const String latestUrl           = '$workerUrl/latest';
   static const String downloadUrl         = '$workerUrl/download';
   static const String arm64DownloadUrl    = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl    = '$workerUrl/apk/arm32';
