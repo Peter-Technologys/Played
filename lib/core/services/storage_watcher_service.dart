@@ -7,18 +7,23 @@ import 'package:flutter/foundation.dart';
 class StorageWatcherService {
   final _ctrl = StreamController<FileSystemEvent>.broadcast();
   final List<StreamSubscription<FileSystemEvent>> _subs = [];
-  Timer? _debounce;
+  // Per-path debounce timers so events from different directories
+  // don't cancel each other's debounce window.
+  final Map<String, Timer> _debounces = {};
 
   Stream<FileSystemEvent> get events => _ctrl.stream;
 
   void watch(String dirPath) {
     final dir = Directory(dirPath);
     if (!dir.existsSync()) return;
+    // Don't register the same path twice.
+    if (_debounces.containsKey(dirPath)) return;
     try {
       final sub = dir.watch(events: FileSystemEvent.all, recursive: true).listen(
         (event) {
-          _debounce?.cancel();
-          _debounce = Timer(const Duration(milliseconds: 300), () {
+          _debounces[dirPath]?.cancel();
+          _debounces[dirPath] = Timer(const Duration(milliseconds: 300), () {
+            _debounces.remove(dirPath);
             if (!_ctrl.isClosed) _ctrl.add(event);
           });
         },
@@ -42,9 +47,10 @@ class StorageWatcherService {
   }
 
   Future<void> dispose() async {
-    _debounce?.cancel();
+    for (final t in _debounces.values) t.cancel();
+    _debounces.clear();
     for (final s in _subs) await s.cancel();
     _subs.clear();
-    await _ctrl.close();
+    if (!_ctrl.isClosed) await _ctrl.close();
   }
 }

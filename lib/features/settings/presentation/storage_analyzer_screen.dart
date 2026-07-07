@@ -16,6 +16,8 @@ class _State extends State<StorageAnalyzerScreen>
   int?  _freed;
   late final AnimationController _ctrl;
   late final Animation<double>   _anim;
+  // Guard against concurrent analyze() calls (e.g. rapid refresh taps).
+  bool _analyzing = false;
 
   @override
   void initState() {
@@ -28,11 +30,17 @@ class _State extends State<StorageAnalyzerScreen>
   @override void dispose() { _ctrl.dispose(); super.dispose(); }
 
   Future<void> _load() async {
+    if (_analyzing) return;
+    _analyzing = true;
     setState(() { _loading = true; _freed = null; });
-    final r = await StorageAnalyzerService.instance.analyze();
-    if (!mounted) return;
-    setState(() { _report = r; _loading = false; });
-    _ctrl.forward(from: 0);
+    try {
+      final r = await StorageAnalyzerService.instance.analyze();
+      if (!mounted) return;
+      setState(() { _report = r; _loading = false; });
+      _ctrl.forward(from: 0);
+    } finally {
+      _analyzing = false;
+    }
   }
 
   Future<void> _purge() async {
@@ -235,5 +243,6 @@ class _RingPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_RingPainter o) => o.progress != progress;
+  bool shouldRepaint(_RingPainter o) =>
+      o.progress != progress || o.report != report;
 }

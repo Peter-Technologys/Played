@@ -42,11 +42,15 @@ class SettingsService extends ChangeNotifier {
   Future<void> save() async {
     try {
       final f = await _settingsFile();
-      f.writeAsStringSync(jsonEncode({
+      // Write to a temp file first, then rename — prevents data loss if
+      // the app is killed mid-write (atomic write pattern).
+      final tmp = File('${f.path}.tmp');
+      tmp.writeAsStringSync(jsonEncode({
         'profileName': _profileName, 'audioEnabled': _audioEnabled,
         'themeIndex': _themeIndex, 'skipSilence': _skipSilence,
         'playbackSpeed': _playbackSpeed, 'showLyrics': _showLyrics,
       }));
+      await tmp.rename(f.path);
       notifyListeners();
     } catch (e) { debugPrint('[Settings] Save error: $e'); }
   }

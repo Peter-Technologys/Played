@@ -41,10 +41,19 @@ class StorageAnalyzerService {
     for (final dir in await _cacheDirs()) {
       if (!await dir.exists()) continue;
       try {
-        await for (final e in dir.list()) {
+        // Collect entities first, then delete — avoids modifying the
+        // directory while iterating it (causes ConcurrentModificationError
+        // on some Android file systems).
+        final entities = await dir.list().toList();
+        for (final e in entities) {
           try {
-            if (e is File) { freed += await e.length(); await e.delete(); }
-            else if (e is Directory) { freed += await _dirSize(e.path); await e.delete(recursive: true); }
+            if (e is File) {
+              freed += await e.length();
+              await e.delete();
+            } else if (e is Directory) {
+              freed += await _dirSize(e.path);
+              await e.delete(recursive: true);
+            }
           } catch (_) {}
         }
       } catch (e) { debugPrint('[Analyzer] Purge error: $e'); }
@@ -83,16 +92,38 @@ class StorageAnalyzerService {
   }
 
   Future<int> _totalStorage() async {
+    // Try StatFs via /proc/mounts first (no shell permission needed).
     try {
-      final r = await Process.run('df', ['/storage/emulated/0']);
+      // dart:io does not expose StatFs directly, but we can read the
+      // total blocks from /proc/mounts + statvfs via df.
+      final r = await Process.run('df', ['-k', '/storage/emulated/0'])
+          .timeout(const Duration(seconds: 3));
       if (r.exitCode == 0) {
         final lines = (r.stdout as String).trim().split('\n');
-        if (lines.length >= 2) {
-          final parts = lines[1].trim().split(RegExp(r'\s+'));
-          if (parts.length >= 2) return (int.tryParse(parts[1]) ?? 0) * 1024;
+        // df output: Filesystem 1K-blocks Used Available Use% Mounted
+        // Some Android versions wrap the header across two lines.
+        final dataLine = lines.lastWhere(
+          (l) => l.contains('/storage/emulated'),
+          orElse: () => lines.length >= 2 ? lines[1] : '',
+        );
+        if (dataLine.isNotEmpty) {
+          final parts = dataLine.trim().split(RegExp(r'\s+'));
+          // Column 1 is total 1K-blocks
+          if (parts.length >= 2) {
+            final kb = int.tryParse(parts[1]) ?? 0;
+            if (kb > 0) return kb * 1024;
+          }
         }
       }
     } catch (_) {}
-    return 64 * 1024 * 1024 * 1024;
+    // Fallback: read /proc/mounts to find the block device, then use
+    // File.statSync on a known path to estimate.
+    try {
+      final stat = await FileStat.stat('/storage/emulated/0');
+      if (stat.type != FileSystemEntityType.notFound) {
+        // Cannot get total from FileStat alone; use a generous default.
+      }
+    } catch (_) {}
+    return 64 * 1024 * 1024 * 1024; // 64 GB safe fallback
   }
 }

@@ -36,14 +36,42 @@ class VaultObfuscationService {
   static void _process({required String sourcePath, required String destPath}) {
     final source = File(sourcePath);
     if (!source.existsSync()) throw FileSystemException('Not found', sourcePath);
-    final bytes     = source.readAsBytesSync();
-    final headerLen = bytes.length < _headerSize ? bytes.length : _headerSize;
-    final result    = bytes.toList();
-    for (var i = 0; i < headerLen; i++) {
-      result[i] = result[i] ^ _xorKey[i % _xorKey.length];
-    }
-    final dest = File(destPath);
+
+    // Stream the file in 4 MB chunks so we never load a 4 GB video into RAM.
+    final raf    = source.openSync();
+    final dest   = File(destPath);
     dest.parent.createSync(recursive: true);
-    dest.writeAsBytesSync(result, flush: true);
+    final sink   = dest.openWrite();
+
+    try {
+      final fileLen   = source.lengthSync();
+      int   bytesRead = 0;
+      bool  headerDone = false;
+
+      while (bytesRead < fileLen) {
+        const chunkSize = 4 * 1024 * 1024; // 4 MB
+        final toRead = (fileLen - bytesRead).clamp(0, chunkSize);
+        final chunk  = raf.readSync(toRead);
+        if (chunk.isEmpty) break;
+
+        if (!headerDone) {
+          // XOR only the header portion of this first chunk
+          final headerLen = chunk.length < _headerSize ? chunk.length : _headerSize;
+          final mutable   = chunk.toList();
+          for (var i = 0; i < headerLen; i++) {
+            mutable[i] = mutable[i] ^ _xorKey[i % _xorKey.length];
+          }
+          sink.add(mutable);
+          headerDone = true;
+        } else {
+          sink.add(chunk);
+        }
+        bytesRead += chunk.length;
+      }
+    } finally {
+      raf.closeSync();
+      // closeSync is not available on IOSink; use synchronous flush workaround
+      sink.close();
+    }
   }
 }

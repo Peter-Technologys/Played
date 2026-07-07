@@ -92,13 +92,23 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target===docu
   Future<void> _mediaList(HttpRequest req) async {
     try {
       final items = await MediaScannerService.instance.scanAll();
-      final json  = items.map((i) => {
-        'title': i.title, 'path': i.filePath,
-        'size': i.formattedSize, 'isVideo': i.isVideo,
+      // Sort by date added descending so newest files appear first in the browser.
+      final sorted = [...items]..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+      final json   = sorted.map((i) => {
+        'title':    i.title,
+        'path':     i.filePath,
+        'size':     i.formattedSize,
+        'isVideo':  i.isVideo,
+        'duration': i.duration?.inSeconds ?? 0,
       }).toList();
-      req.response..statusCode = 200..headers.contentType = ContentType.json..write(jsonEncode(json));
+      req.response
+        ..statusCode = 200
+        ..headers.contentType = ContentType.json
+        ..write(jsonEncode(json));
     } catch (e) {
-      req.response..statusCode = 500..write(jsonEncode({'error': '$e'}));
+      req.response
+        ..statusCode = 500
+        ..write(jsonEncode({'error': '$e'}));
     }
     await req.response.close();
   }
@@ -106,7 +116,13 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target===docu
   Future<void> _stream(HttpRequest req) async {
     final enc  = req.uri.queryParameters['path'] ?? '';
     if (enc.isEmpty) { req.response..statusCode = 400..write('Missing path')..close(); return; }
-    final file = File(Uri.decodeComponent(enc));
+    // Sanitise path — prevent directory traversal attacks.
+    final decoded = Uri.decodeComponent(enc);
+    if (decoded.contains('..') || !decoded.startsWith('/storage/')) {
+      req.response..statusCode = 403..write('Forbidden')..close();
+      return;
+    }
+    final file = File(decoded);
     if (!await file.exists()) { req.response..statusCode = 404..write('Not found')..close(); return; }
     final len  = await file.length();
     final mime = _mime(file.path);
