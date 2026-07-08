@@ -25,10 +25,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _pipSupported   = false;
   bool _pipAutoEnabled = false;
   bool _batterySaver   = false;
+  late final Duration _savedPosition;
 
   @override
   void initState() {
     super.initState();
+    // Cache the seek position once so build() never hits the DB on every rebuild.
+    _savedPosition =
+        PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
+        Duration.zero;
     WidgetsBinding.instance.addObserver(this);
     _lockToLandscape();
     _initPip();
@@ -67,10 +72,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
-
-  Duration get _savedPosition =>
-      PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
-      Duration.zero;
 
   @override
   Widget build(BuildContext context) {

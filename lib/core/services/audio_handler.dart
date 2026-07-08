@@ -128,8 +128,13 @@ class PlayedAudioHandler extends BaseAudioHandler
       _queueIndex++;
       await _loadCurrent();
     } else {
-      // End of queue — stop cleanly
-      await stop();
+      // End of queue — pause and signal completion without dismissing the
+      // notification (stop() sends a stop event that removes the drawer).
+      await _player.pause();
+      playbackState.add(playbackState.value.copyWith(
+        processingState: AudioProcessingState.completed,
+        playing: false,
+      ));
     }
   }
 
@@ -178,7 +183,7 @@ class PlayedAudioHandler extends BaseAudioHandler
         queueIndex: _queueIndex,
       ));
 
-      if (_player.playing) await _player.stop();
+      if (_player.playing) await _player.pause();
 
       await _player.setAudioSource(
         AudioSource.uri(Uri.file(item.filePath)),

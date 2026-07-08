@@ -33,6 +33,7 @@ class MediaScannerService {
   static const Set<String> _skipDirs = {
     'Android', '.thumbnails', '.cache', 'cache', 'obb',
     '.trash', 'lost+found', '.nomedia', 'tmp', 'temp',
+    'proc', 'sys', 'dev', // Linux virtual FS — skip on rooted devices
   };
 
   static const List<String> _receiveDirs = [
