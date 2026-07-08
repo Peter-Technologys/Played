@@ -100,10 +100,11 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
         }
       });
 
-      if (mounted) setState(() => _initialized = true);
-
-      // Open the file after marking initialized so the Video widget renders
+      // Open the file before marking initialized so the Video widget only
+      // renders once the player has a valid source ready.
       await _openFile();
+
+      if (mounted) setState(() => _initialized = true);
     } catch (e) {
       if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); });
     }
@@ -136,7 +137,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
   }
 
   void _onTracksChanged(Tracks tracks) {
-    if (!mounted || _trackSub == null) return;
+    if (!mounted) return;
     // Build subtitle track list
     final subs = <_TrackOption>[
       const _TrackOption('no', 'Off'),
@@ -598,7 +599,7 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 
           // ── Brightness overlay ───────────────────────────────────────────────────
           // A dark overlay that dims the video to simulate brightness control.
-          // Opacity 0 = fully dark (brightness 0%), opacity 0 = full bright.
+          // Opacity 1 = fully dark (brightness 0%), opacity 0 = full bright.
           IgnorePointer(
             child: Opacity(
               opacity: (1.0 - _brightness).clamp(0.0, 0.9),

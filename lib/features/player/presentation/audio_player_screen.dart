@@ -75,6 +75,12 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   bool _streamsAttached = false;
   AudioPlayer? _attachedPlayer;
 
+  // Held subscriptions — cancelled before re-attaching to prevent stacking.
+  StreamSubscription? _playerStateSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
+  StreamSubscription? _processingStateSub;
+
   AudioPlayerNotifier() : super(const AudioPlayerState());
 
   /// Attach stream listeners once the handler is ready (called from load()).
@@ -84,9 +90,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     if (player == null) return;
     // If already attached to this exact player instance, skip.
     if (_streamsAttached && identical(_attachedPlayer, player)) return;
+    // Cancel any existing subscriptions before re-attaching to prevent
+    // stacked listeners when the user loads multiple tracks in sequence.
+    _playerStateSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _processingStateSub?.cancel();
     _streamsAttached = true;
     _attachedPlayer = player;
-    player.playerStateStream.listen((s) {
+    _playerStateSub = player.playerStateStream.listen((s) {
       if (!mounted) return;
       state = state.copyWith(
         isPlaying: s.playing,
@@ -94,18 +106,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
             s.processingState == ProcessingState.buffering,
       );
     });
-    player.positionStream.listen((p) {
+    _positionSub = player.positionStream.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
       if (_currentItemId != null && p.inSeconds > 0 && p.inSeconds % 5 == 0) {
         PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
       }
     });
-    player.durationStream.listen((d) {
+    _durationSub = player.durationStream.listen((d) {
       if (!mounted) return;
       if (d != null) state = state.copyWith(duration: d);
     });
-    player.processingStateStream.listen((ps) {
+    _processingStateSub = player.processingStateStream.listen((ps) {
       if (ps == ProcessingState.completed) {
         _onTrackComplete();
       }
@@ -276,6 +288,11 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   @override
   void dispose() {
+    // Cancel stream subscriptions to prevent callbacks firing after disposal.
+    _playerStateSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _processingStateSub?.cancel();
     // Do NOT stop the handler — it lives for the app lifetime
     super.dispose();
   }
@@ -513,7 +530,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.border),
                       ),
-                      child: Text('${ps.speed}x',
+                      child: Text(
+                          '${ps.speed == ps.speed.truncateToDouble() ? ps.speed.toInt() : ps.speed}x',
                           style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w700,
                             color: AppColors.accent,
