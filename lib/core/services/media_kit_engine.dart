@@ -511,12 +511,15 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
     if (_showControls) _showControlsTemporarily();
   }
 
+  Duration _clampDuration(Duration value, Duration min, Duration max) =>
+      value < min ? min : (value > max ? max : value);
+
   void _onDoubleTapDown(TapDownDetails d) {
     final isLeft = d.localPosition.dx < context.size!.width / 2;
     final delta  = const Duration(seconds: 10);
     final newPos = isLeft
-        ? (_position - delta).clamp(Duration.zero, _duration)
-        : (_position + delta).clamp(Duration.zero, _duration);
+        ? _clampDuration(_position - delta, Duration.zero, _duration)
+        : _clampDuration(_position + delta, Duration.zero, _duration);
     widget.player.seek(newPos);
     HapticFeedback.selectionClick();
     // Show seek HUD briefly
