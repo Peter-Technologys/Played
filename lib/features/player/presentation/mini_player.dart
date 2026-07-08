@@ -119,16 +119,30 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
             opacity: (1 - _dragOffset / (_dismissThreshold * 2)).clamp(0.3, 1.0),
             child: Container(
               height: 68,
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              foregroundDecoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(24),
+                border: Border(
+                  top: BorderSide(
+                    color: AppColors.accent.withValues(alpha: 0.35),
+                    width: 1.5,
+                  ),
+                ),
+              ),
               decoration: BoxDecoration(
                 color: AppColors.surface,
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(color: AppColors.border),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.accent.withValues(alpha: 0.12),
                     blurRadius: 20,
                     offset: const Offset(0, 4),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.4),
+                    blurRadius: 16,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
@@ -137,7 +151,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                   // Album art — real art when available, gradient fallback
                   ClipRRect(
                     borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(18)),
+                        left: Radius.circular(24)),
                     child: SizedBox(
                       width: 68, height: 68,
                       child: displayItem.albumArtPath != null &&

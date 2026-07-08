@@ -155,10 +155,18 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                       duration: const Duration(milliseconds: 250),
                       margin: const EdgeInsets.symmetric(horizontal: 4),
                       width: i == _page ? 24 : 8,
-                      height: 8,
+                      height: i == _page ? 10 : 8,
                       decoration: BoxDecoration(
                         color: i == _page ? _pages[_page].color : AppColors.border,
                         borderRadius: BorderRadius.circular(4),
+                        boxShadow: i == _page
+                            ? [
+                                BoxShadow(
+                                  color: _pages[_page].color.withValues(alpha: 0.5),
+                                  blurRadius: 8,
+                                ),
+                              ]
+                            : null,
                       ),
                     ),
                   ),
@@ -179,7 +187,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
                         gradient: LinearGradient(
                           colors: [_pages[_page].color, AppColors.accentViolet],
                         ),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(20),
                         boxShadow: [
                           BoxShadow(
                             color: _pages[_page].color.withValues(alpha: 0.35),
@@ -238,13 +246,20 @@ class _PageCard extends StatelessWidget {
               height: iconSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: page.color.withValues(alpha: 0.1),
+                gradient: LinearGradient(
+                  colors: [
+                    page.color.withValues(alpha: 0.15),
+                    page.color.withValues(alpha: 0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
                 border: Border.all(color: page.color.withValues(alpha: 0.3), width: 2),
                 boxShadow: [
                   BoxShadow(
                     color: page.color.withValues(alpha: 0.2),
                     blurRadius: 40,
-                    spreadRadius: 8,
+                    spreadRadius: 14,
                   ),
                 ],
               ),

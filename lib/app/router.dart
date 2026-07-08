@@ -154,24 +154,21 @@ class _MainShellState extends ConsumerState<_MainShell> {
         children: [
           const MiniPlayer(),
           const AdBannerSlot(),
-          Container(
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              border: Border(
-                top: BorderSide(
-                  color: AppColors.accent.withValues(alpha: 0.20),
-                  width: 1,
-                ),
+          SafeArea(
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(color: AppColors.border),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.12),
+                    blurRadius: 24,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  blurRadius: 24,
-                  offset: const Offset(0, -6),
-                ),
-              ],
-            ),
-            child: SafeArea(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
                 child: Row(
@@ -218,31 +215,42 @@ class _CenterNavItem extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            width: 52, height: 52,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: const LinearGradient(
-                colors: [Color(0xFF8A2BE2), Color(0xFF00BFFF)],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
+          AnimatedScale(
+            scale: isActive ? 1.0 : 0.90,
+            duration: const Duration(milliseconds: 200),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              width: 54, height: 54,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: const LinearGradient(
+                  colors: [AppColors.accentViolet, AppColors.accent],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: 0.50),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: AppColors.accentViolet.withValues(alpha: 0.30),
+                          blurRadius: 32,
+                          spreadRadius: 4,
+                        ),
+                      ]
+                    : null,
               ),
-              boxShadow: isActive
-                  ? [BoxShadow(
-                      color: const Color(0xFF8A2BE2).withValues(alpha: 0.45),
-                      blurRadius: 18, spreadRadius: 2)]
-                  : null,
+              child: const Icon(Icons.home_rounded, color: Colors.white, size: 26),
             ),
-            child: const Icon(Icons.home_rounded, color: Colors.white, size: 26),
           ),
           const SizedBox(height: 4),
           Text('My Space',
               style: TextStyle(
                 fontSize: 10, fontWeight: FontWeight.w700,
-                color: isActive
-                    ? const Color(0xFF8A2BE2)
-                    : const Color(0xFF6B7280),
+                color: isActive ? AppColors.accent : AppColors.textSecondary,
               )),
         ],
       ),
@@ -274,25 +282,25 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: isActive
-              ? const Color(0xFF8A2BE2).withValues(alpha: 0.1)
+              ? AppColors.accent.withValues(alpha: 0.12)
               : Colors.transparent,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(20),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon,
-                color: isActive
-                    ? const Color(0xFF8A2BE2)
-                    : const Color(0xFF6B7280),
-                size: 22),
+            AnimatedScale(
+              scale: isActive ? 1.1 : 1.0,
+              duration: const Duration(milliseconds: 200),
+              child: Icon(icon,
+                  color: isActive ? AppColors.accent : AppColors.textSecondary,
+                  size: 22),
+            ),
             const SizedBox(height: 3),
             Text(label,
                 style: TextStyle(
                   fontSize: 10, fontWeight: FontWeight.w600,
-                  color: isActive
-                      ? const Color(0xFF8A2BE2)
-                      : const Color(0xFF6B7280),
+                  color: isActive ? AppColors.accent : AppColors.textSecondary,
                 )),
           ],
         ),

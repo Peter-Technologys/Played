@@ -585,6 +585,10 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                             color: AppColors.accent.withValues(alpha: 0.45),
                             blurRadius: 28, spreadRadius: 4,
                           ),
+                          BoxShadow(
+                            color: AppColors.accentViolet.withValues(alpha: 0.25),
+                            blurRadius: 60, spreadRadius: 8,
+                          ),
                         ],
                       ),
                       child: ps.isLoading
@@ -683,6 +687,11 @@ class _AlbumArt extends StatelessWidget {
             blurRadius: isPlaying ? 48 : 16,
             spreadRadius: isPlaying ? 6 : 0,
           ),
+          BoxShadow(
+            color: AppColors.accentViolet.withValues(alpha: isPlaying ? 0.20 : 0.05),
+            blurRadius: isPlaying ? 64 : 20,
+            spreadRadius: isPlaying ? 8 : 0,
+          ),
         ],
       ),
       child: ClipRRect(
@@ -733,12 +742,13 @@ class _SeekBar extends StatelessWidget {
       children: [
         SliderTheme(
           data: SliderThemeData(
-            trackHeight: 4,
+            trackHeight: 5,
             activeTrackColor: AppColors.accent,
             inactiveTrackColor: AppColors.border,
             thumbColor: AppColors.accent,
             overlayColor: AppColors.accent.withValues(alpha: 0.15),
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
+            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
+            overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
           ),
           child: Slider(
             value: progress,
@@ -827,8 +837,14 @@ class _SecondaryBtn extends StatelessWidget {
             width: 44, height: 44,
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.10),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(16),
               border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                  blurRadius: 8,
+                ),
+              ],
             ),
             child: Icon(icon, color: AppColors.accent, size: 20),
           ),
