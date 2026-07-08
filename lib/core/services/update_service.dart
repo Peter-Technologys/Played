@@ -70,7 +70,8 @@ class UpdateService {
       final serverVersionCode = (data['versionCode'] as num?)?.toInt() ?? 0;
       final serverVersion     = data['version']   as String? ?? '';
       final changelog         = data['changelog'] as String? ?? '';
-      final downloads         = data['downloads'] as Map<String, dynamic>? ?? {};
+      final rawDownloads      = data['downloads'];
+      final downloads         = (rawDownloads is Map<String, dynamic>) ? rawDownloads : <String, dynamic>{};
 
       if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
 
@@ -201,14 +202,14 @@ class UpdateService {
   String _detectAbi() {
     try {
       if (Platform.isAndroid) {
-        // Read the CPU ABI from /proc/cpuinfo — reliable on all Android versions
+        // Primary: check SUPPORTED_ABIS environment variable (set by Android runtime)
+        final abis = Platform.environment['SUPPORTED_ABIS'] ?? '';
+        if (abis.contains('arm64-v8a')) return 'arm64';
+        if (abis.contains('armeabi-v7a')) return 'arm32';
+        // Fallback: read /proc/cpuinfo
         final cpuinfo = File('/proc/cpuinfo').readAsStringSync();
-        if (cpuinfo.contains('aarch64') || cpuinfo.contains('arm64')) {
-          return 'arm64';
-        }
-        if (cpuinfo.contains('armv7') || cpuinfo.contains('armeabi')) {
-          return 'arm32';
-        }
+        if (cpuinfo.contains('aarch64') || cpuinfo.contains('arm64')) return 'arm64';
+        if (cpuinfo.contains('armv7')   || cpuinfo.contains('armeabi')) return 'arm32';
       }
     } catch (_) {}
     return 'arm64'; // safe default — covers 99%+ of modern devices

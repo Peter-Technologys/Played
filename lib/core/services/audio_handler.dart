@@ -46,15 +46,14 @@ class PlayedAudioHandler extends BaseAudioHandler
   bool   _skipSilence = false;
 
   PlayedAudioHandler() {
-    // Pipe playback events into the BehaviorSubject exposed by BaseAudioHandler.
-    // catchError keeps the stream alive on transient errors.
-    _player.playbackEventStream
-        .map(_transformEvent)
-        .pipe(playbackState)
-        .catchError((Object e) {
-      debugPrint('[AudioHandler] playbackEventStream error: $e');
-      return playbackState.value;
-    });
+    // Listen to playback events and push into the BehaviorSubject.
+    // Using listen() instead of pipe() avoids an unhandled Future rejection
+    // when the stream closes during dispose.
+    _player.playbackEventStream.listen(
+      (event) => playbackState.add(_transformEvent(event)),
+      onError: (Object e) =>
+          debugPrint('[AudioHandler] playbackEventStream error: $e'),
+    );
 
     // Auto-advance to next track when the current one completes.
     _player.playerStateStream.listen((state) {

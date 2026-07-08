@@ -65,15 +65,17 @@ class ApkDownloader {
         return;
       }
 
-      debugPrint('[ApkDownloader] Saved to $savePath (${await file.length()} bytes)');
+      final fileLen = await file.length();
+      debugPrint('[ApkDownloader] Saved to $savePath ($fileLen bytes)');
 
+      // Open installer — cancel token already cleared above so dispose() is safe.
       final result = await OpenFilex.open(
         savePath,
         type: 'application/vnd.android.package-archive',
       );
       if (result.type != ResultType.done) {
         onError?.call(
-          'Could not open the installer. '
+          'Could not open the installer (${result.message}). '
           'Try opening the file manually from your Downloads folder.',
         );
       }

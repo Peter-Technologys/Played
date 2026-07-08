@@ -14,8 +14,22 @@ class NotificationService {
         AndroidInitializationSettings('@mipmap/ic_launcher');
     const settings =
         InitializationSettings(android: androidSettings);
-    await _plugin.initialize(settings);
+    await _plugin.initialize(
+      settings,
+      onDidReceiveNotificationResponse: _onNotificationResponse,
+    );
+    // Request POST_NOTIFICATIONS permission on Android 13+ (API 33+).
+    await _plugin
+        .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin>()
+        ?.requestNotificationsPermission();
     debugPrint('[Notifications] Initialized.');
+  }
+
+  // ignore: unused_element
+  void _onNotificationResponse(NotificationResponse response) {
+    // Extend here to handle notification taps for tools channel.
+    debugPrint('[Notifications] Tapped: ${response.id}');
   }
 
   Future<void> showProgress({

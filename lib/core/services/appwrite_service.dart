@@ -152,6 +152,28 @@ class AppwriteService {
     }
   }
 
+  /// Helper: list all documents in a collection with automatic pagination
+  /// so callers never silently miss items beyond the default 25-doc page.
+  Future<List<models.Document>> _listAll({
+    required String collectionId,
+    List<String> queries = const [],
+  }) async {
+    final all    = <models.Document>[];
+    int   offset = 0;
+    const pageSize = 100;
+    while (true) {
+      final result = await _databases.listDocuments(
+        databaseId:   Environment.databaseId,
+        collectionId: collectionId,
+        queries:      [...queries, Query.limit(pageSize), Query.offset(offset)],
+      );
+      all.addAll(result.documents);
+      if (result.documents.length < pageSize) break;
+      offset += pageSize;
+    }
+    return all;
+  }
+
   // -- Playlist Backup --------------------------------------------------------
 
   Future<void> backupPlaylists() async {
@@ -206,13 +228,12 @@ class AppwriteService {
     if (user == null) return -1;
     try {
       final userId = user.$id;
-      final result = await _databases.listDocuments(
-        databaseId:   Environment.databaseId,
+      final docs = await _listAll(
         collectionId: Environment.playlistsCollection,
         queries:      [Query.equal('user_id', userId)],
       );
       int restored = 0;
-      for (final doc in result.documents) {
+      for (final doc in docs) {
         final data = doc.data;
         final playlist = Playlist(
           id:        doc.$id.replaceFirst('${userId}_', ''),
@@ -228,7 +249,7 @@ class AppwriteService {
       debugPrint('[Appwrite] Restored $restored playlists.');
       return restored;
     } catch (e) {
-      debugPrint('[Appwrite] Restore failed: $e');
+      debugPrint('[Appwrite] restorePlaylists failed: $e');
       return -1;
     }
   }

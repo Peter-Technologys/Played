@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color;
+import 'package:flutter/material.dart' show Color, WidgetsBinding;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'update_service.dart';
@@ -25,6 +25,7 @@ class UpdateNotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _initialized = false;
+  bool _showing     = false;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -39,7 +40,10 @@ class UpdateNotificationService {
   }
 
   /// Shows a high-priority update notification with Download Now / Later actions.
+  /// Guards against concurrent calls so only one notification is shown at a time.
   Future<void> showUpdateNotification(UpdateInfo info) async {
+    if (_showing) return;
+    _showing = true;
     if (!_initialized) await init();
 
     final changelog = info.changelog.length > 200
@@ -85,6 +89,7 @@ class UpdateNotificationService {
       payload: info.downloadUrl,
     );
 
+    _showing = false;
     debugPrint('[UpdateNotification] Shown for v${info.version}.');
   }
 
@@ -95,7 +100,9 @@ class UpdateNotificationService {
     final url    = response.payload ?? '';
 
     if (action == 'download' || (action == null && url.isNotEmpty)) {
-      _openUrl(url);
+      // Notification callbacks may arrive on a background isolate.
+      // Schedule on the main thread to safely call platform channels.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openUrl(url));
     }
     // 'later' just dismisses — WorkManager will re-check in 24h
   }

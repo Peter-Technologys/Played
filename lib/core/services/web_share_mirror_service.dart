@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
 import '../services/media_scanner_service.dart';
@@ -151,11 +152,19 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target===docu
       int rem = cl;
       while (rem > 0) {
         final n = rem < _chunkSz ? rem : _chunkSz;
-        final c = await raf.read(n);
+        final Uint8List c;
+        try {
+          c = await raf.read(n);
+        } on IOException catch (e) {
+          debugPrint('[WebMirror] Read error: $e');
+          break;
+        }
         if (c.isEmpty) break;
         req.response.add(c); rem -= c.length;
+        // Yield to the event loop so we don't starve other requests.
         await Future<void>.delayed(Duration.zero);
       }
+      await req.response.flush();
     } finally { await raf?.close(); await req.response.close(); }
   }
 

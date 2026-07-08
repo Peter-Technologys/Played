@@ -42,15 +42,17 @@ class SettingsService extends ChangeNotifier {
   Future<void> save() async {
     try {
       final f = await _settingsFile();
-      // Write to a temp file first, then rename — prevents data loss if
-      // the app is killed mid-write (atomic write pattern).
+      // Write to a temp file first, then copy-and-delete — prevents data loss
+      // if the app is killed mid-write. We copy instead of rename because
+      // rename() across mount points throws on some Android file systems.
       final tmp = File('${f.path}.tmp');
-      tmp.writeAsStringSync(jsonEncode({
+      await tmp.writeAsString(jsonEncode({
         'profileName': _profileName, 'audioEnabled': _audioEnabled,
         'themeIndex': _themeIndex, 'skipSilence': _skipSilence,
         'playbackSpeed': _playbackSpeed, 'showLyrics': _showLyrics,
       }));
-      await tmp.rename(f.path);
+      await f.writeAsBytes(await tmp.readAsBytes());
+      await tmp.delete();
       notifyListeners();
     } catch (e) { debugPrint('[Settings] Save error: $e'); }
   }

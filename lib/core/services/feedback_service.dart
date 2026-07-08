@@ -43,12 +43,18 @@ class FeedbackService {
   /// HTTP probe so we don't show the prompt on captive-portal Wi-Fi.
   Future<bool> _hasConnection() async {
     try {
-      final result = await Connectivity().checkConnectivity();
-      if (result == ConnectivityResult.none) return false;
+      final result = await Connectivity()
+          .checkConnectivity()
+          .timeout(const Duration(seconds: 3));
+      // connectivity_plus returns a List<ConnectivityResult> on newer versions.
+      final hasNetwork = result is List
+          ? !(result as List).contains(ConnectivityResult.none)
+          : result != ConnectivityResult.none;
+      if (!hasNetwork) return false;
       // Secondary probe — connectivity_plus can return non-none on captive portals.
       final probe = await http
           .get(Uri.parse('https://clients3.google.com/generate_204'))
-          .timeout(const Duration(seconds: 4));
+          .timeout(const Duration(seconds: 5));
       return probe.statusCode == 204;
     } catch (_) {
       // If the probe itself fails, assume no usable connection.
@@ -59,7 +65,7 @@ class FeedbackService {
   Future<void> _postToAppwrite(
       String collection, Map<String, dynamic> data) async {
     try {
-      await http
+      final res = await http
           .post(
             Uri.parse(
               '${Environment.appwriteEndpoint}/databases/${Environment.databaseId}'
@@ -72,6 +78,9 @@ class FeedbackService {
             body: jsonEncode({'documentId': 'unique()', 'data': data}),
           )
           .timeout(const Duration(seconds: 8));
+      if (res.statusCode >= 400) {
+        debugPrint('[FeedbackService] Appwrite $collection HTTP ${res.statusCode}: ${res.body}');
+      }
     } catch (e) {
       debugPrint('[FeedbackService] Appwrite post failed (non-fatal): $e');
     }

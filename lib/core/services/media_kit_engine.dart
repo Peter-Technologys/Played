@@ -136,7 +136,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
   }
 
   void _onTracksChanged(Tracks tracks) {
-    if (!mounted) return;
+    if (!mounted || _trackSub == null) return;
     // Build subtitle track list
     final subs = <_TrackOption>[
       const _TrackOption('no', 'Off'),
@@ -197,8 +197,12 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
 
   @override
   void dispose() {
+    // Cancel subscriptions BEFORE disposing the player so their callbacks
+    // cannot fire after the player is torn down (avoids setState-after-dispose).
     _trackSub?.cancel();
     _errorSub?.cancel();
+    _trackSub = null;
+    _errorSub = null;
     // Dispose releases all native MPV/MediaCodec resources.
     // Must be called to prevent memory leaks on track navigation.
     _player.dispose();
