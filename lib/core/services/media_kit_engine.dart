@@ -734,7 +734,7 @@ class _NeonHud extends StatelessWidget {
                         borderRadius: BorderRadius.circular(4),
                         child: LinearProgressIndicator(
                           value: value.clamp(0.0, 1.0),
-                          minHeight: 6,
+                          minHeight: 8,
                           backgroundColor: Colors.white.withValues(alpha: 0.12),
                           valueColor: AlwaysStoppedAnimation<Color>(color),
                         ),
@@ -865,12 +865,12 @@ class _TransportControls extends StatelessWidget {
               children: [
                 SliderTheme(
                   data: SliderThemeData(
-                    trackHeight: 3,
+                    trackHeight: 4,
                     activeTrackColor: AppColors.accent,
                     inactiveTrackColor: Colors.white24,
                     thumbColor: AppColors.accent,
                     overlayColor: AppColors.accent.withValues(alpha: 0.2),
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 7),
+                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
                   ),
                   child: Slider(
                     value: progress,
