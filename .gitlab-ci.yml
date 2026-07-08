@@ -14,6 +14,15 @@
 
 image: ghcr.io/cirruslabs/flutter:stable
 
+# Explicitly define when pipelines run so tag pipelines are never skipped.
+# Without this block, pipelines created from the GitLab UI tag page may not
+# trigger because GitLab's default rules require a git push event.
+workflow:
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_BRANCH == "main"'
+    - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/'
+
 variables:
   PUB_ENVIRONMENT: "bot.gitlab"
   PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
