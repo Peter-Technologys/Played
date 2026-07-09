@@ -85,11 +85,8 @@ class ProService {
   Future<bool> _isOnline() async {
     try {
       final result = await Connectivity().checkConnectivity();
-      // connectivity_plus returns List<ConnectivityResult> on newer versions.
-      if (result is List) {
-        return !(result as List<ConnectivityResult>).contains(ConnectivityResult.none);
-      }
-      return !(result as List<ConnectivityResult>).contains(ConnectivityResult.none);
+      // connectivity_plus always returns List<ConnectivityResult>.
+      return !result.contains(ConnectivityResult.none);
     } catch (_) {
       return false;
     }
