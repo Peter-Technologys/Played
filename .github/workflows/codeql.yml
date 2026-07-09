@@ -96,18 +96,27 @@ jobs:
           # coverage beyond the default set (adds CWE-022, CWE-078, etc.)
           queries: security-extended
 
-      # ── 8. Build — explicit Gradle invocation instead of autobuild ─────────────
+      # ── 8. Free disk space before heavy build ───────────────────────────────────
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk/ndk || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/share/powershell || true
+          sudo rm -rf /usr/share/swift || true
+          sudo apt-get clean -y || true
+
+      # ── 9. Build — explicit Gradle invocation instead of autobuild ─────────────
       #       We compile only the debug variant; CodeQL only needs bytecode/IR,
       #       not a signed release APK. This is significantly faster.
       - name: Build Android (debug) for CodeQL
-        run: flutter build apk --debug --no-tree-shake-icons
+        run: flutter build apk --debug --no-pub --no-tree-shake-icons
 
-      # ── 9. Cleanup secrets before upload ────────────────────────────────────────
+      # ── 10. Cleanup secrets before upload ───────────────────────────────────────
       - name: Remove placeholder google-services.json
         if: always()
         run: rm -f android/app/google-services.json
 
-      # ── 10. Run CodeQL analysis and upload SARIF to GitHub Security tab ─────────
+      # ── 11. Run CodeQL analysis and upload SARIF to GitHub Security tab ─────────
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v4
         with:

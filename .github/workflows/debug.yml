@@ -1,13 +1,13 @@
-# OTYA Player — Debug APK Build
+# OTYA Player — Signed Release APK Build
 #
-# Builds a debug APK on every push to main and on every pull request.
-# No keystore or signing secrets needed — debug builds are self-signed by Flutter.
+# Builds a signed release APK on every push to main and on every pull request.
+# APKs are split by ABI (arm64 + arm32) and uploaded as GitHub Actions artifacts.
+# No R2 upload — use the Release workflow (push a v* tag) for that.
 #
-# Required GitHub Variables (Settings → Secrets and variables → Actions → Variables):
-#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
-#
-# The debug APK is uploaded as a workflow artifact and can be downloaded
-# directly from the GitHub Actions run page.
+# Required GitHub Secrets:
+#   KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+# Required GitHub Variables:
+#   GOOGLE_SERVICES_JSON
 
 name: Debug APK
 
