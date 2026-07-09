@@ -52,13 +52,15 @@ class PermissionHelper {
   }
 
   /// Request Air-Drop permissions (Bluetooth + Location + NearbyWifi).
+  /// Request Air-Drop permissions (Bluetooth + NearbyWifi).
+  /// Location permissions are NOT requested because NEARBY_WIFI_DEVICES and
+  /// BLUETOOTH_SCAN both declare neverForLocation in the manifest.
   static Future<void> requestAirDropPermissions() async {
     await [
       Permission.bluetooth,
       Permission.bluetoothScan,
       Permission.bluetoothAdvertise,
       Permission.bluetoothConnect,
-      Permission.locationWhenInUse,
       Permission.nearbyWifiDevices,
     ].request();
   }
