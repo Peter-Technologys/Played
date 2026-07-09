@@ -98,14 +98,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            <!-- Open-with: video files -->
+            
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="video/*" />
             </intent-filter>
-            <!-- Open-with: audio files -->
+            
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -124,7 +124,7 @@
             </intent-filter>
         </activity>
 
-        <!-- Audio playback foreground service -->
+        
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="true"
@@ -134,7 +134,7 @@
             </intent-filter>
         </service>
 
-        <!-- Boot receiver — restarts background service after reboot -->
+        
         <receiver
             android:name=".BootReceiver"
             android:exported="true"
@@ -145,12 +145,12 @@
             </intent-filter>
         </receiver>
 
-        <!-- Update notification dismiss receiver -->
+        
         <receiver
             android:name=".NotificationDismissReceiver"
             android:exported="false" />
 
-        <!-- WorkManager initializer (required for WorkManager 2.6+) -->
+        
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
