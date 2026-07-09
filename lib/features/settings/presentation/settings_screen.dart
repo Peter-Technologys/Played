@@ -223,9 +223,6 @@ class _Tile extends StatelessWidget {
   );
 }
 
-
-/// Main Settings screen for OTYA Player.
-class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
 
   @override
