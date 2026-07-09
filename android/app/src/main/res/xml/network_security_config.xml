@@ -1,8 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
 <network-security-config>
-    <base-config cleartextTrafficPermitted="true">
+    <!-- Block cleartext (HTTP) for all traffic by default -->
+    <base-config cleartextTrafficPermitted="false">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
+
+    <!--
+        Allow cleartext for local/private IP ranges used by Flash Share and
+        Web Mirror (device-to-device over the same Wi-Fi network).
+        These are RFC 1918 private address ranges — no internet traffic.
+    -->
+    <domain-config cleartextTrafficPermitted="true">
+        <!-- 192.168.x.x — most home/office routers -->
+        <domain includeSubdomains="false">192.168.0.1</domain>
+        <!-- 10.x.x.x — corporate and hotspot networks -->
+        <domain includeSubdomains="false">10.0.0.1</domain>
+        <!-- 172.16.x.x – 172.31.x.x — less common private range -->
+        <domain includeSubdomains="false">172.16.0.1</domain>
+    </domain-config>
 </network-security-config>
