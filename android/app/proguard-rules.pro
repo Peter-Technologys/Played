@@ -5,9 +5,6 @@
 -keep class io.appwrite.** { *; }
 -dontwarn io.appwrite.**
 
-# Nearby Connections
--keep class com.google.android.gms.nearby.** { *; }
-
 # Hive
 -keep class hive.** { *; }
 -keep class com.hivedb.** { *; }
@@ -28,9 +25,25 @@
 -keep class com.ryanheise.audio_session.** { *; }
 -dontwarn com.ryanheise.audio_session.**
 
-# flutter_vlc_player — keep VLC native bridge
--keep class org.videolan.libvlc.** { *; }
--dontwarn org.videolan.libvlc.**
+# media_kit — replaces flutter_vlc_player
+-keep class com.alexmercerind.media_kit_video.** { *; }
+-dontwarn com.alexmercerind.media_kit_video.**
+
+# mobile_scanner
+-keep class dev.steenbakker.mobile_scanner.** { *; }
+-dontwarn dev.steenbakker.mobile_scanner.**
+
+# workmanager
+-keep class be.tramckrijte.workmanager.** { *; }
+-dontwarn be.tramckrijte.workmanager.**
+
+# open_filex
+-keep class com.crazecoder.openfile.** { *; }
+-dontwarn com.crazecoder.openfile.**
+
+# flutter_secure_storage
+-keep class com.it_nomads.fluttersecurestorage.** { *; }
+-dontwarn com.it_nomads.fluttersecurestorage.**
 
 # flutter_local_notifications
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
