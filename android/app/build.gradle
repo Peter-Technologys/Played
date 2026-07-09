@@ -43,23 +43,7 @@ android {
         multiDexEnabled true
     }
 
-    // ── Product flavors ──────────────────────────────────────────────────────
-    // 'standard' : Google Play / sideload — includes AdMob
-    // 'huawei'   : Huawei AppGallery — no GMS, AdMob meta-data removed via
-    //              manifest placeholder so the app doesn't crash on HMS devices
-    flavorDimensions 'store'
-    productFlavors {
-        standard {
-            dimension 'store'
-            // ADS DISABLED — admobAppId placeholder removed until Play Store launch
-            // manifestPlaceholders = [admobAppId: 'ca-app-pub-2517163652161686~2375986122']
-        }
-        huawei {
-            dimension 'store'
-            // ADS DISABLED — admobAppId placeholder removed until Play Store launch
-            // manifestPlaceholders = [admobAppId: 'ca-app-pub-0000000000000000~0000000000']
-        }
-    }
+    // No product flavors — single standard build for Google Play / sideload
 
     signingConfigs {
         release {
