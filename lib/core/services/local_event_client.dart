@@ -24,7 +24,7 @@ class LocalEventClient {
     _socket = await Socket.connect(host, port,
         timeout: const Duration(seconds: 5));
     debugPrint('[EventClient] Connected to $host:$port');
-    _sub = _socket!.transform(utf8.decoder).listen(
+    _sub = _socket!.transform(utf8.decoder as StreamTransformer<Uint8List, dynamic>).listen(
       (chunk) {
         _buf.write(chunk);
         final lines = _buf.toString().split('\n');
