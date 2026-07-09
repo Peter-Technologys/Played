@@ -87,9 +87,9 @@ class ProService {
       final result = await Connectivity().checkConnectivity();
       // connectivity_plus returns List<ConnectivityResult> on newer versions.
       if (result is List) {
-        return !(result as List).contains(ConnectivityResult.none);
+        return !(result as List<ConnectivityResult>).contains(ConnectivityResult.none);
       }
-      return result != ConnectivityResult.none;
+      return !(result as List<ConnectivityResult>).contains(ConnectivityResult.none);
     } catch (_) {
       return false;
     }
