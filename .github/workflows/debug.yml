@@ -76,7 +76,7 @@ jobs:
       - name: Decode keystore
         run: |
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
-            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > $GITHUB_WORKSPACE/android/app/keystore.jks
           else
             echo "WARNING: KEYSTORE_BASE64 not set — APK will use debug signing."
           fi
@@ -84,7 +84,7 @@ jobs:
       # ── Build release APK (signed, installable on any device) ──────────
       - name: Build release APK
         env:
-          KEYSTORE_PATH: app/keystore.jks
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -92,7 +92,7 @@ jobs:
 
       - name: Remove keystore
         if: always()
-        run: rm -f android/app/keystore.jks
+        run: rm -f $GITHUB_WORKSPACE/android/app/keystore.jks
 
       # ── Upload artifact ────────────────────────────────────────────────
       - name: Upload release APKs
