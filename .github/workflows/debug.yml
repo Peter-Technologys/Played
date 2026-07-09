@@ -1,0 +1,97 @@
+# OTYA Player — Debug APK Build
+#
+# Builds a debug APK on every push to main and on every pull request.
+# No keystore or signing secrets needed — debug builds are self-signed by Flutter.
+#
+# Required GitHub Variables (Settings → Secrets and variables → Actions → Variables):
+#   GOOGLE_SERVICES_JSON — raw contents of google-services.json
+#
+# The debug APK is uploaded as a workflow artifact and can be downloaded
+# directly from the GitHub Actions run page.
+
+name: Debug APK
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: debug-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PUB_ENVIRONMENT: bot.github
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g -Dkotlin.incremental=false"
+
+jobs:
+  build_debug:
+    name: Build Debug APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Free disk space ────────────────────────────────────────────────
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android/sdk/ndk || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/share/powershell || true
+          sudo rm -rf /usr/share/swift || true
+          sudo apt-get clean -y || true
+          df -h
+
+      - uses: actions/checkout@v4
+
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.x'
+          channel: stable
+          cache: true
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.pub-cache
+          key: pub-${{ hashFiles('pubspec.yaml') }}
+          restore-keys: pub-
+
+      # ── Inject google-services.json ────────────────────────────────────
+      - name: Write google-services.json
+        run: |
+          if [ -z "${{ vars.GOOGLE_SERVICES_JSON }}" ]; then
+            echo "WARNING: GOOGLE_SERVICES_JSON not set — creating a placeholder."
+            echo '{"project_info":{"project_number":"000000000000","project_id":"placeholder","storage_bucket":"placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.otyaplayer.app"}},"oauth_client":[],"api_key":[{"current_key":"placeholder"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > android/app/google-services.json
+          else
+            echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
+          fi
+
+      - name: Flutter pub get
+        run: flutter pub get
+
+      - name: Flutter analyze (non-fatal)
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
+
+      # ── Build debug APK ────────────────────────────────────────────────
+      - name: Build debug APK
+        run: flutter build apk --debug --no-pub
+
+      # ── Upload artifact ────────────────────────────────────────────────
+      - name: Upload debug APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: otya-player-debug-${{ github.sha }}
+          path: build/app/outputs/flutter-apk/app-debug.apk
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Build summary
+        run: |
+          echo "### ✅ Debug APK Built" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
+          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk | cut -f1)
+          echo "**APK size:** $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Download the APK from the Artifacts section above ↑" >> $GITHUB_STEP_SUMMARY
