@@ -195,7 +195,7 @@ class _NeonMediaDashboardState extends State<NeonMediaDashboard>
                           children: [
                             ShaderMask(
                               blendMode: BlendMode.srcIn,
-                              shaderCallback: (b) => const LinearGradient(
+                              shaderCallback: (b) => LinearGradient(
                                 colors: _recvColors,
                               ).createShader(b),
                               child: const Icon(Icons.download_rounded,
