@@ -1,0 +1,12 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+    <!--
+        Standard (Google Play) flavor overlay.
+        Google Play does not allow apps to self-update outside of the Play Store.
+        Remove REQUEST_INSTALL_PACKAGES so the APK self-update feature is
+        disabled for Play Store builds. The huawei flavor keeps it.
+    -->
+    <uses-permission
+        android:name="android.permission.REQUEST_INSTALL_PACKAGES"
+        tools:node="remove" />
+</manifest>
