@@ -51,18 +51,27 @@ class PermissionHelper {
     return true;
   }
 
-  /// Request Air-Drop permissions (Bluetooth + Location + NearbyWifi).
-  /// Request Air-Drop permissions (Bluetooth + NearbyWifi).
-  /// Location permissions are NOT requested because NEARBY_WIFI_DEVICES and
-  /// BLUETOOTH_SCAN both declare neverForLocation in the manifest.
+  /// Request Air-Drop permissions (Bluetooth + Location/NearbyWifi).
+  ///
+  /// On Android 13+ (API >= 33) we request [Permission.nearbyWifiDevices]
+  /// instead of location — the manifest declares NEARBY_WIFI_DEVICES with
+  /// `neverForLocation` so no location access is granted.
+  /// On Android 12 and below (API <= 32) we keep requesting location because
+  /// NEARBY_WIFI_DEVICES is not available and Wi-Fi P2P requires it.
   static Future<void> requestAirDropPermissions() async {
-    await [
+    final sdk = await _getSdkInt();
+    final perms = <Permission>[
       Permission.bluetooth,
       Permission.bluetoothScan,
       Permission.bluetoothAdvertise,
       Permission.bluetoothConnect,
-      Permission.nearbyWifiDevices,
-    ].request();
+    ];
+    if (sdk >= 33) {
+      perms.add(Permission.nearbyWifiDevices);
+    } else {
+      perms.add(Permission.locationWhenInUse);
+    }
+    await perms.request();
   }
 
   /// Show a branded bottom sheet explaining why storage permission is needed,

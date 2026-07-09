@@ -5,6 +5,8 @@
 -keep class io.appwrite.** { *; }
 -dontwarn io.appwrite.**
 
+# nearby_connections — REMOVED (not in pubspec; replaced by pure-Dart Flash Share)
+
 # Hive
 -keep class hive.** { *; }
 -keep class com.hivedb.** { *; }
@@ -25,7 +27,9 @@
 -keep class com.ryanheise.audio_session.** { *; }
 -dontwarn com.ryanheise.audio_session.**
 
-# media_kit — replaces flutter_vlc_player
+# flutter_vlc_player — REMOVED (not in pubspec; flutter_vlc_player replaced by media_kit)
+
+# media_kit
 -keep class com.alexmercerind.media_kit_video.** { *; }
 -dontwarn com.alexmercerind.media_kit_video.**
 

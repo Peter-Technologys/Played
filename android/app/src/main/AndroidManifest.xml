@@ -11,18 +11,18 @@
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- MANAGE_EXTERNAL_STORAGE removed: restricted permission not needed;
-         READ_MEDIA_VIDEO + READ_MEDIA_AUDIO (API 33+) and
-         READ_EXTERNAL_STORAGE (API ≤32) are sufficient. -->
-    <!-- MANAGE_MEDIA removed: restricted permission, no feature requires it. -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- MANAGE_MEDIA removed — not needed by this app -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- CHANGE_NETWORK_STATE removed: not needed for a media player. -->
+    <!-- CHANGE_NETWORK_STATE — required for Flash Share P2P hotspot -->
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <!-- ACCESS_WIFI_STATE / CHANGE_WIFI_STATE — required for Flash Share & Web Mirror -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
-    <!-- Legacy Bluetooth (API ≤30) — capped so they don't appear on API 31+ -->
+    <!-- Legacy Bluetooth — kept for Android ≤ 10 (API 30) only -->
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
@@ -32,9 +32,12 @@
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- ACCESS_FINE_LOCATION / ACCESS_COARSE_LOCATION removed:
-         NEARBY_WIFI_DEVICES has neverForLocation and BLUETOOTH_SCAN has
-         neverForLocation, so location permissions are not needed. -->
+    <!-- Location — required for Wi-Fi P2P on Android ≤ 12 (API 32) only -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
+        android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
+        android:maxSdkVersion="32" />
+    <!-- NearbyWifiDevices — replaces location for Wi-Fi P2P on Android 13+ -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
 
@@ -46,15 +49,13 @@
         android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- REQUEST_IGNORE_BATTERY_OPTIMIZATIONS removed: restricted permission;
-         WorkManager handles background tasks correctly without it. -->
-    <!-- SYSTEM_ALERT_WINDOW removed: restricted permission, not needed. -->
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <!-- REQUEST_IGNORE_BATTERY_OPTIMIZATIONS removed — WorkManager handles background correctly -->
+    <!-- SYSTEM_ALERT_WINDOW removed — not needed for a media player -->
+    <!-- REQUEST_INSTALL_PACKAGES is managed per-flavor (standard removes it, huawei keeps it) -->
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <!-- SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM removed: require special Play
-         Store approval; sleep timer and WorkManager don't need exact alarms. -->
+    <!-- SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM removed — not needed -->
 
     <queries>
         <intent>

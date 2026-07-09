@@ -1,21 +1,18 @@
 /// Compile-time flavor configuration.
 ///
-/// Set via `--dart-define=FLAVOR=standard` (Play Store) or
-/// `--dart-define=FLAVOR=huawei` (Huawei AppGallery).
+/// Set via `--dart-define=SELF_UPDATE=true` when building the Huawei flavor.
+/// The standard (Google Play) flavor uses the default value of `false`.
 ///
-/// The standard (Play Store) flavor disables the self-update mechanism
-/// because Google Play does not allow apps to download and install their
-/// own APK updates outside of the Play Store.
+/// Usage in build commands:
+///   Standard:  flutter build apk --flavor standard
+///   Huawei:    flutter build apk --flavor huawei --dart-define=SELF_UPDATE=true
 class FlavorConfig {
   FlavorConfig._();
 
-  /// The current build flavor, read from the compile-time constant.
-  /// Defaults to 'standard' if not set.
-  static const String flavor =
-      String.fromEnvironment('FLAVOR', defaultValue: 'standard');
-
-  /// Whether the app is allowed to download and install its own APK updates.
-  /// - `false` for the `standard` (Google Play) flavor — Play Store policy.
-  /// - `true`  for the `huawei` (Huawei AppGallery) flavor.
-  static const bool selfUpdateEnabled = flavor == 'huawei';
+  /// Whether in-app APK download and self-install is enabled.
+  ///
+  /// `true`  → Huawei AppGallery build (self-update allowed).
+  /// `false` → Google Play / standard build (updates via Play Store only).
+  static const bool selfUpdateEnabled =
+      bool.fromEnvironment('SELF_UPDATE', defaultValue: false);
 }

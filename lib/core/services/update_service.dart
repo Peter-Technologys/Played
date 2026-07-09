@@ -33,13 +33,12 @@ class UpdateService {
   /// Returns [UpdateInfo] if a newer version is available, null otherwise.
   /// Checks at most once per 24 hours unless [force] is true.
   /// Guards against concurrent calls.
+  ///
+  /// Returns null immediately when [FlavorConfig.selfUpdateEnabled] is false
+  /// (i.e. the Google Play / standard flavor) — updates are handled by the
+  /// Play Store in that case.
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
-    // Self-update is disabled for the standard (Play Store) flavor.
-    // Google Play does not allow apps to download and install their own APKs.
-    if (!FlavorConfig.selfUpdateEnabled) {
-      debugPrint('[UpdateService] Self-update disabled for this flavor.');
-      return null;
-    }
+    if (!FlavorConfig.selfUpdateEnabled) return null;
     if (_checkInProgress) return null;
     _checkInProgress = true;
     try {

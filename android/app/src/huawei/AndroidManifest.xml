@@ -1,7 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Huawei (AppGallery) flavor manifest overlay.
+  Keeps REQUEST_INSTALL_PACKAGES so the Huawei build can self-update
+  by downloading and installing the latest APK directly.
+-->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!--
-        Huawei AppGallery flavor overlay.
-        Self-update via APK download is permitted on Huawei AppGallery.
-        REQUEST_INSTALL_PACKAGES is kept (inherited from main manifest).
-    -->
+
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+
 </manifest>
