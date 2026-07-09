@@ -74,14 +74,14 @@ jobs:
 
       # ── Build debug APK ────────────────────────────────────────────────
       - name: Build debug APK
-        run: flutter build apk --debug --no-pub
+        run: flutter build apk --debug --no-pub --flavor standard
 
       # ── Upload artifact ────────────────────────────────────────────────
       - name: Upload debug APK
         uses: actions/upload-artifact@v4
         with:
           name: otya-player-debug-${{ github.sha }}
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          path: build/app/outputs/flutter-apk/app-standard-debug.apk
           retention-days: 14
           if-no-files-found: error
 
@@ -91,7 +91,7 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk | cut -f1)
+          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-standard-debug.apk | cut -f1)
           echo "**APK size:** $APK_SIZE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Download the APK from the Artifacts section above ↑" >> $GITHUB_STEP_SUMMARY
