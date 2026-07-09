@@ -97,7 +97,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           flutter build appbundle --release \
-            --flavor standard \
             --obfuscate \
             --split-debug-info=build/debug-info
 
@@ -109,7 +108,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           flutter build apk --release --split-per-abi \
-            --flavor standard \
             --target-platform android-arm,android-arm64 \
             --obfuscate \
             --split-debug-info=build/debug-info
@@ -119,9 +117,7 @@ jobs:
         run: |
           echo "=== APK output directory ==="
           ls -lh build/app/outputs/flutter-apk/
-          # Fail fast if expected files are missing
           test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk || \
-          test -f build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk || \
           { echo "ERROR: arm64 APK not found"; exit 1; }
 
       - name: Remove secrets
@@ -135,15 +131,8 @@ jobs:
         id: apk
         run: |
           APK_DIR=build/app/outputs/flutter-apk
-          # Flutter names the APK based on the signing config name.
-          # Try 'standard' first (most common), then fall back to no-suffix.
-          if [ -f "$APK_DIR/app-arm64-v8a-standard-release.apk" ]; then
-            echo "arm64=$APK_DIR/app-arm64-v8a-standard-release.apk" >> $GITHUB_OUTPUT
-            echo "arm32=$APK_DIR/app-armeabi-v7a-standard-release.apk" >> $GITHUB_OUTPUT
-          else
-            echo "arm64=$APK_DIR/app-arm64-v8a-release.apk" >> $GITHUB_OUTPUT
-            echo "arm32=$APK_DIR/app-armeabi-v7a-release.apk" >> $GITHUB_OUTPUT
-          fi
+          echo "arm64=$APK_DIR/app-arm64-v8a-release.apk" >> $GITHUB_OUTPUT
+          echo "arm32=$APK_DIR/app-armeabi-v7a-release.apk" >> $GITHUB_OUTPUT
 
       # ── Publish to Cloudflare R2 ────────────────────────────────────────
       - name: Publish to Cloudflare R2
@@ -184,7 +173,7 @@ jobs:
 
           if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$VERSION" ]; then
             echo "Backing up v$CURRENT_VERSION..."
-            for KEY in app-arm64-v8a-standard-release.apk app-armeabi-v7a-standard-release.apk version.json; do
+            for KEY in app-arm64-v8a-release.apk app-armeabi-v7a-release.apk version.json; do
               aws s3 cp \
                 s3://$R2_BUCKET/$KEY \
                 s3://$R2_BUCKET/releases/v$CURRENT_VERSION/$KEY \
@@ -195,14 +184,14 @@ jobs:
           # Upload APKs with consistent names (Worker always reads these exact names)
           aws s3 cp \
             "$ARM64_APK" \
-            s3://$R2_BUCKET/app-arm64-v8a-standard-release.apk \
+            s3://$R2_BUCKET/app-arm64-v8a-release.apk \
             --endpoint-url $R2_ENDPOINT \
             --content-type application/vnd.android.package-archive \
             --cache-control "public, max-age=31536000, immutable"
 
           aws s3 cp \
             "$ARM32_APK" \
-            s3://$R2_BUCKET/app-armeabi-v7a-standard-release.apk \
+            s3://$R2_BUCKET/app-armeabi-v7a-release.apk \
             --endpoint-url $R2_ENDPOINT \
             --content-type application/vnd.android.package-archive \
             --cache-control "public, max-age=31536000, immutable"

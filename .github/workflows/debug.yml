@@ -72,26 +72,47 @@ jobs:
       - name: Flutter analyze (non-fatal)
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
 
-      # ── Build debug APK ────────────────────────────────────────────────
-      - name: Build debug APK
-        run: flutter build apk --debug --no-pub
+      # ── Decode keystore (if available) ────────────────────────────────
+      - name: Decode keystore
+        if: ${{ vars.KEYSTORE_BASE64 != '' || secrets.KEYSTORE_BASE64 != '' }}
+        run: |
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          fi
+
+      # ── Build release APK (signed, installable on any device) ──────────
+      - name: Build release APK
+        env:
+          KEYSTORE_PATH: app/keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        run: flutter build apk --release --no-pub --split-per-abi --target-platform android-arm,android-arm64
+
+      - name: Remove keystore
+        if: always()
+        run: rm -f android/app/keystore.jks
 
       # ── Upload artifact ────────────────────────────────────────────────
-      - name: Upload debug APK
+      - name: Upload release APKs
         uses: actions/upload-artifact@v4
         with:
-          name: otya-player-debug-${{ github.sha }}
-          path: build/app/outputs/flutter-apk/app-debug.apk
+          name: otya-player-${{ github.sha }}
+          path: |
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
           retention-days: 14
           if-no-files-found: error
 
       - name: Build summary
         run: |
-          echo "### ✅ Debug APK Built" >> $GITHUB_STEP_SUMMARY
+          echo "### ✅ Release APK Built" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          APK_SIZE=$(du -sh build/app/outputs/flutter-apk/app-debug.apk | cut -f1)
-          echo "**APK size:** $APK_SIZE" >> $GITHUB_STEP_SUMMARY
+          ARM64_SIZE=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk 2>/dev/null | cut -f1 || echo 'n/a')
+          ARM32_SIZE=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk 2>/dev/null | cut -f1 || echo 'n/a')
+          echo "**arm64 APK size:** $ARM64_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "**arm32 APK size:** $ARM32_SIZE" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Download the APK from the Artifacts section above ↑" >> $GITHUB_STEP_SUMMARY
+          echo "Download the APKs from the Artifacts section above ↑" >> $GITHUB_STEP_SUMMARY
