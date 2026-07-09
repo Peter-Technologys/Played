@@ -48,8 +48,8 @@ class FeedbackService {
           .timeout(const Duration(seconds: 3));
       // connectivity_plus returns a List<ConnectivityResult> on newer versions.
       final hasNetwork = result is List
-          ? !(result as List).contains(ConnectivityResult.none)
-          : result != ConnectivityResult.none;
+          ? !(result as List<ConnectivityResult>).contains(ConnectivityResult.none)
+          : !(result as List<ConnectivityResult>).contains(ConnectivityResult.none);
       if (!hasNetwork) return false;
       // Secondary probe — connectivity_plus can return non-none on captive portals.
       final probe = await http
