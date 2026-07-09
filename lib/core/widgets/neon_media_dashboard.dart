@@ -164,7 +164,7 @@ class _NeonMediaDashboardState extends State<NeonMediaDashboard>
                                   size: 36, color: Colors.white),
                             ),
                             const SizedBox(height: 10),
-                            const ModernNeonText(
+                            ModernNeonText(
                               text:     'SEND',
                               fontSize: 16,
                               colors:   _sendColors,
