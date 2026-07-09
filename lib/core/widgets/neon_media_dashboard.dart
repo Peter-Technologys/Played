@@ -78,13 +78,13 @@ class _NeonMediaDashboardState extends State<NeonMediaDashboard>
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
               // ── TOP HEADER ────────────────────────────────────────────────────────────
-              const ModernNeonText(
+              ModernNeonText(
                 text:     '⚡ Flash Share',
                 fontSize: 32,
                 colors:   _titleColors,
               ),
               const SizedBox(height: 4),
-              const ModernNeonText(
+              ModernNeonText(
                 text:     'Offline P2P • No Internet Needed',
                 fontSize: 13,
                 colors:   [Color(0xFF5E7399), Color(0xFF5E7399)],
