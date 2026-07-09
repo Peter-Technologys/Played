@@ -6,6 +6,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../config/environment.dart';
+import '../config/flavor_config.dart';
 import 'update_notification_service.dart';
 
 /// Checks if a newer version of OTYA Player is available.
@@ -33,6 +34,12 @@ class UpdateService {
   /// Checks at most once per 24 hours unless [force] is true.
   /// Guards against concurrent calls.
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
+    // Self-update is disabled for the standard (Play Store) flavor.
+    // Google Play does not allow apps to download and install their own APKs.
+    if (!FlavorConfig.selfUpdateEnabled) {
+      debugPrint('[UpdateService] Self-update disabled for this flavor.');
+      return null;
+    }
     if (_checkInProgress) return null;
     _checkInProgress = true;
     try {
