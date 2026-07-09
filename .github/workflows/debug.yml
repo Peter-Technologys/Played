@@ -74,10 +74,11 @@ jobs:
 
       # ── Decode keystore (if available) ────────────────────────────────
       - name: Decode keystore
-        if: ${{ vars.KEYSTORE_BASE64 != '' || secrets.KEYSTORE_BASE64 != '' }}
         run: |
           if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+          else
+            echo "WARNING: KEYSTORE_BASE64 not set — APK will use debug signing."
           fi
 
       # ── Build release APK (signed, installable on any device) ──────────
