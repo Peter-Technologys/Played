@@ -1,4 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security config for OTYA Player.
+
+  cleartextTrafficPermitted="true" in base-config is intentional and required
+  for two core features:
+
+  1. Flash Share — pure-Dart HTTP P2P file transfer over a local Wi-Fi hotspot.
+     The server binds to a raw local IP (e.g. 192.168.43.1) chosen at runtime
+     by the OS. Because the IP is dynamic and not a registered domain name,
+     Android's <domain-config> cannot enumerate it. Cleartext must be permitted
+     at the base level.
+
+  2. Web Mirror — streams the phone's media library to any PC browser on the
+     same Wi-Fi network over HTTP on port 8085. Same raw-IP constraint applies.
+
+  All external (internet) traffic uses HTTPS. The cleartext allowance only
+  affects local-network connections in practice.
+-->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
