@@ -29,7 +29,8 @@ CURRENT_VERSION=$(aws s3 cp \
 
 if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$VERSION" ]; then
   echo "Backing up v$CURRENT_VERSION to releases/v$CURRENT_VERSION/..."
-  for KEY in app-arm64-v8a-standard-release.apk app-armeabi-v7a-standard-release.apk version.json; do
+  # Filenames match the no-flavor artifact paths produced by build_release.
+  for KEY in app-arm64-v8a-release.apk app-armeabi-v7a-release.apk version.json; do
     aws s3 cp \
       "s3://${R2_BUCKET}/${KEY}" \
       "s3://${R2_BUCKET}/releases/v${CURRENT_VERSION}/${KEY}" \
@@ -40,16 +41,16 @@ fi
 # Upload APKs
 echo "Uploading arm64 APK..."
 aws s3 cp \
-  build/app/outputs/flutter-apk/app-arm64-v8a-standard-release.apk \
-  "s3://${R2_BUCKET}/app-arm64-v8a-standard-release.apk" \
+  build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+  "s3://${R2_BUCKET}/app-arm64-v8a-release.apk" \
   --endpoint-url "$R2_ENDPOINT" \
   --content-type application/vnd.android.package-archive \
   --cache-control "public, max-age=31536000, immutable"
 
 echo "Uploading arm32 APK..."
 aws s3 cp \
-  build/app/outputs/flutter-apk/app-armeabi-v7a-standard-release.apk \
-  "s3://${R2_BUCKET}/app-armeabi-v7a-standard-release.apk" \
+  build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk \
+  "s3://${R2_BUCKET}/app-armeabi-v7a-release.apk" \
   --endpoint-url "$R2_ENDPOINT" \
   --content-type application/vnd.android.package-archive \
   --cache-control "public, max-age=31536000, immutable"
@@ -61,8 +62,9 @@ data = {
     "version":     "${VERSION}",
     "versionCode": int("${VERSION_CODE}"),
     "date":        "${DATE}",
-    "arm64":       "app-arm64-v8a-standard-release.apk",
-    "arm32":       "app-armeabi-v7a-standard-release.apk",
+    # Filenames match the no-flavor artifact paths produced by build_release.
+    "arm64":       "app-arm64-v8a-release.apk",
+    "arm32":       "app-armeabi-v7a-release.apk",
     "changelog":   """${CHANGELOG}""",
     "minSdk":      int("${MIN_SDK}"),
     "targetSdk":   int("${TARGET_SDK}"),
