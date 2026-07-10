@@ -14,7 +14,6 @@ import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
 
-/// WorkManager callback dispatcher — must be a top-level function.
 @pragma('vm:entry-point')
 void callbackDispatcher() {
   Workmanager().executeTask((taskName, inputData) async {
@@ -30,29 +29,87 @@ void main() async {
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
-    debugPrint('[FlutterError] ${details.summary}');
+    debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
+    _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
+    _showCrashOverlay('Platform Error', '$error\n\n$stack');
     return true;
   };
 
-  // ── Fast path: only the minimum before runApp ─────────────────────
-  await _initDatabase();
-  final savedSettings = await AppSettings.load();
+  await runZonedGuarded(() async {
+    await _initDatabase();
+    final savedSettings = await AppSettings.load();
 
+    runApp(
+      ProviderScope(
+        overrides: [
+          settingsProvider.overrideWith(
+              (ref) => SettingsNotifier(savedSettings)),
+        ],
+        child: const OtyaPlayerApp(),
+      ),
+    );
+
+    unawaited(_initBackground());
+  }, (error, stack) {
+    debugPrint('[ZoneError] $error\n$stack');
+    _showCrashOverlay('Startup Crash', '$error\n\n$stack');
+  });
+}
+
+// REMOVE before Play Store release
+void _showCrashOverlay(String title, String details) {
   runApp(
-    ProviderScope(
-      overrides: [
-        settingsProvider.overrideWith(
-            (ref) => SettingsNotifier(savedSettings)),
-      ],
-      child: const OtyaPlayerApp(),
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFF1A0000),
+        body: SafeArea(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.bug_report, color: Color(0xFFFF4444), size: 40),
+                const SizedBox(height: 8),
+                Text(
+                  'OTYA CRASH: $title',
+                  style: const TextStyle(
+                    color: Color(0xFFFF4444),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF2A0000),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: SelectableText(
+                    details,
+                    style: const TextStyle(
+                      color: Color(0xFFFFCCCC),
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Screenshot this screen and share it here to debug the crash.',
+                  style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     ),
   );
-
-  // ── Background init after first frame ─────────────────────────────
-  unawaited(_initBackground());
 }
 
 Future<void> _initDatabase() async {
@@ -75,7 +132,6 @@ Future<void> _initBackground() async {
     StorageFolderService.instance.ensureCreated(),
   ]);
 
-  // Register device + run immediate update check after everything is ready
   unawaited(UpdateService.instance.registerDevice());
   unawaited(UpdateService.instance.checkAndNotify());
 }
@@ -122,7 +178,6 @@ Future<void> _initWorkManager() async {
       callbackDispatcher,
       isInDebugMode: kDebugMode,
     );
-    // Register periodic update check — KEEP policy, won't duplicate
     await Workmanager().registerPeriodicTask(
       'otya_update_check',
       'otya_update_check',
