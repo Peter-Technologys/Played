@@ -72,9 +72,17 @@
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
 -dontwarn com.dexterous.flutterlocalnotifications.**
 
-# Google Mobile Ads — disabled until Play Store launch
-# -keep class com.google.android.gms.ads.** { *; }
-# -dontwarn com.google.android.gms.ads.**
+# Google Mobile Ads + local_auth (Google Play Services)
+-keep class com.google.android.gms.** { *; }
+-dontwarn com.google.android.gms.**
+
+# androidx.startup — required by WorkManagerInitializer declared in AndroidManifest
+-keep class androidx.startup.** { *; }
+-dontwarn androidx.startup.**
+
+# local_auth — biometric classes
+-keep class androidx.biometric.** { *; }
+-dontwarn androidx.biometric.**
 
 # Encrypt / Bouncy Castle (used by vault)
 -keep class org.bouncycastle.** { *; }
