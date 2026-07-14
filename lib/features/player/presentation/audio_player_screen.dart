@@ -177,9 +177,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       return;
     }
     _currentItemId = item.id;
-    // Reset stream attachment flag so _attachStreams() re-wires on each load.
-    // This prevents stacked listeners when the user opens multiple tracks.
-    _streamsAttached = false;
+    // Do NOT reset _streamsAttached here — the identical(_attachedPlayer, player)
+    // guard in _attachStreams() is sufficient to detect player instance changes.
+    // Resetting the flag caused streams to be re-attached and stacked on every
+    // track load even when the underlying AudioPlayer instance had not changed.
     state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _attachStreams();

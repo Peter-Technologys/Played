@@ -77,8 +77,17 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
 
   Future<void> _backgroundRefresh() async {
     try {
-      // Run on a separate isolate so the UI thread is never blocked
-      final fresh = await compute(_runScan, true);
+      List<MediaItem> fresh;
+      try {
+        // Attempt to run on a separate isolate for UI thread isolation.
+        // Falls back to main isolate if the isolate cannot be spawned —
+        // this happens when MediaRepository holds MethodChannel references
+        // that cannot be transferred across isolate boundaries.
+        fresh = await compute(_runScan, true);
+      } on IsolateSpawnException {
+        debugPrint('[MediaLibrary] Isolate spawn failed — running on main isolate.');
+        fresh = await _runScan(true);
+      }
       if (fresh.isNotEmpty) state = AsyncData(fresh);
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');

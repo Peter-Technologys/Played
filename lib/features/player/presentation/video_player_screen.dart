@@ -22,9 +22,10 @@ class VideoPlayerScreen extends ConsumerStatefulWidget {
 
 class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     with WidgetsBindingObserver {
-  bool _pipSupported   = false;
-  bool _pipAutoEnabled = false;
-  bool _batterySaver   = false;
+  bool _pipSupported    = false;
+  bool _pipAutoEnabled  = false;
+  bool _pipInitialized  = false; // guard: prevents PiP before async init completes
+  bool _batterySaver    = false;
   late final Duration _savedPosition;
 
   @override
@@ -43,10 +44,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _pipSupported   = await PipService.instance.isPipSupported();
     _pipAutoEnabled = ref.read(settingsProvider).autoPip;
     await PipService.instance.setVideoPlaying(playing: true);
+    _pipInitialized = true; // safe to attempt PiP from this point
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Guard: _initPip is async — do not attempt PiP before it completes
+    // or we may call enterPip() on a device where support is unknown.
+    if (!_pipInitialized) return;
     if (state == AppLifecycleState.paused && _pipAutoEnabled && _pipSupported) {
       PipService.instance.enterPip();
     }
