@@ -15,6 +15,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.util.Size
@@ -22,19 +23,29 @@ import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 
 class MainActivity : FlutterActivity() {
 
-    private val pipChannel     = "com.otyaplayer.app/pip"
-    private val mediaChannel   = "com.otyaplayer.app/media_store"
-    private val fileChannel    = "com.otyaplayer.app/file_ops"
-    private val eqChannel      = "com.otyaplayer.app/equalizer"
-    private val phoneChannel   = "com.otyaplayer.app/phone_state"
-    private val ffmpegChannel  = "com.otyaplayer.app/ffmpeg"
-    private val mediaEventCh   = "com.otyaplayer.app/media_events"
+    private val pipChannel      = "com.otyaplayer.app/pip"
+    private val mediaChannel    = "com.otyaplayer.app/media_store"
+    private val fileChannel     = "com.otyaplayer.app/file_ops"
+    private val eqChannel       = "com.otyaplayer.app/equalizer"
+    private val phoneChannel    = "com.otyaplayer.app/phone_state"
+    private val ffmpegChannel   = "com.otyaplayer.app/ffmpeg"
+    private val mediaEventCh    = "com.otyaplayer.app/media_events"
+    private val deviceIdChannel = "com.otyaplayer.app/device_id"
+
+    // Fix #10: coroutine scope for long-running FFmpeg operations.
+    // Cancelled in onDestroy() to avoid leaking threads on low-RAM devices.
+    private val ioScope = CoroutineScope(Dispatchers.IO + Job())
 
     // Tracks whether the video player is actively playing — used by
     // onUserLeaveHint() to decide whether to auto-enter PiP.
@@ -168,26 +179,53 @@ class MainActivity : FlutterActivity() {
         // ── FFmpeg (offline trim + extract) ──────────────────────────────
         // Uses Android's built-in MediaExtractor + MediaMuxer — no FFmpeg
         // binary needed, works 100% offline on all Android versions.
+        // Fix #10: replaced raw Thread with a coroutine on Dispatchers.IO.
+        // The ioScope is cancelled in onDestroy() so operations are properly
+        // cleaned up and do not leak threads on low-RAM devices.
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, ffmpegChannel)
             .setMethodCallHandler { call, result ->
-                Thread {
-                    when (call.method) {
-                        "trimVideo" -> {
-                            val path    = call.argument<String>("path") ?: ""
-                            val startMs = call.argument<Int>("startMs") ?: 0
-                            val endMs   = call.argument<Int>("endMs") ?: 30000
+                when (call.method) {
+                    "trimVideo" -> {
+                        val path    = call.argument<String>("path") ?: ""
+                        val startMs = call.argument<Int>("startMs") ?: 0
+                        val endMs   = call.argument<Int>("endMs") ?: 30000
+                        ioScope.launch {
                             val out = trimVideo(path, startMs.toLong(), endMs.toLong())
-                            runOnUiThread { if (out != null) result.success(out) else result.error("TRIM_FAILED", "Trim failed", null) }
+                            runOnUiThread {
+                                if (out != null) result.success(out)
+                                else result.error("TRIM_FAILED", "Trim failed", null)
+                            }
                         }
-                        "extractAudio" -> {
-                            val path = call.argument<String>("path") ?: ""
-                            val out  = extractAudio(path)
-                            runOnUiThread { if (out != null) result.success(out) else result.error("EXTRACT_FAILED", "Extract failed", null) }
-                        }
-                        "cancel" -> runOnUiThread { result.success(null) }
-                        else    -> runOnUiThread { result.notImplemented() }
                     }
-                }.start()
+                    "extractAudio" -> {
+                        val path = call.argument<String>("path") ?: ""
+                        ioScope.launch {
+                            val out = extractAudio(path)
+                            runOnUiThread {
+                                if (out != null) result.success(out)
+                                else result.error("EXTRACT_FAILED", "Extract failed", null)
+                            }
+                        }
+                    }
+                    "cancel" -> result.success(null)
+                    else     -> result.notImplemented()
+                }
+            }
+
+        // ── Device ID (ANDROID_ID for vault key fallback) ─────────────────
+        // Fix #12: exposes Settings.Secure.ANDROID_ID to Dart so the vault
+        // key derivation can use a stable, device-unique value when
+        // FlutterSecureStorage is unavailable (no secure enclave, policy, etc.)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, deviceIdChannel)
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "getAndroidId" -> {
+                        val androidId = Settings.Secure.getString(
+                            contentResolver, Settings.Secure.ANDROID_ID)
+                        result.success(androidId)
+                    }
+                    else -> result.notImplemented()
+                }
             }
     }
 
@@ -663,7 +701,35 @@ class MainActivity : FlutterActivity() {
         }
     }
 
+    // Fix #11: pause the player when the app goes to background so the
+    // MediaKit surface is not rendering to a detached surface. Resume on
+    // foreground. We signal Flutter via the existing PiP channel which
+    // MediaKitEngine already listens to for PiP state changes.
+    override fun onPause() {
+        super.onPause()
+        // Only pause if NOT entering PiP (PiP keeps the surface alive).
+        if (!isInPictureInPictureMode) {
+            try {
+                flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                    MethodChannel(messenger, pipChannel).invokeMethod("playerPause", null)
+                }
+            } catch (_: Exception) {}
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        try {
+            flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
+                MethodChannel(messenger, pipChannel).invokeMethod("playerResume", null)
+            }
+        } catch (_: Exception) {}
+    }
+
     override fun onDestroy() {
+        // Fix #10: cancel the IO coroutine scope so any in-progress trim/extract
+        // operations are properly cleaned up and do not leak threads.
+        ioScope.cancel()
         unregisterMediaObserver()
         unregisterPhoneListener()
         equalizer?.release()

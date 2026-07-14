@@ -1,5 +1,7 @@
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 /// Manages local notifications for FFmpeg extraction progress.
 class NotificationService {
@@ -26,10 +28,28 @@ class NotificationService {
     debugPrint('[Notifications] Initialized.');
   }
 
-  // ignore: unused_element
   void _onNotificationResponse(NotificationResponse response) {
-    // Extend here to handle notification taps for tools channel.
-    debugPrint('[Notifications] Tapped: ${response.id}');
+    // Fix #8: route notification taps instead of just logging.
+    // The payload carries an optional URL (e.g. output file path or download URL).
+    debugPrint('[Notifications] Tapped: id=${response.id} payload=${response.payload}');
+    final payload = response.payload;
+    if (payload != null && payload.isNotEmpty) {
+      // Schedule on the main thread — notification callbacks may arrive on a
+      // background isolate where platform channels are unavailable.
+      WidgetsBinding.instance.addPostFrameCallback((_) => _openPayload(payload));
+    }
+  }
+
+  Future<void> _openPayload(String payload) async {
+    try {
+      final uri = Uri.tryParse(payload);
+      if (uri == null) return;
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      }
+    } catch (e) {
+      debugPrint('[Notifications] Could not open payload URL: $e');
+    }
   }
 
   Future<void> showProgress({

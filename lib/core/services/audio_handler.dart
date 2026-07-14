@@ -56,13 +56,19 @@ class PlayedAudioHandler extends BaseAudioHandler
     );
 
     // Auto-advance to next track when the current one completes.
+    // Fix #2: guard against video files — media_kit fires ProcessingState.completed
+    // for video too, but auto-advancing during video playback is wrong (the video
+    // player manages its own lifecycle). Only advance for audio items.
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.completed,
         ));
-        // Advance queue automatically — mirrors what a notification skip does.
-        skipToNext();
+        // Only auto-advance if the current item is NOT a video file.
+        final currentItem = _playlist.isNotEmpty ? _playlist[_queueIndex] : null;
+        if (currentItem != null && !currentItem.isVideo) {
+          skipToNext();
+        }
       }
     });
   }

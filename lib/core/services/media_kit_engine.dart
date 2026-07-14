@@ -465,6 +465,10 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
 
+  // Fix #3: threshold constants to avoid rebuilding on every position tick.
+  // Position updates at up to 60 Hz; we only need ~1 Hz for the seek bar.
+  static const _kPositionThreshold = Duration(milliseconds: 500);
+
   @override
   void initState() {
     super.initState();
@@ -472,11 +476,21 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
     _stateSub = widget.player.stream.playing.listen((p) {
       if (mounted) setState(() => _playing = p);
     });
+    // Fix #3: only call setState when position changes by more than 500ms.
+    // This reduces rebuilds from ~60/s to ~2/s during normal playback.
     _posSub = widget.player.stream.position.listen((p) {
-      if (mounted) setState(() => _position = p);
+      if (!mounted) return;
+      final delta = (p - _position).abs();
+      if (delta >= _kPositionThreshold) {
+        setState(() => _position = p);
+      }
     });
+    // Fix #3: duration rarely changes — only rebuild when it actually differs.
     _durSub = widget.player.stream.duration.listen((d) {
-      if (mounted) setState(() => _duration = d);
+      if (!mounted) return;
+      if (d != _duration) {
+        setState(() => _duration = d);
+      }
     });
   }
 
