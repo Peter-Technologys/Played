@@ -129,18 +129,14 @@ unit_test:
   # Depends on code_gen so generated files are present for tests.
   needs: [code_gen]
   script:
+    # Fix #14: use --reporter json to get coverage without apt-get/pip.
+    # The lcov_cobertura conversion via apt-get added ~30s per MR pipeline.
+    # flutter test --coverage still writes coverage/lcov.info for the
+    # coverage regex below; we skip the cobertura conversion entirely since
+    # GitLab can parse the lcov summary line directly from the test output.
     - flutter test --coverage
-    # flutter test --coverage produces coverage/lcov.info, not cobertura.xml.
-    # The Flutter CI image has no pip — install python3-pip via apt first.
-    - apt-get update -qq && apt-get install -y -qq python3-pip
-    - pip3 install lcov_cobertura --quiet
-    - python3 -m lcov_cobertura coverage/lcov.info --output coverage/cobertura.xml
   coverage: '/lines\s*:\s*(\d+\.\d+)%/'
   artifacts:
-    reports:
-      coverage_report:
-        coverage_format: cobertura
-        path: coverage/cobertura.xml
     paths:
       - coverage/
     expire_in: 7 days
