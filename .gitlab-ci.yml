@@ -131,8 +131,9 @@ unit_test:
   script:
     - flutter test --coverage
     # flutter test --coverage produces coverage/lcov.info, not cobertura.xml.
-    # Convert here so GitLab can render the MR coverage diff widget.
-    - pip install lcov_cobertura --quiet
+    # The Flutter CI image has no pip — install python3-pip via apt first.
+    - apt-get update -qq && apt-get install -y -qq python3-pip
+    - pip3 install lcov_cobertura --quiet
     - python3 -m lcov_cobertura coverage/lcov.info --output coverage/cobertura.xml
   coverage: '/lines\s*:\s*(\d+\.\d+)%/'
   artifacts:
