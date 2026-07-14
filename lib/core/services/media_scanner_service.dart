@@ -107,7 +107,9 @@ class MediaScannerService {
     }
   }
 
-  // SUPPLEMENTAL: all dirs checked + scanned in parallel
+  // SUPPLEMENTAL: dirs checked in parallel, scanned in batches of 5
+  // to avoid memory pressure from too many concurrent stat() calls on
+  // large dirs (e.g. WhatsApp with thousands of files).
   Future<List<MediaItem>> _scanReceiveDirs(Set<String> alreadySeen) async {
     // Check all dirs exist simultaneously
     final existChecks = await Future.wait(
@@ -119,12 +121,16 @@ class MediaScannerService {
     ];
     if (existingDirs.isEmpty) return [];
 
-    // Scan all existing dirs simultaneously
-    final batches = await Future.wait(
-      existingDirs.map((d) => _scanSingleDir(d, alreadySeen)),
-    );
+    // Scan in batches of 5 to limit concurrent file I/O
+    const batchSize = 5;
     final merged = <MediaItem>[];
-    for (final b in batches) merged.addAll(b);
+    for (var i = 0; i < existingDirs.length; i += batchSize) {
+      final batch = existingDirs.sublist(
+          i, (i + batchSize).clamp(0, existingDirs.length));
+      final results = await Future.wait(
+          batch.map((d) => _scanSingleDir(d, alreadySeen)));
+      for (final r in results) merged.addAll(r);
+    }
     debugPrint('[Scanner] Receive dirs: ${merged.length} extra items.');
     return merged;
   }
