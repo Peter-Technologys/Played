@@ -61,6 +61,12 @@
 # flutter_secure_storage
 -keep class com.it_nomads.fluttersecurestorage.** { *; }
 -dontwarn com.it_nomads.fluttersecurestorage.**
+# Fix #13: keep Android KeyStore provider classes used by reflection inside
+# flutter_secure_storage. Without these rules R8 strips the class names and
+# the KeyStore provider lookup fails silently in release builds.
+-keep class android.security.keystore.** { *; }
+-keep class java.security.KeyStore { *; }
+-keep class java.security.KeyStore$* { *; }
 
 # flutter_local_notifications
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
