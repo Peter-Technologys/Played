@@ -1,7 +1,7 @@
 name: otya_player
 description: OTYA Player — A premium offline media player inspired by the Luganda word "Otya?".
 publish_to: 'none'
-version: 1.3.0+5
+version: 1.3.3+6
 
 environment:
   sdk: '>=3.0.0 <4.0.0'

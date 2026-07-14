@@ -17,6 +17,32 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.3.3] — 2026-07-14
+
+### Fixed
+- **Cold-start crash** — added missing `MediaKit.ensureInitialized()` call; video playback was silently failing on many devices
+- **ProGuard stripping** — added keep rules for `media_kit`, `media_kit_libs_android_video`, native JNI methods, `flutter_secure_storage` KeyStore provider, `androidx.startup`, `androidx.biometric`, and Google Play Services classes
+- **Release build crash** — removed `--obfuscate` flag from CI builds; it was renaming Dart symbols and breaking WorkManager task dispatch and Hive adapter registration
+- **Vault data loss** — vault encryption key fallback now persists to SharedPreferences instead of generating a throwaway random key that was lost on restart
+- **Audio auto-advance on video** — fixed `skipToNext()` being called when a video file completed playback
+- **Video player 60fps rebuilds** — throttled position `setState` to fire only when position changes by more than 500ms
+- **Stacked stream subscriptions** — removed `_streamsAttached = false` from `AudioPlayerNotifier.load()` that was defeating the dedup guard
+- **PiP race condition** — added `_pipInitialized` guard to prevent PiP being attempted before async init completes
+- **Isolate platform channel crash** — `compute()` now falls back to main isolate on `IsolateSpawnException` since `MethodChannel` cannot cross isolate boundaries
+- **MediaStore scan missing files** — receive-dir scan now always runs in parallel with MediaStore instead of only as a fallback
+- **Memory pressure on large dirs** — receive-dir scan now processes in batches of 5 instead of all at once
+- **Appwrite backup performance** — history and playlist backups now run in parallel chunks of 10/5 instead of sequentially
+- **ABI detection** — replaced broken `Platform.environment['SUPPORTED_ABIS']` with `Abi.current()` from `dart:ffi`
+- **MediaStore queries on main thread** — moved `queryAudio`, `queryVideo`, `getVideoThumbnail`, `getAlbumArt` to background coroutine scope
+- **GitHub Actions secrets error** — moved all secret references to `env:` blocks; `secrets` context is not allowed in shell `if` expressions
+
+### Changed
+- `SystemChrome.setSystemUIOverlayStyle` moved out of `build()` into `initState` + `ref.listen` to avoid side-effects on every rebuild
+- Appwrite history backup batched: 200 sequential HTTP calls reduced to parallel chunks of 10
+- FFmpeg trim/extract operations moved from raw `Thread` to `kotlinx.coroutines` `Dispatchers.IO` scope
+
+---
+
 ## [1.3.0] — 2026-07-07
 
 ### Added
