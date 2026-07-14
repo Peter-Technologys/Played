@@ -131,8 +131,9 @@ unit_test:
   script:
     - flutter test --coverage
     # flutter test --coverage produces coverage/lcov.info, not cobertura.xml.
-    # Convert here so GitLab can render the MR coverage diff widget.
-    - pip install lcov_cobertura --quiet
+    # The Flutter CI image has no pip — install python3-pip via apt first.
+    - apt-get update -qq && apt-get install -y -qq python3-pip
+    - pip3 install lcov_cobertura --quiet
     - python3 -m lcov_cobertura coverage/lcov.info --output coverage/cobertura.xml
   coverage: '/lines\s*:\s*(\d+\.\d+)%/'
   artifacts:
@@ -183,8 +184,12 @@ build_release:
     # absolute path regardless of the directory Flutter invokes Gradle from.
     - export KEYSTORE_PATH="$(pwd)/android/app/keystore.jks"
     # No --flavor flag: build.gradle has no product flavors defined.
-    - flutter build appbundle --release --no-pub --obfuscate --split-debug-info=build/debug-info
-    - flutter build apk --release --split-per-abi --no-pub --target-platform android-arm,android-arm64 --obfuscate --split-debug-info=build/debug-info
+    # --obfuscate is intentionally removed: it renames Dart symbols which breaks
+    # workmanager's callbackDispatcher task-name lookup and any reflection-based
+    # plugin code (media_kit, hive adapters). Use --split-debug-info only for
+    # stack-trace de-symbolication without renaming.
+    - flutter build appbundle --release --no-pub --split-debug-info=build/debug-info
+    - flutter build apk --release --split-per-abi --no-pub --target-platform android-arm,android-arm64 --split-debug-info=build/debug-info
     - rm -f android/app/keystore.jks
   artifacts:
     paths:
