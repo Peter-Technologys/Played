@@ -63,8 +63,11 @@ void main() async {
   });
 }
 
-// REMOVE before Play Store release
+// REMOVE before Play Store release — only shown in debug builds
 void _showCrashOverlay(String title, String details) {
+  // In release builds, errors are already logged via debugPrint.
+  // Never show internal stack traces to end users in production.
+  if (!kDebugMode) return;
   runApp(
     MaterialApp(
       debugShowCheckedModeBanner: false,

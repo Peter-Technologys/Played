@@ -126,7 +126,7 @@ class MediaScannerService {
     final merged = <MediaItem>[];
     for (var i = 0; i < existingDirs.length; i += batchSize) {
       final batch = existingDirs.sublist(
-          i, (i + batchSize).clamp(0, existingDirs.length));
+          i, min(i + batchSize, existingDirs.length));
       final results = await Future.wait(
           batch.map((d) => _scanSingleDir(d, alreadySeen)));
       for (final r in results) merged.addAll(r);
