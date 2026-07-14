@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:ffi';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -206,17 +207,15 @@ class UpdateService {
   }
 
   String _detectAbi() {
+    // Fix #5: use dart:ffi Abi.current() — instant, accurate, no file I/O.
+    // Platform.environment['SUPPORTED_ABIS'] is NOT set by the Android runtime
+    // in Dart isolates. The /proc/cpuinfo fallback works but is a synchronous
+    // file read on the main isolate. Abi.current() is a single native call.
     try {
-      if (Platform.isAndroid) {
-        // Primary: check SUPPORTED_ABIS environment variable (set by Android runtime)
-        final abis = Platform.environment['SUPPORTED_ABIS'] ?? '';
-        if (abis.contains('arm64-v8a')) return 'arm64';
-        if (abis.contains('armeabi-v7a')) return 'arm32';
-        // Fallback: read /proc/cpuinfo
-        final cpuinfo = File('/proc/cpuinfo').readAsStringSync();
-        if (cpuinfo.contains('aarch64') || cpuinfo.contains('arm64')) return 'arm64';
-        if (cpuinfo.contains('armv7')   || cpuinfo.contains('armeabi')) return 'arm32';
-      }
+      final abi = Abi.current();
+      if (abi == Abi.androidArm64) return 'arm64';
+      if (abi == Abi.androidArm)   return 'arm32';
+      if (abi == Abi.androidX64)   return 'arm64'; // x86_64 emulator — use arm64 APK
     } catch (_) {}
     return 'arm64'; // safe default — covers 99%+ of modern devices
   }

@@ -262,42 +262,54 @@ class AppwriteService {
     if (user == null) return;
     final userId = user.$id;
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200);
+
+    // Fix #4: batch requests in groups of 10 with Future.wait instead of
+    // sequential await — reduces wall-clock time from O(n) serial round-trips
+    // to O(n/10) parallel batches without overwhelming the Appwrite API.
     int synced = 0;
-    for (final item in history) {
-      try {
-        final data = {
-          'title':          item.title,
-          'artist':         item.artist ?? '',
-          'file_path':      item.filePath,
-          'is_video':       item.isVideo,
-          'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
-          'user_id':        userId,
-        };
-        try {
-          await _databases.updateDocument(
-            databaseId:   Environment.databaseId,
-            collectionId: Environment.historyCollection,
-            documentId:   '${userId}_${item.id}',
-            data:         data,
-          );
-        } on AppwriteException catch (ae) {
-          if (ae.code == 404) {
-            await _databases.createDocument(
-              databaseId:   Environment.databaseId,
-              collectionId: Environment.historyCollection,
-              documentId:   '${userId}_${item.id}',
-              data:         data,
-            );
-          } else {
-            rethrow;
+    const batchSize = 10;
+    for (var i = 0; i < history.length; i += batchSize) {
+      final batch = history.skip(i).take(batchSize);
+      final results = await Future.wait(
+        batch.map((item) async {
+          try {
+            final data = {
+              'title':          item.title,
+              'artist':         item.artist ?? '',
+              'file_path':      item.filePath,
+              'is_video':       item.isVideo,
+              'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
+              'user_id':        userId,
+            };
+            try {
+              await _databases.updateDocument(
+                databaseId:   Environment.databaseId,
+                collectionId: Environment.historyCollection,
+                documentId:   '${userId}_${item.id}',
+                data:         data,
+              );
+            } on AppwriteException catch (ae) {
+              if (ae.code == 404) {
+                await _databases.createDocument(
+                  databaseId:   Environment.databaseId,
+                  collectionId: Environment.historyCollection,
+                  documentId:   '${userId}_${item.id}',
+                  data:         data,
+                );
+              } else {
+                rethrow;
+              }
+            }
+            return true;
+          } catch (e) {
+            debugPrint('[Appwrite] Failed to sync history item: $e');
+            return false;
           }
-        }
-        synced++;
-      } catch (e) {
-        debugPrint('[Appwrite] Failed to sync history item: $e');
-      }
+        }),
+      );
+      synced += results.where((ok) => ok).length;
     }
-    debugPrint('[Appwrite] Synced $synced history items.');
+    debugPrint('[Appwrite] Synced $synced/${history.length} history items.');
   }
 
   // -- Full Backup ------------------------------------------------------------

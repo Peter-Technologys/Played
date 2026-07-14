@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart';
@@ -71,6 +72,10 @@ class PlayedDatabase {
     await init();
   }
 
+  // Platform channel to retrieve Settings.Secure.ANDROID_ID from Kotlin.
+  // Used as a deterministic fallback seed when FlutterSecureStorage fails.
+  static const _kDeviceIdChannel = MethodChannel('com.otyaplayer.app/device_id');
+
   Future<Uint8List> _deriveVaultKey() async {
     const storage = FlutterSecureStorage(
       aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -87,10 +92,47 @@ class PlayedDatabase {
       }
       return Uint8List.fromList(base64Decode(existing));
     } catch (e) {
-      debugPrint('[PlayedDB] Vault key error: $e — using session key');
-      final rng = Random.secure();
-      return Uint8List.fromList(List<int>.generate(32, (_) => rng.nextInt(256)));
+      // Fix #12: if FlutterSecureStorage fails (no secure enclave, device
+      // policy, etc.), derive a deterministic key from ANDROID_ID instead of
+      // a random session key. A random key is lost on restart, making all
+      // vault data permanently unreadable.
+      debugPrint('[PlayedDB] Vault key error: $e — falling back to ANDROID_ID derivation');
+      return _deriveKeyFromAndroidId();
     }
+  }
+
+  /// Derives a deterministic 32-byte key from the device's ANDROID_ID.
+  /// ANDROID_ID is stable across reboots (changes only on factory reset),
+  /// so the vault remains readable after app restarts even without secure storage.
+  Future<Uint8List> _deriveKeyFromAndroidId() async {
+    try {
+      final androidId = await _kDeviceIdChannel.invokeMethod<String>('getAndroidId') ?? '';
+      if (androidId.isNotEmpty) {
+        // Stretch the ANDROID_ID into 32 bytes using a simple PBKDF-like
+        // approach: repeat + XOR with a fixed salt to fill 32 bytes.
+        const salt = 'otya_vault_v1_salt';
+        final combined = '$androidId:$salt';
+        final bytes = combined.codeUnits;
+        final key = Uint8List(32);
+        for (var i = 0; i < 32; i++) {
+          key[i] = bytes[i % bytes.length] ^ (i * 37 + 13) & 0xFF;
+        }
+        debugPrint('[PlayedDB] Vault key derived from ANDROID_ID.');
+        return key;
+      }
+    } catch (e) {
+      debugPrint('[PlayedDB] ANDROID_ID fallback failed: $e');
+    }
+    // Absolute last resort: fixed key derived from app ID (vault data will be
+    // readable but not device-unique — better than losing all data).
+    debugPrint('[PlayedDB] Using app-ID-derived vault key (last resort).');
+    const appId = 'com.otyaplayer.app:vault:v1';
+    final bytes = appId.codeUnits;
+    final key = Uint8List(32);
+    for (var i = 0; i < 32; i++) {
+      key[i] = bytes[i % bytes.length] ^ (i * 53 + 7) & 0xFF;
+    }
+    return key;
   }
 
   // ── Playback History ──────────────────────────────────────────────────────

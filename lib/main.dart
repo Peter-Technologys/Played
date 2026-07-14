@@ -3,6 +3,7 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
@@ -26,6 +27,9 @@ void callbackDispatcher() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  // Fix #7: media_kit requires this before runApp() — without it, video
+  // playback silently fails on some devices (native libs not loaded).
+  MediaKit.ensureInitialized();
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);

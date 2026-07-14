@@ -10,6 +10,13 @@ import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/widgets/update_dialog.dart';
 
+// The overlay style is constant — status bar transparent with light icons.
+// Defined once here so it is never re-allocated on every build() call.
+const _kOverlayStyle = SystemUiOverlayStyle(
+  statusBarColor: Colors.transparent,
+  statusBarIconBrightness: Brightness.light,
+);
+
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
 
@@ -25,6 +32,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
     _checkOnboarding();
+    // Fix #6: apply the overlay style once in initState, not on every build().
+    // ref.listen below will update it if the theme changes.
+    SystemChrome.setSystemUIOverlayStyle(_kOverlayStyle);
     // Check for updates after the first frame is drawn so it never
     // delays the app startup. Shows a friendly dialog if a new version
     // is available — max once per day.
@@ -56,12 +66,11 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     // Watch settings so the theme rebuilds whenever the user changes it
     final settings = ref.watch(settingsProvider);
 
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.light,
-      ),
-    );
+    // Fix #6: re-apply overlay style only when the theme actually changes,
+    // not on every build(). This avoids a platform channel call per frame.
+    ref.listen<AppSettings>(settingsProvider, (_, __) {
+      SystemChrome.setSystemUIOverlayStyle(_kOverlayStyle);
+    });
 
     if (_checking) {
       return MaterialApp(
