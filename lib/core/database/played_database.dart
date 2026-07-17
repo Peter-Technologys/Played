@@ -115,7 +115,9 @@ class PlayedDatabase {
         final bytes = combined.codeUnits;
         final key = Uint8List(32);
         for (var i = 0; i < 32; i++) {
-          key[i] = bytes[i % bytes.length] ^ (i * 37 + 13) & 0xFF;
+          // Fix: parenthesise correctly so the 0xFF mask applies to the full
+          // expression, not just the constant 13 (operator precedence bug).
+          key[i] = bytes[i % bytes.length] ^ ((i * 37 + 13) & 0xFF);
         }
         debugPrint('[PlayedDB] Vault key derived from ANDROID_ID.');
         return key;
@@ -123,14 +125,14 @@ class PlayedDatabase {
     } catch (e) {
       debugPrint('[PlayedDB] ANDROID_ID fallback failed: $e');
     }
-    // Absolute last resort: fixed key derived from app ID (vault data will be
-    // readable but not device-unique — better than losing all data).
+    // Absolute last resort: key derived from app ID + extra salt so it is
+    // not a bare fixed constant.
     debugPrint('[PlayedDB] Using app-ID-derived vault key (last resort).');
-    const appId = 'com.otyaplayer.app:vault:v1';
+    const appId = 'com.otyaplayer.app:vault:v1:otya_salt_2025';
     final bytes = appId.codeUnits;
     final key = Uint8List(32);
     for (var i = 0; i < 32; i++) {
-      key[i] = bytes[i % bytes.length] ^ (i * 53 + 7) & 0xFF;
+      key[i] = bytes[i % bytes.length] ^ ((i * 53 + 7) & 0xFF);
     }
     return key;
   }
@@ -267,25 +269,27 @@ class PlayedDatabase {
   }
 
   // ── Favorites ───────────────────────────────────────────────────────────────
+  // Stored in _shelfCacheBox (Box<String>) to avoid polluting the seek-position
+  // box (Box<Map>) with non-seek data and risking type errors on clearance.
 
   static const _kFavPrefix = 'fav_';
 
   bool getFavoriteFlag(String mediaId) {
     try {
-      final data = _seekPos.get('$_kFavPrefix$mediaId');
-      return data != null && (data['fav'] as bool? ?? false);
+      final val = _shelfCache.get('$_kFavPrefix$mediaId');
+      return val == '1';
     } catch (_) { return false; }
   }
 
   Future<void> setFavoriteFlag(String mediaId, bool value) async {
     try {
-      await _seekPos.put('$_kFavPrefix$mediaId', {'fav': value});
+      await _shelfCache.put('$_kFavPrefix$mediaId', value ? '1' : '0');
     } catch (_) {}
   }
 
   List<String> getAllFavoriteIds() {
     try {
-      return _seekPos.keys
+      return _shelfCache.keys
           .where((k) => k.toString().startsWith(_kFavPrefix))
           .map((k) => k.toString().substring(_kFavPrefix.length))
           .toList();

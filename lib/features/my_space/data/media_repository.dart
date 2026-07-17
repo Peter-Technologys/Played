@@ -67,15 +67,11 @@ class MediaRepository {
           .take(limit)
           .toList();
     }
-    // Fallback: synchronous file-existence check
+    // Fallback: return history without blocking the main thread.
+    // existsSync() on slow storage can freeze the UI for hundreds of ms;
+    // stale entries are harmless — they are filtered on the next full scan.
     try {
-      final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
-      return history
-          .where((item) {
-            try { return File(item.filePath).existsSync(); } catch (_) { return false; }
-          })
-          .take(limit)
-          .toList();
+      return PlayedDatabase.instance.getRecentlyPlayed(limit: limit);
     } catch (_) {
       return [];
     }

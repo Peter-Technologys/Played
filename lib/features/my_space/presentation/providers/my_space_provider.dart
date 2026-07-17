@@ -1,16 +1,9 @@
 import 'dart:async';
-import 'dart:isolate';
-import 'dart:math' show min;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/database/played_database.dart';
 import '../../data/media_repository.dart';
-import 'package:flutter/services.dart';
-
-// Top-level function required by compute() — must not be a closure.
-Future<List<MediaItem>> _runScan(bool _) =>
-    MediaRepository.instance.getAllMedia(forceRefresh: true);
 
 /// Live media change event stream from Android MediaStore.
 /// Channel name MUST match the one registered in MainActivity.kt.
@@ -79,17 +72,11 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
 
   Future<void> _backgroundRefresh() async {
     try {
-      List<MediaItem> fresh;
-      try {
-        // Attempt to run on a separate isolate for UI thread isolation.
-        // Falls back to main isolate if the isolate cannot be spawned —
-        // this happens when MediaRepository holds MethodChannel references
-        // that cannot be transferred across isolate boundaries.
-        fresh = await compute(_runScan, true);
-      } on IsolateSpawnException {
-        debugPrint('[MediaLibrary] Isolate spawn failed — running on main isolate.');
-        fresh = await _runScan(true);
-      }
+      // MethodChannels (used by MediaScannerService) cannot cross isolate
+      // boundaries — compute() always fails with MissingPluginException.
+      // Run the scan directly on the main isolate; it is fully async so
+      // it does not block the UI thread.
+      final fresh = await MediaRepository.instance.getAllMedia(forceRefresh: true);
       if (fresh.isNotEmpty) state = AsyncData(fresh);
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');

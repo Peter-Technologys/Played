@@ -1,6 +1,9 @@
 
 <resources>
     
+    <!-- tools:keep in res/raw/keep.xml prevents the resource shrinker from
+         renaming launch_background to an obfuscated filename (e.g. aT.xml),
+         which caused a Resources$NotFoundException crash on startup. -->
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <!-- Branded splash: navy + cyan glow + app icon -->
         <item name="android:windowBackground">@drawable/launch_background</item>

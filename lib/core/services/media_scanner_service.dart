@@ -239,19 +239,16 @@ class MediaScannerService {
   ///
   /// Filesystem walk is last resort only if both above return nothing.
   Future<List<MediaItem>> scanAll() async {
-    // Fix #1: run MediaStore and receive-dir scan in parallel, then merge.
-    // Previously the receive-dir scan was only a fallback when MediaStore
-    // returned < 3 items, which caused missed files on non-fresh installs.
-    final results = await Future.wait([
-      _queryMediaStore(),
-      _scanReceiveDirs({}), // pass empty set; dedup happens below
-    ]);
+    // Run MediaStore first so we can pre-populate alreadySeen with its paths.
+    // This prevents _scanReceiveDirs from re-processing files already returned
+    // by MediaStore, saving redundant stat() calls on large libraries.
+    final storeItems = await _queryMediaStore();
 
-    final storeItems = results[0];
-    final dirItems   = results[1];
+    // Pre-populate alreadySeen so receive-dir scan skips MediaStore files.
+    final alreadySeen = {for (final item in storeItems) item.filePath};
+    final dirItems = await _scanReceiveDirs(alreadySeen);
 
-    // Deduplicate by filePath — MediaStore is authoritative when both sources
-    // return the same file, so store items take precedence.
+    // Deduplicate by filePath — MediaStore is authoritative.
     final seen    = <String>{};
     final merged  = <MediaItem>[];
     for (final item in [...storeItems, ...dirItems]) {
@@ -295,14 +292,12 @@ class MediaScannerService {
     return results;
   }
 
-  /// Stable ID derived directly from the file path.
+  /// Stable ID derived from the full file path.
   ///
-  /// Fix #9: replaced SHA-256 (overkill for a stable ID — adds ~50ms CPU for
-  /// 5000 files) with the path itself. File paths are already unique per file
-  /// on Android's filesystem, so no hashing is needed for collision avoidance.
-  /// Using Object.hash gives a compact integer-based string that is fast and
-  /// deterministic across restarts.
-  String _stableId(String path) => path.hashCode.toUnsigned(32).toRadixString(16).padLeft(8, '0')
-      + path.length.toRadixString(16).padLeft(4, '0');
+  /// Using the path directly (URL-encoded as a safe Hive key) eliminates the
+  /// 32-bit hashCode collision risk: two different paths with the same
+  /// hashCode + same length would silently overwrite each other in Hive.
+  /// File paths are guaranteed unique on Android's filesystem.
+  String _stableId(String path) => Uri.encodeComponent(path);
 
 }
