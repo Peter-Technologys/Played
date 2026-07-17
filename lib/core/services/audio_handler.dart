@@ -32,8 +32,13 @@ class PlayedAudioHandler extends BaseAudioHandler
 
   // ── Queue state ───────────────────────────────────────────────────────────────
   List<app.MediaItem> _playlist = [];
-  int                 _queueIndex = 0;
-  bool                _loading    = false;
+  int                 _queueIndex     = 0;
+  bool                _loading        = false;
+  // Incremented on every setPlaylist/loadAndPlay call so an in-flight
+  // _loadCurrent can detect it has been superseded and bail out early,
+  // fixing the race condition where rapid song taps caused the wrong
+  // track to play.
+  int                 _loadGeneration = 0;
 
   // Public callbacks — wired by AudioPlayerNotifier so notification /
   // lock-screen skip buttons advance the in-app queue automatically.
@@ -55,20 +60,17 @@ class PlayedAudioHandler extends BaseAudioHandler
           debugPrint('[AudioHandler] playbackEventStream error: $e'),
     );
 
-    // Auto-advance to next track when the current one completes.
-    // Fix #2: guard against video files — media_kit fires ProcessingState.completed
-    // for video too, but auto-advancing during video playback is wrong (the video
-    // player manages its own lifecycle). Only advance for audio items.
+    // Update playbackState on completion. Auto-advance is intentionally NOT
+    // done here — it is handled exclusively by AudioPlayerNotifier via the
+    // onSkipNext callback, which respects repeat/shuffle state. Calling
+    // skipToNext() here AND in the notifier caused double-skipping.
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.completed,
         ));
-        // Only auto-advance if the current item is NOT a video file.
-        final currentItem = _playlist.isNotEmpty ? _playlist[_queueIndex] : null;
-        if (currentItem != null && !currentItem.isVideo) {
-          skipToNext();
-        }
+        // Notify the UI-side notifier so it can drive queue progression.
+        onSkipNext?.call();
       }
     });
   }
@@ -84,6 +86,8 @@ class PlayedAudioHandler extends BaseAudioHandler
     double speed       = 1.0,
     bool   skipSilence = false,
   }) async {
+    // Bump generation so any in-flight _loadCurrent bails out early.
+    _loadGeneration++;
     _playlist    = List.unmodifiable(items);
     _queueIndex  = startIndex.clamp(0, items.isEmpty ? 0 : items.length - 1);
     _speed       = speed;
@@ -170,6 +174,9 @@ class PlayedAudioHandler extends BaseAudioHandler
   // ── Internal helpers ───────────────────────────────────────────────────────────────
 
   Future<void> _loadCurrent() async {
+    // Capture generation at entry; bail out if superseded by a newer call.
+    final myGeneration = _loadGeneration;
+
     if (_loading) {
       debugPrint('[AudioHandler] _loadCurrent skipped — already loading.');
       return;
@@ -190,13 +197,18 @@ class PlayedAudioHandler extends BaseAudioHandler
       ));
 
       if (_player.playing) await _player.pause();
+      if (_loadGeneration != myGeneration) return; // superseded
 
       await _player.setAudioSource(
         AudioSource.uri(Uri.file(item.filePath)),
         preload: true,
       );
+      if (_loadGeneration != myGeneration) return; // superseded
+
       await _player.setSpeed(_speed);
       await _player.setSkipSilenceEnabled(_skipSilence);
+      if (_loadGeneration != myGeneration) return; // superseded
+
       await play();
     } catch (e) {
       debugPrint('[AudioHandler] _loadCurrent error: $e');
