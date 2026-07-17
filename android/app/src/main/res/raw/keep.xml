@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Resource keep rules for Android's resource shrinker (shrinkResources true).
+
+  The shrinker renames drawables it considers unreachable to short obfuscated
+  names (e.g. aT.xml). launch_background is referenced by name in styles.xml
+  via @drawable/launch_background, but the shrinker cannot always trace
+  string-based references through the theme system, causing a
+  Resources$NotFoundException crash on startup in release builds.
+
+  Explicitly keeping it here guarantees the original filename is preserved
+  in the final APK/AAB regardless of shrinkResources or resource obfuscation.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/launch_background,@drawable/ic_launcher_background,@drawable/ic_launcher_foreground" />
