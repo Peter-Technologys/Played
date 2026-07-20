@@ -79,6 +79,9 @@ jobs:
       - name: Install AWS CLI
         run: pip install awscli --quiet
 
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
       - run: flutter pub get
 
       # ── Inject secrets ─────────────────────────────────────────────────
@@ -110,13 +113,27 @@ jobs:
             --target-platform android-arm,android-arm64 \
             --split-debug-info=build/debug-info
 
-      # ── Verify APK files exist before uploading ─────────────────────────
+      - name: Remove secrets
+        if: always()
+        run: |
+          rm -f android/app/keystore.jks
+          rm -f android/app/google-services.json
+
       - name: Verify APK output files
         run: |
           echo "=== APK output directory ==="
           ls -lh build/app/outputs/flutter-apk/
           test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk || \
-          { echo "ERROR: arm64 APK not found"; exit 1; }
+            { echo "ERROR: arm64 APK not found"; exit 1; }
+          test -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk || \
+            { echo "ERROR: arm32 APK not found"; exit 1; }
+          # Sanity-check file sizes (APKs should be > 5 MB)
+          ARM64_SIZE=$(stat -c%s build/app/outputs/flutter-apk/app-arm64-v8a-release.apk)
+          ARM32_SIZE=$(stat -c%s build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk)
+          echo "arm64: $ARM64_SIZE bytes"
+          echo "arm32: $ARM32_SIZE bytes"
+          [ "$ARM64_SIZE" -gt 5000000 ] || { echo "ERROR: arm64 APK too small"; exit 1; }
+          [ "$ARM32_SIZE" -gt 5000000 ] || { echo "ERROR: arm32 APK too small"; exit 1; }
 
       - name: Remove secrets
         if: always()
@@ -144,6 +161,9 @@ jobs:
           APPWRITE_ENDPOINT: ${{ vars.APPWRITE_ENDPOINT }}
           APPWRITE_PROJECT_ID: ${{ vars.APPWRITE_PROJECT_ID }}
           APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
+          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+          KV_NAMESPACE_ID: ${{ vars.KV_NAMESPACE_ID }}
           ARM64_APK: ${{ steps.apk.outputs.arm64 }}
           ARM32_APK: ${{ steps.apk.outputs.arm32 }}
         run: |
@@ -272,6 +292,16 @@ print(json.dumps({
             aws s3 rm s3://$R2_BUCKET/releases/$OLD \
               --endpoint-url $R2_ENDPOINT --recursive 2>/dev/null || true
           done
+
+          # ── Purge Worker KV cache so new version is live immediately ────
+          if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_API_TOKEN:-}" ] && [ -n "${KV_NAMESPACE_ID:-}" ]; then
+            echo "Purging KV cache..."
+            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+              -X DELETE \
+              "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${KV_NAMESPACE_ID}/values/version:current" \
+              -H "Authorization: Bearer ${CF_API_TOKEN}")
+            echo "KV purge HTTP: $HTTP"
+          fi
 
           echo "✓ Publish complete. Live at $WORKER_URL"
 
