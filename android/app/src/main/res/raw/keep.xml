@@ -12,4 +12,5 @@
   in the final APK/AAB regardless of shrinkResources or resource obfuscation.
 -->
 <resources xmlns:tools="http://schemas.android.com/tools"
-    tools:keep="@drawable/launch_background,@drawable/ic_launcher_background,@drawable/ic_launcher_foreground" />
+    tools:keep="@drawable/launch_background,@drawable/ic_launcher_background,@drawable/ic_launcher_foreground"
+    tools:shrinkMode="strict" />
