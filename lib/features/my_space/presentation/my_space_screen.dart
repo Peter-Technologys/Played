@@ -515,6 +515,9 @@ class _TabViews extends StatelessWidget {
 
         // Playlists
         const _PlaylistsTab(),
+
+        // Favorites
+        const FavoritesTab(),
       ],
     );
   }
