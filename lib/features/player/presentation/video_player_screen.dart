@@ -9,6 +9,7 @@ import '../../../core/models/media_item.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../features/settings/settings_provider.dart';
+import 'widgets/video_gesture_layer.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
@@ -93,11 +94,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          MediaKitEngine(
-            filePath:      widget.mediaItem.filePath,
-            title:         widget.mediaItem.title,
-            startPosition: _savedPosition,
-            autoPlay:      true,
+          VideoGestureLayer(
+            child: MediaKitEngine(
+              filePath:      widget.mediaItem.filePath,
+              title:         widget.mediaItem.title,
+              startPosition: _savedPosition,
+              autoPlay:      true,
+            ),
           ),
           Positioned(
             top: 16, right: 16,
