@@ -296,6 +296,35 @@ class PlayedDatabase {
     } catch (_) { return []; }
   }
 
+  /// Returns all MediaItems that are marked as favorites, filtered from the
+  /// provided [allItems] list (since favorites are stored as IDs only).
+  List<MediaItem> getFavoriteItems(List<MediaItem> allItems) {
+    try {
+      final ids = getAllFavoriteIds().toSet();
+      return allItems.where((item) => ids.contains(item.id)).toList();
+    } catch (_) { return []; }
+  }
+
+  /// Returns items added within the last [days] days, sorted newest first.
+  List<MediaItem> getRecentlyAddedItems(List<MediaItem> allItems, {int days = 7}) {
+    try {
+      final cutoff = DateTime.now().subtract(Duration(days: days));
+      return allItems
+          .where((item) => item.addedAt.isAfter(cutoff))
+          .toList()
+        ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    } catch (_) { return []; }
+  }
+
+  /// Returns playback history sorted by most recently played, with timestamps.
+  List<MediaItem> getPlaybackHistory({int limit = 200}) {
+    return getRecentlyPlayed(limit: limit);
+  }
+
+  Future<void> clearPlaybackHistory() async {
+    await clearHistory();
+  }
+
   // ── Lyrics Cache ────────────────────────────────────────────────────────────
 
   Future<void> cacheLyrics(String mediaId, String rawLyrics) async {
