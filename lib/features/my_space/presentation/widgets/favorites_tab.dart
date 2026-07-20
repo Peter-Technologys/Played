@@ -13,8 +13,14 @@ class FavoritesTab extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-    final favorites = PlayedDatabase.instance.getFavoriteItems(allItems);
+    // Guard: DB may not be initialized on very first frame
+    List<MediaItem> favorites;
+    try {
+      final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
+      favorites = PlayedDatabase.instance.getFavoriteItems(allItems);
+    } catch (_) {
+      favorites = [];
+    }
 
     if (favorites.isEmpty) {
       return const Center(
@@ -30,7 +36,7 @@ class FavoritesTab extends ConsumerWidget {
                     fontSize: 16,
                     fontWeight: FontWeight.w600)),
             SizedBox(height: 8),
-            Text('Tap ♥ in the audio player to add songs here.',
+            Text('Tap the heart in the audio player to add songs here.',
                 style: TextStyle(
                     color: AppColors.textSecondary, fontSize: 12)),
           ],
@@ -78,10 +84,11 @@ class FavoritesTab extends ConsumerWidget {
               GestureDetector(
                 onTap: () async {
                   HapticFeedback.lightImpact();
-                  await PlayedDatabase.instance
-                      .setFavoriteFlag(item.id, false);
-                  // Trigger rebuild by invalidating provider
-                  ref.invalidate(mediaLibraryProvider);
+                  try {
+                    await PlayedDatabase.instance.setFavoriteFlag(item.id, false);
+                    // Use read (not invalidate) to avoid provider disposal crash
+                    ref.read(mediaLibraryProvider.notifier).refresh();
+                  } catch (_) {}
                 },
                 child: const Icon(Icons.favorite_rounded,
                     color: Colors.redAccent, size: 18),

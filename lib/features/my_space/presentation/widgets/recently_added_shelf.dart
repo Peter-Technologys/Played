@@ -14,12 +14,19 @@ class RecentlyAddedShelf extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-    final recent = PlayedDatabase.instance.getRecentlyAddedItems(allItems, days: 7);
+    // Guard: DB may not be initialized yet on very first frame
+    List<MediaItem> recent;
+    try {
+      final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
+      recent = PlayedDatabase.instance.getRecentlyAddedItems(allItems, days: 7);
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
     if (recent.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 10),
@@ -136,9 +143,13 @@ class RecentlyAddedShelf extends ConsumerWidget {
   }
 
   String _daysAgo(DateTime dt) {
-    final diff = DateTime.now().difference(dt);
-    if (diff.inDays == 0) return 'Today';
-    if (diff.inDays == 1) return 'Yesterday';
-    return '${diff.inDays} days ago';
+    try {
+      final diff = DateTime.now().difference(dt);
+      if (diff.inDays == 0) return 'Today';
+      if (diff.inDays == 1) return 'Yesterday';
+      return '${diff.inDays} days ago';
+    } catch (_) {
+      return '';
+    }
   }
 }

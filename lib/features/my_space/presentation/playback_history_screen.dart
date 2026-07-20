@@ -22,13 +22,19 @@ class _PlaybackHistoryScreenState
   @override
   void initState() {
     super.initState();
-    _load();
+    // Defer to post-frame so DB is guaranteed ready and setState is safe
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _load();
+    });
   }
 
   void _load() {
-    setState(() {
-      _history = PlayedDatabase.instance.getPlaybackHistory(limit: 200);
-    });
+    try {
+      final items = PlayedDatabase.instance.getPlaybackHistory(limit: 200);
+      if (mounted) setState(() => _history = items);
+    } catch (_) {
+      if (mounted) setState(() => _history = []);
+    }
   }
 
   Future<void> _clearHistory() async {
@@ -58,8 +64,10 @@ class _PlaybackHistoryScreenState
         ],
       ),
     );
-    if (confirmed == true) {
-      await PlayedDatabase.instance.clearPlaybackHistory();
+    if (confirmed == true && mounted) {
+      try {
+        await PlayedDatabase.instance.clearPlaybackHistory();
+      } catch (_) {}
       _load();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -175,13 +183,17 @@ class _PlaybackHistoryScreenState
   }
 
   String _formatTimestamp(DateTime dt) {
-    final now = DateTime.now();
-    final diff = now.difference(dt);
-    if (diff.inMinutes < 1) return 'Just now';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
-    if (diff.inHours < 24) return '${diff.inHours}h ago';
-    if (diff.inDays == 1) return 'Yesterday';
-    if (diff.inDays < 7) return '${diff.inDays} days ago';
-    return '${dt.day}/${dt.month}/${dt.year}';
+    try {
+      final now = DateTime.now();
+      final diff = now.difference(dt);
+      if (diff.inMinutes < 1) return 'Just now';
+      if (diff.inMinutes < 60) return '${diff.inMinutes}m ago';
+      if (diff.inHours < 24) return '${diff.inHours}h ago';
+      if (diff.inDays == 1) return 'Yesterday';
+      if (diff.inDays < 7) return '${diff.inDays} days ago';
+      return '${dt.day}/${dt.month}/${dt.year}';
+    } catch (_) {
+      return '';
+    }
   }
 }

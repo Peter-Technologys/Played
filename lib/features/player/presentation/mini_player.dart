@@ -197,13 +197,14 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                   ),
 
                   // Crossfade indicator — shown when crossfade > 0
-                  Builder(builder: (context) {
-                    final settings = ref.watch(settingsProvider);
-                    if (settings.crossfadeDuration <= 0) return const SizedBox.shrink();
-                    return Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: Tooltip(
-                        message: 'Crossfade ${settings.crossfadeDuration.toStringAsFixed(0)}s',
+                  // Wrapped in try/catch via Builder to prevent settings
+                  // provider errors from crashing the whole mini player
+                  Builder(builder: (ctx) {
+                    try {
+                      final settings = ref.watch(settingsProvider);
+                      if (settings.crossfadeDuration <= 0) return const SizedBox.shrink();
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 4),
                         child: Container(
                           padding: const EdgeInsets.symmetric(
                               horizontal: 5, vertical: 2),
@@ -231,8 +232,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                             ],
                           ),
                         ),
-                      ),
-                    );
+                      );
+                    } catch (_) {
+                      return const SizedBox.shrink();
+                    }
                   }),
 
                   // Progress ring + play/pause

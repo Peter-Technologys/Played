@@ -1,12 +1,11 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/utils/duration_formatter.dart';
 import '../../playlists/playlist_screen.dart' show playlistsProvider;
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../core/database/played_database.dart';
 
 /// Full-screen unified search delegate — songs, videos, playlists, folders.
 /// Results are categorized and debounced at 300 ms.
@@ -83,7 +82,7 @@ class MediaSearchDelegate extends SearchDelegate<MediaItem?> {
       );
 }
 
-class _DebouncedResults extends StatefulWidget {
+class _DebouncedResults extends ConsumerStatefulWidget {
   final String query;
   final List<MediaItem> allItems;
   final WidgetRef ref;
@@ -97,10 +96,10 @@ class _DebouncedResults extends StatefulWidget {
   });
 
   @override
-  State<_DebouncedResults> createState() => _DebouncedResultsState();
+  ConsumerState<_DebouncedResults> createState() => _DebouncedResultsState();
 }
 
-class _DebouncedResultsState extends State<_DebouncedResults> {
+class _DebouncedResultsState extends ConsumerState<_DebouncedResults> {
   Timer? _debounce;
   String _activeQuery = '';
 
@@ -175,11 +174,14 @@ class _DebouncedResultsState extends State<_DebouncedResults> {
       }
     }
 
-    // Playlists
-    final playlists = widget.ref
-        .read(playlistsProvider)
-        .where((pl) => _matches(pl.name, q))
-        .toList();
+    // Playlists — safe read via ConsumerState
+    List<dynamic> playlists = [];
+    try {
+      playlists = ref
+          .read(playlistsProvider)
+          .where((pl) => _matches(pl.name, q))
+          .toList();
+    } catch (_) {}
 
     final totalResults =
         songs.length + videos.length + folderMap.length + playlists.length;
@@ -229,9 +231,9 @@ class _DebouncedResultsState extends State<_DebouncedResults> {
             playlists.map((pl) => _ResultTile(
                   icon: Icons.queue_music_rounded,
                   color: AppColors.accent,
-                  title: pl.name,
+                  title: pl.name as String,
                   subtitle:
-                      '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
+                      '${(pl.mediaIds as List).length} track${(pl.mediaIds as List).length == 1 ? '' : 's'}',
                   onTap: () => context.push('/playlists'),
                 )).toList(),
           ),
