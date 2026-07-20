@@ -81,14 +81,6 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
-      - name: Build release AAB
-        env:
-          KEYSTORE_PATH: app/keystore.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build appbundle --release --split-debug-info=build/debug-info
-
       - name: Build split APKs (arm64 + arm32)
         env:
           KEYSTORE_PATH: app/keystore.jks
