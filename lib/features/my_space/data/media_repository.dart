@@ -11,9 +11,22 @@ class MediaRepository {
 
   List<MediaItem>? _cachedItems;
   List<MediaItem>? get cachedItems => _cachedItems;
+  bool _scanning = false;
 
   Future<List<MediaItem>> getAllMedia({bool forceRefresh = false}) async {
     if (_cachedItems != null && !forceRefresh) return _cachedItems!;
+    // Prevent concurrent scans — if a scan is already in progress, wait
+    // for it to complete rather than launching a second parallel scan
+    // that wastes CPU and causes race conditions on the cache.
+    if (_scanning) {
+      for (var i = 0; i < 100; i++) {
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (!_scanning && _cachedItems != null) return _cachedItems!;
+      }
+      return _cachedItems ?? [];
+    }
+    _scanning = true;
+    try {
 
     final scanned = await MediaScannerService.instance.scanAll();
 
@@ -55,6 +68,9 @@ class MediaRepository {
     } catch (_) {}
 
     return alive;
+    } finally {
+      _scanning = false;
+    }
   }
 
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
