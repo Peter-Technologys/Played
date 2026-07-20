@@ -1282,6 +1282,7 @@ class _VideoCard extends StatefulWidget {
 class _VideoCardState extends State<_VideoCard> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
   String? _thumbPath;
+  bool _disposed = false;
 
   // Session-level thumbnail cache
   static final Map<String, String?> _thumbCache = {};
@@ -1292,11 +1293,17 @@ class _VideoCardState extends State<_VideoCard> {
     _loadThumb();
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   Future<void> _loadThumb() async {
     final key = widget.item.id;
     if (_thumbCache.containsKey(key)) {
       final cached = _thumbCache[key];
-      if (mounted && cached != null) setState(() => _thumbPath = cached);
+      if (!_disposed && mounted && cached != null) setState(() => _thumbPath = cached);
       return;
     }
     try {
@@ -1305,7 +1312,7 @@ class _VideoCardState extends State<_VideoCard> {
         'id': widget.item.id,
       });
       _thumbCache[key] = path;
-      if (mounted && path != null) setState(() => _thumbPath = path);
+      if (!_disposed && mounted && path != null) setState(() => _thumbPath = path);
     } catch (_) {
       _thumbCache[key] = null;
     }
