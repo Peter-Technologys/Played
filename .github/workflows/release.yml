@@ -83,7 +83,7 @@ jobs:
 
       - name: Build split APKs (arm64 + arm32)
         env:
-          KEYSTORE_PATH: app/keystore.jks
+          KEYSTORE_PATH: keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -142,7 +142,6 @@ jobs:
           files: |
             ${{ steps.apk.outputs.arm64 }}
             ${{ steps.apk.outputs.arm32 }}
-            build/app/outputs/bundle/release/app-release.aab
             version.json
 
       - uses: actions/upload-artifact@v4
