@@ -183,3 +183,13 @@ final settingsProvider =
     StateNotifierProvider<SettingsNotifier, AppSettings>(
   (_) => SettingsNotifier(const AppSettings()),
 );
+
+/// Call this once in main() before runApp() to pre-load settings from
+/// SharedPreferences so the provider starts with the correct persisted values.
+Future<AppSettings> loadSettingsOnce() async {
+  try {
+    return await AppSettings.load();
+  } catch (_) {
+    return const AppSettings();
+  }
+}

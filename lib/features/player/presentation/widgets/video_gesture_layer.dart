@@ -23,7 +23,6 @@ class _VideoGestureLayerState extends State<VideoGestureLayer> {
   bool _showBrightness = false;
   bool _showVolume = false;
   Timer? _hideTimer;
-
   void _scheduleHide() {
     _hideTimer?.cancel();
     _hideTimer = Timer(const Duration(seconds: 2), () {
@@ -53,7 +52,6 @@ class _VideoGestureLayerState extends State<VideoGestureLayer> {
 
   @override
   Widget build(BuildContext context) {
-    final width = MediaQuery.of(context).size.width;
     return Stack(
       children: [
         widget.child,
