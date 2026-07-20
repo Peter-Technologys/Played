@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../features/settings/settings_provider.dart';
 import 'audio_player_screen.dart';
 
 // ── Provider ────────────────────────────────────────────────────────
@@ -194,6 +195,45 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                       ],
                     ),
                   ),
+
+                  // Crossfade indicator — shown when crossfade > 0
+                  Builder(builder: (context) {
+                    final settings = ref.watch(settingsProvider);
+                    if (settings.crossfadeDuration <= 0) return const SizedBox.shrink();
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 4),
+                      child: Tooltip(
+                        message: 'Crossfade ${settings.crossfadeDuration.toStringAsFixed(0)}s',
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 5, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.accentViolet.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(4),
+                            border: Border.all(
+                                color: AppColors.accentViolet
+                                    .withValues(alpha: 0.4)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.swap_horiz_rounded,
+                                  color: AppColors.accentViolet, size: 10),
+                              const SizedBox(width: 2),
+                              Text(
+                                '${settings.crossfadeDuration.toStringAsFixed(0)}s',
+                                style: const TextStyle(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.accentViolet,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    );
+                  }),
 
                   // Progress ring + play/pause
                   Padding(
