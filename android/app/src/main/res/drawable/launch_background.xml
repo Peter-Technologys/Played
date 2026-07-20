@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Branded splash shown by Android while the Flutter engine loads.
-     Uses only shapes/colors — no bitmap reference — so the resource
-     shrinker cannot break it regardless of minifyEnabled/shrinkResources. -->
+     Uses only shapes and vector drawables — no bitmap PNG reference —
+     so the resource shrinker cannot corrupt it in release builds. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Deep dark navy background -->
@@ -19,6 +19,14 @@
         <shape android:shape="oval">
             <solid android:color="#1400D4FF" />
         </shape>
+    </item>
+
+    <!-- App icon (vector — shrinker-safe) centred -->
+    <item
+        android:gravity="center"
+        android:width="96dp"
+        android:height="96dp">
+        <drawable android:drawable="@drawable/ic_launcher_foreground" />
     </item>
 
 </layer-list>
