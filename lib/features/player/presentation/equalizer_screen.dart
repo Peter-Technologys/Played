@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../app/theme/app_colors.dart';
 
 // Native channel for Android's built-in Equalizer AudioEffect.
@@ -40,10 +41,13 @@ class EqNotifier extends StateNotifier<EqState> {
   static const Map<String, List<double>> _presets = {
     'Flat':          [0, 0, 0, 0, 0],
     'Bass Boost':    [8, 5, 0, -2, -3],
+    'Rock':          [5, 3, -1, 3, 5],
+    'Pop':           [2, 1, 0, 2, 3],
+    'Classical':     [4, 3, -2, 3, 4],
+    'Jazz':          [3, 2, 0, 2, 4],
+    'Hip-Hop':       [6, 4, 0, 2, 1],
     'Vocal Clarity': [0, -2, 4, 5, 3],
     'Night Mode':    [-4, -2, 0, -3, -5],
-    'Pop':           [2, 1, 0, 2, 3],
-    'Hip-Hop':       [6, 4, 0, 2, 1],
   };
 
   void setBand(int index, double gain) {
@@ -62,6 +66,49 @@ class EqNotifier extends StateNotifier<EqState> {
     );
     state = state.copyWith(bands: updated, preset: name);
     _applyToNative(updated);
+    _savePreset(name);
+  }
+
+  /// Saves the current custom band settings as a named preset.
+  Future<void> saveCustomPreset(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final gains = state.bands.map((b) => b.gain).toList();
+    await prefs.setString(
+      'eq_custom_$name',
+      gains.map((g) => g.toString()).join(','),
+    );
+    state = state.copyWith(preset: name);
+  }
+
+  /// Loads all custom preset names saved by the user.
+  Future<List<String>> loadCustomPresetNames() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getKeys()
+        .where((k) => k.startsWith('eq_custom_'))
+        .map((k) => k.substring('eq_custom_'.length))
+        .toList();
+  }
+
+  /// Applies a custom preset by name from SharedPreferences.
+  Future<void> applyCustomPreset(String name) async {
+    final prefs = await SharedPreferences.getInstance();
+    final raw = prefs.getString('eq_custom_$name');
+    if (raw == null) return;
+    final gains = raw.split(',').map(double.parse).toList();
+    if (gains.length != state.bands.length) return;
+    final updated = List.generate(
+      state.bands.length,
+      (i) => state.bands[i].copyWith(gain: gains[i]),
+    );
+    state = state.copyWith(bands: updated, preset: name);
+    _applyToNative(updated);
+  }
+
+  Future<void> _savePreset(String name) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('eq_last_preset', name);
+    } catch (_) {}
   }
 
   /// Sends band gains (in dB) to the Android Equalizer AudioEffect
