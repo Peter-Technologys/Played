@@ -176,21 +176,27 @@ build_release:
         exit 1
       fi
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-    # Export KEYSTORE_PATH so build.gradle's signingConfig picks up the correct
-    # absolute path regardless of the directory Flutter invokes Gradle from.
     - export KEYSTORE_PATH="$(pwd)/android/app/keystore.jks"
-    # No --flavor flag: build.gradle has no product flavors defined.
-    # --obfuscate is intentionally removed: it renames Dart symbols which breaks
-    # workmanager's callbackDispatcher task-name lookup and any reflection-based
-    # plugin code (media_kit, hive adapters). Use --split-debug-info only for
-    # stack-trace de-symbolication without renaming.
     - flutter build appbundle --release --no-pub --split-debug-info=build/debug-info
     - flutter build apk --release --split-per-abi --no-pub --target-platform android-arm,android-arm64 --split-debug-info=build/debug-info
-    - rm -f android/app/keystore.jks
+    # Verify APKs were produced before marking job successful
+    - |
+      for APK in \
+        build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+        build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
+        if [ ! -f "$APK" ]; then
+          echo "ERROR: Expected APK not found: $APK"
+          ls -lh build/app/outputs/flutter-apk/ || true
+          exit 1
+        fi
+        echo "OK: $APK ($(stat -c%s "$APK") bytes)"
+      done
+  after_script:
+    # Always clean up secrets, even on failure
+    - rm -f android/app/keystore.jks android/app/google-services.json
   artifacts:
     paths:
       - build/app/outputs/bundle/release/app-release.aab
-      # Output paths without a flavor suffix.
       - build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
       - build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
       - build/debug-info/
@@ -208,6 +214,11 @@ publish_to_r2:
   script:
     - chmod +x scripts/publish_r2.sh
     - bash scripts/publish_r2.sh
+  retry:
+    max: 2
+    when:
+      - script_failure
+      - runner_system_failure
   environment:
     name: production
     url: https://getotya.petersmartlink.com
@@ -217,3 +228,7 @@ publish_to_r2:
     AWS_ACCESS_KEY_ID: $R2_ACCESS_KEY_ID
     AWS_SECRET_ACCESS_KEY: $R2_SECRET_ACCESS_KEY
     AWS_DEFAULT_REGION: auto
+    # Optional: set these in GitLab CI/CD Variables to purge KV cache immediately after upload
+    # CF_ACCOUNT_ID: $CF_ACCOUNT_ID
+    # CF_API_TOKEN: $CF_API_TOKEN
+    # KV_NAMESPACE_ID: $KV_NAMESPACE_ID
