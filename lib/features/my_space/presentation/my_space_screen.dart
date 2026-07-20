@@ -457,6 +457,7 @@ class _TabBar extends StatelessWidget {
           Tab(text: 'Videos'),
           Tab(text: 'Folders'),
           Tab(text: 'Playlists'),
+          Tab(text: 'Favorites'),
         ],
       ),
     );
