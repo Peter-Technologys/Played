@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Branded splash for API 21+ (Lollipop and above).
-     Mirrors drawable/launch_background.xml to ensure consistent
-     splash on all supported API levels. -->
+     Uses only shapes/colors — no bitmap reference — so the resource
+     shrinker cannot break it regardless of minifyEnabled/shrinkResources. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Deep dark navy background -->
@@ -11,7 +11,7 @@
         </shape>
     </item>
 
-    <!-- Subtle cyan glow behind the icon -->
+    <!-- Subtle cyan glow centred -->
     <item
         android:gravity="center"
         android:width="240dp"
@@ -19,14 +19,6 @@
         <shape android:shape="oval">
             <solid android:color="#1400D4FF" />
         </shape>
-    </item>
-
-    <!-- App icon centred -->
-    <item android:gravity="center">
-        <bitmap
-            android:src="@mipmap/ic_launcher"
-            android:gravity="center"
-            android:tileMode="disabled" />
     </item>
 
 </layer-list>
