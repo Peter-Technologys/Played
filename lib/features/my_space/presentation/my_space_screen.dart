@@ -172,7 +172,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
+    _tabs = TabController(length: 5, vsync: this, initialIndex: 0);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMediaPermission());
   }
