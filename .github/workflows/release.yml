@@ -1,25 +1,17 @@
 # ───────────────────────────────────────────────────────────────
 # OTYA Player — GitHub Actions Release Pipeline
 #
-# Triggers on v* tags pushed from GitLab mirror (e.g. v1.3.0).
-# Builds signed split APKs, uploads to Cloudflare R2, notifies Appwrite.
+# Triggers on v* tags (e.g. v1.3.3) pushed to GitHub.
 #
-# Required GitHub Secrets (Settings → Secrets and variables → Actions → Secrets):
-#   KEYSTORE_BASE64        — base64-encoded .jks keystore
-#   STORE_PASSWORD         — keystore password
-#   KEY_ALIAS              — key alias
-#   KEY_PASSWORD           — key password
-#   R2_ACCESS_KEY_ID       — Cloudflare R2 Access Key ID
-#   R2_SECRET_ACCESS_KEY   — Cloudflare R2 Secret Access Key
-#   APPWRITE_API_KEY       — Appwrite Server API Key
+# Required Secrets:
+#   KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
+#   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
+#   APPWRITE_API_KEY, CF_API_TOKEN
 #
-# Required GitHub Variables (Settings → Secrets and variables → Actions → Variables):
-#   GOOGLE_SERVICES_JSON   — raw contents of google-services.json
-#   R2_ENDPOINT            — https://6c76d2a9e5f95d5f9b393e97374d9afb.r2.cloudflarestorage.com
-#   R2_BUCKET              — otya-player-releases
-#   APPWRITE_ENDPOINT      — https://nyc.cloud.appwrite.io/v1
-#   APPWRITE_PROJECT_ID    — your Appwrite project ID
-#   WORKER_URL             — https://getotya.petersmartlink.com
+# Required Variables:
+#   GOOGLE_SERVICES_JSON, R2_ENDPOINT, R2_BUCKET
+#   APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID
+#   WORKER_URL, CF_ACCOUNT_ID, KV_NAMESPACE_ID
 # ───────────────────────────────────────────────────────────────
 
 name: Release
@@ -31,7 +23,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Version tag to release (e.g. v1.3.0)'
+        description: 'Version tag to release (e.g. v1.3.3)'
         required: true
 
 concurrency:
@@ -50,7 +42,6 @@ jobs:
       contents: write
 
     steps:
-      # ── Free disk space ────────────────────────────────────────────────
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -76,31 +67,27 @@ jobs:
           key: pub-${{ hashFiles('pubspec.yaml') }}
           restore-keys: pub-
 
-      - name: Install AWS CLI
-        run: pip install awscli --quiet
+      - name: Install dependencies
+        run: |
+          pip install awscli --quiet
+          flutter pub get
 
       - name: Run code generation
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - run: flutter pub get
-
-      # ── Inject secrets ─────────────────────────────────────────────────
       - name: Write google-services.json
         run: echo '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
 
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
-      # ── Build ──────────────────────────────────────────────────────────
       - name: Build release AAB
         env:
           KEYSTORE_PATH: app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: |
-          flutter build appbundle --release \
-            --split-debug-info=build/debug-info
+        run: flutter build appbundle --release --split-debug-info=build/debug-info
 
       - name: Build split APKs (arm64 + arm32)
         env:
@@ -121,27 +108,16 @@ jobs:
 
       - name: Verify APK output files
         run: |
-          echo "=== APK output directory ==="
           ls -lh build/app/outputs/flutter-apk/
-          test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk || \
-            { echo "ERROR: arm64 APK not found"; exit 1; }
-          test -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk || \
-            { echo "ERROR: arm32 APK not found"; exit 1; }
-          # Sanity-check file sizes (APKs should be > 5 MB)
+          test -f build/app/outputs/flutter-apk/app-arm64-v8a-release.apk || { echo "ERROR: arm64 APK not found"; exit 1; }
+          test -f build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk || { echo "ERROR: arm32 APK not found"; exit 1; }
           ARM64_SIZE=$(stat -c%s build/app/outputs/flutter-apk/app-arm64-v8a-release.apk)
           ARM32_SIZE=$(stat -c%s build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk)
-          echo "arm64: $ARM64_SIZE bytes"
-          echo "arm32: $ARM32_SIZE bytes"
-          [ "$ARM64_SIZE" -gt 5000000 ] || { echo "ERROR: arm64 APK too small"; exit 1; }
-          [ "$ARM32_SIZE" -gt 5000000 ] || { echo "ERROR: arm32 APK too small"; exit 1; }
+          [ "$ARM64_SIZE" -gt 5000000 ] || { echo "ERROR: arm64 APK too small ($ARM64_SIZE bytes)"; exit 1; }
+          [ "$ARM32_SIZE" -gt 5000000 ] || { echo "ERROR: arm32 APK too small ($ARM32_SIZE bytes)"; exit 1; }
+          echo "arm64: $ARM64_SIZE bytes OK"
+          echo "arm32: $ARM32_SIZE bytes OK"
 
-      - name: Remove secrets
-        if: always()
-        run: |
-          rm -f android/app/keystore.jks
-          rm -f android/app/google-services.json
-
-      # ── Resolve actual APK filenames (signing config name varies) ──────
       - name: Resolve APK paths
         id: apk
         run: |
@@ -149,7 +125,6 @@ jobs:
           echo "arm64=$APK_DIR/app-arm64-v8a-release.apk" >> $GITHUB_OUTPUT
           echo "arm32=$APK_DIR/app-armeabi-v7a-release.apk" >> $GITHUB_OUTPUT
 
-      # ── Publish to Cloudflare R2 ────────────────────────────────────────
       - name: Publish to Cloudflare R2
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -166,146 +141,8 @@ jobs:
           KV_NAMESPACE_ID: ${{ vars.KV_NAMESPACE_ID }}
           ARM64_APK: ${{ steps.apk.outputs.arm64 }}
           ARM32_APK: ${{ steps.apk.outputs.arm32 }}
-        run: |
-          set -euo pipefail
+        run: bash scripts/publish_r2.sh
 
-          VERSION=${GITHUB_REF_NAME#v}
-          VERSION_CODE=$(echo "$VERSION" | awk -F. '{printf "%d%02d%02d", $1, $2, $3}')
-          echo "Publishing OTYA Player v$VERSION (code $VERSION_CODE)"
-
-          # Read changelog from CHANGELOG.md top section
-          CHANGELOG=$(awk '/^## \[/{found++} found==1{print} found==2{exit}' CHANGELOG.md \
-            | tail -n +2 | head -40 | tr '\n' ' ' \
-            | sed 's/  */ /g; s/^[[:space:]]*//; s/[[:space:]]*$//')
-          [ -z "$CHANGELOG" ] && CHANGELOG="Bug fixes and improvements"
-
-          # Read SDK versions from build.gradle
-          MIN_SDK=$(grep 'minSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+' || echo 21)
-          TARGET_SDK=$(grep 'targetSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+' || echo 36)
-
-          # Backup current version before overwriting
-          CURRENT_VERSION=$(aws s3 cp \
-            s3://$R2_BUCKET/version.json - \
-            --endpoint-url $R2_ENDPOINT 2>/dev/null \
-            | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('version',''))" 2>/dev/null || echo "")
-
-          if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$VERSION" ]; then
-            echo "Backing up v$CURRENT_VERSION..."
-            for KEY in app-arm64-v8a-release.apk app-armeabi-v7a-release.apk version.json; do
-              aws s3 cp \
-                s3://$R2_BUCKET/$KEY \
-                s3://$R2_BUCKET/releases/v$CURRENT_VERSION/$KEY \
-                --endpoint-url $R2_ENDPOINT 2>/dev/null || true
-            done
-          fi
-
-          # Upload APKs with consistent names (Worker always reads these exact names)
-          aws s3 cp \
-            "$ARM64_APK" \
-            s3://$R2_BUCKET/app-arm64-v8a-release.apk \
-            --endpoint-url $R2_ENDPOINT \
-            --content-type application/vnd.android.package-archive \
-            --cache-control "public, max-age=31536000, immutable"
-
-          aws s3 cp \
-            "$ARM32_APK" \
-            s3://$R2_BUCKET/app-armeabi-v7a-release.apk \
-            --endpoint-url $R2_ENDPOINT \
-            --content-type application/vnd.android.package-archive \
-            --cache-control "public, max-age=31536000, immutable"
-
-          # Generate version.json
-          DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
-          python3 - <<PYEOF
-          import json
-          data = {
-              "version":     "$VERSION",
-              "versionCode": int("$VERSION_CODE"),
-              "date":        "$DATE",
-              "arm64":       "app-arm64-v8a-release.apk",
-              "arm32":       "app-armeabi-v7a-release.apk",
-              "changelog":   """$CHANGELOG""",
-              "minSdk":      int("$MIN_SDK"),
-              "targetSdk":   int("$TARGET_SDK"),
-              "workerUrl":   "$WORKER_URL",
-              "downloads": {
-                  "arm64": "$WORKER_URL/apk/arm64",
-                  "arm32": "$WORKER_URL/apk/arm32",
-                  "auto":  "$WORKER_URL/download"
-              }
-          }
-          with open('version.json', 'w') as f:
-              json.dump(data, f, indent=2)
-              f.write('\n')
-          print(json.dumps(data, indent=2))
-          PYEOF
-
-          python3 -c "import json; json.load(open('version.json'))" || { echo "ERROR: invalid version.json"; exit 1; }
-
-          # Upload version.json LAST so Worker is always consistent
-          aws s3 cp \
-            version.json \
-            s3://$R2_BUCKET/version.json \
-            --endpoint-url $R2_ENDPOINT \
-            --content-type application/json \
-            --cache-control "public, max-age=300"
-
-          echo "✓ R2 upload complete."
-
-          # Notify Appwrite (creates release document for in-app update checker)
-          if [ -n "${APPWRITE_ENDPOINT:-}" ] && [ -n "${APPWRITE_PROJECT_ID:-}" ] && [ -n "${APPWRITE_API_KEY:-}" ]; then
-            DOC_ID=$(echo "v$VERSION" | tr '.' '-')
-            DOC_BODY=$(python3 -c "
-import json
-print(json.dumps({
-    'documentId': '$DOC_ID',
-    'data': {
-        'version':     '$VERSION',
-        'versionCode': int('$VERSION_CODE'),
-        'date':        '$DATE',
-        'changelog':   '$CHANGELOG',
-        'arm64Url':    '$WORKER_URL/apk/arm64',
-        'arm32Url':    '$WORKER_URL/apk/arm32',
-        'downloadUrl': '$WORKER_URL/download',
-        'minSdk':      int('$MIN_SDK'),
-        'targetSdk':   int('$TARGET_SDK')
-    }
-}))
-")
-            HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X POST \
-              "${APPWRITE_ENDPOINT}/databases/otya-db/collections/releases/documents" \
-              -H "Content-Type: application/json" \
-              -H "X-Appwrite-Project: ${APPWRITE_PROJECT_ID}" \
-              -H "X-Appwrite-Key: ${APPWRITE_API_KEY}" \
-              -d "$DOC_BODY")
-            echo "Appwrite response: $HTTP_STATUS"
-          else
-            echo "Appwrite vars not set — skipping notification."
-          fi
-
-          # Prune old backups (keep last 5)
-          VERSIONS=$(aws s3 ls s3://$R2_BUCKET/releases/ \
-            --endpoint-url $R2_ENDPOINT 2>/dev/null \
-            | awk '{print $2}' | sort -V | head -n -5)
-          for OLD in $VERSIONS; do
-            aws s3 rm s3://$R2_BUCKET/releases/$OLD \
-              --endpoint-url $R2_ENDPOINT --recursive 2>/dev/null || true
-          done
-
-          # ── Purge Worker KV cache so new version is live immediately ────
-          if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_API_TOKEN:-}" ] && [ -n "${KV_NAMESPACE_ID:-}" ]; then
-            echo "Purging KV cache..."
-            HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
-              -X DELETE \
-              "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${KV_NAMESPACE_ID}/values/version:current" \
-              -H "Authorization: Bearer ${CF_API_TOKEN}")
-            echo "KV purge HTTP: $HTTP"
-          fi
-
-          echo "✓ Publish complete. Live at $WORKER_URL"
-
-      # ── GitHub Release ─────────────────────────────────────────────────
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
@@ -316,7 +153,6 @@ print(json.dumps({
             build/app/outputs/bundle/release/app-release.aab
             version.json
 
-      # ── Upload artifacts ───────────────────────────────────────────────
       - uses: actions/upload-artifact@v4
         with:
           name: release-apks-${{ github.ref_name }}
