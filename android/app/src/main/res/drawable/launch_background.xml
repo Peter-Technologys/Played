@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Branded splash shown by Android while the Flutter engine loads.
-     Uses only shapes and vector drawables — no bitmap PNG reference —
-     so the resource shrinker cannot corrupt it in release builds. -->
+     Uses only shapes — no bitmap or custom drawable tag —
+     guaranteed to inflate correctly on all Android API levels. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
     <!-- Deep dark navy background -->
@@ -21,12 +21,12 @@
         </shape>
     </item>
 
-    <!-- App icon (vector — shrinker-safe) centred -->
+    <!-- App icon referenced directly on <item> — the only valid way
+         to include a vector drawable inside a layer-list. -->
     <item
+        android:drawable="@drawable/ic_launcher_foreground"
         android:gravity="center"
         android:width="96dp"
-        android:height="96dp">
-        <drawable android:drawable="@drawable/ic_launcher_foreground" />
-    </item>
+        android:height="96dp" />
 
 </layer-list>
