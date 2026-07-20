@@ -6,7 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/database/played_database.dart';
 import '../../../../core/models/media_item.dart';
 import '../providers/my_space_provider.dart';
-import '../../player/presentation/queue_screen.dart';
+import '../../../player/presentation/queue_screen.dart';
 
 class FavoritesTab extends ConsumerWidget {
   const FavoritesTab({super.key});

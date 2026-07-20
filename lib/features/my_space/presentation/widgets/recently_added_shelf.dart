@@ -6,7 +6,7 @@ import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/database/played_database.dart';
 import '../providers/my_space_provider.dart';
-import '../../player/presentation/queue_screen.dart';
+import '../../../player/presentation/queue_screen.dart';
 
 /// Horizontal shelf showing files added in the last 7 days.
 class RecentlyAddedShelf extends ConsumerWidget {

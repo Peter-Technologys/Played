@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import '../../../app/theme/app_colors.dart';
+import '../../../../app/theme/app_colors.dart';
 
 /// Gesture layer for video player: swipe left/right half for brightness/volume.
 class VideoGestureLayer extends StatefulWidget {

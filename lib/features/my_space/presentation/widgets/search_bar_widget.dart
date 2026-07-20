@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/utils/duration_formatter.dart';
-import '../../playlists/playlist_screen.dart' show playlistsProvider;
+import '../../../playlists/playlist_screen.dart' show playlistsProvider;
 
 /// Full-screen unified search delegate — songs, videos, playlists, folders.
 /// Results are categorized and debounced at 300 ms.
