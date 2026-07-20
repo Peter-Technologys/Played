@@ -342,7 +342,7 @@ class _Header extends ConsumerWidget {
               final items = ref.read(mediaLibraryProvider).valueOrNull ?? [];
               showSearch(
                 context: context,
-                delegate: MediaSearchDelegate(allItems: items),
+                delegate: MediaSearchDelegate(allItems: items, ref: ref),
               );
             },
           ),
@@ -364,7 +364,11 @@ class _Header extends ConsumerWidget {
             shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(14)),
             onSelected: (value) {
-              if (value == 'sort') {
+              if (value == 'history') {
+                Navigator.of(context).push(MaterialPageRoute(
+                  builder: (_) => const PlaybackHistoryScreen(),
+                ));
+              } else if (value == 'sort') {
                 _SortBtn(current: sort).showSheet(context, ref);
               } else if (value == 'refresh') {
                 ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
@@ -373,6 +377,17 @@ class _Header extends ConsumerWidget {
               }
             },
             itemBuilder: (_) => [
+              const PopupMenuItem(
+                value: 'history',
+                child: Row(children: [
+                  Icon(Icons.history_rounded,
+                      color: AppColors.textSecondary, size: 18),
+                  SizedBox(width: 10),
+                  Text('History',
+                      style: TextStyle(
+                          color: AppColors.textPrimary, fontSize: 14)),
+                ]),
+              ),
               const PopupMenuItem(
                 value: 'sort',
                 child: Row(children: [
