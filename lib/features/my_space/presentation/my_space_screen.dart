@@ -718,6 +718,7 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
   String? _resolvedPath;
   bool _loading = true;
+  bool _disposed = false;
 
   // Session-level cache: album art path resolved once per albumid per session
   static final Map<String, String?> _cache = {};
@@ -728,25 +729,34 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
     _resolve();
   }
 
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
   Future<void> _resolve() async {
     final raw = widget.albumArtPath;
-    if (raw == null) { if (mounted) setState(() => _loading = false); return; }
+    if (raw == null) {
+      if (!_disposed && mounted) setState(() => _loading = false);
+      return;
+    }
     if (!raw.startsWith('albumid:')) {
-      if (mounted) setState(() { _resolvedPath = raw; _loading = false; });
+      if (!_disposed && mounted) setState(() { _resolvedPath = raw; _loading = false; });
       return;
     }
     if (_cache.containsKey(raw)) {
-      if (mounted) setState(() { _resolvedPath = _cache[raw]; _loading = false; });
+      if (!_disposed && mounted) setState(() { _resolvedPath = _cache[raw]; _loading = false; });
       return;
     }
     try {
       final albumId = raw.substring('albumid:'.length);
       final path = await _channel.invokeMethod<String>('getAlbumArt', {'albumId': albumId});
       _cache[raw] = path;
-      if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+      if (!_disposed && mounted) setState(() { _resolvedPath = path; _loading = false; });
     } catch (_) {
       _cache[raw] = null;
-      if (mounted) setState(() => _loading = false);
+      if (!_disposed && mounted) setState(() => _loading = false);
     }
   }
 
