@@ -17,6 +17,31 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [1.4.0] — 2026-07-20
+
+### Added
+- **Favorites system** — dedicated Favorites tab (5th tab) in My Space, persisted in Hive. Tap the heart in the audio player to add songs.
+- **Recently Added shelf** — horizontal shelf on My Space home showing files added in the last 7 days with a NEW badge and days-ago label.
+- **Playback history screen** — full history list with relative timestamps ("2h ago", "Yesterday") and one-tap clear option.
+- **EQ presets expanded** — Rock, Classical, Jazz added alongside existing Flat, Bass Boost, Pop, Hip-Hop, Vocal Clarity, Night Mode.
+- **Custom EQ preset saving** — save any manual band configuration as a named preset via SharedPreferences.
+- **Crossfade visual indicator** — mini player shows a compact badge (e.g. 3s) when crossfade is active.
+- **Video gesture controls** — swipe left half of screen for brightness, right half for volume, with animated overlay feedback.
+- **Lock screen artwork** — audio_service MediaItem always sets artUri from the resolved album art path.
+- **Unified search** — categorized results across Songs, Videos, Playlists, and Folders with 300ms debounce.
+- **Sort/filter persistence** — My Space sort preference saved to SharedPreferences and restored on next launch.
+- **Playback History menu item** — accessible from the overflow menu in My Space.
+
+### Fixed
+- **Pipeline prune crash** — `head -n -5` exits non-zero on some systems when fewer than 5 backups exist, aborting the publish script under `set -euo pipefail` even after a successful upload. Replaced with an explicit count-based guard.
+- **Search delegate** — now passes `ref` so playlist results are live.
+
+### Changed
+- My Space tab bar expanded from 4 to 5 tabs (Songs / Videos / Folders / Playlists / Favorites).
+- Version bumped to `1.4.0+7`.
+
+---
+
 ## [1.3.3] — 2026-07-14
 
 ### Fixed
@@ -200,7 +225,10 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
-[Unreleased]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.2.1...HEAD
+[Unreleased]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.4.0...HEAD
+[1.4.0]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.3.3...v1.4.0
+[1.3.3]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.3.0...v1.3.3
+[1.3.0]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.2.1...v1.3.0
 [1.2.1]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.2.0...v1.2.1
 [1.2.0]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.1.0...v1.2.0
 [1.1.0]: https://gitlab.com/updates1793427/apk-v1/played/-/compare/v1.0.0...v1.1.0
