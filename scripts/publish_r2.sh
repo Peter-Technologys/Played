@@ -79,7 +79,7 @@ CURRENT_VERSION=$(aws s3 cp \
 
 if [ -n "$CURRENT_VERSION" ] && [ "$CURRENT_VERSION" != "$VERSION" ]; then
   echo "Backing up v$CURRENT_VERSION..."
-  for KEY in app-arm64-v8a-release.apk app-armeabi-v7a-release.apk version.json; do
+  for KEY in OtyaPlayer-arm64.apk OtyaPlayer-arm32.apk version.json; do
     aws s3 cp \
       "s3://${R2_BUCKET}/${KEY}" \
       "s3://${R2_BUCKET}/releases/v${CURRENT_VERSION}/${KEY}" \
@@ -105,8 +105,8 @@ upload_and_verify() {
   echo "OK: $DEST_KEY verified ($REMOTE_SIZE bytes)"
 }
 
-upload_and_verify "$ARM64_APK" "app-arm64-v8a-release.apk"
-upload_and_verify "$ARM32_APK" "app-armeabi-v7a-release.apk"
+upload_and_verify "$ARM64_APK" "OtyaPlayer-arm64.apk"
+upload_and_verify "$ARM32_APK" "OtyaPlayer-arm32.apk"
 
 # ── Generate version.json (Python reads changelog from file — no shell injection) ────
 python3 - "$VERSION" "$VERSION_CODE" "$DATE" "$MIN_SDK" "$TARGET_SDK" "${WORKER_URL:-https://petersmartlink.com}" "$CHANGELOG_FILE" << 'PYEOF'
@@ -118,8 +118,8 @@ data = {
     'version':     version,
     'versionCode': int(version_code),
     'date':        date,
-    'arm64':       'app-arm64-v8a-release.apk',
-    'arm32':       'app-armeabi-v7a-release.apk',
+    'arm64':       'OtyaPlayer-arm64.apk',
+    'arm32':       'OtyaPlayer-arm32.apk',
     'changelog':   changelog,
     'minSdk':      int(min_sdk),
     'targetSdk':   int(target_sdk),
