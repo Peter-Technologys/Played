@@ -220,6 +220,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
             ),
 
             // ── Recently Played ──────────────────────────────────────
+            const RecentlyAddedShelf(),
             const _RecentlyPlayedRow(),
 
             // ── Tab bar ─────────────────────────────────────────────
