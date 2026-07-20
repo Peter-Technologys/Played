@@ -196,15 +196,25 @@ else
   echo "INFO: Appwrite vars not set — skipping"
 fi
 
-# ── Prune old backups (keep last 5) ─────────────────────────────────────────────────
-VERSIONS=$(aws s3 ls "s3://${R2_BUCKET}/releases/" \
+# -- Prune old backups (keep last 5) --
+# head -n -5 exits non-zero on some systems when the list has fewer than 5
+# entries, which aborts the script under set -euo pipefail even after a
+# successful upload. Use an explicit count guard instead.
+ALL_VERSIONS=$(aws s3 ls "s3://${R2_BUCKET}/releases/" \
   --endpoint-url "$R2_ENDPOINT" 2>/dev/null \
-  | awk '{print $2}' | sort -V | head -n -5)
-for OLD in $VERSIONS; do
-  echo "Deleting old backup: $OLD"
-  aws s3 rm "s3://${R2_BUCKET}/releases/${OLD}" \
-    --endpoint-url "$R2_ENDPOINT" --recursive 2>/dev/null || true
-done
+  | awk '{print $2}' | sort -V || true)
+VERSION_COUNT=$(echo "$ALL_VERSIONS" | grep -c '.' 2>/dev/null || echo 0)
+if [ "$VERSION_COUNT" -gt 5 ]; then
+  PRUNE_COUNT=$((VERSION_COUNT - 5))
+  TO_DELETE=$(echo "$ALL_VERSIONS" | head -n "$PRUNE_COUNT")
+  for OLD in $TO_DELETE; do
+    echo "Deleting old backup: $OLD"
+    aws s3 rm "s3://${R2_BUCKET}/releases/${OLD}" \
+      --endpoint-url "$R2_ENDPOINT" --recursive 2>/dev/null || true
+  done
+else
+  echo "INFO: ${VERSION_COUNT} backup(s) found -- nothing to prune (keeping all <=5)"
+fi
 
 echo ""
 echo "====================================================="
