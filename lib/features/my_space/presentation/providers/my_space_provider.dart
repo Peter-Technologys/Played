@@ -78,7 +78,15 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       // Run the scan directly on the main isolate; it is fully async so
       // it does not block the UI thread.
       final fresh = await MediaRepository.instance.getAllMedia(forceRefresh: true);
-      if (fresh.isNotEmpty) state = AsyncData(fresh);
+      // Guard: ref may have been disposed if the user navigated away
+      // during the scan. Accessing state on a disposed ref throws.
+      if (fresh.isNotEmpty) {
+        try {
+          state = AsyncData(fresh);
+        } catch (_) {
+          // Ref disposed — ignore silently
+        }
+      }
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
       // Keep previous state — never wipe library on error
