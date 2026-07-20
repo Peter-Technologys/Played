@@ -1,3 +1,4 @@
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -155,6 +156,42 @@ class _RecentlyPlayedRow extends ConsumerWidget {
 enum MediaSort { dateAdded, name, size, duration }
 
 final _sortProvider = StateProvider<MediaSort>((_) => MediaSort.dateAdded);
+
+/// Persists sort preference per-session using SharedPreferences.
+/// Loaded once at startup; saved on every change.
+final _persistedSortProvider =
+    StateNotifierProvider<_SortPersistNotifier, MediaSort>(
+  (_) => _SortPersistNotifier(),
+);
+
+class _SortPersistNotifier extends StateNotifier<MediaSort> {
+  static const _key = 'my_space_sort';
+
+  _SortPersistNotifier() : super(MediaSort.dateAdded) {
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_key);
+      if (raw != null) {
+        state = MediaSort.values.firstWhere(
+          (e) => e.name == raw,
+          orElse: () => MediaSort.dateAdded,
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> set(MediaSort sort) async {
+    state = sort;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_key, sort.name);
+    } catch (_) {}
+  }
+}
 
 // ── Root screen ──────────────────────────────────────────────────────
 
