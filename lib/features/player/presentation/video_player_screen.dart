@@ -25,14 +25,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     with WidgetsBindingObserver {
   bool _pipSupported    = false;
   bool _pipAutoEnabled  = false;
-  bool _pipInitialized  = false; // guard: prevents PiP before async init completes
+  bool _pipInitialized  = false;
   bool _batterySaver    = false;
+  bool _isLandscape     = true; // toggle between landscape and portrait
   late final Duration _savedPosition;
 
   @override
   void initState() {
     super.initState();
-    // Cache the seek position once so build() never hits the DB on every rebuild.
     _savedPosition =
         PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
         Duration.zero;
@@ -45,13 +45,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _pipSupported   = await PipService.instance.isPipSupported();
     _pipAutoEnabled = ref.read(settingsProvider).autoPip;
     await PipService.instance.setVideoPlaying(playing: true);
-    _pipInitialized = true; // safe to attempt PiP from this point
+    _pipInitialized = true;
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // Guard: _initPip is async — do not attempt PiP before it completes
-    // or we may call enterPip() on a device where support is unknown.
     if (!_pipInitialized) return;
     if (state == AppLifecycleState.paused && _pipAutoEnabled && _pipSupported) {
       PipService.instance.enterPip();
@@ -59,11 +57,30 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   Future<void> _lockToLandscape() async {
+    _isLandscape = true;
     await SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  Future<void> _lockToPortrait() async {
+    _isLandscape = false;
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+    ]);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  }
+
+  Future<void> _toggleOrientation() async {
+    HapticFeedback.selectionClick();
+    if (_isLandscape) {
+      await _lockToPortrait();
+    } else {
+      await _lockToLandscape();
+    }
+    if (mounted) setState(() {});
   }
 
   Future<void> _restoreOrientation() async {
@@ -102,27 +119,70 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               autoPlay:      true,
             ),
           ),
+          // Top-right controls: rotation toggle + battery saver
           Positioned(
             top: 16, right: 16,
             child: SafeArea(
-              child: GestureDetector(
-                onTap: () => setState(() => _batterySaver = true),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // Rotation toggle
+                  GestureDetector(
+                    onTap: _toggleOrientation,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _isLandscape
+                                ? Icons.screen_lock_portrait_rounded
+                                : Icons.screen_lock_landscape_rounded,
+                            color: AppColors.accent,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _isLandscape ? 'Portrait' : 'Landscape',
+                            style: const TextStyle(
+                                color: Colors.white70, fontSize: 11,
+                                fontFamily: 'Inter'),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.battery_saver_rounded, color: AppColors.accentGreen, size: 16),
-                      SizedBox(width: 4),
-                      Text('Saver', style: TextStyle(color: Colors.white70, fontSize: 11, fontFamily: 'Inter')),
-                    ],
+                  const SizedBox(width: 8),
+                  // Battery saver
+                  GestureDetector(
+                    onTap: () => setState(() => _batterySaver = true),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: AppColors.border.withValues(alpha: 0.5)),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.battery_saver_rounded,
+                              color: AppColors.accentGreen, size: 16),
+                          SizedBox(width: 4),
+                          Text('Saver',
+                              style: TextStyle(
+                                  color: Colors.white70, fontSize: 11,
+                                  fontFamily: 'Inter')),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
+                ],
               ),
             ),
           ),
@@ -145,15 +205,19 @@ class _BatterySaverOverlay extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.battery_saver_rounded, color: AppColors.accentGreen, size: 64),
+            const Icon(Icons.battery_saver_rounded,
+                color: AppColors.accentGreen, size: 64),
             const SizedBox(height: 16),
             const Text('Battery Saver Active',
-                style: TextStyle(color: AppColors.textPrimary, fontSize: 20,
+                style: TextStyle(
+                    color: AppColors.textPrimary, fontSize: 20,
                     fontWeight: FontWeight.w700, fontFamily: 'Inter')),
             const SizedBox(height: 8),
-            const Text('Audio playing in background.\nVideo rendering paused.',
+            const Text(
+                'Audio playing in background.\nVideo rendering paused.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13,
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13,
                     height: 1.5, fontFamily: 'Inter')),
             const SizedBox(height: 32),
             _AudioWaveAnimation(),
@@ -162,11 +226,15 @@ class _BatterySaverOverlay extends StatelessWidget {
               onPressed: onResume,
               icon: const Icon(Icons.play_arrow_rounded, size: 20),
               label: const Text('Resume Video',
-                  style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+                  style: TextStyle(
+                      fontWeight: FontWeight.w700, fontFamily: 'Inter')),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.accent, foregroundColor: Colors.black,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                backgroundColor: AppColors.accent,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14)),
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
               ),
             ),
           ],
@@ -183,12 +251,19 @@ class _AudioWaveAnimation extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: List.generate(5, (i) {
         return Container(
-          width: 4, margin: const EdgeInsets.symmetric(horizontal: 3),
-          decoration: BoxDecoration(color: AppColors.accent, borderRadius: BorderRadius.circular(2)),
-        ).animate(onPlay: (c) => c.repeat(reverse: true))
-            .scaleY(begin: 0.2, end: 1.0,
-                duration: Duration(milliseconds: 400 + (i * 80)),
-                curve: Curves.easeInOut);
+          width: 4,
+          margin: const EdgeInsets.symmetric(horizontal: 3),
+          decoration: BoxDecoration(
+              color: AppColors.accent,
+              borderRadius: BorderRadius.circular(2)),
+        )
+            .animate(onPlay: (c) => c.repeat(reverse: true))
+            .scaleY(
+              begin: 0.2,
+              end: 1.0,
+              duration: Duration(milliseconds: 400 + (i * 80)),
+              curve: Curves.easeInOut,
+            );
       }),
     );
   }

@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
@@ -27,18 +28,33 @@ void callbackDispatcher() {
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  // Fix #7: media_kit requires this before runApp() — without it, video
+
+  // media_kit MUST be initialized before runApp — without this, video
   // playback silently fails on some devices (native libs not loaded).
   MediaKit.ensureInitialized();
+
+  // Lock to portrait on startup; video player overrides to landscape.
+  await SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
+
+  // Transparent status bar, light icons — applied once here.
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Color(0xFF0F1117),
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
-    _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
+    if (kDebugMode) _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
-    _showCrashOverlay('Platform Error', '$error\n\n$stack');
+    if (kDebugMode) _showCrashOverlay('Platform Error', '$error\n\n$stack');
     return true;
   };
 
@@ -59,7 +75,7 @@ void main() async {
     unawaited(_initBackground());
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
-    _showCrashOverlay('Startup Crash', '$error\n\n$stack');
+    if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
   });
 }
 
