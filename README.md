@@ -11,7 +11,7 @@ Play any audio or video file, 100% offline. No account required.
 [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00D4FF.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)]()
-[![Version](https://img.shields.io/badge/Version-1.2.0-8A2BE2)]()
+[![Version](https://img.shields.io/badge/Version-1.4.0-8A2BE2)]()
 
 </div>
 

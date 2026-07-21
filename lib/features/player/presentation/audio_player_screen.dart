@@ -633,7 +633,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     onTap: () => _showLyrics(ps.position),
                   ),
                   _SecondaryBtn(
-                    icon: Icons.equalizer_rounded,
+                    icon: Icons.graphic_eq_rounded,
                     label: 'EQ',
                     onTap: () => context.push('/player/equalizer'),
                   ),

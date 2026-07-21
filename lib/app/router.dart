@@ -73,15 +73,19 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  // 0=AirDrop  1=MySpace(center)  2=Tools
-  int _currentIndex = 1;
+  // 0=AirDrop  1=Vault  2=MySpace(center)  3=Tools
+  int _currentIndex = 2;
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
-    if (index == 2) { _showToolsSheet(); return; }
+    if (index == 3) { _showToolsSheet(); return; }
+    if (index == 1) {
+      GoRouter.of(context).push('/vault');
+      return;
+    }
     if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
-    const routes = ['/airdrop', '/', ''];
+    const routes = ['/airdrop', '', '/', ''];
     GoRouter.of(context).go(routes[index]);
   }
 
@@ -180,15 +184,21 @@ class _MainShellState extends ConsumerState<_MainShell> {
                       isActive: _currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
-                    _CenterNavItem(
+                    _NavItem(
+                      icon: Icons.lock_rounded,
+                      label: 'Vault',
                       isActive: _currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
-                    _NavItem(
-                      icon: Icons.build_rounded,
-                      label: 'Tools',
+                    _CenterNavItem(
                       isActive: _currentIndex == 2,
                       onTap: () => _onTap(2),
+                    ),
+                    _NavItem(
+                      icon: Icons.construction_rounded,
+                      label: 'Tools',
+                      isActive: _currentIndex == 3,
+                      onTap: () => _onTap(3),
                     ),
                   ],
                 ),
