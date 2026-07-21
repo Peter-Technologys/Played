@@ -290,7 +290,7 @@ class _AppCard extends StatelessWidget {
               child: Text(
                 version.isEmpty
                     ? 'Loading version…'
-                    : 'Version $version (build $build)',
+                    : 'Version $version (build $buildNumber)',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.accent,
