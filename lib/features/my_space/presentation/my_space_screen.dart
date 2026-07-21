@@ -219,11 +219,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
               sort: sort,
             ),
 
-            // ── Recently Played ──────────────────────────────────────
-            const RecentlyAddedShelf(),
-            const _RecentlyPlayedRow(),
-
-            // ── Tab bar ─────────────────────────────────────────────
+            // ── Tab bar (immediately below header) ─────────────────
             _TabBar(controller: _tabs),
 
             // ── Tab views ───────────────────────────────────────────
@@ -289,7 +285,7 @@ class _Header extends ConsumerWidget {
     final isScanning = libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
@@ -297,13 +293,18 @@ class _Header extends ConsumerWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const FittedBox(
-                  fit: BoxFit.scaleDown,
-                  child: PlayedLogo(
-                    fontSize: 17,
-                    letterSpacing: 3,
-                    borderRadius: 9,
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Image.asset(
+                    'assets/icons/play_store_512.png',
+                    width: 36,
+                    height: 36,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.play_circle_fill_rounded,
+                      color: AppColors.accent,
+                      size: 36,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 3),
@@ -554,24 +555,295 @@ class _SongList extends ConsumerWidget {
       return const _EmptyState(
           icon: Icons.music_note_rounded, label: 'No songs found');
     }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(0, 4, 0, 100),
-      itemCount: items.length,
-      addAutomaticKeepAlives: false,
-      addRepaintBoundaries: false,
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return _SongRow(
-          item: item,
-          index: i,
-          onTap: () {
-            HapticFeedback.lightImpact();
-            ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
-            ref.read(_nowPlayingIdProvider.notifier).state = item.id;
-            context.push('/player/audio', extra: item);
-          },
-        );
-      },
+
+    List<MediaItem> recentlyAdded = [];
+    List<MediaItem> recentlyPlayed = [];
+    try {
+      recentlyAdded = PlayedDatabase.instance.getRecentlyAddedItems(items, days: 7);
+    } catch (_) {}
+    try {
+      recentlyPlayed = PlayedDatabase.instance.getRecentlyPlayed(limit: 20);
+    } catch (_) {}
+
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        if (recentlyAdded.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _InlineRecentlyAddedShelf(items: recentlyAdded, ref: ref),
+          ),
+        if (recentlyPlayed.isNotEmpty)
+          SliverToBoxAdapter(
+            child: _InlineRecentlyPlayedShelf(recent: recentlyPlayed, ref: ref),
+          ),
+        SliverPadding(
+          padding: const EdgeInsets.fromLTRB(0, 4, 0, 100),
+          sliver: SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, i) {
+                final item = items[i];
+                return _SongRow(
+                  item: item,
+                  index: i,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+                    ref.read(_nowPlayingIdProvider.notifier).state = item.id;
+                    context.push('/player/audio', extra: item);
+                  },
+                );
+              },
+              childCount: items.length,
+              addAutomaticKeepAlives: false,
+              addRepaintBoundaries: false,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ── Inline Recently Added shelf ───────────────────────────────────────────
+
+class _InlineRecentlyAddedShelf extends StatelessWidget {
+  final List<MediaItem> items;
+  final WidgetRef ref;
+  const _InlineRecentlyAddedShelf({required this.items, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+          child: Row(
+            children: [
+              const Text('RECENTLY ADDED',
+                  style: TextStyle(
+                    fontSize: 11, fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary, letterSpacing: 1.3,
+                    fontFamily: 'Inter',
+                  )),
+              const Spacer(),
+              Text('${items.length} new',
+                  style: const TextStyle(
+                    fontSize: 10, color: AppColors.accent,
+                    fontWeight: FontWeight.w600,
+                  )),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final item = items[i];
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+                  context.push(
+                    item.isVideo ? '/player/video' : '/player/audio',
+                    extra: item,
+                  );
+                },
+                child: Container(
+                  width: 155,
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.accent.withValues(alpha: 0.10),
+                        AppColors.accentViolet.withValues(alpha: 0.07),
+                      ],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                        color: AppColors.accent.withValues(alpha: 0.22)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Container(
+                            width: 28, height: 28,
+                            decoration: BoxDecoration(
+                              color: item.isVideo
+                                  ? AppColors.accent.withValues(alpha: 0.15)
+                                  : AppColors.accentViolet.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(7),
+                            ),
+                            child: Icon(
+                              item.isVideo
+                                  ? Icons.play_circle_fill_rounded
+                                  : Icons.music_note_rounded,
+                              color: item.isVideo
+                                  ? AppColors.accent
+                                  : AppColors.accentViolet,
+                              size: 15,
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text('NEW',
+                                style: TextStyle(
+                                  fontSize: 8, fontWeight: FontWeight.w800,
+                                  color: AppColors.accent, letterSpacing: 0.5,
+                                )),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 7),
+                      Text(item.title,
+                          style: const TextStyle(
+                            fontSize: 12, fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary, fontFamily: 'Inter',
+                          ),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      const SizedBox(height: 2),
+                      Text(_daysAgo(item.addedAt),
+                          style: const TextStyle(
+                              fontSize: 10, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+      ],
+    );
+  }
+
+  String _daysAgo(DateTime dt) {
+    final diff = DateTime.now().difference(dt);
+    if (diff.inDays == 0) return 'Today';
+    if (diff.inDays == 1) return 'Yesterday';
+    return '${diff.inDays}d ago';
+  }
+}
+
+// ── Inline Recently Played shelf ──────────────────────────────────────────
+
+class _InlineRecentlyPlayedShelf extends StatelessWidget {
+  final List<MediaItem> recent;
+  final WidgetRef ref;
+  const _InlineRecentlyPlayedShelf({required this.recent, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Padding(
+          padding: EdgeInsets.fromLTRB(20, 4, 20, 8),
+          child: Text('RECENTLY PLAYED',
+              style: TextStyle(
+                fontSize: 11, fontWeight: FontWeight.w700,
+                color: AppColors.textSecondary, letterSpacing: 1.3,
+                fontFamily: 'Inter',
+              )),
+        ),
+        SizedBox(
+          height: 64,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: recent.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (context, i) {
+              final item = recent[i];
+              return GestureDetector(
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(queueProvider.notifier).setQueue(recent, startIndex: i);
+                  context.push(
+                    item.isVideo ? '/player/video' : '/player/audio',
+                    extra: item,
+                  );
+                },
+                child: Container(
+                  width: 210,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [AppColors.surfaceElevated, AppColors.surface],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 36, height: 36,
+                        decoration: BoxDecoration(
+                          color: item.isVideo
+                              ? AppColors.accent.withValues(alpha: 0.12)
+                              : AppColors.accentViolet.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(
+                          item.isVideo
+                              ? Icons.play_circle_fill_rounded
+                              : Icons.music_note_rounded,
+                          color: item.isVideo
+                              ? AppColors.accent
+                              : AppColors.accentViolet,
+                          size: 18,
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(item.title,
+                                style: const TextStyle(
+                                  fontSize: 12, fontWeight: FontWeight.w600,
+                                  color: AppColors.textPrimary, fontFamily: 'Inter',
+                                ),
+                                maxLines: 1, overflow: TextOverflow.ellipsis),
+                            Text(
+                              item.artist != null && item.artist != '<unknown>'
+                                  ? item.artist!
+                                  : item.formattedDuration,
+                              style: const TextStyle(
+                                  fontSize: 10, color: AppColors.textSecondary),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 10),
+      ],
     );
   }
 }
