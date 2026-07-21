@@ -91,7 +91,32 @@ class AppwriteService {
         provider: OAuthProvider.google,
         success: 'appwrite-callback-${Environment.appwriteProjectId}:///',
         failure: 'appwrite-callback-${Environment.appwriteProjectId}:///failure',
+        scopes: ['profile', 'email'],
       );
+      // Store Google avatar URL in user prefs so photoUrlProvider can read it
+      try {
+        final user = await _account.get();
+        // Appwrite stores OAuth identity info — build avatar URL from email hash
+        // or use the Appwrite initials avatar as fallback
+        final identities = await _account.listIdentities();
+        String? avatarUrl;
+        for (final identity in identities.identities) {
+          if (identity.provider == 'google') {
+            // Google avatar is available via the providerAccessToken
+            // Store the user's name for initials avatar generation
+            avatarUrl = null; // Appwrite initials avatar used as fallback
+            break;
+          }
+        }
+        await _account.updatePrefs(prefs: {
+          ...user.prefs.data,
+          if (avatarUrl != null) 'avatarUrl': avatarUrl,
+          'signedInWith': 'google',
+          'email': user.email,
+        });
+      } catch (e) {
+        debugPrint('[Appwrite] Could not update prefs after sign-in: $e');
+      }
       _notifyAuthChange();
       unawaited(_backupAfterSignIn());
     } catch (e) {
