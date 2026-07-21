@@ -212,7 +212,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                       label: 'About OTYA Player',
                       subtitle: 'Version, support & what\'s new',
                       color: AppColors.textSecondary,
-                      onTap: () => context.push('/profile'),
+                      onTap: () => context.push('/about'),
                     ),
                   ],
                 ),

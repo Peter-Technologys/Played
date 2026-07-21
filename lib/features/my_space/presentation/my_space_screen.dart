@@ -172,7 +172,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
   @override
   void initState() {
     super.initState();
-    _tabs = TabController(length: 5, vsync: this, initialIndex: 0);
+    _tabs = TabController(length: 4, vsync: this, initialIndex: 0);
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) => _ensureMediaPermission());
   }
@@ -470,7 +470,6 @@ class _TabBar extends StatelessWidget {
         ),
         tabs: const [
           Tab(text: 'Songs'),
-          Tab(text: 'Videos'),
           Tab(text: 'Folders'),
           Tab(text: 'Playlists'),
           Tab(text: 'Favorites'),
@@ -512,7 +511,6 @@ class _TabViews extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final songs = _sorted(items.where((e) => !e.isVideo).toList());
-    final videos = _sorted(items.where((e) => e.isVideo).toList());
 
     return TabBarView(
       controller: controller,
@@ -522,12 +520,7 @@ class _TabViews extends StatelessWidget {
             ? const _EmptyState(icon: Icons.music_note_rounded, label: 'No songs found')
             : _SongList(items: songs),
 
-        // Videos
-        items.isEmpty
-            ? const _EmptyState(icon: Icons.videocam_rounded, label: 'No videos found')
-            : _VideoGrid(items: videos),
-
-        // Folders
+        // Folders (all media)
         _FoldersTab(items: items),
 
         // Playlists

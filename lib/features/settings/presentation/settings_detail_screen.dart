@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
@@ -285,12 +286,15 @@ class SettingsDetailScreen extends ConsumerWidget {
           _SectionHeader(label: 'Updates & About'),
           const SizedBox(height: 10),
 
-          // Glowing About card
-          _AboutCard(),
-
-          const SizedBox(height: 10),
-
           _GroupCard(children: [
+            _NavTile(
+              icon: Icons.info_outline_rounded,
+              label: 'About OTYA Player',
+              subtitle: 'Version, support & what\'s new',
+              color: AppColors.accent,
+              onTap: () => context.push('/about'),
+            ),
+            _Divider(),
             _NavTile(
               icon: Icons.system_update_outlined,
               label: 'Check for Updates',
@@ -680,117 +684,4 @@ class _Chip extends StatelessWidget {
   }
 }
 
-// ── Glowing About Card ────────────────────────────────────────────────
 
-class _AboutCard extends StatefulWidget {
-  @override
-  State<_AboutCard> createState() => _AboutCardState();
-}
-
-class _AboutCardState extends State<_AboutCard> {
-  String _version = '';
-  String _build   = '';
-
-  @override
-  void initState() {
-    super.initState();
-    PackageInfo.fromPlatform().then((info) {
-      if (mounted) {
-        setState(() {
-          _version = info.version;
-          _build   = info.buildNumber;
-        });
-      }
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(2),
-      decoration: BoxDecoration(
-        gradient: const LinearGradient(
-          colors: [AppColors.accent, AppColors.accentViolet],
-        ),
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: 0.25),
-            blurRadius: 24,
-            spreadRadius: 0,
-          ),
-        ],
-      ),
-      child: Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: const Color(0xFF1B1E2B),
-          borderRadius: BorderRadius.circular(18),
-        ),
-        child: Column(
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(14),
-              child: Image.asset(
-                'assets/icons/play_store_512.png',
-                width: 56,
-                height: 56,
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const Icon(
-                  Icons.play_circle_fill_rounded,
-                  color: AppColors.accent,
-                  size: 56,
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Text(
-              'OTYA Player',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Otya? Play. Your media, your rules.',
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 6),
-            Text(
-              _version.isEmpty
-                  ? 'Loading…'
-                  : 'Version $_version (build $_build)',
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.accent,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Divider(color: AppColors.border, height: 1),
-            const SizedBox(height: 16),
-            const Text(
-              'A premium offline media player inspired by the Luganda word "Otya?". '
-              'Play, organise, and share your local audio and video — no internet required.',
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                fontSize: 12,
-                color: AppColors.textSecondary,
-                height: 1.6,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
