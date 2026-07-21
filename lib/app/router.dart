@@ -3,7 +3,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/my_space/presentation/my_space_screen.dart';
+import '../features/my_space/presentation/my_space_hub_screen.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart';
+import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
@@ -12,11 +14,13 @@ import '../features/player/presentation/mini_player.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
+import '../features/tools/tools_screen.dart';
 import '../features/playlists/playlist_screen.dart';
+import '../features/settings/presentation/settings_detail_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
-import '../shared/widgets/ad_banner_slot.dart'; // no-op stub while ads disabled
-import '../shared/widgets/pro_gate.dart'; // pass-through stub while ads disabled
+import '../shared/widgets/ad_banner_slot.dart';
+import '../shared/widgets/pro_gate.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -25,15 +29,25 @@ class AppRouter {
       ShellRoute(
         builder: (context, state, child) => _MainShell(child: child),
         routes: [
-          GoRoute(path: '/',        builder: (_, __) => const MySpaceScreen()),
+          // Tab 0 — Video
+          GoRoute(path: '/',        builder: (_, __) => const _VideoTab()),
+          // Tab 1 — Music
+          GoRoute(path: '/music',   builder: (_, __) => const MySpaceScreen()),
+          // Tab 2 — Tools
+          GoRoute(path: '/tools',   builder: (_, __) => const ToolsScreen()),
+          // Tab 3 — My Space
+          GoRoute(path: '/myspace', builder: (_, __) => const MySpaceHubScreen()),
+          // Air-Drop (accessible from Tools)
           GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
         ],
       ),
-      GoRoute(path: '/profile',       builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/settings',      builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/tools/folders', builder: (_, __) => const FolderBrowserScreen()),
-      GoRoute(path: '/playlists',     builder: (_, __) => const PlaylistsScreen()),
-      GoRoute(path: '/vault',         builder: (_, __) => const VaultLockScreen()),
+      GoRoute(path: '/profile',         builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/settings',        builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/settings-detail', builder: (_, __) => const SettingsDetailScreen()),
+      GoRoute(path: '/tools/folders',   builder: (_, __) => const FolderBrowserScreen()),
+      GoRoute(path: '/history',         builder: (_, __) => const PlaybackHistoryScreen()),
+      GoRoute(path: '/playlists',       builder: (_, __) => const PlaylistsScreen()),
+      GoRoute(path: '/vault',           builder: (_, __) => const VaultLockScreen()),
       GoRoute(
         path: '/player/equalizer',
         builder: (_, __) => const ProGate(
@@ -54,7 +68,8 @@ class AppRouter {
         path: '/tools/whatsapp',
         builder: (_, s) => ProGate(
           featureName: 'WhatsApp Trimmer',
-          featureDescription: 'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
+          featureDescription:
+              'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
           child: WhatsAppTrimmerScreen(mediaItem: s.extra as MediaItem),
         ),
       ),
@@ -62,7 +77,20 @@ class AppRouter {
   );
 }
 
-// ── Main Shell ─────────────────────────────────────────────────────────────────────────────
+// ── Video Tab placeholder (wraps MySpaceScreen filtered to videos) ────
+
+class _VideoTab extends StatelessWidget {
+  const _VideoTab();
+
+  @override
+  Widget build(BuildContext context) {
+    // Reuse MySpaceScreen but open directly on the Videos tab (index 0).
+    // MySpaceScreen already has Videos as tab 0 after the tab-order fix.
+    return const MySpaceScreen();
+  }
+}
+
+// ── Main Shell ────────────────────────────────────────────────────────
 
 class _MainShell extends ConsumerStatefulWidget {
   final Widget child;
@@ -73,101 +101,40 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  // 0=AirDrop  1=Vault  2=MySpace(center)  3=Tools
-  int _currentIndex = 2;
+  int _currentIndex = 0;
+
+  static const _routes = ['/', '/music', '/tools', '/myspace'];
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
-    if (index == 3) { _showToolsSheet(); return; }
-    if (index == 1) {
-      GoRouter.of(context).push('/vault');
-      return;
-    }
     if (index == _currentIndex) return;
     setState(() => _currentIndex = index);
-    const routes = ['/airdrop', '', '/', ''];
-    GoRouter.of(context).go(routes[index]);
-  }
-
-  void _showToolsSheet() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(width: 40, height: 4,
-                  decoration: BoxDecoration(
-                      color: AppColors.border,
-                      borderRadius: BorderRadius.circular(2))),
-            ),
-            const SizedBox(height: 20),
-            const Text('Tools',
-                style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                )),
-            const SizedBox(height: 4),
-            const Text('Quick utilities for your media',
-                style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 20),
-            _ToolTile(
-              icon: Icons.phone_android_rounded,
-              label: 'WhatsApp Trimmer',
-              subtitle: 'Trim & compress video to 30s / 16MB',
-              color: AppColors.accent,
-              isPro: true,
-              onTap: () {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Open a file from My Space, then tap ⋮ → Trim for WhatsApp'),
-                    duration: Duration(seconds: 3),
-                  ),
-                );
-              },
-            ),
-            _ToolTile(
-              icon: Icons.folder_open_rounded,
-              label: 'Browse by Folder',
-              subtitle: 'Navigate files by directory',
-              color: AppColors.accent,
-              onTap: () {
-                Navigator.pop(context);
-                GoRouter.of(context).push('/tools/folders');
-              },
-            ),
-          ],
-        ),
-      ),
-    );
+    GoRouter.of(context).go(_routes[index]);
   }
 
   @override
   Widget build(BuildContext context) {
+    final miniItem = ref.watch(miniPlayerItemProvider);
+    final hasMini  = miniItem != null;
+
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const MiniPlayer(),
+          // Mini-player — only rendered when a track is loaded
+          if (hasMini) const MiniPlayer(),
           const AdBannerSlot(),
           SafeArea(
             child: Container(
-              margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: const Color(0xFF1B1E2B),
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: AppColors.border),
+                border: Border.all(color: const Color(0xFF2A2F45)),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.12),
+                    color: AppColors.accent.withValues(alpha: 0.10),
                     blurRadius: 24,
                     offset: const Offset(0, 4),
                   ),
@@ -179,24 +146,26 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _NavItem(
-                      icon: Icons.wifi_tethering_rounded,
-                      label: 'Air-Drop',
+                      icon: Icons.play_circle_rounded,
+                      label: 'Video',
                       isActive: _currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
                     _NavItem(
-                      icon: Icons.lock_rounded,
-                      label: 'Vault',
+                      icon: Icons.music_note_rounded,
+                      label: 'Music',
                       isActive: _currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
-                    _CenterNavItem(
+                    _NavItem(
+                      icon: Icons.grid_view_rounded,
+                      label: 'Tools',
                       isActive: _currentIndex == 2,
                       onTap: () => _onTap(2),
                     ),
                     _NavItem(
-                      icon: Icons.construction_rounded,
-                      label: 'Tools',
+                      icon: Icons.person_rounded,
+                      label: 'My Space',
                       isActive: _currentIndex == 3,
                       onTap: () => _onTap(3),
                     ),
@@ -211,64 +180,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
   }
 }
 
-// ── Center Nav Item (My Space) ─────────────────────────────────────────────────────────────────
-
-class _CenterNavItem extends StatelessWidget {
-  final bool isActive;
-  final VoidCallback onTap;
-  const _CenterNavItem({required this.isActive, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          AnimatedScale(
-            scale: isActive ? 1.0 : 0.90,
-            duration: const Duration(milliseconds: 200),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 250),
-              width: 54, height: 54,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: const LinearGradient(
-                  colors: [AppColors.accentViolet, AppColors.accent],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                boxShadow: isActive
-                    ? [
-                        BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.50),
-                          blurRadius: 20,
-                          spreadRadius: 2,
-                        ),
-                        BoxShadow(
-                          color: AppColors.accentViolet.withValues(alpha: 0.30),
-                          blurRadius: 32,
-                          spreadRadius: 4,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: const Icon(Icons.home_rounded, color: Colors.white, size: 26),
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text('My Space',
-              style: TextStyle(
-                fontSize: 10, fontWeight: FontWeight.w700,
-                color: isActive ? AppColors.accent : AppColors.textSecondary,
-              )),
-        ],
-      ),
-    );
-  }
-}
-
-// ── Regular Nav Item ───────────────────────────────────────────────────────────────────────────────────
+// ── Nav Item ──────────────────────────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
@@ -289,12 +201,25 @@ class _NavItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.accent.withValues(alpha: 0.12)
-              : Colors.transparent,
+          gradient: isActive
+              ? const LinearGradient(
+                  colors: [AppColors.accent, AppColors.accentViolet],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                )
+              : null,
           borderRadius: BorderRadius.circular(20),
+          boxShadow: isActive
+              ? [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: 0.30),
+                    blurRadius: 12,
+                    spreadRadius: 0,
+                  ),
+                ]
+              : null,
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
@@ -302,103 +227,22 @@ class _NavItem extends StatelessWidget {
             AnimatedScale(
               scale: isActive ? 1.1 : 1.0,
               duration: const Duration(milliseconds: 200),
-              child: Icon(icon,
-                  color: isActive ? AppColors.accent : AppColors.textSecondary,
-                  size: 22),
+              child: Icon(
+                icon,
+                color: isActive ? Colors.black : AppColors.textSecondary,
+                size: 22,
+              ),
             ),
             const SizedBox(height: 3),
-            Text(label,
-                style: TextStyle(
-                  fontSize: 10, fontWeight: FontWeight.w600,
-                  color: isActive ? AppColors.accent : AppColors.textSecondary,
-                )),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ── Tools Sheet Tile ───────────────────────────────────────────────────────────────────────────────────
-
-class _ToolTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String subtitle;
-  final Color color;
-  final bool isPro;
-  final VoidCallback onTap;
-  const _ToolTile({
-    required this.icon,
-    required this.label,
-    required this.subtitle,
-    required this.color,
-    required this.onTap,
-    this.isPro = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        decoration: BoxDecoration(
-          color: AppColors.background,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 40, height: 40,
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(icon, color: color, size: 20),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Text(label,
-                          style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w600,
-                            color: color,
-                          )),
-                      if (isPro) ...[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                                color: AppColors.accent.withValues(alpha: 0.4)),
-                          ),
-                          child: const Text('PRO',
-                              style: TextStyle(
-                                fontSize: 9, fontWeight: FontWeight.w700,
-                                color: AppColors.accent,
-                              )),
-                        ),
-                      ],
-                    ],
-                  ),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          fontSize: 11, color: AppColors.textSecondary)),
-                ],
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: isActive ? Colors.black : AppColors.textSecondary,
+                fontFamily: 'Inter',
               ),
             ),
-            Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 18),
           ],
         ),
       ),

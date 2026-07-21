@@ -10,13 +10,6 @@ import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/widgets/update_dialog.dart';
 
-// The overlay style is constant — status bar transparent with light icons.
-// Defined once here so it is never re-allocated on every build() call.
-const _kOverlayStyle = SystemUiOverlayStyle(
-  statusBarColor: Colors.transparent,
-  statusBarIconBrightness: Brightness.light,
-);
-
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
 
@@ -32,15 +25,22 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
     _checkOnboarding();
-    // Fix #6: apply the overlay style once in initState, not on every build().
-    // ref.listen below will update it if the theme changes.
-    SystemChrome.setSystemUIOverlayStyle(_kOverlayStyle);
-    // Check for updates after the first frame is drawn so it never
-    // delays the app startup. Shows a friendly dialog if a new version
-    // is available — max once per day.
+    _applyOverlayStyle(isDark: true);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) UpdateDialog.checkAndShow(context);
     });
+  }
+
+  void _applyOverlayStyle({required bool isDark}) {
+    SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
+      systemNavigationBarColor:
+          isDark ? const Color(0xFF0F1117) : const Color(0xFFF5F7FA),
+      systemNavigationBarIconBrightness:
+          isDark ? Brightness.light : Brightness.dark,
+    ));
   }
 
   Future<void> _checkOnboarding() async {
@@ -63,20 +63,21 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Watch settings so the theme rebuilds whenever the user changes it
     final settings = ref.watch(settingsProvider);
+    final isDark = settings.themeMode != AppThemeMode.light;
 
-    // Fix #6: re-apply overlay style only when the theme actually changes,
-    // not on every build(). This avoids a platform channel call per frame.
-    ref.listen<AppSettings>(settingsProvider, (_, __) {
-      SystemChrome.setSystemUIOverlayStyle(_kOverlayStyle);
+    // Update status-bar icon brightness whenever theme changes.
+    ref.listen<AppSettings>(settingsProvider, (prev, next) {
+      if (prev?.themeMode != next.themeMode) {
+        _applyOverlayStyle(isDark: next.themeMode != AppThemeMode.light);
+      }
     });
 
     if (_checking) {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         home: Scaffold(
-          backgroundColor: const Color(0xFF020408),
+          backgroundColor: const Color(0xFF0F111A),
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -131,10 +132,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     return MaterialApp.router(
       title: 'OTYA Player',
       debugShowCheckedModeBanner: false,
-      // theme / darkTheme / themeMode work together:
-      //   Light  → ThemeMode.light  → AppTheme.light
-      //   Dark   → ThemeMode.dark   → AppTheme.dark
-      //   AMOLED → ThemeMode.dark   → AppTheme.dark + pure-black override in builder
       theme:     AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: switch (settings.themeMode) {
@@ -145,7 +142,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       routerConfig: AppRouter.router,
       builder: (context, child) {
         final isAmoled = settings.themeMode == AppThemeMode.amoled;
-        // AMOLED: override scaffold + surface to pure black
         final wrappedChild = isAmoled
             ? Theme(
                 data: Theme.of(context).copyWith(
