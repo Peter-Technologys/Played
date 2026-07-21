@@ -156,37 +156,43 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   void attachContainer(ProviderContainer container) {
     _container = container;
-    // Wire notification / lock screen skip buttons to the in-app queue
+    // Best-effort wire at creation time. If the handler is not yet ready
+    // (AudioService.init() is async), load() will re-wire on every call.
     _handler?.onSkipNext     = skipNext;
     _handler?.onSkipPrevious = skipPrevious;
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
-    // AudioService initialises in the background after runApp.
-    // If the user taps a song before it is ready, retry for up to 4 s.
+    // ── Wait for AudioService ──────────────────────────────────────────────
+    // AudioService.init() runs in the background after runApp().
+    // Exponential back-off: total wait up to ~7 s before giving up.
     if (_handler == null) {
-      debugPrint('[AudioPlayer] Waiting for AudioService to be ready...');
-      for (var i = 0; i < 8; i++) {
-        await Future.delayed(const Duration(milliseconds: 500));
+      debugPrint('[AudioPlayer] Waiting for AudioService...');
+      const delays = [100, 200, 300, 500, 500, 1000, 1000, 1500, 2000];
+      for (final ms in delays) {
+        await Future.delayed(Duration(milliseconds: ms));
         if (_handler != null) break;
       }
     }
     if (_handler == null) {
-      debugPrint('[AudioPlayer] AudioService not ready after 4 s — giving up.');
-      state = state.copyWith(isLoading: false);
+      debugPrint('[AudioPlayer] AudioService not ready — giving up.');
+      if (mounted) state = state.copyWith(isLoading: false);
       return;
     }
-    _currentItemId = item.id;
-    // Do NOT reset _streamsAttached here — the identical(_attachedPlayer, player)
-    // guard in _attachStreams() is sufficient to detect player instance changes.
-    // Resetting the flag caused streams to be re-attached and stacked on every
-    // track load even when the underlying AudioPlayer instance had not changed.
-    state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
-    _container?.read(miniPlayerItemProvider.notifier).state = item;
-    _attachStreams();
 
+    // FIX 3: Re-wire callbacks on EVERY load() call.
+    // attachContainer() runs at provider creation when globalAudioHandler is
+    // still null, so the ?. operator silently skips the assignment and the
+    // callbacks are never set. Re-wiring here guarantees they are always live.
     _handler!.onSkipNext     = skipNext;
     _handler!.onSkipPrevious = skipPrevious;
+
+    _currentItemId = item.id;
+    if (mounted) {
+      state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
+    }
+    _container?.read(miniPlayerItemProvider.notifier).state = item;
+    _attachStreams();
 
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
     final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);

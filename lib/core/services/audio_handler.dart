@@ -7,69 +7,33 @@ import '../../core/models/media_item.dart' as app;
 /// Global singleton — initialised once in main.dart via AudioService.init().
 PlayedAudioHandler? globalAudioHandler;
 
-/// PlayedAudioHandler — 2027 MediaPlaybackHandler.
-///
-/// Extends BaseAudioHandler with QueueHandler + SeekHandler so the Android
-/// MediaSession notification drawer gets full interactive controls:
-/// Play, Pause, Skip Next/Previous, and a scrubbable seek timeline.
-///
-/// Queue management:
-///   The handler owns the playlist queue internally. When skipToNext() or
-///   skipToPrevious() is called from the notification, it advances the
-///   queue index, updates the MediaItem metadata (title, artist, art URI)
-///   in the notification, and loads the new track — all without touching
-///   the UI thread.
-///
-/// Performance:
-///   • _loading guard prevents overlapping loadAndPlay calls.
-///   • playbackEventStream is piped directly into the BehaviorSubject
-///     — no intermediate StreamController allocation.
-///   • switch expression for processingState is exhaustive and avoids
-///     the null-fallback overhead of the old Map lookup.
 class PlayedAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
   final AudioPlayer _player = AudioPlayer();
 
-  // ── Queue state ───────────────────────────────────────────────────────────────
-  List<app.MediaItem> _playlist = [];
+  List<app.MediaItem> _playlist      = [];
   int                 _queueIndex     = 0;
   bool                _loading        = false;
-  // Incremented on every setPlaylist/loadAndPlay call so an in-flight
-  // _loadCurrent can detect it has been superseded and bail out early,
-  // fixing the race condition where rapid song taps caused the wrong
-  // track to play.
   int                 _loadGeneration = 0;
 
-  // Public callbacks — wired by AudioPlayerNotifier so notification /
-  // lock-screen skip buttons advance the in-app queue automatically.
-  // Restored: accidentally removed in the !62 QueueHandler rewrite.
   void Function()? onSkipNext;
   void Function()? onSkipPrevious;
 
-  // Playback settings carried across track changes
   double _speed       = 1.0;
   bool   _skipSilence = false;
 
   PlayedAudioHandler() {
-    // Listen to playback events and push into the BehaviorSubject.
-    // Using listen() instead of pipe() avoids an unhandled Future rejection
-    // when the stream closes during dispose.
     _player.playbackEventStream.listen(
       (event) => playbackState.add(_transformEvent(event)),
       onError: (Object e) =>
           debugPrint('[AudioHandler] playbackEventStream error: $e'),
     );
 
-    // Update playbackState on completion. Auto-advance is intentionally NOT
-    // done here — it is handled exclusively by AudioPlayerNotifier via the
-    // onSkipNext callback, which respects repeat/shuffle state. Calling
-    // skipToNext() here AND in the notifier caused double-skipping.
     _player.playerStateStream.listen((state) {
       if (state.processingState == ProcessingState.completed) {
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.completed,
         ));
-        // Notify the UI-side notifier so it can drive queue progression.
         onSkipNext?.call();
       }
     });
@@ -77,36 +41,25 @@ class PlayedAudioHandler extends BaseAudioHandler
 
   AudioPlayer get player => _player;
 
-  // ── Queue management ───────────────────────────────────────────────────────────
-
-  /// Replace the entire playlist and start playing from [startIndex].
   Future<void> setPlaylist(
     List<app.MediaItem> items, {
     int    startIndex  = 0,
     double speed       = 1.0,
     bool   skipSilence = false,
   }) async {
-    // Bump generation so any in-flight _loadCurrent bails out early.
     _loadGeneration++;
     _playlist    = List.unmodifiable(items);
     _queueIndex  = startIndex.clamp(0, items.isEmpty ? 0 : items.length - 1);
     _speed       = speed;
     _skipSilence = skipSilence;
-
-    // Publish the full queue to the MediaSession so the notification
-    // drawer can show queue metadata on supported Android versions.
     queue.add(_playlist.map(_toMediaItem).toList());
-
-    if (_playlist.isNotEmpty) {
-      await _loadCurrent();
-    }
+    if (_playlist.isNotEmpty) await _loadCurrent();
   }
 
-  /// Load and play a single item (backwards-compatible with existing callers).
   Future<void> loadAndPlay(
     app.MediaItem item, {
-    double   speed       = 1.0,
-    bool     skipSilence = false,
+    double    speed         = 1.0,
+    bool      skipSilence   = false,
     Duration? savedPosition,
   }) async {
     await setPlaylist([item], speed: speed, skipSilence: skipSilence);
@@ -114,8 +67,6 @@ class PlayedAudioHandler extends BaseAudioHandler
       await _player.seek(savedPosition);
     }
   }
-
-  // ── BaseAudioHandler overrides ───────────────────────────────────────────────────────
 
   @override Future<void> play()  => _player.play();
   @override Future<void> pause() => _player.pause();
@@ -129,8 +80,6 @@ class PlayedAudioHandler extends BaseAudioHandler
     return _player.setSpeed(speed);
   }
 
-  /// Skip to next track in the queue.
-  /// Updates the notification MediaItem metadata before loading.
   @override
   Future<void> skipToNext() async {
     if (_playlist.isEmpty) return;
@@ -138,8 +87,6 @@ class PlayedAudioHandler extends BaseAudioHandler
       _queueIndex++;
       await _loadCurrent();
     } else {
-      // End of queue — pause and signal completion without dismissing the
-      // notification (stop() sends a stop event that removes the drawer).
       await _player.pause();
       playbackState.add(playbackState.value.copyWith(
         processingState: AudioProcessingState.completed,
@@ -148,8 +95,6 @@ class PlayedAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Skip to previous track in the queue.
-  /// If more than 3 seconds have elapsed, seeks to start instead.
   @override
   Future<void> skipToPrevious() async {
     if (_playlist.isEmpty) return;
@@ -163,7 +108,6 @@ class PlayedAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Jump to a specific queue index (e.g. user taps a track in the playlist).
   @override
   Future<void> skipToQueueItem(int index) async {
     if (index < 0 || index >= _playlist.length) return;
@@ -171,43 +115,52 @@ class PlayedAudioHandler extends BaseAudioHandler
     await _loadCurrent();
   }
 
-  // ── Internal helpers ───────────────────────────────────────────────────────────────
-
   Future<void> _loadCurrent() async {
-    // Capture generation at entry; bail out if superseded by a newer call.
     final myGeneration = _loadGeneration;
 
+    // FIX 1: Reset stale _loading flag instead of returning early.
+    // The old guard caused a permanent deadlock when the user tapped a new
+    // track while the previous one was still buffering — _loading stayed
+    // true forever and silently blocked all future playback.
     if (_loading) {
-      debugPrint('[AudioHandler] _loadCurrent skipped — already loading.');
-      return;
+      debugPrint('[AudioHandler] _loadCurrent: resetting stale _loading flag.');
+      _loading = false;
     }
+
     if (_playlist.isEmpty) return;
     _loading = true;
+
     try {
       final item = _playlist[_queueIndex];
 
-      // Update the notification MediaItem BEFORE loading so the drawer
-      // shows the new title/art immediately without waiting for buffering.
       mediaItem.add(_toMediaItem(item));
-
-      // Publish the current queue index so the notification can highlight
-      // the active track in queue-aware launchers.
-      playbackState.add(playbackState.value.copyWith(
-        queueIndex: _queueIndex,
-      ));
+      playbackState.add(playbackState.value.copyWith(queueIndex: _queueIndex));
 
       if (_player.playing) await _player.pause();
-      if (_loadGeneration != myGeneration) return; // superseded
+      if (_loadGeneration != myGeneration) return;
 
-      await _player.setAudioSource(
-        AudioSource.uri(Uri.file(item.filePath)),
-        preload: true,
-      );
-      if (_loadGeneration != myGeneration) return; // superseded
+      // FIX 2: Inner try/catch so a bad file path surfaces a clear error
+      // and does NOT leave _loading = true forever via an early return that
+      // bypasses the outer finally block.
+      try {
+        await _player.setAudioSource(
+          AudioSource.uri(Uri.file(item.filePath)),
+          preload: true,
+        );
+      } catch (srcErr) {
+        debugPrint('[AudioHandler] setAudioSource failed: $srcErr\nPath: ${item.filePath}');
+        playbackState.add(playbackState.value.copyWith(
+          processingState: AudioProcessingState.error,
+          playing: false,
+        ));
+        return; // falls through to finally -> _loading = false
+      }
+
+      if (_loadGeneration != myGeneration) return;
 
       await _player.setSpeed(_speed);
       await _player.setSkipSilenceEnabled(_skipSilence);
-      if (_loadGeneration != myGeneration) return; // superseded
+      if (_loadGeneration != myGeneration) return;
 
       await play();
     } catch (e) {
@@ -221,7 +174,6 @@ class PlayedAudioHandler extends BaseAudioHandler
     }
   }
 
-  /// Convert an app.MediaItem to the audio_service MediaItem format.
   MediaItem _toMediaItem(app.MediaItem item) => MediaItem(
     id:       item.id,
     title:    item.title,
@@ -242,7 +194,6 @@ class PlayedAudioHandler extends BaseAudioHandler
       ProcessingState.ready     => AudioProcessingState.ready,
       ProcessingState.completed => AudioProcessingState.completed,
     };
-
     return PlaybackState(
       controls: [
         MediaControl.skipToPrevious,
