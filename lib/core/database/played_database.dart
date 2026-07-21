@@ -190,6 +190,11 @@ class PlayedDatabase {
     try { await _seekPos.delete(mediaId); } catch (_) {}
   }
 
+  /// Clears ALL saved seek positions — used by the Storage Cleaner tool.
+  Future<void> clearAllSeekPositions() async {
+    try { await _seekPos.clear(); } catch (_) {}
+  }
+
   // ── Playlists ──────────────────────────────────────────────────────────────
 
   Future<void> savePlaylist(Playlist playlist) async {

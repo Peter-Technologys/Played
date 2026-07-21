@@ -353,7 +353,7 @@ class ToolsScreen extends ConsumerWidget {
     );
     if (confirmed != true || !context.mounted) return;
     try {
-      await PlayedDatabase.instance.clearSeekPositions();
+      await PlayedDatabase.instance.clearAllSeekPositions();
     } catch (_) {}
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
