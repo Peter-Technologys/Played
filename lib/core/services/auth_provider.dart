@@ -5,17 +5,13 @@ import 'appwrite_service.dart';
 /// Streams the current Appwrite user.
 /// Re-emits whenever sign-in or sign-out happens.
 final authUserProvider = StreamProvider<models.User?>((ref) async* {
-  // Emit current state immediately
   yield await AppwriteService.instance.getCurrentUser();
-
-  // Then re-emit every time auth changes (sign-in / sign-out)
   await for (final _ in _authChangeStream()) {
     yield await AppwriteService.instance.getCurrentUser();
   }
 });
 
 Stream<void> _authChangeStream() async* {
-  // Backed by the callback list on AppwriteService
   while (true) {
     final completer = _AuthCompleter();
     AppwriteService.instance.addAuthListener(completer.complete);
@@ -26,24 +22,17 @@ Stream<void> _authChangeStream() async* {
 
 class _AuthCompleter {
   bool _done = false;
-  void Function()? _resolve;
 
   Future<void> get future async {
-    if (_done) return;
-    await Future<void>(() async {
-      while (!_done) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-      }
-    });
+    while (!_done) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
   }
 
-  void complete() {
-    _done = true;
-    _resolve?.call();
-  }
+  void complete() => _done = true;
 }
 
-/// True when a real (non-anonymous) user is signed in.
+/// True when a real user is signed in.
 final isSignedInProvider = Provider<bool>((ref) {
   return ref.watch(authUserProvider).maybeWhen(
     data: (user) => user != null,
@@ -67,6 +56,27 @@ final userEmailProvider = Provider<String?>((ref) {
   );
 });
 
-// Keep old name for settings_screen.dart compatibility
+/// Google profile photo URL.
+/// Appwrite stores it in user prefs after OAuth under key 'avatarUrl'.
+/// Falls back to the Appwrite avatar API which generates an initials avatar.
+final photoUrlProvider = Provider<String?>((ref) {
+  return ref.watch(authUserProvider).maybeWhen(
+    data: (user) {
+      if (user == null) return null;
+      // Check prefs for Google avatar stored after OAuth
+      final prefs = user.prefs.data;
+      final avatar = prefs['avatarUrl'] as String?;
+      if (avatar != null && avatar.isNotEmpty) return avatar;
+      // Fallback: Appwrite initials avatar
+      if (user.name.isNotEmpty) {
+        final encoded = Uri.encodeComponent(user.name);
+        return 'https://nyc.cloud.appwrite.io/v1/avatars/initials?name=$encoded&project=6a3011f1003b1a6cc74d';
+      }
+      return null;
+    },
+    orElse: () => null,
+  );
+});
+
+// Compatibility aliases
 final isGoogleSignedInProvider = isSignedInProvider;
-final photoUrlProvider = Provider<String?>((_) => null);
