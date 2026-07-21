@@ -143,6 +143,7 @@ class ProfileScreen extends ConsumerWidget {
           const _SectionHeader(label: 'Audio'),
           const SizedBox(height: 8),
           _CollapsibleSection(
+            initiallyExpanded: false,
             children: [
               _SettingsTile(
                 icon: Icons.speed_rounded,
@@ -220,6 +221,7 @@ class ProfileScreen extends ConsumerWidget {
           const _SectionHeader(label: 'Video'),
           const SizedBox(height: 8),
           _CollapsibleSection(
+            initiallyExpanded: false,
             children: [
               _SwitchTile(
                 icon: Icons.battery_saver_rounded,
@@ -359,58 +361,7 @@ class ProfileScreen extends ConsumerWidget {
           // ── 9. ABOUT ──────────────────────────────────────────────────
           const _SectionHeader(label: 'About'),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(2),
-            decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                  colors: [AppColors.accent, AppColors.accentViolet]),
-              borderRadius: BorderRadius.circular(18),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                children: [
-                  const PlayedLogo(fontSize: 18, letterSpacing: 3,
-                      borderRadius: 10,
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6)),
-                  const SizedBox(height: 12),
-                  const Text('Otya? Play. Your media, your rules.',
-                      style: TextStyle(
-                          fontSize: 13, color: AppColors.textSecondary,
-                          fontFamily: 'Inter')),
-                  const SizedBox(height: 4),
-                  const Text('Version 1.2.0 (build 3)',
-                      style: TextStyle(
-                          fontSize: 12, color: AppColors.textMuted,
-                          fontFamily: 'Inter')),
-                  const SizedBox(height: 16),
-                  const Divider(color: AppColors.border, height: 1),
-                  const SizedBox(height: 16),
-                  const Text(
-                    'OTYA Player is a premium offline media player inspired by the Luganda word "Otya?". '
-                    'Play, organise, and share your local audio and video — no internet required.',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                        fontSize: 12, color: AppColors.textSecondary,
-                        height: 1.6, fontFamily: 'Inter'),
-                  ),
-                ],
-              ),
-            ),
-          ).animate().fadeIn(duration: 400.ms),
-          const SizedBox(height: 12),
-          _SettingsTile(
-            icon: Icons.business_rounded,
-            label: 'Developer',
-            trailing: const Text('OTYA Player Team',
-                style: TextStyle(
-                    fontSize: 13, color: AppColors.textSecondary,
-                    fontFamily: 'Inter')),
-          ),
+          const _AboutCard(),
           const SizedBox(height: 8),
           _TappableTile(
             icon: Icons.email_outlined,
@@ -422,10 +373,17 @@ class ProfileScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.new_releases_outlined,
             label: "What's New",
-            subtitle: 'Version 1.2.0 release notes',
+            subtitle: 'See what changed in this version',
             onTap: () => Navigator.of(context).push(
               MaterialPageRoute(builder: (_) => const WhatsNewScreen()),
             ),
+          ),
+          const SizedBox(height: 8),
+          _TappableTile(
+            icon: Icons.share_rounded,
+            label: 'Share App',
+            subtitle: 'Send OTYA Player to a friend',
+            onTap: () => _shareApp(context),
           ),
           const SizedBox(height: 8),
           _TappableTile(
@@ -805,6 +763,24 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _shareApp(BuildContext context) async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      await Share.share(
+        'Download OTYA Player v${info.version} — free offline media player for Android:\n'
+        'https://getotya.petersmartlink.com/download',
+        subject: 'OTYA Player',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not share: $e'),
+              backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   Future<void> _launchUrl(BuildContext context, String url) async {
     final uri = Uri.parse(url);
     // Try in-app browser first, fall back to external app
@@ -995,6 +971,90 @@ class _StorageSectionState extends State<_StorageSection> {
   }
 }
 
+// ── About Card (live version from PackageInfo) ──────────────────────────────────────────────
+
+class _AboutCard extends StatefulWidget {
+  const _AboutCard();
+  @override
+  State<_AboutCard> createState() => _AboutCardState();
+}
+
+class _AboutCardState extends State<_AboutCard> {
+  String _version = '';
+  String _build   = '';
+
+  @override
+  void initState() {
+    super.initState();
+    PackageInfo.fromPlatform().then((info) {
+      if (mounted) setState(() { _version = info.version; _build = info.buildNumber; });
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+            colors: [AppColors.accent, AppColors.accentViolet]),
+        borderRadius: BorderRadius.circular(18),
+      ),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(14),
+              child: Image.asset(
+                'assets/icons/play_store_512.png',
+                width: 56, height: 56, fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => const Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: AppColors.accent, size: 56,
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Text('OTYA Player',
+                style: TextStyle(
+                  fontSize: 18, fontWeight: FontWeight.w800,
+                  color: AppColors.textPrimary, fontFamily: 'Inter',
+                )),
+            const SizedBox(height: 4),
+            const Text('Otya? Play. Your media, your rules.',
+                style: TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary,
+                    fontFamily: 'Inter')),
+            const SizedBox(height: 6),
+            Text(
+              _version.isEmpty ? 'Loading…' : 'Version $_version (build $_build)',
+              style: const TextStyle(
+                  fontSize: 12, color: AppColors.accent,
+                  fontFamily: 'Inter', fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 16),
+            const Divider(color: AppColors.border, height: 1),
+            const SizedBox(height: 16),
+            const Text(
+              'A premium offline media player inspired by the Luganda word "Otya?". '
+              'Play, organise, and share your local audio and video — no internet required.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 12, color: AppColors.textSecondary,
+                  height: 1.6, fontFamily: 'Inter'),
+            ),
+          ],
+        ),
+      ),
+    ).animate().fadeIn(duration: 400.ms);
+  }
+}
+
 // ── What's New Screen ──────────────────────────────────────────────────────
 
 class WhatsNewScreen extends StatelessWidget {
@@ -1002,9 +1062,28 @@ class WhatsNewScreen extends StatelessWidget {
 
   static const _sections = [
     _ChangeSection(
+      version: '1.4.0',
+      date: 'July 2026',
+      isLatest: true,
+      items: [
+        _ChangeItem(Icons.play_circle_fill_rounded, AppColors.accent,
+            'New Video Engine', 'Migrated to media_kit — faster startup, hardware-accelerated, supports MKV/AVI/4K.'),
+        _ChangeItem(Icons.wifi_tethering_rounded, AppColors.accentViolet,
+            'Flash Share', 'Pure-Dart HTTP file sharing — no Bluetooth pairing needed.'),
+        _ChangeItem(Icons.lock_rounded, AppColors.accent,
+            'Vault in Nav Bar', 'One-tap access to your private vault from the bottom nav.'),
+        _ChangeItem(Icons.construction_rounded, AppColors.accentViolet,
+            'UI Refresh', 'Readable dark theme, logo-only header, less crowded screens.'),
+        _ChangeItem(Icons.system_update_rounded, AppColors.accent,
+            'Auto Update Check', 'In-app update checker now enabled by default.'),
+        _ChangeItem(Icons.share_rounded, AppColors.accentViolet,
+            'Share App', 'Share the app download link directly from Settings.'),
+      ],
+    ),
+    _ChangeSection(
       version: '1.2.0',
       date: 'June 2026',
-      isLatest: true,
+      isLatest: false,
       items: [
         _ChangeItem(Icons.video_library_rounded, AppColors.accent,
             'Video Thumbnails', 'Real video frames shown in the grid.'),
@@ -1012,11 +1091,9 @@ class WhatsNewScreen extends StatelessWidget {
             'Album Art', 'Real cover art from your music files.'),
         _ChangeItem(Icons.directions_car_rounded, AppColors.accent,
             'Car Mode', 'Large-button layout for safe driving.'),
-        _ChangeItem(Icons.drive_file_rename_outline_rounded, AppColors.accentViolet,
-            'File Management', 'Rename and delete files from inside the app.'),
-        _ChangeItem(Icons.lyrics_rounded, AppColors.accent,
+        _ChangeItem(Icons.lyrics_rounded, AppColors.accentViolet,
             'Offline Lyrics', 'Lyrics cached locally after first fetch.'),
-        _ChangeItem(Icons.subtitles_rounded, AppColors.accentViolet,
+        _ChangeItem(Icons.subtitles_rounded, AppColors.accent,
             'Auto Subtitles', 'Loads .srt/.ass automatically with videos.'),
       ],
     ),
@@ -1031,8 +1108,6 @@ class WhatsNewScreen extends StatelessWidget {
             'PiP Auto-Mode', 'Video floats when you leave the app.'),
         _ChangeItem(Icons.folder_special_rounded, AppColors.accent,
             'Full SD Card Access', 'MANAGE_EXTERNAL_STORAGE support.'),
-        _ChangeItem(Icons.tab_rounded, AppColors.accentViolet,
-            'Songs / Videos / Folders tabs', 'Organised like PlayIt.'),
       ],
     ),
   ];
@@ -1408,14 +1483,24 @@ class _SettingsTile extends StatelessWidget {
 
 class _CollapsibleSection extends StatefulWidget {
   final List<Widget> children;
-  const _CollapsibleSection({required this.children});
+  final bool initiallyExpanded;
+  const _CollapsibleSection({
+    required this.children,
+    this.initiallyExpanded = true,
+  });
 
   @override
   State<_CollapsibleSection> createState() => _CollapsibleSectionState();
 }
 
 class _CollapsibleSectionState extends State<_CollapsibleSection> {
-  bool _expanded = true;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
 
   @override
   Widget build(BuildContext context) {
