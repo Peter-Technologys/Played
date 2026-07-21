@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../features/my_space/presentation/my_space_screen.dart';
 import '../features/my_space/presentation/my_space_hub_screen.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart';
 import '../features/my_space/presentation/playback_history_screen.dart';
@@ -17,6 +16,9 @@ import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../features/tools/tools_screen.dart';
 import '../features/playlists/playlist_screen.dart';
 import '../features/settings/presentation/settings_detail_screen.dart';
+import '../features/settings/presentation/about_screen.dart';
+import '../features/video/presentation/video_tab_screen.dart';
+import '../features/music/presentation/music_tab_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
 import '../shared/widgets/ad_banner_slot.dart';
@@ -29,21 +31,22 @@ class AppRouter {
       ShellRoute(
         builder: (context, state, child) => _MainShell(child: child),
         routes: [
-          // Tab 0 — Video
-          GoRoute(path: '/',        builder: (_, __) => const _VideoTab()),
-          // Tab 1 — Music
-          GoRoute(path: '/music',   builder: (_, __) => const MySpaceScreen()),
+          // Tab 0 — Video Library (dedicated)
+          GoRoute(path: '/',        builder: (_, __) => const VideoTabScreen()),
+          // Tab 1 — Music Library (dedicated)
+          GoRoute(path: '/music',   builder: (_, __) => const MusicTabScreen()),
           // Tab 2 — Tools
           GoRoute(path: '/tools',   builder: (_, __) => const ToolsScreen()),
-          // Tab 3 — My Space
+          // Tab 3 — My Space hub (account + playlists + history)
           GoRoute(path: '/myspace', builder: (_, __) => const MySpaceHubScreen()),
           // Air-Drop (accessible from Tools)
           GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
         ],
       ),
       GoRoute(path: '/profile',         builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/settings',        builder: (_, __) => const ProfileScreen()),
+      GoRoute(path: '/settings',        builder: (_, __) => const SettingsDetailScreen()),
       GoRoute(path: '/settings-detail', builder: (_, __) => const SettingsDetailScreen()),
+      GoRoute(path: '/about',           builder: (_, __) => const AboutScreen()),
       GoRoute(path: '/tools/folders',   builder: (_, __) => const FolderBrowserScreen()),
       GoRoute(path: '/history',         builder: (_, __) => const PlaybackHistoryScreen()),
       GoRoute(path: '/playlists',       builder: (_, __) => const PlaylistsScreen()),
@@ -75,19 +78,6 @@ class AppRouter {
       ),
     ],
   );
-}
-
-// ── Video Tab placeholder (wraps MySpaceScreen filtered to videos) ────
-
-class _VideoTab extends StatelessWidget {
-  const _VideoTab();
-
-  @override
-  Widget build(BuildContext context) {
-    // Reuse MySpaceScreen but open directly on the Videos tab (index 0).
-    // MySpaceScreen already has Videos as tab 0 after the tab-order fix.
-    return const MySpaceScreen();
-  }
 }
 
 // ── Main Shell ────────────────────────────────────────────────────────

@@ -6,14 +6,20 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../features/my_space/presentation/providers/my_space_provider.dart';
-import '../../../features/player/presentation/queue_screen.dart';
+import '../../my_space/presentation/providers/my_space_provider.dart';
+import '../../player/presentation/queue_screen.dart';
+import '../../my_space/presentation/playback_history_screen.dart';
 import '../../../features/playlists/playlist_screen.dart' show playlistsProvider;
 
-// ── Video Tab Screen ─────────────────────────────────────────────────────────
+// ── Filter pill state ─────────────────────────────────────────────────────
 
-/// Standalone video browser with filter pills (Videos | Folders | Playlists),
-/// a 2-column video grid, folder grouping, and playlist integration.
+enum _VideoFilter { videos, folders, playlists }
+
+final _videoFilterProvider =
+    StateProvider<_VideoFilter>((_) => _VideoFilter.videos);
+
+// ── Video Tab Screen ──────────────────────────────────────────────────────
+
 class VideoTabScreen extends ConsumerStatefulWidget {
   const VideoTabScreen({super.key});
 
@@ -21,105 +27,63 @@ class VideoTabScreen extends ConsumerStatefulWidget {
   ConsumerState<VideoTabScreen> createState() => _VideoTabScreenState();
 }
 
-class _VideoTabScreenState extends ConsumerState<VideoTabScreen> {
-  int _filterIndex = 0; // 0=Videos, 1=Folders, 2=Playlists
+class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
+    with WidgetsBindingObserver {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
 
-  static const _filters = ['Videos', 'Folders', 'Playlists'];
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     final libraryAsync = ref.watch(mediaLibraryProvider);
+    final filter = ref.watch(_videoFilterProvider);
 
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // ── Header ──────────────────────────────────────────────
-            const Padding(
-              padding: EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Text(
-                'Videos',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 12),
+            _VideoHeader(libraryAsync: libraryAsync),
 
             // ── Filter pills ─────────────────────────────────────────
-            SizedBox(
-              height: 36,
-              child: ListView.separated(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 20),
-                itemCount: _filters.length,
-                separatorBuilder: (_, __) => const SizedBox(width: 8),
-                itemBuilder: (context, i) {
-                  final active = _filterIndex == i;
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _filterIndex = i);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 18, vertical: 8),
-                      decoration: BoxDecoration(
-                        gradient: active
-                            ? const LinearGradient(
-                                colors: [
-                                  AppColors.accent,
-                                  AppColors.accentViolet
-                                ],
-                              )
-                            : null,
-                        color: active ? null : AppColors.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: active
-                              ? Colors.transparent
-                              : AppColors.border,
-                        ),
-                      ),
-                      child: Text(
-                        _filters[i],
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w700,
-                          color: active
-                              ? Colors.black
-                              : AppColors.textSecondary,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-
-            const SizedBox(height: 8),
+            _FilterPills(current: filter),
 
             // ── Content ──────────────────────────────────────────────
             Expanded(
               child: libraryAsync.when(
                 loading: () => libraryAsync.valueOrNull != null
-                    ? _buildContent(libraryAsync.valueOrNull!)
-                    : const Center(
-                        child: CircularProgressIndicator(
-                            color: AppColors.accent, strokeWidth: 2)),
-                error: (e, _) => Center(
-                  child: Text('Error: $e',
-                      style: const TextStyle(color: AppColors.error)),
+                    ? _buildContent(
+                        context, libraryAsync.valueOrNull!, filter)
+                    : const _VideoShimmer(),
+                error: (e, _) => _ErrorView(
+                  message: e.toString(),
+                  onRetry: () =>
+                      ref.read(mediaLibraryProvider.notifier).refresh(),
                 ),
-                data: _buildContent,
+                data: (items) => RefreshIndicator(
+                  color: AppColors.accent,
+                  backgroundColor: AppColors.surface,
+                  onRefresh: () => ref
+                      .read(mediaLibraryProvider.notifier)
+                      .backgroundRefresh(),
+                  child: _buildContent(context, items, filter),
+                ),
               ),
             ),
           ],
@@ -128,50 +92,235 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen> {
     );
   }
 
-  Widget _buildContent(List<MediaItem> allItems) {
-    final videos = allItems.where((e) => e.isVideo).toList();
+  Widget _buildContent(
+      BuildContext context, List<MediaItem> items, _VideoFilter filter) {
+    final videos = items.where((e) => e.isVideo).toList()
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
-    switch (_filterIndex) {
-      case 0:
-        return _VideosView(videos: videos);
-      case 1:
-        return _FoldersView(videos: videos);
-      case 2:
-        return _PlaylistsView();
-      default:
-        return _VideosView(videos: videos);
+    switch (filter) {
+      case _VideoFilter.videos:
+        return _VideoGrid(items: videos);
+      case _VideoFilter.folders:
+        return _VideoFoldersTab(items: videos);
+      case _VideoFilter.playlists:
+        return const _PlaylistsView();
     }
   }
 }
 
-// ── Videos view ──────────────────────────────────────────────────────────────
+// ── Header ────────────────────────────────────────────────────────────────
 
-class _VideosView extends ConsumerWidget {
-  final List<MediaItem> videos;
-  const _VideosView({required this.videos});
+class _VideoHeader extends ConsumerWidget {
+  final AsyncValue<List<MediaItem>> libraryAsync;
+  const _VideoHeader({required this.libraryAsync});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    if (videos.isEmpty) {
-      return const _EmptyState(
-        icon: Icons.videocam_off_rounded,
-        title: 'No videos found',
-        subtitle: 'Videos will appear here after scanning.',
-      );
-    }
+    final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).toList();
+    final count = videos?.length ?? 0;
+    final isScanning =
+        libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      child: Row(
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.asset(
+              'assets/icons/play_store_512.png',
+              width: 34,
+              height: 34,
+              fit: BoxFit.cover,
+              errorBuilder: (_, __, ___) => const Icon(
+                Icons.play_circle_fill_rounded,
+                color: AppColors.accent,
+                size: 34,
+              ),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ShaderMask(
+                  shaderCallback: (b) => const LinearGradient(
+                    colors: [AppColors.accent, AppColors.accentViolet],
+                  ).createShader(b),
+                  child: const Text(
+                    'Video Library',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                      fontFamily: 'Inter',
+                      letterSpacing: -0.3,
+                    ),
+                  ),
+                ),
+                Row(
+                  children: [
+                    if (count > 0)
+                      Text(
+                        '$count video${count == 1 ? '' : 's'}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    if (isScanning) ...[
+                      const SizedBox(width: 6),
+                      const SizedBox(
+                        width: 10,
+                        height: 10,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 1.5,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          // Search
+          _IconBtn(
+            icon: Icons.search_rounded,
+            onTap: () {
+              final items =
+                  ref.read(mediaLibraryProvider).valueOrNull ?? [];
+              final videos = items.where((e) => e.isVideo).toList();
+              showSearch(
+                context: context,
+                delegate: _VideoSearchDelegate(videos: videos, ref: ref),
+              );
+            },
+          ),
+          const SizedBox(width: 6),
+          // History
+          _IconBtn(
+            icon: Icons.history_rounded,
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                  builder: (_) => const PlaybackHistoryScreen()),
+            ),
+          ),
+          const SizedBox(width: 6),
+          // Refresh
+          _IconBtn(
+            icon: Icons.refresh_rounded,
+            onTap: () =>
+                ref.read(mediaLibraryProvider.notifier).backgroundRefresh(),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Filter pills ──────────────────────────────────────────────────────────
+
+class _FilterPills extends ConsumerWidget {
+  final _VideoFilter current;
+  const _FilterPills({required this.current});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const pills = [
+      (_VideoFilter.videos, 'Videos', Icons.play_circle_rounded),
+      (_VideoFilter.folders, 'Folders', Icons.folder_rounded),
+      (_VideoFilter.playlists, 'Playlists', Icons.queue_play_next_rounded),
+    ];
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
+      height: 44,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: pills.map((pill) {
+          final (filter, label, icon) = pill;
+          final isActive = current == filter;
+          return Expanded(
+            child: GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                ref.read(_videoFilterProvider.notifier).state = filter;
+              },
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                margin: const EdgeInsets.all(4),
+                decoration: BoxDecoration(
+                  gradient: isActive
+                      ? const LinearGradient(
+                          colors: [AppColors.accent, AppColors.accentViolet],
+                        )
+                      : null,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      icon,
+                      size: 14,
+                      color: isActive
+                          ? Colors.black
+                          : AppColors.textSecondary,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: isActive
+                            ? Colors.black
+                            : AppColors.textSecondary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+}
+
+// ── Video Grid ────────────────────────────────────────────────────────────
+
+class _VideoGrid extends ConsumerWidget {
+  final List<MediaItem> items;
+  const _VideoGrid({required this.items});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    if (items.isEmpty) {
+      return const _EmptyState(
+          icon: Icons.videocam_rounded, label: 'No videos found');
+    }
     return Column(
       children: [
         // ── Shuffle all bar ──────────────────────────────────────────
         GestureDetector(
           onTap: () {
             HapticFeedback.selectionClick();
-            final shuffled = List<MediaItem>.from(videos)..shuffle();
+            final shuffled = List<MediaItem>.from(items)..shuffle();
             ref.read(queueProvider.notifier).setQueue(shuffled, startIndex: 0);
             context.push('/player/video', extra: shuffled.first);
           },
           child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 4, 16, 8),
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
             decoration: BoxDecoration(
               color: AppColors.surface,
@@ -184,7 +333,7 @@ class _VideosView extends ConsumerWidget {
                     color: AppColors.accent, size: 20),
                 const SizedBox(width: 10),
                 Text(
-                  'Shuffle all (${videos.length})',
+                  'Shuffle all (${items.length})',
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -205,23 +354,22 @@ class _VideosView extends ConsumerWidget {
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount:
-                  MediaQuery.of(context).size.width > 600 ? 3 : 2,
+              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio: 16 / 13,
             ),
             cacheExtent: 400,
-            itemCount: videos.length,
+            itemCount: items.length,
             itemBuilder: (context, i) {
-              final item = videos[i];
+              final item = items[i];
               return _VideoCard(
                 item: item,
                 onTap: () {
                   HapticFeedback.lightImpact();
                   ref
                       .read(queueProvider.notifier)
-                      .setQueue(videos, startIndex: i);
+                      .setQueue(items, startIndex: i);
                   context.push('/player/video', extra: item);
                 },
               );
@@ -233,7 +381,7 @@ class _VideosView extends ConsumerWidget {
   }
 }
 
-// ── Video card ────────────────────────────────────────────────────────────────
+// ── Video Card ────────────────────────────────────────────────────────────
 
 class _VideoCard extends StatefulWidget {
   final MediaItem item;
@@ -324,13 +472,13 @@ class _VideoCardState extends State<_VideoCard> {
       child: Container(
         decoration: BoxDecoration(
           color: AppColors.surface,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(18),
           border: Border.all(color: AppColors.border),
           boxShadow: [
             BoxShadow(
-              color: AppColors.accent.withValues(alpha: 0.06),
-              blurRadius: 10,
-              offset: const Offset(0, 3),
+              color: AppColors.accent.withValues(alpha: 0.07),
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -341,38 +489,40 @@ class _VideoCardState extends State<_VideoCard> {
             Expanded(
               child: ClipRRect(
                 borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(15)),
+                    const BorderRadius.vertical(top: Radius.circular(17)),
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
                     // Thumbnail or gradient placeholder
                     _thumbPath != null
-                        ? Image.file(File(_thumbPath!),
+                        ? Image.file(
+                            File(_thumbPath!),
                             fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => _gradientBg())
+                            errorBuilder: (_, __, ___) => _gradientBg(),
+                          )
                         : _gradientBg(),
 
                     // Play button overlay
                     Center(
                       child: Container(
-                        width: 36,
-                        height: 36,
+                        width: 40,
+                        height: 40,
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.45),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 22),
+                            color: Colors.white, size: 26),
                       ),
                     ),
 
                     // Duration badge (bottom-right)
                     Positioned(
-                      bottom: 5,
-                      right: 5,
+                      bottom: 6,
+                      right: 6,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
+                            horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.72),
                           borderRadius: BorderRadius.circular(4),
@@ -477,12 +627,12 @@ class _VideoCardState extends State<_VideoCard> {
       ),
     ),
     child: const Center(
-      child: Icon(Icons.movie_rounded, color: Colors.white38, size: 28),
+      child: Icon(Icons.movie_rounded, color: Colors.white38, size: 32),
     ),
   );
 }
 
-// ── Small badge widget ────────────────────────────────────────────────────────
+// ── Small badge widget ────────────────────────────────────────────────────
 
 class _Badge extends StatelessWidget {
   final String label;
@@ -511,7 +661,7 @@ class _Badge extends StatelessWidget {
   }
 }
 
-// ── Video context menu ────────────────────────────────────────────────────────
+// ── Video context menu ────────────────────────────────────────────────────
 
 class _VideoContextMenu extends StatelessWidget {
   final MediaItem item;
@@ -659,15 +809,15 @@ class _ContextOption extends StatelessWidget {
   }
 }
 
-// ── Folders view ──────────────────────────────────────────────────────────────
+// ── Video Folders Tab ─────────────────────────────────────────────────────
 
-class _FoldersView extends ConsumerWidget {
-  final List<MediaItem> videos;
-  const _FoldersView({required this.videos});
+class _VideoFoldersTab extends StatelessWidget {
+  final List<MediaItem> items;
+  const _VideoFoldersTab({required this.items});
 
   Map<String, List<MediaItem>> _buildFolders() {
     final map = <String, List<MediaItem>>{};
-    for (final item in videos) {
+    for (final item in items) {
       final parts = item.filePath.split('/');
       final folder = parts.length > 1
           ? parts.sublist(0, parts.length - 1).join('/')
@@ -683,20 +833,16 @@ class _FoldersView extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (videos.isEmpty) {
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
       return const _EmptyState(
-        icon: Icons.folder_off_rounded,
-        title: 'No video folders',
-        subtitle: 'Videos will appear here after scanning.',
-      );
+          icon: Icons.folder_open_rounded, label: 'No video folders found');
     }
-
     final folders = _buildFolders();
     final keys = folders.keys.toList()..sort();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
@@ -741,21 +887,12 @@ class _FoldersView extends ConsumerWidget {
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              showModalBottomSheet(
-                context: context,
-                isScrollControlled: true,
-                backgroundColor: AppColors.surface,
-                shape: const RoundedRectangleBorder(
-                    borderRadius:
-                        BorderRadius.vertical(top: Radius.circular(24))),
-                builder: (_) => _FolderVideosSheet(
-                  folderName: name,
-                  items: files,
-                ),
-              );
-            },
+            onTap: () => Navigator.of(context).push(
+              MaterialPageRoute(
+                builder: (_) =>
+                    _VideoFolderDetailPage(name: name, items: files),
+              ),
+            ),
           ),
         );
       },
@@ -763,124 +900,74 @@ class _FoldersView extends ConsumerWidget {
   }
 }
 
-// ── Folder videos bottom sheet ────────────────────────────────────────────────
-
-class _FolderVideosSheet extends ConsumerWidget {
-  final String folderName;
+class _VideoFolderDetailPage extends ConsumerWidget {
+  final String name;
   final List<MediaItem> items;
-  const _FolderVideosSheet(
-      {required this.folderName, required this.items});
+  const _VideoFolderDetailPage(
+      {required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    return DraggableScrollableSheet(
-      initialChildSize: 0.7,
-      maxChildSize: 0.95,
-      minChildSize: 0.4,
-      expand: false,
-      builder: (_, scrollCtrl) => Column(
-        children: [
-          // Handle + title
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
-            child: Column(
-              children: [
-                Center(
-                  child: Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                        color: AppColors.border,
-                        borderRadius: BorderRadius.circular(2)),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
-                    const Icon(Icons.folder_rounded,
-                        color: AppColors.accent, size: 20),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        folderName,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    Text(
-                      '${items.length} videos',
-                      style: const TextStyle(
-                          fontSize: 12, color: AppColors.textSecondary),
-                    ),
-                  ],
-                ),
-              ],
-            ),
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded,
+              color: AppColors.textPrimary),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          name,
+          style: const TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+            fontSize: 16,
           ),
-          const Divider(color: AppColors.border, height: 1),
-          Expanded(
-            child: ListView.builder(
-              controller: scrollCtrl,
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 32),
-              itemCount: items.length,
-              itemBuilder: (context, i) {
-                final item = items[i];
-                return ListTile(
-                  contentPadding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                  leading: Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(Icons.play_circle_rounded,
-                        color: AppColors.accent, size: 22),
-                  ),
-                  title: Text(
-                    item.title,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Text(
-                    '${item.formattedDuration} · ${item.formattedSize}',
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary),
-                  ),
-                  trailing: const Icon(Icons.chevron_right_rounded,
-                      color: AppColors.textSecondary, size: 18),
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    Navigator.pop(context);
-                    ref
-                        .read(queueProvider.notifier)
-                        .setQueue(items, startIndex: i);
-                    context.push('/player/video', extra: item);
-                  },
-                );
-              },
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                '${items.length} video${items.length == 1 ? '' : 's'}',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
             ),
           ),
         ],
+      ),
+      body: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 16 / 13,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return _VideoCard(
+            item: item,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref
+                  .read(queueProvider.notifier)
+                  .setQueue(items, startIndex: i);
+              context.push('/player/video', extra: item);
+            },
+          );
+        },
       ),
     );
   }
 }
 
-// ── Playlists view ────────────────────────────────────────────────────────────
+// ── Playlists view ────────────────────────────────────────────────────────
 
 class _PlaylistsView extends ConsumerWidget {
   const _PlaylistsView();
@@ -895,8 +982,7 @@ class _PlaylistsView extends ConsumerWidget {
         children: [
           const _EmptyState(
             icon: Icons.queue_music_rounded,
-            title: 'No playlists yet',
-            subtitle: 'Create a playlist to organise your videos.',
+            label: 'No playlists yet',
           ),
           const SizedBox(height: 16),
           GestureDetector(
@@ -980,17 +1066,194 @@ class _PlaylistsView extends ConsumerWidget {
   }
 }
 
-// ── Empty state ───────────────────────────────────────────────────────────────
+// ── Search delegate ───────────────────────────────────────────────────────
+
+class _VideoSearchDelegate extends SearchDelegate<MediaItem?> {
+  final List<MediaItem> videos;
+  final WidgetRef ref;
+  _VideoSearchDelegate({required this.videos, required this.ref});
+
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return Theme.of(context).copyWith(
+      scaffoldBackgroundColor: AppColors.background,
+      appBarTheme: const AppBarTheme(
+        backgroundColor: AppColors.background,
+        elevation: 0,
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: InputBorder.none,
+        hintStyle: TextStyle(color: AppColors.textSecondary),
+      ),
+    );
+  }
+
+  @override
+  List<Widget> buildActions(BuildContext context) => [
+        IconButton(
+          icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+          onPressed: () => query = '',
+        ),
+      ];
+
+  @override
+  Widget buildLeading(BuildContext context) => IconButton(
+        icon: const Icon(Icons.arrow_back_rounded,
+            color: AppColors.textPrimary),
+        onPressed: () => close(context, null),
+      );
+
+  @override
+  Widget buildResults(BuildContext context) => _buildList(context);
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildList(context);
+
+  Widget _buildList(BuildContext context) {
+    final q = query.toLowerCase();
+    final results = q.isEmpty
+        ? videos
+        : videos
+            .where((v) =>
+                v.title.toLowerCase().contains(q) ||
+                (v.artist?.toLowerCase().contains(q) ?? false))
+            .toList();
+
+    if (results.isEmpty) {
+      return const Center(
+        child: Text('No videos found',
+            style: TextStyle(color: AppColors.textSecondary)),
+      );
+    }
+
+    return Container(
+      color: AppColors.background,
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 16 / 13,
+        ),
+        itemCount: results.length,
+        itemBuilder: (context, i) {
+          final item = results[i];
+          return _VideoCard(
+            item: item,
+            onTap: () {
+              ref
+                  .read(queueProvider.notifier)
+                  .setQueue(results, startIndex: i);
+              close(context, item);
+              context.push('/player/video', extra: item);
+            },
+          );
+        },
+      ),
+    );
+  }
+}
+
+// ── Shared helpers ────────────────────────────────────────────────────────
+
+class _IconBtn extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback onTap;
+  const _IconBtn({required this.icon, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppColors.border),
+        ),
+        child: Icon(icon, color: AppColors.textSecondary, size: 18),
+      ),
+    );
+  }
+}
 
 class _EmptyState extends StatelessWidget {
   final IconData icon;
-  final String title;
-  final String subtitle;
-  const _EmptyState({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-  });
+  final String label;
+  const _EmptyState({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.08),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: AppColors.accent, size: 36),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'Videos will appear here after scanning.',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _VideoShimmer extends StatelessWidget {
+  const _VideoShimmer();
+
+  @override
+  Widget build(BuildContext context) {
+    return GridView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 16 / 11,
+      ),
+      itemCount: 8,
+      itemBuilder: (_, __) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: AppColors.border),
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorView extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorView({required this.message, required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -1000,27 +1263,42 @@ class _EmptyState extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: AppColors.textSecondary, size: 56),
+            const Icon(Icons.error_outline_rounded,
+                color: AppColors.error, size: 48),
             const SizedBox(height: 16),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
+            const Text(
+              'Could not load videos',
+              style: TextStyle(
                 color: AppColors.textPrimary,
-                fontFamily: 'Inter',
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
               ),
-              textAlign: TextAlign.center,
             ),
             const SizedBox(height: 8),
             Text(
-              subtitle,
+              message,
               style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
+                  color: AppColors.textSecondary, fontSize: 12),
               textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 24),
+            GestureDetector(
+              onTap: onRetry,
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 24, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'Try Again',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
             ),
           ],
         ),

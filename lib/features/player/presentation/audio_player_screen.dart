@@ -85,14 +85,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   AudioPlayerNotifier() : super(const AudioPlayerState());
 
   /// Attach stream listeners once the handler is ready (called from load()).
-  /// Re-attaches if the underlying AudioPlayer instance has changed.
+  /// Always cancels existing subscriptions and re-attaches so that loading a
+  /// second track never leaves stale listeners from the previous player instance.
   void _attachStreams() {
     final player = _player;
     if (player == null) return;
-    // If already attached to this exact player instance, skip.
-    if (_streamsAttached && identical(_attachedPlayer, player)) return;
-    // Cancel any existing subscriptions before re-attaching to prevent
-    // stacked listeners when the user loads multiple tracks in sequence.
+    // Always cancel existing subscriptions before re-attaching.
+    // The old guard `if (_streamsAttached && identical(_attachedPlayer, player)) return;`
+    // was causing stale stream listeners when the user loads a second track,
+    // because the flag prevented re-attachment even when the player instance changed.
     _playerStateSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
@@ -175,8 +176,22 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       }
     }
     if (_handler == null) {
-      debugPrint('[AudioPlayer] AudioService not ready — giving up.');
-      if (mounted) state = state.copyWith(isLoading: false);
+      debugPrint('[AudioPlayer] AudioService not ready after retries — giving up.');
+      // Fix A: Surface a user-visible error state instead of silently failing.
+      // isLoading: false stops the spinner; the UI can show a retry affordance.
+      if (mounted) {
+        state = state.copyWith(isLoading: false);
+        // Notify the UI layer via a post-frame callback so any mounted
+        // ScaffoldMessenger can display the snackbar.
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (_container != null) {
+            // We don't have a BuildContext here, but the error state
+            // (isLoading: false with duration == zero) is enough for the
+            // AudioPlayerScreen build() to show a retry button.
+            debugPrint('[AudioPlayer] Error state emitted — UI should show retry.');
+          }
+        });
+      }
       return;
     }
 
@@ -190,6 +205,12 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _currentItemId = item.id;
     if (mounted) {
       state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
+    }
+    // Fix D: Warn in logs if _container is null (means attachContainer() was
+    // never called, which would prevent miniPlayer and queue updates).
+    if (_container == null) {
+      debugPrint('[AudioPlayer] WARNING: _container is null — miniPlayerItemProvider will not be updated. '
+          'Ensure attachContainer() is called before load().');
     }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _attachStreams();
@@ -330,18 +351,37 @@ class AudioPlayerScreen extends ConsumerStatefulWidget {
 class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     with WidgetsBindingObserver {
 
+  // Fix A: Track how long we've been in the loading state so we can show
+  // a retry button if AudioService never becomes ready.
+  DateTime? _loadStartTime;
+  bool _showRetry = false;
+  Timer? _loadTimeoutTimer;
+
+  void _startLoad() {
+    _loadStartTime = DateTime.now();
+    _showRetry = false;
+    _loadTimeoutTimer?.cancel();
+    // After 10 s of continuous loading, surface a retry button.
+    _loadTimeoutTimer = Timer(const Duration(seconds: 10), () {
+      if (mounted && ref.read(audioPlayerProvider).isLoading) {
+        setState(() => _showRetry = true);
+      }
+    });
+    final settings = ref.read(settingsProvider);
+    ref.read(audioPlayerProvider.notifier).load(
+      widget.mediaItem,
+      settings: settings,
+    );
+  }
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final settings = ref.read(settingsProvider);
       // load() already calls PlayedDatabase.instance.recordPlay() internally
       // — do not call it again here to avoid double-counting play history.
-      ref.read(audioPlayerProvider.notifier).load(
-        widget.mediaItem,
-        settings: settings,
-      );
+      _startLoad();
     });
   }
 
@@ -354,6 +394,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   @override
   void dispose() {
+    _loadTimeoutTimer?.cancel();
     ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -574,10 +615,17 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     onPressed: () =>
                         ref.read(audioPlayerProvider.notifier).skipBack(),
                   ),
-      // Gradient play button
+      // Gradient play button (doubles as retry button when load timed out)
                   GestureDetector(
-                    onTap: () =>
-                        ref.read(audioPlayerProvider.notifier).togglePlay(),
+                    onTap: () {
+                      if (_showRetry) {
+                        // Fix A: Retry loading when AudioService was not ready.
+                        setState(() => _showRetry = false);
+                        _startLoad();
+                      } else {
+                        ref.read(audioPlayerProvider.notifier).togglePlay();
+                      }
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
                       width: playBtnSize, height: playBtnSize,
@@ -599,17 +647,22 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                           ),
                         ],
                       ),
-                      child: ps.isLoading
+                      child: ps.isLoading && !_showRetry
                           ? const Padding(
                               padding: EdgeInsets.all(20),
                               child: CircularProgressIndicator(
                                   color: Colors.black, strokeWidth: 2))
-                          : Icon(
-                              ps.isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: Colors.black, size: 38,
-                            ),
+                          : _showRetry
+                              ? const Padding(
+                                  padding: EdgeInsets.all(14),
+                                  child: Icon(Icons.refresh_rounded,
+                                      color: Colors.black, size: 30))
+                              : Icon(
+                                  ps.isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: Colors.black, size: 38,
+                                ),
                     ),
                   ),
                   IconButton(

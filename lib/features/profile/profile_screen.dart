@@ -57,66 +57,7 @@ class ProfileScreen extends ConsumerWidget {
         padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
         children: [
 
-          // ── 1. APPEARANCE ─────────────────────────────────────────────
-          const _SectionHeader(label: 'Appearance'),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: AppThemeMode.values.map((mode) {
-                final label = switch (mode) {
-                  AppThemeMode.dark   => 'Dark',
-                  AppThemeMode.amoled => 'AMOLED',
-                  AppThemeMode.light  => 'Light',
-                };
-                final icon = switch (mode) {
-                  AppThemeMode.dark   => Icons.dark_mode_rounded,
-                  AppThemeMode.amoled => Icons.brightness_1_rounded,
-                  AppThemeMode.light  => Icons.light_mode_rounded,
-                };
-                final active = s.themeMode == mode;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () => sn.setThemeMode(mode),
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      decoration: BoxDecoration(
-                        gradient: active
-                            ? const LinearGradient(
-                                colors: [AppColors.accent, AppColors.accentViolet])
-                            : null,
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(icon,
-                              color: active ? Colors.black : AppColors.textSecondary,
-                              size: 18),
-                          const SizedBox(height: 4),
-                          Text(label,
-                              style: TextStyle(
-                                fontSize: 11, fontWeight: FontWeight.w700,
-                                color: active ? Colors.black : AppColors.textSecondary,
-                              )),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 2. ACCOUNT ────────────────────────────────────────────────
+          // ── 1. ACCOUNT ────────────────────────────────────────────────
           const _SectionHeader(label: 'Account'),
           const SizedBox(height: 12),
           if (isGoogle) ...[  
@@ -139,119 +80,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 3. AUDIO ──────────────────────────────────────────────────
-          const _SectionHeader(label: 'Audio'),
-          const SizedBox(height: 8),
-          _CollapsibleSection(
-            initiallyExpanded: false,
-            children: [
-              _SettingsTile(
-                icon: Icons.speed_rounded,
-                label: 'Default Playback Speed',
-                trailing: _ValueChip(
-                  label: '${s.playbackSpeed}x',
-                  onTap: () => _showSpeedPicker(context, sn, s.playbackSpeed),
-                ),
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.queue_music_rounded,
-                label: 'Gapless Playback',
-                subtitle: 'No silence between tracks',
-                value: s.gaplessPlayback,
-                onChanged: sn.setGaplessPlayback,
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.swap_horiz_rounded,
-                label: 'Crossfade',
-                subtitle: 'Blend tracks smoothly',
-                value: s.crossfadeDuration > 0,
-                onChanged: (v) => sn.setCrossfade(v ? 3.0 : 0.0),
-              ),
-              if (s.crossfadeDuration > 0) ...[  
-                const SizedBox(height: 6),
-                _SettingsTile(
-                  icon: Icons.timer_outlined,
-                  label: 'Crossfade Duration',
-                  trailing: _ValueChip(
-                    label: '${s.crossfadeDuration.toInt()}s',
-                    onTap: () => _showCrossfadePicker(context, sn, s.crossfadeDuration),
-                  ),
-                ),
-              ],
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.skip_next_rounded,
-                label: 'Skip Silence',
-                subtitle: 'Auto-skip silent sections',
-                value: s.skipSilence,
-                onChanged: sn.setSkipSilence,
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.headphones_rounded,
-                label: 'Resume on Headset',
-                subtitle: 'Auto-play when headphones connect',
-                value: s.autoResume,
-                onChanged: sn.setAutoResume,
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.phone_in_talk_rounded,
-                label: 'Pause During Calls',
-                subtitle: 'Auto-pause when a call comes in',
-                value: s.pauseDuringCalls,
-                onChanged: sn.setPauseDuringCalls,
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.notifications_rounded,
-                label: 'Now Playing Notification',
-                subtitle: 'Show media controls in notification bar',
-                value: s.nowPlayingNotification,
-                onChanged: sn.setNowPlayingNotification,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 4. VIDEO ──────────────────────────────────────────────────
-          const _SectionHeader(label: 'Video'),
-          const SizedBox(height: 8),
-          _CollapsibleSection(
-            initiallyExpanded: false,
-            children: [
-              _SwitchTile(
-                icon: Icons.battery_saver_rounded,
-                label: 'Battery Saver by Default',
-                subtitle: 'Start video player in audio-only mode',
-                value: s.defaultBatterySaver,
-                onChanged: sn.setDefaultBatterySaver,
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.picture_in_picture_alt_rounded,
-                label: 'Auto Picture-in-Picture',
-                subtitle: 'Float video when you leave the app',
-                value: s.autoPip,
-                onChanged: sn.setAutoPip,
-              ),
-              const SizedBox(height: 6),
-              _SwitchTile(
-                icon: Icons.subtitles_rounded,
-                label: 'Auto-load Subtitles',
-                subtitle: 'Load .srt/.ass from same folder as video',
-                value: s.autoLoadSubtitles,
-                onChanged: sn.setAutoLoadSubtitles,
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 5. PRIVACY & SECURITY ─────────────────────────────────────
+          // ── 2. PRIVACY & SECURITY ─────────────────────────────────────
           const _SectionHeader(label: 'Privacy & Security'),
           const SizedBox(height: 12),
           _SwitchTile(
@@ -279,7 +108,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 6. BACKUP & SYNC ──────────────────────────────────────────
+          // ── 3. BACKUP & SYNC ──────────────────────────────────────────
           const _SectionHeader(label: 'Backup & Sync'),
           const SizedBox(height: 8),
           if (!isGoogle)
@@ -322,7 +151,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 7. LIBRARY ────────────────────────────────────────────────
+          // ── 4. LIBRARY ────────────────────────────────────────────────
           const _SectionHeader(label: 'Library'),
           const SizedBox(height: 12),
           _TappableTile(
@@ -351,14 +180,14 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 8. APP UPDATES ────────────────────────────────────────────
+          // ── 5. APP UPDATES ────────────────────────────────────────────
           const _SectionHeader(label: 'App Updates'),
           const SizedBox(height: 12),
           const _UpdateCheckerTile(),
 
           const SizedBox(height: 20),
 
-          // ── 9. ABOUT ──────────────────────────────────────────────────
+          // ── 6. ABOUT ──────────────────────────────────────────────────
           const _SectionHeader(label: 'About'),
           const SizedBox(height: 12),
           const _AboutCard(),
@@ -405,135 +234,6 @@ class ProfileScreen extends ConsumerWidget {
           const Center(child: PlayedFooter()),
           const SizedBox(height: 24),
         ],
-      ),
-    );
-  }
-
-  // ── Pickers ────────────────────────────────────────────────────────────────
-
-  void _showSpeedPicker(BuildContext context, SettingsNotifier sn, double current) {
-    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Default Playback Speed',
-                style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 10, runSpacing: 10,
-              children: speeds.map((sp) {
-                final active = sp == current;
-                return GestureDetector(
-                  onTap: () {
-                    sn.setPlaybackSpeed(sp);
-                    Navigator.pop(context);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: active ? AppColors.accent : AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: active ? AppColors.accent : AppColors.border),
-                    ),
-                    child: Text('${sp}x',
-                        style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700,
-                          color: active ? Colors.black : AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                        )),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCrossfadePicker(
-      BuildContext context, SettingsNotifier sn, double current) {
-    const options = [1, 2, 3, 5, 8, 10];
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Crossfade Duration',
-                style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 10, runSpacing: 10,
-              children: options.map((sec) {
-                final active = sec == current.toInt();
-                return GestureDetector(
-                  onTap: () {
-                    sn.setCrossfade(sec.toDouble());
-                    Navigator.pop(context);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: active ? AppColors.accent : AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: active ? AppColors.accent : AppColors.border),
-                    ),
-                    child: Text('${sec}s',
-                        style: TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700,
-                          color: active ? Colors.black : AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                        )),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -1415,129 +1115,6 @@ class _SectionHeader extends StatelessWidget {
               color: AppColors.textSecondary,
               letterSpacing: 1.4, fontFamily: 'Inter',
             )),
-      ],
-    );
-  }
-}
-
-class _ValueChip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _ValueChip({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-        ),
-        child: Text(label,
-            style: const TextStyle(
-              fontSize: 13, fontWeight: FontWeight.w700,
-              color: AppColors.accent, fontFamily: 'Inter',
-            )),
-      ),
-    );
-  }
-}
-
-class _SettingsTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Widget? trailing;
-  const _SettingsTile({required this.icon, required this.label, this.trailing});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: AppColors.textSecondary, size: 20),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Text(label,
-                style: const TextStyle(
-                  fontSize: 14, color: AppColors.textPrimary,
-                  fontWeight: FontWeight.w500, fontFamily: 'Inter',
-                )),
-          ),
-          if (trailing != null) trailing!,
-        ],
-      ),
-    );
-  }
-}
-
-// ── Collapsible Section ────────────────────────────────────────────────────
-
-class _CollapsibleSection extends StatefulWidget {
-  final List<Widget> children;
-  final bool initiallyExpanded;
-  const _CollapsibleSection({
-    required this.children,
-    this.initiallyExpanded = true,
-  });
-
-  @override
-  State<_CollapsibleSection> createState() => _CollapsibleSectionState();
-}
-
-class _CollapsibleSectionState extends State<_CollapsibleSection> {
-  late bool _expanded;
-
-  @override
-  void initState() {
-    super.initState();
-    _expanded = widget.initiallyExpanded;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        GestureDetector(
-          onTap: () => setState(() => _expanded = !_expanded),
-          child: Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: Row(
-              children: [
-                Text(
-                  _expanded ? 'Collapse' : 'Expand',
-                  style: const TextStyle(
-                    fontSize: 11, color: AppColors.textSecondary,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                const SizedBox(width: 4),
-                Icon(
-                  _expanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
-                  color: AppColors.textSecondary, size: 16,
-                ),
-              ],
-            ),
-          ),
-        ),
-        AnimatedCrossFade(
-          firstChild: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: widget.children,
-          ),
-          secondChild: const SizedBox.shrink(),
-          crossFadeState: _expanded ? CrossFadeState.showFirst : CrossFadeState.showSecond,
-          duration: const Duration(milliseconds: 250),
-        ),
       ],
     );
   }
