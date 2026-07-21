@@ -17,6 +17,7 @@ import '../features/tools/tools_screen.dart';
 import '../features/playlists/playlist_screen.dart';
 import '../features/settings/presentation/settings_detail_screen.dart';
 import '../features/settings/presentation/about_screen.dart';
+import '../features/settings/presentation/theme_selection_screen.dart';
 import '../features/video/presentation/video_tab_screen.dart';
 import '../features/music/presentation/music_tab_screen.dart';
 import '../core/models/media_item.dart';
@@ -47,6 +48,7 @@ class AppRouter {
       GoRoute(path: '/settings',        builder: (_, __) => const SettingsDetailScreen()),
       GoRoute(path: '/settings-detail', builder: (_, __) => const SettingsDetailScreen()),
       GoRoute(path: '/about',           builder: (_, __) => const AboutScreen()),
+      GoRoute(path: '/theme',           builder: (_, __) => const ThemeSelectionScreen()),
       GoRoute(path: '/tools/folders',   builder: (_, __) => const FolderBrowserScreen()),
       GoRoute(path: '/history',         builder: (_, __) => const PlaybackHistoryScreen()),
       GoRoute(path: '/playlists',       builder: (_, __) => const PlaylistsScreen()),

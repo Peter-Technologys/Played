@@ -9,6 +9,7 @@ import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/widgets/update_dialog.dart';
+import '../core/services/custom_theme_manager.dart';
 
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
@@ -25,6 +26,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
     _checkOnboarding();
+    CustomThemeManager.instance.load();
     _applyOverlayStyle(isDark: true);
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) UpdateDialog.checkAndShow(context);
@@ -129,37 +131,51 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       );
     }
 
-    return MaterialApp.router(
-      title: 'OTYA Player',
-      debugShowCheckedModeBanner: false,
-      theme:     AppTheme.light,
-      darkTheme: AppTheme.dark,
-      themeMode: switch (settings.themeMode) {
-        AppThemeMode.dark   => ThemeMode.dark,
-        AppThemeMode.amoled => ThemeMode.dark,
-        AppThemeMode.light  => ThemeMode.light,
-      },
-      routerConfig: AppRouter.router,
-      builder: (context, child) {
-        final isAmoled = settings.themeMode == AppThemeMode.amoled;
-        final wrappedChild = isAmoled
-            ? Theme(
-                data: Theme.of(context).copyWith(
-                  scaffoldBackgroundColor: Colors.black,
-                  colorScheme: Theme.of(context).colorScheme.copyWith(
-                    surface: Colors.black,
-                  ),
-                ),
-                child: child ?? const SizedBox.shrink(),
-              )
-            : (child ?? const SizedBox.shrink());
+    return ListenableBuilder(
+      listenable: CustomThemeManager.instance,
+      builder: (context, _) {
+        return MaterialApp.router(
+          title: 'OTYA Player',
+          debugShowCheckedModeBanner: false,
+          theme:     AppTheme.light,
+          darkTheme: AppTheme.dark,
+          themeMode: switch (settings.themeMode) {
+            AppThemeMode.dark   => ThemeMode.dark,
+            AppThemeMode.amoled => ThemeMode.dark,
+            AppThemeMode.light  => ThemeMode.light,
+          },
+          routerConfig: AppRouter.router,
+          builder: (context, child) {
+            final isAmoled = settings.themeMode == AppThemeMode.amoled;
+            Widget wrappedChild = isAmoled
+                ? Theme(
+                    data: Theme.of(context).copyWith(
+                      scaffoldBackgroundColor: Colors.black,
+                      colorScheme: Theme.of(context).colorScheme.copyWith(
+                        surface: Colors.black,
+                      ),
+                    ),
+                    child: child ?? const SizedBox.shrink(),
+                  )
+                : (child ?? const SizedBox.shrink());
 
-        return Stack(
-          children: [
-            wrappedChild,
-            if (!_onboardingDone)
-              OnboardingOverlay(onDone: _completeOnboarding),
-          ],
+            final wallpaperDecoration =
+                CustomThemeManager.instance.wallpaperDecoration;
+            if (wallpaperDecoration != null) {
+              wrappedChild = Container(
+                decoration: BoxDecoration(image: wallpaperDecoration),
+                child: wrappedChild,
+              );
+            }
+
+            return Stack(
+              children: [
+                wrappedChild,
+                if (!_onboardingDone)
+                  OnboardingOverlay(onDone: _completeOnboarding),
+              ],
+            );
+          },
         );
       },
     );
