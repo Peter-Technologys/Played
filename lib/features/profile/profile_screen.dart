@@ -143,6 +143,7 @@ class ProfileScreen extends ConsumerWidget {
           const _SectionHeader(label: 'Audio'),
           const SizedBox(height: 8),
           _CollapsibleSection(
+            initiallyExpanded: false,
             children: [
               _SettingsTile(
                 icon: Icons.speed_rounded,
@@ -220,6 +221,7 @@ class ProfileScreen extends ConsumerWidget {
           const _SectionHeader(label: 'Video'),
           const SizedBox(height: 8),
           _CollapsibleSection(
+            initiallyExpanded: false,
             children: [
               _SwitchTile(
                 icon: Icons.battery_saver_rounded,
@@ -805,6 +807,24 @@ class ProfileScreen extends ConsumerWidget {
     }
   }
 
+  Future<void> _shareApp(BuildContext context) async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      await Share.share(
+        'Download OTYA Player v${info.version} — free offline media player for Android:\n'
+        'https://getotya.petersmartlink.com/download',
+        subject: 'OTYA Player',
+      );
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not share: $e'),
+              backgroundColor: AppColors.error),
+        );
+      }
+    }
+  }
+
   Future<void> _launchUrl(BuildContext context, String url) async {
     final uri = Uri.parse(url);
     // Try in-app browser first, fall back to external app
@@ -1031,8 +1051,6 @@ class WhatsNewScreen extends StatelessWidget {
             'PiP Auto-Mode', 'Video floats when you leave the app.'),
         _ChangeItem(Icons.folder_special_rounded, AppColors.accent,
             'Full SD Card Access', 'MANAGE_EXTERNAL_STORAGE support.'),
-        _ChangeItem(Icons.tab_rounded, AppColors.accentViolet,
-            'Songs / Videos / Folders tabs', 'Organised like PlayIt.'),
       ],
     ),
   ];
@@ -1408,14 +1426,24 @@ class _SettingsTile extends StatelessWidget {
 
 class _CollapsibleSection extends StatefulWidget {
   final List<Widget> children;
-  const _CollapsibleSection({required this.children});
+  final bool initiallyExpanded;
+  const _CollapsibleSection({
+    required this.children,
+    this.initiallyExpanded = true,
+  });
 
   @override
   State<_CollapsibleSection> createState() => _CollapsibleSectionState();
 }
 
 class _CollapsibleSectionState extends State<_CollapsibleSection> {
-  bool _expanded = true;
+  late bool _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    _expanded = widget.initiallyExpanded;
+  }
 
   @override
   Widget build(BuildContext context) {
