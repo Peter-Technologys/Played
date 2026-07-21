@@ -33,7 +33,7 @@ variables:
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=4 -Xmx4g -Dkotlin.incremental=false"
   R2_ENDPOINT: "https://6c76d2a9e5f95d5f9b393e97374d9afb.r2.cloudflarestorage.com"
   R2_BUCKET: "otya-player-releases"
-  WORKER_URL: "https://getotya.petersmartlink.com"
+  WORKER_URL: "https://petersmartlink.com"
 
 stages:
   - prepare

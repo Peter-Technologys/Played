@@ -127,7 +127,7 @@ data = {
     'downloads': {
         'arm64': f'{worker_url}/apk/arm64',
         'arm32': f'{worker_url}/apk/arm32',
-        'auto':  f'{worker_url}/download',
+        'auto':  f'{worker_url}/apk/arm64',
     },
 }
 with open('version.json', 'w') as f:
