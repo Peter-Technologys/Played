@@ -123,6 +123,20 @@ class SettingsDetailScreen extends ConsumerWidget {
             ),
           ),
 
+          const SizedBox(height: 12),
+          _GroupCard(children: [
+            _NavTile(
+              icon: Icons.wallpaper_rounded,
+              label: 'Customize Wallpaper',
+              subtitle: 'Pick a photo or festive theme',
+              color: AppColors.accentViolet,
+              onTap: () {
+                HapticFeedback.selectionClick();
+                context.push('/theme');
+              },
+            ),
+          ]),
+
           const SizedBox(height: 24),
 
           // ── GROUP 1: PLAYBACK ─────────────────────────────────────
