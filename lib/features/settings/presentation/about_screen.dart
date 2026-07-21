@@ -199,8 +199,8 @@ class _AboutScreenState extends State<AboutScreen> {
 
 class _AppCard extends StatelessWidget {
   final String version;
-  final String build;
-  const _AppCard({required this.version, required this.build});
+  final String buildNumber;
+  const _AppCard({required this.version, required this.buildNumber});
 
   @override
   Widget build(BuildContext context) {
