@@ -119,7 +119,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
           child: Opacity(
             opacity: (1 - _dragOffset / (_dismissThreshold * 2)).clamp(0.3, 1.0),
             child: Container(
-              height: 68,
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
               foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
@@ -147,146 +146,224 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  // Album art — real art when available, gradient fallback
-                  ClipRRect(
-                    borderRadius: const BorderRadius.horizontal(
-                        left: Radius.circular(24)),
-                    child: SizedBox(
-                      width: 68, height: 68,
-                      child: displayItem.albumArtPath != null &&
-                              !displayItem.albumArtPath!.startsWith('albumid:')
-                          ? Image.file(
-                              File(displayItem.albumArtPath!),
-                              fit: BoxFit.cover,
-                              errorBuilder: (_, __, ___) => _artFallback(),
-                            )
-                          : _artFallback(),
-                    ),
-                  ),
-
-                  const SizedBox(width: 12),
-
-                  // Track info
-                  Expanded(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                  // ── Main content row ──────────────────────────────
+                  SizedBox(
+                    height: 68,
+                    child: Row(
                       children: [
-                        Text(
-                          displayItem.title,
-                          style: const TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                        // Album art — real art when available, gradient fallback
+                        ClipRRect(
+                          borderRadius: const BorderRadius.horizontal(
+                              left: Radius.circular(24)),
+                          child: SizedBox(
+                            width: 68, height: 68,
+                            child: displayItem.albumArtPath != null &&
+                                    !displayItem.albumArtPath!.startsWith('albumid:')
+                                ? Image.file(
+                                    File(displayItem.albumArtPath!),
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => _artFallback(),
+                                  )
+                                : _artFallback(),
                           ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
                         ),
-                        const SizedBox(height: 2),
-                        Text(
-                          displayItem.artist ?? 'Unknown Artist',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+
+                        const SizedBox(width: 12),
+
+                        // Track info
+                        Expanded(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                displayItem.title,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.textPrimary,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                displayItem.artist ?? 'Unknown Artist',
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppColors.textSecondary),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              // Audio output indicator
+                              Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.volume_up_rounded,
+                                      size: 10, color: AppColors.textSecondary),
+                                  SizedBox(width: 3),
+                                  Text(
+                                    'Phone speaker',
+                                    style: TextStyle(
+                                        fontSize: 9,
+                                        color: AppColors.textSecondary,
+                                        fontFamily: 'Inter'),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+
+                        // Crossfade indicator — shown when crossfade > 0
+                        // Wrapped in try/catch via Builder to prevent settings
+                        // provider errors from crashing the whole mini player
+                        Builder(builder: (ctx) {
+                          try {
+                            final settings = ref.watch(settingsProvider);
+                            if (settings.crossfadeDuration <= 0) return const SizedBox.shrink();
+                            return Padding(
+                              padding: const EdgeInsets.only(right: 4),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: AppColors.accentViolet.withValues(alpha: 0.15),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                      color: AppColors.accentViolet
+                                          .withValues(alpha: 0.4)),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    const Icon(Icons.swap_horiz_rounded,
+                                        color: AppColors.accentViolet, size: 10),
+                                    const SizedBox(width: 2),
+                                    Text(
+                                      '${settings.crossfadeDuration.toStringAsFixed(0)}s',
+                                      style: const TextStyle(
+                                        fontSize: 9,
+                                        fontWeight: FontWeight.w700,
+                                        color: AppColors.accentViolet,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          } catch (_) {
+                            return const SizedBox.shrink();
+                          }
+                        }),
+
+                        // Queue button
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            context.push('/player/audio', extra: displayItem);
+                          },
+                          child: const Padding(
+                            padding: EdgeInsets.only(right: 4),
+                            child: Icon(Icons.queue_music_rounded,
+                                color: AppColors.textSecondary, size: 18),
+                          ),
+                        ),
+
+                        // Progress ring + play/pause
+                        Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          child: SizedBox(
+                            width: 36,
+                            height: 36,
+                            child: Stack(
+                              alignment: Alignment.center,
+                              children: [
+                                CircularProgressIndicator(
+                                  value: playerState.duration.inMilliseconds > 0
+                                      ? (playerState.position.inMilliseconds /
+                                              playerState.duration.inMilliseconds)
+                                          .clamp(0.0, 1.0)
+                                      : 0,
+                                  strokeWidth: 2.5,
+                                  backgroundColor: AppColors.border,
+                                  valueColor: const AlwaysStoppedAnimation<Color>(
+                                      AppColors.accent),
+                                ),
+                                GestureDetector(
+                                  onTap: () {
+                                    HapticFeedback.lightImpact();
+                                    ref
+                                        .read(audioPlayerProvider.notifier)
+                                        .togglePlay();
+                                  },
+                                  child: Icon(
+                                    playerState.isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    color: AppColors.accent,
+                                    size: 20,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+
+                        // Close
+                        GestureDetector(
+                          onTap: _dismiss,
+                          child: const Padding(
+                            padding: EdgeInsets.only(right: 12),
+                            child: Icon(Icons.close_rounded,
+                                color: AppColors.textSecondary, size: 18),
+                          ),
                         ),
                       ],
                     ),
                   ),
 
-                  // Crossfade indicator — shown when crossfade > 0
-                  // Wrapped in try/catch via Builder to prevent settings
-                  // provider errors from crashing the whole mini player
+                  // ── Seek bar (tappable, at bottom of mini player) ──
                   Builder(builder: (ctx) {
-                    try {
-                      final settings = ref.watch(settingsProvider);
-                      if (settings.crossfadeDuration <= 0) return const SizedBox.shrink();
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 4),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 5, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accentViolet.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(4),
-                            border: Border.all(
-                                color: AppColors.accentViolet
-                                    .withValues(alpha: 0.4)),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.swap_horiz_rounded,
-                                  color: AppColors.accentViolet, size: 10),
-                              const SizedBox(width: 2),
-                              Text(
-                                '${settings.crossfadeDuration.toStringAsFixed(0)}s',
-                                style: const TextStyle(
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.w700,
-                                  color: AppColors.accentViolet,
-                                ),
-                              ),
-                            ],
-                          ),
+                    final totalMs = playerState.duration.inMilliseconds;
+                    final progress = totalMs > 0
+                        ? (playerState.position.inMilliseconds / totalMs)
+                            .clamp(0.0, 1.0)
+                        : 0.0;
+                    return GestureDetector(
+                      onTapDown: (details) {
+                        HapticFeedback.selectionClick();
+                        final box = ctx.findRenderObject() as RenderBox?;
+                        if (box == null || totalMs <= 0) return;
+                        final fraction =
+                            (details.localPosition.dx / box.size.width)
+                                .clamp(0.0, 1.0);
+                        final seekTo = Duration(
+                            milliseconds: (fraction * totalMs).toInt());
+                        ref
+                            .read(audioPlayerProvider.notifier)
+                            .seek(seekTo);
+                      },
+                      child: ClipRRect(
+                        borderRadius: const BorderRadius.only(
+                          bottomLeft: Radius.circular(24),
+                          bottomRight: Radius.circular(24),
                         ),
-                      );
-                    } catch (_) {
-                      return const SizedBox.shrink();
-                    }
-                  }),
-
-                  // Progress ring + play/pause
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 8),
-                    child: SizedBox(
-                      width: 36,
-                      height: 36,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          CircularProgressIndicator(
-                            value: playerState.duration.inMilliseconds > 0
-                                ? (playerState.position.inMilliseconds /
-                                        playerState.duration.inMilliseconds)
-                                    .clamp(0.0, 1.0)
-                                : 0,
-                            strokeWidth: 2.5,
+                        child: SizedBox(
+                          height: 2.5,
+                          child: LinearProgressIndicator(
+                            value: progress,
                             backgroundColor: AppColors.border,
                             valueColor: const AlwaysStoppedAnimation<Color>(
                                 AppColors.accent),
                           ),
-                          GestureDetector(
-                            onTap: () {
-                              HapticFeedback.lightImpact();
-                              ref
-                                  .read(audioPlayerProvider.notifier)
-                                  .togglePlay();
-                            },
-                            child: Icon(
-                              playerState.isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: AppColors.accent,
-                              size: 20,
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ),
-
-                  // Close
-                  GestureDetector(
-                    onTap: _dismiss,
-                    child: const Padding(
-                      padding: EdgeInsets.only(right: 12),
-                      child: Icon(Icons.close_rounded,
-                          color: AppColors.textSecondary, size: 18),
-                    ),
-                  ),
+                    );
+                  }),
                 ],
               ),
             ),

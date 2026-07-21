@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
 import '../../my_space/presentation/playback_history_screen.dart';
+import '../../../features/playlists/playlist_screen.dart' show playlistsProvider;
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -101,7 +103,7 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
       case _VideoFilter.folders:
         return _VideoFoldersTab(items: videos);
       case _VideoFilter.playlists:
-        return _VideoPlaylistsPlaceholder();
+        return const _PlaylistsView();
     }
   }
 }
@@ -307,27 +309,74 @@ class _VideoGrid extends ConsumerWidget {
       return const _EmptyState(
           icon: Icons.videocam_rounded, label: 'No videos found');
     }
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 16 / 11,
-      ),
-      cacheExtent: 400,
-      itemCount: items.length,
-      itemBuilder: (context, i) {
-        final item = items[i];
-        return _VideoCard(
-          item: item,
+    return Column(
+      children: [
+        // ── Shuffle all bar ──────────────────────────────────────────
+        GestureDetector(
           onTap: () {
-            HapticFeedback.lightImpact();
-            ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
-            context.push('/player/video', extra: item);
+            HapticFeedback.selectionClick();
+            final shuffled = List<MediaItem>.from(items)..shuffle();
+            ref.read(queueProvider.notifier).setQueue(shuffled, startIndex: 0);
+            context.push('/player/video', extra: shuffled.first);
           },
-        );
-      },
+          child: Container(
+            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.shuffle_rounded,
+                    color: AppColors.accent, size: 20),
+                const SizedBox(width: 10),
+                Text(
+                  'Shuffle all (${items.length})',
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const Spacer(),
+                const Icon(Icons.play_arrow_rounded,
+                    color: AppColors.accent, size: 20),
+              ],
+            ),
+          ),
+        ),
+
+        // ── Grid ─────────────────────────────────────────────────────
+        Expanded(
+          child: GridView.builder(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: 16 / 13,
+            ),
+            cacheExtent: 400,
+            itemCount: items.length,
+            itemBuilder: (context, i) {
+              final item = items[i];
+              return _VideoCard(
+                item: item,
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref
+                      .read(queueProvider.notifier)
+                      .setQueue(items, startIndex: i);
+                  context.push('/player/video', extra: item);
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
@@ -348,6 +397,7 @@ class _VideoCardState extends State<_VideoCard> {
   String? _thumbPath;
   bool _disposed = false;
 
+  // Session-level thumbnail cache shared across all instances
   static final Map<String, String?> _thumbCache = {};
 
   @override
@@ -385,6 +435,36 @@ class _VideoCardState extends State<_VideoCard> {
     }
   }
 
+  /// Infer a resolution badge from the file path.
+  String _resolutionBadge() {
+    final p = widget.item.filePath.toLowerCase();
+    if (p.contains('1080')) return '1080p';
+    if (p.contains('720')) return '720p';
+    if (p.contains('480')) return '480p';
+    if (p.contains('4k') || p.contains('2160')) return '4K';
+    return '720p'; // sensible default
+  }
+
+  /// Extract the immediate parent folder name from the file path.
+  String _folderName() {
+    final parts = widget.item.filePath.split('/');
+    if (parts.length >= 2) return parts[parts.length - 2];
+    return 'Local';
+  }
+
+  void _showContextMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _VideoContextMenu(
+        item: widget.item,
+        onPlay: widget.onTap,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -405,6 +485,7 @@ class _VideoCardState extends State<_VideoCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Thumbnail area
             Expanded(
               child: ClipRRect(
                 borderRadius:
@@ -412,6 +493,7 @@ class _VideoCardState extends State<_VideoCard> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
+                    // Thumbnail or gradient placeholder
                     _thumbPath != null
                         ? Image.file(
                             File(_thumbPath!),
@@ -419,6 +501,8 @@ class _VideoCardState extends State<_VideoCard> {
                             errorBuilder: (_, __, ___) => _gradientBg(),
                           )
                         : _gradientBg(),
+
+                    // Play button overlay
                     Center(
                       child: Container(
                         width: 40,
@@ -431,6 +515,8 @@ class _VideoCardState extends State<_VideoCard> {
                             color: Colors.white, size: 26),
                       ),
                     ),
+
+                    // Duration badge (bottom-right)
                     Positioned(
                       bottom: 6,
                       right: 6,
@@ -447,7 +533,29 @@ class _VideoCardState extends State<_VideoCard> {
                             fontSize: 10,
                             color: Colors.white,
                             fontWeight: FontWeight.w600,
+                            fontFamily: 'Inter',
                           ),
+                        ),
+                      ),
+                    ),
+
+                    // 3-dot menu (top-right)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: GestureDetector(
+                        onTap: () {
+                          HapticFeedback.selectionClick();
+                          _showContextMenu(context);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withValues(alpha: 0.5),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.more_vert_rounded,
+                              color: Colors.white, size: 14),
                         ),
                       ),
                     ),
@@ -455,18 +563,53 @@ class _VideoCardState extends State<_VideoCard> {
                 ),
               ),
             ),
+
+            // Info area
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 6, 10, 8),
-              child: Text(
-                widget.item.title,
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                ),
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
+              padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.item.title,
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      // Resolution badge
+                      _Badge(
+                          label: _resolutionBadge(),
+                          color: AppColors.accent),
+                      const SizedBox(width: 4),
+                      // File size
+                      _Badge(
+                          label: widget.item.formattedSize,
+                          color: AppColors.textSecondary),
+                      const Spacer(),
+                      // Folder name
+                      Flexible(
+                        child: Text(
+                          _folderName(),
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
           ],
@@ -476,17 +619,194 @@ class _VideoCardState extends State<_VideoCard> {
   }
 
   Widget _gradientBg() => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [Color(0xFF1a1a2e), AppColors.accentViolet],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+    decoration: const BoxDecoration(
+      gradient: LinearGradient(
+        colors: [Color(0xFF1a1a2e), AppColors.accentViolet],
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+      ),
+    ),
+    child: const Center(
+      child: Icon(Icons.movie_rounded, color: Colors.white38, size: 32),
+    ),
+  );
+}
+
+// ── Small badge widget ────────────────────────────────────────────────────
+
+class _Badge extends StatelessWidget {
+  final String label;
+  final Color color;
+  const _Badge({required this.label, required this.color});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 8,
+          fontWeight: FontWeight.w700,
+          color: color,
+          fontFamily: 'Inter',
+        ),
+      ),
+    );
+  }
+}
+
+// ── Video context menu ────────────────────────────────────────────────────
+
+class _VideoContextMenu extends StatelessWidget {
+  final MediaItem item;
+  final VoidCallback onPlay;
+  const _VideoContextMenu({required this.item, required this.onPlay});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
           ),
-        ),
-        child: const Center(
-          child: Icon(Icons.movie_rounded, color: Colors.white38, size: 32),
-        ),
-      );
+          const SizedBox(height: 12),
+          // Title row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.movie_rounded,
+                      color: AppColors.accent, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
+                      Text(item.formattedDuration,
+                          style: const TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: AppColors.border, height: 1),
+          _ContextOption(
+            icon: Icons.play_arrow_rounded,
+            label: 'Play',
+            color: AppColors.accent,
+            onTap: () {
+              Navigator.pop(context);
+              onPlay();
+            },
+          ),
+          _ContextOption(
+            icon: Icons.share_rounded,
+            label: 'Share',
+            color: AppColors.textSecondary,
+            onTap: () async {
+              Navigator.pop(context);
+              await Share.shareXFiles(
+                [XFile(item.filePath)],
+                text: item.title,
+              );
+            },
+          ),
+          _ContextOption(
+            icon: Icons.lock_rounded,
+            label: 'Add to Vault',
+            color: AppColors.accentViolet,
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Vault feature coming soon'),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
+          ),
+          _ContextOption(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete',
+            color: AppColors.error,
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Delete not implemented'),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContextOption extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _ContextOption({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Icon(icon, color: color, size: 22),
+      title: Text(label,
+          style: const TextStyle(
+              fontSize: 14,
+              color: AppColors.textPrimary,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Inter')),
+      onTap: onTap,
+      dense: true,
+    );
+  }
 }
 
 // ── Video Folders Tab ─────────────────────────────────────────────────────
@@ -626,7 +946,7 @@ class _VideoFolderDetailPage extends ConsumerWidget {
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 16 / 11,
+          childAspectRatio: 16 / 13,
         ),
         itemCount: items.length,
         itemBuilder: (context, i) {
@@ -647,14 +967,101 @@ class _VideoFolderDetailPage extends ConsumerWidget {
   }
 }
 
-// ── Playlists placeholder ─────────────────────────────────────────────────
+// ── Playlists view ────────────────────────────────────────────────────────
 
-class _VideoPlaylistsPlaceholder extends StatelessWidget {
+class _PlaylistsView extends ConsumerWidget {
+  const _PlaylistsView();
+
   @override
-  Widget build(BuildContext context) {
-    return const _EmptyState(
-      icon: Icons.queue_play_next_rounded,
-      label: 'Video playlists coming soon',
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playlists = ref.watch(playlistsProvider);
+
+    if (playlists.isEmpty) {
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          const _EmptyState(
+            icon: Icons.queue_music_rounded,
+            label: 'No playlists yet',
+          ),
+          const SizedBox(height: 16),
+          GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              context.push('/playlists');
+            },
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [AppColors.accent, AppColors.accentViolet],
+                ),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Text(
+                'Create Playlist',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      itemCount: playlists.length,
+      itemBuilder: (context, i) {
+        final pl = playlists[i];
+        return Container(
+          margin: const EdgeInsets.only(bottom: 10),
+          child: ListTile(
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+            tileColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+              side: const BorderSide(color: AppColors.border),
+            ),
+            leading: Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.accentViolet.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(Icons.queue_music_rounded,
+                  color: AppColors.accentViolet, size: 22),
+            ),
+            title: Text(
+              pl.name,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            subtitle: Text(
+              '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
+              style: const TextStyle(
+                  fontSize: 11, color: AppColors.textSecondary),
+            ),
+            trailing: const Icon(Icons.chevron_right_rounded,
+                color: AppColors.textSecondary, size: 20),
+            onTap: () {
+              HapticFeedback.selectionClick();
+              context.push('/playlists');
+            },
+          ),
+        );
+      },
     );
   }
 }
@@ -727,7 +1134,7 @@ class _VideoSearchDelegate extends SearchDelegate<MediaItem?> {
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 16 / 11,
+          childAspectRatio: 16 / 13,
         ),
         itemCount: results.length,
         itemBuilder: (context, i) {
