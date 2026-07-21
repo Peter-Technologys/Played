@@ -60,7 +60,7 @@ class _AboutScreenState extends State<AboutScreen> {
         children: [
           // ── App card ──────────────────────────────────────────────
           const SizedBox(height: 8),
-          _AppCard(version: _version, build: _build),
+          _AppCard(version: _version, buildNumber: _build),
 
           const SizedBox(height: 24),
 
