@@ -163,37 +163,61 @@ fi
 if [ -n "${APPWRITE_ENDPOINT:-}" ] && [ -n "${APPWRITE_PROJECT_ID:-}" ] && [ -n "${APPWRITE_API_KEY:-}" ]; then
   echo "Notifying Appwrite..."
   DOC_ID=$(echo "v${VERSION}" | tr '.' '-')
-  DOC_BODY=$(python3 - "$VERSION" "$VERSION_CODE" "$DATE" "${WORKER_URL:-https://petersmartlink.com}" "$MIN_SDK" "$TARGET_SDK" "$CHANGELOG_FILE" << 'PYEOF'
+  APPWRITE_BASE="${APPWRITE_ENDPOINT}/databases/otya-db/collections/releases/documents"
+
+  DOC_DATA=$(python3 - "$VERSION" "$VERSION_CODE" "$DATE" "${WORKER_URL:-https://petersmartlink.com}" "$MIN_SDK" "$TARGET_SDK" "$CHANGELOG_FILE" << 'PYEOF'
 import json, sys
 version, version_code, date, worker_url, min_sdk, target_sdk, changelog_file = sys.argv[1:]
 with open(changelog_file) as f:
     changelog = f.read().strip() or 'Bug fixes and improvements'
 print(json.dumps({
-    'documentId': f'v{version.replace(".", "-")}',
-    'data': {
-        'version':     version,
-        'versionCode': int(version_code),
-        'date':        date,
-        'changelog':   changelog,
-        'arm64Url':    f'{worker_url}/apk/arm64',
-        'arm32Url':    f'{worker_url}/apk/arm32',
-        'downloadUrl': f'{worker_url}/download',
-        'minSdk':      int(min_sdk),
-        'targetSdk':   int(target_sdk),
-    },
+    'version':     version,
+    'versionCode': int(version_code),
+    'date':        date,
+    'changelog':   changelog,
+    'arm64Url':    f'{worker_url}/apk/arm64',
+    'arm32Url':    f'{worker_url}/apk/arm32',
+    'downloadUrl': f'{worker_url}/download',
+    'minSdk':      int(min_sdk),
+    'targetSdk':   int(target_sdk),
 }))
 PYEOF
 )
-  HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
-    -X POST \
-    "${APPWRITE_ENDPOINT}/databases/otya-db/collections/releases/documents" \
-    -H "Content-Type: application/json" \
-    -H "X-Appwrite-Project: ${APPWRITE_PROJECT_ID}" \
-    -H "X-Appwrite-Key: ${APPWRITE_API_KEY}" \
-    -d "$DOC_BODY")
-  echo "Appwrite HTTP: $HTTP_STATUS"
+
+  APPWRITE_HEADERS=(
+    -H "Content-Type: application/json"
+    -H "X-Appwrite-Project: ${APPWRITE_PROJECT_ID}"
+    -H "X-Appwrite-Key: ${APPWRITE_API_KEY}"
+  )
+
+  # Try PATCH first (update existing document)
+  PATCH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X PATCH \
+    "${APPWRITE_BASE}/${DOC_ID}" \
+    "${APPWRITE_HEADERS[@]}" \
+    -d "{\"data\": ${DOC_DATA}}")
+  echo "Appwrite PATCH HTTP: $PATCH_STATUS"
+
+  if [ "$PATCH_STATUS" = "404" ]; then
+    # Document does not exist yet -- create it
+    POST_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+      -X POST \
+      "${APPWRITE_BASE}" \
+      "${APPWRITE_HEADERS[@]}" \
+      -d "{\"documentId\": \"${DOC_ID}\", \"data\": ${DOC_DATA}}")
+    echo "Appwrite POST HTTP: $POST_STATUS"
+    if [ "$POST_STATUS" != "201" ] && [ "$POST_STATUS" != "200" ]; then
+      echo "WARNING: Appwrite create failed (HTTP $POST_STATUS) -- release is still live via R2"
+    else
+      echo "Appwrite: document created OK"
+    fi
+  elif [ "$PATCH_STATUS" != "200" ]; then
+    echo "WARNING: Appwrite update failed (HTTP $PATCH_STATUS) -- release is still live via R2"
+  else
+    echo "Appwrite: document updated OK"
+  fi
 else
-  echo "INFO: Appwrite vars not set — skipping"
+  echo "INFO: Appwrite vars not set -- release is live via R2"
 fi
 
 # -- Prune old backups (keep last 5) --
