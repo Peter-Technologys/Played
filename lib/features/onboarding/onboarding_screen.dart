@@ -62,6 +62,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
     setState(() => _dismissing = true);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('isFirstLaunch', false);
+    await prefs.setBool('onboarding_done', true);
     await _fadeOut.forward();
     widget.onDone();
   }

@@ -406,15 +406,32 @@ class PlaylistDetailScreenById extends ConsumerWidget {
 
 // ── Playlist Detail Screen ─────────────────────────────────────
 
-class PlaylistDetailScreen extends ConsumerWidget {
+class PlaylistDetailScreen extends ConsumerStatefulWidget {
   final Playlist playlist;
   const PlaylistDetailScreen({super.key, required this.playlist});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PlaylistDetailScreen> createState() =>
+      _PlaylistDetailScreenState();
+}
+
+class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
+  void _showAddSongsSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Theme.of(context).colorScheme.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _AddSongsSheet(playlist: widget.playlist),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Resolve MediaItems from IDs using the in-memory cache
     final allMedia = MediaRepository.instance.cachedItems ?? [];
-    final tracks = playlist.mediaIds
+    final tracks = widget.playlist.mediaIds
         .map((id) {
           try {
             return allMedia.firstWhere((m) => m.id == id);
@@ -435,7 +452,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text(playlist.name,
+        title: Text(widget.playlist.name,
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
@@ -473,15 +490,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: () {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text(
-                'Go to the Music tab → tap ⋮ on any track to add it to a playlist.',
-              ),
-            ),
-          );
-        },
+        onPressed: _showAddSongsSheet,
         backgroundColor: AppColors.accentViolet,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add_rounded),
@@ -518,14 +527,14 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 // ReorderableListView passes newIndex after removal;
                 // adjust when moving downward.
                 final adjusted = newIndex > oldIndex ? newIndex - 1 : newIndex;
-                final ids = List<String>.from(playlist.mediaIds);
+                final ids = List<String>.from(widget.playlist.mediaIds);
                 final id = ids.removeAt(oldIndex);
                 ids.insert(adjusted, id);
                 final updated = Playlist(
-                  id: playlist.id,
-                  name: playlist.name,
+                  id: widget.playlist.id,
+                  name: widget.playlist.name,
                   mediaIds: ids,
-                  createdAt: playlist.createdAt,
+                  createdAt: widget.playlist.createdAt,
                   updatedAt: DateTime.now(),
                 );
                 PlayedDatabase.instance.savePlaylist(updated);
@@ -572,7 +581,7 @@ class PlaylistDetailScreen extends ConsumerWidget {
                           HapticFeedback.lightImpact();
                           ref
                               .read(playlistsProvider.notifier)
-                              .removeTrack(playlist.id, item.id);
+                              .removeTrack(widget.playlist.id, item.id);
                         },
                         child: const Icon(
                             Icons.remove_circle_outline_rounded,
@@ -595,6 +604,169 @@ class PlaylistDetailScreen extends ConsumerWidget {
                 );
               },
             ),
+    );
+  }
+}
+
+// ── Add Songs Sheet ────────────────────────────────────────────
+
+class _AddSongsSheet extends ConsumerStatefulWidget {
+  final Playlist playlist;
+  const _AddSongsSheet({required this.playlist});
+
+  @override
+  ConsumerState<_AddSongsSheet> createState() => _AddSongsSheetState();
+}
+
+class _AddSongsSheetState extends ConsumerState<_AddSongsSheet> {
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final allMedia = MediaRepository.instance.cachedItems ?? [];
+    final audioTracks = allMedia.where((item) => !item.isVideo).toList();
+    final filtered = _query.isEmpty
+        ? audioTracks
+        : audioTracks.where((item) {
+            final q = _query.toLowerCase();
+            return item.title.toLowerCase().contains(q) ||
+                (item.artist?.toLowerCase().contains(q) ?? false);
+          }).toList();
+
+    return DraggableScrollableSheet(
+      initialChildSize: 0.75,
+      minChildSize: 0.5,
+      maxChildSize: 0.95,
+      expand: false,
+      builder: (_, scrollCtrl) => Column(
+        children: [
+          // Drag handle
+          const SizedBox(height: 12),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Title
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Add Songs to ${widget.playlist.name}',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Search field
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: TextField(
+              controller: _searchCtrl,
+              style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurface),
+              decoration: InputDecoration(
+                hintText: 'Search songs…',
+                hintStyle:
+                    const TextStyle(color: AppColors.textSecondary),
+                prefixIcon: const Icon(Icons.search_rounded,
+                    color: AppColors.textSecondary, size: 20),
+                filled: true,
+                fillColor: Theme.of(context).colorScheme.surface,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.borderOf(context)),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: AppColors.borderOf(context)),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.accent),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 12, vertical: 10),
+              ),
+              onChanged: (v) => setState(() => _query = v),
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Divider(color: AppColors.border, height: 1),
+          // Track list
+          Expanded(
+            child: filtered.isEmpty
+                ? const Center(
+                    child: Text('No songs found',
+                        style: TextStyle(color: AppColors.textSecondary)),
+                  )
+                : ListView.builder(
+                    controller: scrollCtrl,
+                    itemCount: filtered.length,
+                    itemBuilder: (_, i) {
+                      final item = filtered[i];
+                      return ListTile(
+                        leading: Container(
+                          width: 40,
+                          height: 40,
+                          decoration: BoxDecoration(
+                            color: AppColors.accentViolet
+                                .withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: const Icon(Icons.music_note_rounded,
+                              color: AppColors.accentViolet, size: 20),
+                        ),
+                        title: Text(item.title,
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: Theme.of(context).colorScheme.onSurface,
+                              fontFamily: 'Inter',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis),
+                        subtitle: Text(
+                          item.artist ?? item.formattedDuration,
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary),
+                        ),
+                        onTap: () async {
+                          await ref
+                              .read(playlistsProvider.notifier)
+                              .addTrack(widget.playlist.id, item);
+                          if (context.mounted) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                    '"${item.title}" added to playlist'),
+                                backgroundColor: AppColors.surface,
+                              ),
+                            );
+                          }
+                        },
+                      );
+                    },
+                  ),
+          ),
+        ],
+      ),
     );
   }
 }

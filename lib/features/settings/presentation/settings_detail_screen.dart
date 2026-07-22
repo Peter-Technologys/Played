@@ -53,9 +53,9 @@ class SettingsDetailScreen extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(4),
             decoration: BoxDecoration(
-              color: const Color(0xFF1B1E2B),
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: const Color(0xFF2A2F45)),
+              border: Border.all(color: AppColors.borderOf(context)),
             ),
             child: Row(
               children: AppThemeMode.values.map((mode) {
@@ -1144,9 +1144,9 @@ class _GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1B1E2B),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2F45)),
+        border: Border.all(color: AppColors.borderOf(context)),
       ),
       child: Column(
         children: children,
@@ -1158,10 +1158,10 @@ class _GroupCard extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Divider(
+    return Divider(
       height: 1,
       thickness: 1,
-      color: Color(0xFF2A2F45),
+      color: AppColors.borderOf(context),
       indent: 16,
       endIndent: 16,
     );

@@ -12,6 +12,7 @@ import '../../../core/services/auth_service.dart';
 import '../../../core/services/appwrite_service.dart';
 import '../../settings/settings_provider.dart';
 import 'providers/my_space_provider.dart';
+import 'usage_stats_dashboard.dart';
 
 /// The "My Space" hub — account, stats, quick links, and Settings entry.
 class MySpaceHubScreen extends ConsumerWidget {
@@ -162,6 +163,10 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             if (total > 0) const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
+            // ── Usage Stats Dashboard ────────────────────────────────
+            const SliverToBoxAdapter(child: UsageStatsDashboard()),
+            const SliverToBoxAdapter(child: SizedBox(height: 16)),
+
             // ── Quick Links ──────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
@@ -205,6 +210,14 @@ class MySpaceHubScreen extends ConsumerWidget {
                       subtitle: 'Private encrypted media',
                       color: AppColors.accentViolet,
                       onTap: () => context.push('/vault'),
+                    ),
+                    const SizedBox(height: 8),
+                    _QuickLink(
+                      icon: Icons.bar_chart_rounded,
+                      label: 'Your Stats',
+                      subtitle: 'Listening time, tracks played & more',
+                      color: AppColors.accentGreen,
+                      onTap: () => context.push('/stats'),
                     ),
                     const SizedBox(height: 8),
                     _QuickLink(

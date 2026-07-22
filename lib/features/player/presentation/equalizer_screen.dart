@@ -36,7 +36,18 @@ class EqNotifier extends StateNotifier<EqState> {
             EqBand(label: '3.6kHz', gain: 0),
             EqBand(label: '14kHz', gain: 0),
           ],
-        ));
+        )) {
+    // Load the last-used preset from SharedPreferences on startup.
+    Future.microtask(() async {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final lastPreset = prefs.getString('eq_last_preset');
+        if (lastPreset != null && _presets.containsKey(lastPreset)) {
+          applyPreset(lastPreset);
+        }
+      } catch (_) {}
+    });
+  }
 
   static const Map<String, List<double>> _presets = {
     'Flat':          [0, 0, 0, 0, 0],
@@ -131,11 +142,84 @@ final eqProvider =
 
 // ── Equalizer Screen ───────────────────────────────────────────────
 
-class EqualizerScreen extends ConsumerWidget {
+class EqualizerScreen extends ConsumerStatefulWidget {
   const EqualizerScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<EqualizerScreen> createState() => _EqualizerScreenState();
+}
+
+class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
+  List<String> _customPresets = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCustomPresets();
+  }
+
+  Future<void> _loadCustomPresets() async {
+    final notifier = ref.read(eqProvider.notifier);
+    final names = await notifier.loadCustomPresetNames();
+    if (mounted) setState(() => _customPresets = names);
+  }
+
+  Future<void> _showSavePresetDialog() async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: Theme.of(context).colorScheme.surface,
+        title: Text('Save Preset',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+            )),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
+          decoration: const InputDecoration(
+            hintText: 'Preset name',
+            hintStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: UnderlineInputBorder(
+                borderSide: BorderSide(color: AppColors.accent)),
+          ),
+          onSubmitted: (v) => Navigator.pop(context, v),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+            child: const Text('Save',
+                style: TextStyle(
+                    color: Colors.black, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (name != null && name.trim().isNotEmpty) {
+      final notifier = ref.read(eqProvider.notifier);
+      await notifier.saveCustomPreset(name.trim());
+      await _loadCustomPresets();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Preset saved')),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final eq = ref.watch(eqProvider);
     final notifier = ref.read(eqProvider.notifier);
 
@@ -184,34 +268,79 @@ class EqualizerScreen extends ConsumerWidget {
             child: ListView(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: notifier.presetNames.map((name) {
-                final active = eq.preset == name;
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    notifier.applyPreset(name);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: active ? AppColors.accent : Theme.of(context).colorScheme.surface,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: active ? AppColors.accent : AppColors.borderOf(context),
+              children: [
+                // Built-in presets
+                ...notifier.presetNames.map((name) {
+                  final active = eq.preset == name;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      notifier.applyPreset(name);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: active ? AppColors.accent : Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: active ? AppColors.accent : AppColors.borderOf(context),
+                        ),
+                      ),
+                      child: Text(name,
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: active ? Colors.black : AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          )),
+                    ),
+                  );
+                }),
+                // Custom presets
+                ..._customPresets.map((name) {
+                  final active = eq.preset == name;
+                  return GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      notifier.applyCustomPreset(name);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      margin: const EdgeInsets.only(right: 8),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: active
+                            ? AppColors.accentViolet
+                            : Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: active
+                              ? AppColors.accentViolet
+                              : AppColors.borderOf(context),
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.star_rounded,
+                              size: 12,
+                              color: active ? Colors.white : AppColors.accentViolet),
+                          const SizedBox(width: 4),
+                          Text(name,
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: active ? Colors.white : AppColors.textSecondary,
+                                fontFamily: 'Inter',
+                              )),
+                        ],
                       ),
                     ),
-                    child: Text(name,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: active ? Colors.black : AppColors.textSecondary,
-                          fontFamily: 'Inter',
-                        )),
-                  ),
-                );
-              }).toList(),
+                  );
+                }),
+              ],
             ),
           ),
           const SizedBox(height: 32),
@@ -237,28 +366,59 @@ class EqualizerScreen extends ConsumerWidget {
           const SizedBox(height: 32),
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                notifier.applyPreset('Flat');
-              },
-              child: Container(
-                width: double.infinity,
-                height: 52,
-                decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.borderOf(context)),
+            child: Row(
+              children: [
+                Expanded(
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.mediumImpact();
+                      notifier.applyPreset('Flat');
+                    },
+                    child: Container(
+                      height: 52,
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surface,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.borderOf(context)),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text('Reset to Flat',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          )),
+                    ),
+                  ),
                 ),
-                alignment: Alignment.center,
-                child: const Text('Reset to Flat',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Inter',
-                    )),
-              ),
+                const SizedBox(width: 12),
+                TextButton(
+                  onPressed: _showSavePresetDialog,
+                  style: TextButton.styleFrom(
+                    backgroundColor: AppColors.accentViolet.withValues(alpha: 0.12),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14)),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.save_rounded,
+                          color: AppColors.accentViolet, size: 18),
+                      SizedBox(width: 6),
+                      Text('Save Preset',
+                          style: TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.accentViolet,
+                            fontFamily: 'Inter',
+                          )),
+                    ],
+                  ),
+                ),
+              ],
             ),
           ),
         ],

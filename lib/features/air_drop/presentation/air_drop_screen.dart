@@ -9,9 +9,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/media_scanner_service.dart';
-import '../../../core/widgets/modern_aura_background.dart';
-import '../../../core/widgets/modern_glass_container.dart';
-import '../../../core/theme/app_spacing.dart';
 import '../../my_space/data/media_repository.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../data/media_sender.dart';
@@ -197,11 +194,10 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
   Widget build(BuildContext context) {
     final s   = ref.watch(_airDropProvider);
     final lib = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-    return ModernAuraBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+    return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         appBar: AppBar(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
           title: Text('Flash Share',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface,
@@ -221,7 +217,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
             // Tab bar
             Container(
               margin: const EdgeInsets.symmetric(
-                  horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+                  horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                   color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(14)),
@@ -253,10 +249,14 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
             if (s.log.isNotEmpty)
               Container(
                 height: 80,
-                margin: const EdgeInsets.fromLTRB(
-                    AppSpacing.md, 0, AppSpacing.md, AppSpacing.md),
-                child: ModernGlassContainer(
-                  padding: const EdgeInsets.all(AppSpacing.sm),
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surface,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: AppColors.borderOf(context)),
+                  ),
                   child: ListView.builder(
                     reverse: true,
                     itemCount: s.log.length,
@@ -269,7 +269,6 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               ),
           ],
         ),
-      ),
     );
   }
 }
@@ -285,22 +284,28 @@ class _SendView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final n = ref.read(_airDropProvider.notifier);
     return SingleChildScrollView(
-      padding: AppSpacing.screenPadding.copyWith(top: AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           // QR panel
           if (state.serverUrl != null) ...[
-            ModernGlassContainer(
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: AppColors.borderOf(context)),
+              ),
               child: Column(
                 children: [
                   const Text('Scan on the receiving device',
                       style: TextStyle(fontSize: 13,
                           color: AppColors.textSecondary, fontFamily: 'Inter')),
-                  AppSpacing.vMd,
+                  const SizedBox(height: 16),
                   Center(
                     child: Container(
-                      padding: const EdgeInsets.all(AppSpacing.sm),
+                      padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(16)),
@@ -312,7 +317,7 @@ class _SendView extends ConsumerWidget {
                       ),
                     ),
                   ),
-                  AppSpacing.vSm,
+                  const SizedBox(height: 8),
                   GestureDetector(
                     onTap: () {
                       Clipboard.setData(ClipboardData(text: state.serverUrl!));
@@ -326,7 +331,7 @@ class _SendView extends ConsumerWidget {
                         textAlign: TextAlign.center),
                   ),
                   if (state.selectedItem != null) ...[
-                    AppSpacing.vSm,
+                    const SizedBox(height: 8),
                     Text('🎥 ${state.selectedItem!.title}  •  ${state.selectedItem!.formattedSize}',
                         style: const TextStyle(fontSize: 12,
                             color: AppColors.textSecondary, fontFamily: 'Inter'),
@@ -335,7 +340,7 @@ class _SendView extends ConsumerWidget {
                 ],
               ),
             ),
-            AppSpacing.vMd,
+            const SizedBox(height: 16),
           ],
           // Share APK
           _GlassButton(
@@ -345,10 +350,10 @@ class _SendView extends ConsumerWidget {
             color: AppColors.accentViolet,
             onTap: () => n.shareApk(),
           ),
-          AppSpacing.vSm,
+          const SizedBox(height: 8),
           // File list
           const Padding(
-            padding: EdgeInsets.symmetric(vertical: AppSpacing.sm),
+            padding: EdgeInsets.symmetric(vertical: 8),
             child: Text('PICK A FILE TO SEND',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
@@ -362,13 +367,13 @@ class _SendView extends ConsumerWidget {
           if (library.isEmpty)
             const Center(
               child: Padding(
-                padding: EdgeInsets.all(AppSpacing.xl),
+                padding: EdgeInsets.all(32),
                 child: Text('No media files found.',
                     style: TextStyle(
                         color: AppColors.textSecondary, fontFamily: 'Inter')),
               ),
             ),
-          AppSpacing.vXxl,
+          const SizedBox(height: 48),
         ],
       ),
     );
@@ -386,7 +391,7 @@ class _ReceiveView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final n = ref.read(_airDropProvider.notifier);
     return Padding(
-      padding: AppSpacing.screenPadding.copyWith(top: AppSpacing.md),
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
       child: switch (state.receiveStep) {
         _ReceiveStep.scanning    => _scanner(n),
         _ReceiveStep.downloading => _downloading(n),
@@ -403,7 +408,7 @@ class _ReceiveView extends ConsumerWidget {
         const Text('Point camera at the sender’s QR code',
             style: TextStyle(fontSize: 13,
                 color: AppColors.textSecondary, fontFamily: 'Inter')),
-        AppSpacing.vMd,
+        const SizedBox(height: 16),
         Expanded(
           child: ClipRRect(
             borderRadius: BorderRadius.circular(20),
@@ -421,7 +426,7 @@ class _ReceiveView extends ConsumerWidget {
             ),
           ),
         ),
-        AppSpacing.vMd,
+        const SizedBox(height: 16),
       ],
     );
   }
@@ -430,12 +435,18 @@ class _ReceiveView extends ConsumerWidget {
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
       const Icon(Icons.download_rounded, color: AppColors.accent, size: 56),
-      AppSpacing.vMd,
+      const SizedBox(height: 16),
       const Text('Downloading…',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
               color: AppColors.textPrimary, fontFamily: 'Inter')),
-      AppSpacing.vMd,
-      ModernGlassContainer(
+      const SizedBox(height: 16),
+      Builder(builder: (context) => Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
         child: Column(
           children: [
             ClipRRect(
@@ -447,7 +458,7 @@ class _ReceiveView extends ConsumerWidget {
                 minHeight: 8,
               ),
             ),
-            AppSpacing.vSm,
+            const SizedBox(height: 8),
             Text(
               state.progress > 0
                   ? '${(state.progress * 100).toStringAsFixed(1)}%'
@@ -457,8 +468,8 @@ class _ReceiveView extends ConsumerWidget {
             ),
           ],
         ),
-      ),
-      AppSpacing.vLg,
+      )),
+      const SizedBox(height: 24),
       TextButton(
         onPressed: n.cancelDownload,
         child: const Text('Cancel',
@@ -478,28 +489,28 @@ class _ReceiveView extends ConsumerWidget {
         child: const Icon(Icons.check_rounded,
             color: AppColors.accentGreen, size: 44),
       ),
-      AppSpacing.vMd,
+      const SizedBox(height: 16),
       const Text('File received! ✔',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
               color: AppColors.textPrimary, fontFamily: 'Inter')),
-      AppSpacing.vSm,
+      const SizedBox(height: 8),
       if (state.receivedPath != null)
         Text(state.receivedPath!.split('/').last,
             style: const TextStyle(color: AppColors.textSecondary,
                 fontFamily: 'Inter', fontSize: 12),
             textAlign: TextAlign.center),
-      AppSpacing.vSm,
+      const SizedBox(height: 8),
       const Text('Added to your media library.',
           style: TextStyle(color: AppColors.accentGreen,
               fontFamily: 'Inter', fontSize: 13)),
-      AppSpacing.vLg,
+      const SizedBox(height: 24),
       ElevatedButton(
         onPressed: n.resetReceive,
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.accent, foregroundColor: Colors.black,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xl, vertical: AppSpacing.sm + 4),
+              horizontal: 32, vertical: 12),
         ),
         child: const Text('Receive Another',
             style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter')),
@@ -511,20 +522,20 @@ class _ReceiveView extends ConsumerWidget {
     mainAxisAlignment: MainAxisAlignment.center,
     children: [
       const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 56),
-      AppSpacing.vMd,
+      const SizedBox(height: 16),
       const Text('Download failed',
           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
               color: AppColors.textPrimary, fontFamily: 'Inter')),
-      AppSpacing.vSm,
+      const SizedBox(height: 8),
       if (state.errorMessage != null)
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.lg),
+          padding: const EdgeInsets.symmetric(horizontal: 24),
           child: Text(state.errorMessage!,
               style: const TextStyle(color: AppColors.textSecondary,
                   fontFamily: 'Inter', fontSize: 12),
               textAlign: TextAlign.center),
         ),
-      AppSpacing.vLg,
+      const SizedBox(height: 24),
       ElevatedButton(
         onPressed: n.resetReceive,
         style: ElevatedButton.styleFrom(
@@ -549,7 +560,13 @@ class _GlassButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
-    child: ModernGlassContainer(
+    child: Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surface,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppColors.borderOf(context)),
+      ),
       child: Row(
         children: [
           Container(
@@ -559,7 +576,7 @@ class _GlassButton extends StatelessWidget {
                 borderRadius: BorderRadius.circular(12)),
             child: Icon(icon, color: color, size: 22),
           ),
-          AppSpacing.hMd,
+          const SizedBox(width: 16),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -589,9 +606,9 @@ class _FileTile extends StatelessWidget {
     onTap: onTap,
     child: AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      margin: const EdgeInsets.only(bottom: AppSpacing.xs),
+      margin: const EdgeInsets.only(bottom: 4),
       padding: const EdgeInsets.symmetric(
-          horizontal: AppSpacing.md, vertical: AppSpacing.sm + 2),
+          horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
         color: isSelected
             ? AppColors.accent.withValues(alpha: 0.12)
@@ -609,7 +626,7 @@ class _FileTile extends StatelessWidget {
             color: isSelected ? AppColors.accent : AppColors.textSecondary,
             size: 20,
           ),
-          AppSpacing.hSm,
+          const SizedBox(width: 8),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
