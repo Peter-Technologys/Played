@@ -29,7 +29,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _pipAutoEnabled  = false;
   bool _pipInitialized  = false;
   bool _batterySaver    = false;
-  bool _isLandscape     = true;
+  bool _isLandscape     = false;
   late final Duration _savedPosition;
 
   // ── Overlay state ──────────────────────────────────────────────────
@@ -59,7 +59,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
         Duration.zero;
     WidgetsBinding.instance.addObserver(this);
-    _lockToLandscape();
+    _initOrientationFromVideo();
     _initPip();
     _resetHideTimer();
   }
@@ -93,6 +93,21 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   // ── Orientation helpers ────────────────────────────────────────────
+
+  /// Picks the starting orientation based on the video's aspect ratio.
+  /// Portrait videos (width < height) open in portrait; landscape videos
+  /// (width >= height) open in landscape. Falls back to landscape if unknown.
+  Future<void> _initOrientationFromVideo() async {
+    final w = widget.mediaItem.width ?? 0;
+    final h = widget.mediaItem.height ?? 0;
+    if (w > 0 && h > 0 && h > w) {
+      // Portrait video — stay in portrait
+      await _lockToPortrait();
+    } else {
+      // Landscape video or unknown — go landscape
+      await _lockToLandscape();
+    }
+  }
 
   Future<void> _lockToLandscape() async {
     _isLandscape = true;
