@@ -36,6 +36,9 @@ class MediaKitEngine extends StatefulWidget {
   final String   title;
   final Duration startPosition;
   final bool     autoPlay;
+  /// Called once the internal [Player] is created and ready.
+  /// Use this to wire external controls (seek, play/pause, volume, rate).
+  final void Function(Player player)? onPlayerReady;
 
   const MediaKitEngine({
     super.key,
@@ -43,6 +46,7 @@ class MediaKitEngine extends StatefulWidget {
     this.title        = '',
     this.startPosition = Duration.zero,
     this.autoPlay     = true,
+    this.onPlayerReady,
   });
 
   @override
@@ -103,6 +107,9 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
       // Open the file before marking initialized so the Video widget only
       // renders once the player has a valid source ready.
       await _openFile();
+
+      // Notify the parent widget that the player is ready for external control.
+      widget.onPlayerReady?.call(_player);
 
       if (mounted) setState(() => _initialized = true);
     } catch (e) {

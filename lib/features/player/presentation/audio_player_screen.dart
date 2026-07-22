@@ -449,7 +449,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final skipIconSize = isSmall ? 26.0 : 30.0;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: SingleChildScrollView(
           physics: const ClampingScrollPhysics(),

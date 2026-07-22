@@ -143,7 +143,10 @@ class PlayedAudioHandler extends BaseAudioHandler
       // and does NOT leave _loading = true forever via an early return that
       // bypasses the outer finally block.
       try {
-        // Normalise path: content:// URIs must use Uri.parse, not Uri.file
+        // On Android 10+, MediaStore returns content:// URIs.
+        // Uri.file('content://...') produces file:///content:/... which is
+        // invalid. Parse content:// URIs directly; use Uri.file only for
+        // plain file-system paths.
         final uri = item.filePath.startsWith('content://')
             ? Uri.parse(item.filePath)
             : Uri.file(item.filePath);

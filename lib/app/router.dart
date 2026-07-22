@@ -69,6 +69,16 @@ class AppRouter {
         builder: (_, s) => AudioPlayerScreen(mediaItem: s.extra as MediaItem),
       ),
       GoRoute(
+        path: '/music/folder',
+        builder: (_, s) {
+          final args = s.extra as Map<String, dynamic>;
+          return MusicFolderDetailPage(
+            name: args['name'] as String,
+            items: args['items'] as List<MediaItem>,
+          );
+        },
+      ),
+      GoRoute(
         path: '/tools/whatsapp',
         builder: (_, s) => ProGate(
           featureName: 'WhatsApp Trimmer',
@@ -127,9 +137,15 @@ class _MainShellState extends ConsumerState<_MainShell> {
             child: Container(
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
               decoration: BoxDecoration(
-                color: const Color(0xFF1B1E2B),
+                color: Theme.of(context).brightness == Brightness.dark
+                    ? const Color(0xFF1B1E2B)
+                    : Colors.white,
                 borderRadius: BorderRadius.circular(28),
-                border: Border.all(color: const Color(0xFF2A2F45)),
+                border: Border.all(
+                  color: Theme.of(context).brightness == Brightness.dark
+                      ? const Color(0xFF2A2F45)
+                      : const Color(0xFFE5E7EB),
+                ),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.accent.withValues(alpha: 0.10),
