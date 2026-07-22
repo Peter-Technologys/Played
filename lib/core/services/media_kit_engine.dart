@@ -36,6 +36,9 @@ class MediaKitEngine extends StatefulWidget {
   final String   title;
   final Duration startPosition;
   final bool     autoPlay;
+  /// Controls how the video is fitted inside its container.
+  /// Defaults to [BoxFit.contain] (letterboxed).
+  final BoxFit   fit;
   /// Called once the internal [Player] is created and ready.
   /// Use this to wire external controls (seek, play/pause, volume, rate).
   final void Function(Player player)? onPlayerReady;
@@ -46,6 +49,7 @@ class MediaKitEngine extends StatefulWidget {
     this.title        = '',
     this.startPosition = Duration.zero,
     this.autoPlay     = true,
+    this.fit          = BoxFit.contain,
     this.onPlayerReady,
   });
 
@@ -232,6 +236,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
       player:     _player!,
       controller: _controller!,
       title:      widget.title,
+      fit:        widget.fit,
       onTracksTap: _subtitleTracks.length > 1 || _audioTracks.length > 1
           ? () => _showTrackMenu(context)
           : null,
@@ -438,6 +443,7 @@ class MediaKitGestureWrapper extends StatefulWidget {
   final VideoController controller;
   final String          title;
   final VoidCallback?   onTracksTap;
+  final BoxFit          fit;
 
   const MediaKitGestureWrapper({
     super.key,
@@ -445,6 +451,7 @@ class MediaKitGestureWrapper extends StatefulWidget {
     required this.controller,
     this.title       = '',
     this.onTracksTap,
+    this.fit         = BoxFit.contain,
   });
 
   @override
@@ -462,33 +469,19 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   Duration _seekPosition = Duration.zero;
   Timer?   _hudTimer;
 
-  // ── Gesture tracking (plain fields — no setState during drag) ───────────────
-  double _volume      = 1.0;
-
-  // ── Controls visibility ─────────────────────────────────────────────────────────
-  bool   _showControls = false;
-  Timer? _controlsTimer;
-
-  // ── Playback state (listened from player stream) ──────────────────────────
-  bool     _playing  = false;
+  // ── Playback state (listened from player stream for HUD only) ─────────────
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
-  StreamSubscription? _stateSub;
   StreamSubscription? _posSub;
   StreamSubscription? _durSub;
 
-  // Fix #3: threshold constants to avoid rebuilding on every position tick.
-  // Position updates at up to 60 Hz; we only need ~1 Hz for the seek bar.
+  // Threshold to avoid rebuilding on every position tick.
   static const _kPositionThreshold = Duration(milliseconds: 500);
 
   @override
   void initState() {
     super.initState();
-    _stateSub = widget.player.stream.playing.listen((p) {
-      if (mounted) setState(() => _playing = p);
-    });
-    // Fix #3: only call setState when position changes by more than 500ms.
-    // This reduces rebuilds from ~60/s to ~2/s during normal playback.
+    // Only track position/duration for the seek HUD timestamp label.
     _posSub = widget.player.stream.position.listen((p) {
       if (!mounted) return;
       final delta = (p - _position).abs();
@@ -496,7 +489,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
         setState(() => _position = p);
       }
     });
-    // Fix #3: duration rarely changes — only rebuild when it actually differs.
     _durSub = widget.player.stream.duration.listen((d) {
       if (!mounted) return;
       if (d != _duration) {
@@ -508,8 +500,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   @override
   void dispose() {
     _hudTimer?.cancel();
-    _controlsTimer?.cancel();
-    _stateSub?.cancel();
     _posSub?.cancel();
     _durSub?.cancel();
     super.dispose();
@@ -532,20 +522,7 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
     });
   }
 
-  void _showControlsTemporarily() {
-    _controlsTimer?.cancel();
-    setState(() => _showControls = true);
-    _controlsTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) setState(() => _showControls = false);
-    });
-  }
-
   // ── Gesture handlers ─────────────────────────────────────────────────────────────
-
-  void _onTap() {
-    setState(() => _showControls = !_showControls);
-    if (_showControls) _showControlsTemporarily();
-  }
 
   Duration _clampDuration(Duration value, Duration min, Duration max) =>
       value < min ? min : (value > max ? max : value);
@@ -573,7 +550,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap:           _onTap,
       onDoubleTapDown: _onDoubleTapDown,
       child: Stack(
         children: [
@@ -583,8 +559,9 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
               color: Colors.black,
               child: Video(
                 controller: widget.controller,
-                controls:   NoVideoControls, // we provide our own
+                controls:   NoVideoControls, // VideoPlayerScreen provides all controls
                 fill:       Colors.black,
+                fit:        widget.fit,
               ),
             ),
           ),
@@ -597,24 +574,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
             duration:     _duration,
             seekPosition: _seekPosition,
             seekForward:  _seekForward,
-          ),
-
-          // ── Transport controls ───────────────────────────────────────────────────
-          AnimatedOpacity(
-            opacity:  _showControls ? 1.0 : 0.0,
-            duration: const Duration(milliseconds: 250),
-            child: IgnorePointer(
-              ignoring: !_showControls,
-              child: _TransportControls(
-                player:      widget.player,
-                playing:     _playing,
-                position:    _position,
-                duration:    _duration,
-                title:       widget.title,
-                onTracksTap: widget.onTracksTap,
-                onHide:      () => setState(() => _showControls = false),
-              ),
-            ),
           ),
         ],
       ),
@@ -733,146 +692,4 @@ class _NeonHud extends StatelessWidget {
   }
 }
 
-// ── Transport controls ───────────────────────────────────────────────────────────────────
 
-class _TransportControls extends StatelessWidget {
-  final Player      player;
-  final bool        playing;
-  final Duration    position;
-  final Duration    duration;
-  final String      title;
-  final VoidCallback? onTracksTap;
-  final VoidCallback  onHide;
-
-  const _TransportControls({
-    required this.player,
-    required this.playing,
-    required this.position,
-    required this.duration,
-    required this.title,
-    required this.onHide,
-    this.onTracksTap,
-  });
-
-  static String _fmt(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final durMs = duration.inMilliseconds.toDouble();
-    final posMs = position.inMilliseconds.toDouble();
-    final progress = durMs > 0 ? (posMs / durMs).clamp(0.0, 1.0) : 0.0;
-
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [Colors.black87, Colors.transparent, Colors.black87],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          stops: [0.0, 0.45, 1.0],
-        ),
-      ),
-      child: Column(
-        children: [
-          // Top bar
-          Padding(
-            padding: const EdgeInsets.fromLTRB(4, 8, 8, 0),
-            child: Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new_rounded,
-                      color: Colors.white, size: 20),
-                  onPressed: () => Navigator.of(context).maybePop(),
-                ),
-                Expanded(
-                  child: Text(title,
-                      style: const TextStyle(
-                        color: Colors.white, fontSize: 14,
-                        fontWeight: FontWeight.w600, fontFamily: 'Inter',
-                      ),
-                      maxLines: 1, overflow: TextOverflow.ellipsis),
-                ),
-                if (onTracksTap != null)
-                  IconButton(
-                    icon: const Icon(Icons.subtitles_rounded,
-                        color: Colors.white70, size: 22),
-                    onPressed: onTracksTap,
-                    tooltip: 'Audio / Subtitles',
-                  ),
-                IconButton(
-                  icon: const Icon(Icons.close_rounded,
-                      color: Colors.white70, size: 22),
-                  onPressed: onHide,
-                ),
-              ],
-            ),
-          ),
-          const Spacer(),
-          // Center play/pause
-          Center(
-            child: GestureDetector(
-              onTap: () => playing ? player.pause() : player.play(),
-              child: Container(
-                width: 64, height: 64,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle, color: Colors.black45,
-                  border: Border.all(
-                      color: AppColors.accent.withValues(alpha: 0.5), width: 1.5),
-                ),
-                child: Icon(
-                  playing ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  color: AppColors.accent, size: 36,
-                ),
-              ),
-            ),
-          ),
-          const Spacer(),
-          // Bottom seek bar + time
-          Padding(
-            padding: const EdgeInsets.fromLTRB(8, 0, 8, 12),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                SliderTheme(
-                  data: SliderThemeData(
-                    trackHeight: 4,
-                    activeTrackColor: AppColors.accent,
-                    inactiveTrackColor: Colors.white24,
-                    thumbColor: AppColors.accent,
-                    overlayColor: AppColors.accent.withValues(alpha: 0.2),
-                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 9),
-                  ),
-                  child: Slider(
-                    value: progress,
-                    onChanged: (v) => player.seek(
-                        Duration(milliseconds: (v * durMs).toInt())),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(_fmt(position),
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12,
-                              fontFamily: 'Inter')),
-                      Text(_fmt(duration),
-                          style: const TextStyle(
-                              color: Colors.white70, fontSize: 12,
-                              fontFamily: 'Inter')),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

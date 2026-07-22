@@ -47,22 +47,22 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'Settings',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontFamily: 'Inter',
           ),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 40),
+        padding: EdgeInsets.only(bottom: MediaQuery.of(context).padding.bottom + 100),
         children: [
           // ── APPEARANCE & PLAYBACK ─────────────────────────────────
           const _Header('Appearance & Playback'),
@@ -78,31 +78,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           const _Div(),
           _Tile(
-            icon: Icons.language_rounded,
-            color: AppColors.accent,
-            title: 'Language',
-            sub: 'App display language',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Language settings coming soon')),
-            ),
-          ),
-          const _Div(),
-          _Tile(
             icon: Icons.storage_rounded,
             color: AppColors.accentAmber,
             title: 'Cache',
             sub: 'Clear thumbnail & media cache',
             onTap: () => context.push('/settings/storage'),
-          ),
-          const _Div(),
-          _Tile(
-            icon: Icons.videocam_rounded,
-            color: AppColors.accent,
-            title: 'Video Settings',
-            sub: 'Subtitles, aspect ratio, hardware decode',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Video settings coming soon')),
-            ),
           ),
           const _Div(),
           _Tile(
@@ -135,16 +115,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // ── STORAGE & PRIVACY ─────────────────────────────────────
           const _Header('Storage & Privacy'),
-          _Tile(
-            icon: Icons.folder_rounded,
-            color: AppColors.accentAmber,
-            title: 'Downloads Path',
-            sub: 'Where downloaded files are saved',
-            onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('Downloads path coming soon')),
-            ),
-          ),
-          const _Div(),
           _switchTile(
             icon: Icons.lock_rounded,
             color: AppColors.accentViolet,

@@ -161,16 +161,22 @@ class ToolsScreen extends ConsumerWidget {
           label: 'MP3 Convert',
           subtitle: 'Extract audio',
           gradient: const [Color(0xFF34D399), Color(0xFF059669)],
-          onTapBuilder: (ctx) => () => _showComingSoon(ctx, 'MP3 Converter',
-              'Open a video from Music or Video tab, tap ⋮ → Extract Audio (MP3).'),
+          onTapBuilder: (ctx) => () => ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Open a video first, then tap ⋮ → Extract Audio (MP3)'),
+            ),
+          ),
         ),
         _ToolEntry(
           icon: Icons.content_cut_rounded,
           label: 'Trimmer',
           subtitle: 'Clip & compress',
           gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
-          onTapBuilder: (ctx) => () => _showComingSoon(ctx, 'Video Trimmer',
-              'Open a video from the Video tab, tap ⋮ → Trim for WhatsApp.'),
+          onTapBuilder: (ctx) => () => ScaffoldMessenger.of(ctx).showSnackBar(
+            const SnackBar(
+              content: Text('Open a video first, then tap ⋮ → Trim for WhatsApp'),
+            ),
+          ),
         ),
         _ToolEntry(
           icon: Icons.palette_rounded,
@@ -199,14 +205,6 @@ class ToolsScreen extends ConsumerWidget {
           subtitle: 'Free up space',
           gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
           onTapBuilder: (ctx) => () => _showStorageCleaner(ctx, ref),
-        ),
-        _ToolEntry(
-          icon: Icons.delete_sweep_rounded,
-          label: 'Recycle Bin',
-          subtitle: 'Deleted media',
-          gradient: const [Color(0xFF6B7280), Color(0xFF374151)],
-          onTapBuilder: (ctx) => () => _showComingSoon(ctx, 'Recycle Bin',
-              'Deleted media recovery is coming in a future update.'),
         ),
       ];
 
@@ -378,78 +376,6 @@ class ToolsScreen extends ConsumerWidget {
                         ),
                       ),
                     ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showComingSoon(BuildContext context, String title, String hint) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Icon(Icons.info_outline_rounded,
-                color: AppColors.accent, size: 40),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              hint,
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                fontSize: 13,
-                color: AppColors.textSecondary,
-                height: 1.5,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 20),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  foregroundColor: Colors.black,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                ),
-                child: const Text(
-                  'Got it',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    fontFamily: 'Inter',
                   ),
                 ),
               ),

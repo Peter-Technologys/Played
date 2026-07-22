@@ -219,7 +219,11 @@ class MySpaceHubScreen extends ConsumerWidget {
               ),
             ),
 
-            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+            SliverToBoxAdapter(
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 160,
+              ),
+            ),
           ],
         ),
       ),

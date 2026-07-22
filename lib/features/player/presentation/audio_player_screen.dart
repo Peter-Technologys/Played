@@ -213,7 +213,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
           'Ensure attachContainer() is called before load().');
     }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
-    _attachStreams();
 
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
     final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);
@@ -227,6 +226,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         skipSilence: skipSilence,
         savedPosition: saved,
       );
+      // Attach streams AFTER loadAndPlay() completes so we always subscribe
+      // to the live player instance, never a stale one from a previous track.
+      _attachStreams();
       state = state.copyWith(speed: speed, isLoading: false);
       // Fire-and-forget — don't block the UI on a DB write
       PlayedDatabase.instance.recordPlay(item).ignore();
@@ -244,10 +246,14 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void togglePlay() {
-    if (_player?.playing == true) {
-      _handler?.pause();
-    } else {
+    // Optimistic update so the button reflects the new state immediately,
+    // even if the stream subscription is momentarily stale.
+    final willPlay = _player?.playing != true;
+    state = state.copyWith(isPlaying: willPlay);
+    if (willPlay) {
       _handler?.play();
+    } else {
+      _handler?.pause();
     }
   }
   void pause()      => _handler?.pause();
@@ -451,13 +457,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: SingleChildScrollView(
-          physics: const ClampingScrollPhysics(),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minHeight: screenHeight - MediaQuery.of(context).padding.top - MediaQuery.of(context).padding.bottom),
-            child: IntrinsicHeight(
-              child: Column(
-                children: [
+        child: Column(
+          children: [
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               child: Row(
@@ -722,10 +723,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               ),
             ),
             SizedBox(height: isSmall ? 12 : 24),
-                ],
-              ),
-            ),
-          ),
+          ],
         ),
       ),
     );
