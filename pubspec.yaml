@@ -97,6 +97,15 @@ dependencies:
   dio: ^5.4.3
   open_filex: ^4.7.0
 
+  # Video thumbnails
+  video_thumbnail: ^0.5.3
+
+  # Google Sign-In
+  google_sign_in: ^6.2.1
+
+  # Google Fonts (Fredoka for display/headline text)
+  google_fonts: ^6.2.1
+
 
 dev_dependencies:
   flutter_test:

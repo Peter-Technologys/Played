@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
@@ -28,7 +29,10 @@ class VideoTabScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -50,6 +54,7 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_videoFilterProvider);
 
@@ -1230,20 +1235,23 @@ class _VideoShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GridView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 16 / 11,
-      ),
-      itemCount: 8,
-      itemBuilder: (_, __) => Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
+    return Shimmer.fromColors(
+      baseColor: AppColors.surface,
+      highlightColor: const Color(0xFF2A2F45),
+      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 16 / 11,
+        ),
+        itemCount: 8,
+        itemBuilder: (_, __) => Container(
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(18),
+          ),
         ),
       ),
     );

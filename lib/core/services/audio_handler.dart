@@ -143,8 +143,12 @@ class PlayedAudioHandler extends BaseAudioHandler
       // and does NOT leave _loading = true forever via an early return that
       // bypasses the outer finally block.
       try {
+        // Normalise path: content:// URIs must use Uri.parse, not Uri.file
+        final uri = item.filePath.startsWith('content://')
+            ? Uri.parse(item.filePath)
+            : Uri.file(item.filePath);
         await _player.setAudioSource(
-          AudioSource.uri(Uri.file(item.filePath)),
+          AudioSource.uri(uri),
           preload: true,
         );
       } catch (srcErr) {
