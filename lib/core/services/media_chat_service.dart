@@ -213,7 +213,7 @@ class MediaChatService {
 
   void _attachReader(Socket socket) {
     final buf = StringBuffer();
-    socket.transform(utf8.decoder as StreamTransformer<Uint8List, dynamic>).listen(
+    socket.cast<List<int>>().transform(utf8.decoder).listen(
       (chunk) {
         buf.write(chunk);
         final lines = buf.toString().split('\n');

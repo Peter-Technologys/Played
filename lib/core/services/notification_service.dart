@@ -82,6 +82,7 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
+    String? payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'com.otyaplayer.app.tools',
@@ -95,6 +96,7 @@ class NotificationService {
       title,
       body,
       const NotificationDetails(android: androidDetails),
+      payload: payload,
     );
   }
 
@@ -102,6 +104,7 @@ class NotificationService {
     required int id,
     required String title,
     required String body,
+    String? payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'com.otyaplayer.app.tools',
@@ -114,6 +117,7 @@ class NotificationService {
       title,
       body,
       const NotificationDetails(android: androidDetails),
+      payload: payload,
     );
   }
 

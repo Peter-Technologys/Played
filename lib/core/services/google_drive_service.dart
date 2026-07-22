@@ -61,6 +61,7 @@ class GoogleDriveService {
       headers: {...auth, 'Content-Type': 'multipart/related; boundary=$boundary'},
       body: mp,
     ).timeout(const Duration(seconds: 20));
+    if (res.statusCode == 401) throw Exception('Drive token expired: re-authenticate required');
     if (res.statusCode != 200 && res.statusCode != 201)
       throw Exception('Drive create failed: ${res.statusCode}');
     debugPrint('[DriveService] Backup created.');
@@ -72,6 +73,7 @@ class GoogleDriveService {
       headers: {...auth, 'Content-Type': _mime},
       body: body,
     ).timeout(const Duration(seconds: 20));
+    if (res.statusCode == 401) throw Exception('Drive token expired: re-authenticate required');
     if (res.statusCode != 200)
       throw Exception('Drive patch failed: ${res.statusCode}');
     debugPrint('[DriveService] Backup updated.');

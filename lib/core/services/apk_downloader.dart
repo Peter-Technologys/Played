@@ -73,6 +73,9 @@ class ApkDownloader {
         savePath,
         type: 'application/vnd.android.package-archive',
       );
+      // Delete the temp APK after handing it to the installer so it does not
+      // accumulate stale files in the cache directory across update attempts.
+      try { await file.delete(); } catch (_) {}
       if (result.type != ResultType.done) {
         onError?.call(
           'Could not open the installer (${result.message}). '

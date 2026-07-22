@@ -183,18 +183,24 @@ class AppwriteService {
     required String collectionId,
     List<String> queries = const [],
   }) async {
-    final all    = <models.Document>[];
-    int   offset = 0;
+    final all      = <models.Document>[];
+    int   offset   = 0;
+    int   page     = 0;
     const pageSize = 100;
-    while (true) {
+    const maxPages = 50;
+    while (page < maxPages) {
       final result = await _databases.listDocuments(
         databaseId:   Environment.databaseId,
         collectionId: collectionId,
         queries:      [...queries, Query.limit(pageSize), Query.offset(offset)],
       );
       all.addAll(result.documents);
+      page++;
       if (result.documents.length < pageSize) break;
       offset += pageSize;
+    }
+    if (page >= maxPages) {
+      debugPrint('[Appwrite] _listAll: hit max page limit ($maxPages pages) for $collectionId');
     }
     return all;
   }
