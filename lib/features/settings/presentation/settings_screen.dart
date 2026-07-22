@@ -93,24 +93,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             onTap: () => context.push('/player/equalizer'),
           ),
           const _Div(),
-          _switchTile(
-            icon: Icons.music_note_rounded,
-            color: AppColors.accentGreen,
-            title: 'Gapless Playback',
-            sub: 'Seamless transitions between tracks',
-            value: sp.gaplessPlayback,
-            onChanged: spn.setGaplessPlayback,
-          ),
-          const _Div(),
-          _switchTile(
-            icon: Icons.skip_next_rounded,
-            color: AppColors.accent,
-            title: 'Skip Silence',
-            sub: 'Auto-skip silent sections',
-            value: sp.skipSilence,
-            onChanged: spn.setSkipSilence,
-          ),
-          const _Div(),
           _speedTile(),
 
           // ── STORAGE & PRIVACY ─────────────────────────────────────

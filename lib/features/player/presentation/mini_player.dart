@@ -50,11 +50,6 @@ final _miniDurationProvider = Provider<Duration>((ref) {
   return ref.watch(audioPlayerProvider.select((s) => s.duration));
 });
 
-/// Watches only crossfade duration from settings.
-final _miniCrossfadeProvider = Provider<double>((ref) {
-  return ref.watch(settingsProvider.select((s) => s.crossfadeDuration));
-});
-
 // ── Mini Player Widget ──────────────────────────────────────────────
 
 /// Persistent collapsible mini player shown across all tabs.
@@ -230,9 +225,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                           ),
                         ),
 
-                        // TASK 2: Crossfade indicator — isolated selector widget
-                        const _CrossfadeIndicator(),
-
                         // Queue button
                         GestureDetector(
                           onTap: () {
@@ -307,46 +299,6 @@ class _AudioOutputLabel extends ConsumerWidget {
       },
       loading: () => const SizedBox.shrink(),
       error: (_, __) => const SizedBox.shrink(),
-    );
-  }
-}
-
-// ── TASK 2: Crossfade indicator — only rebuilds when crossfade changes ──
-
-class _CrossfadeIndicator extends ConsumerWidget {
-  const _CrossfadeIndicator();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final crossfade = ref.watch(_miniCrossfadeProvider);
-    if (crossfade <= 0) return const SizedBox.shrink();
-    return Padding(
-      padding: const EdgeInsets.only(right: 4),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-        decoration: BoxDecoration(
-          color: AppColors.accentViolet.withValues(alpha: 0.15),
-          borderRadius: BorderRadius.circular(4),
-          border: Border.all(
-              color: AppColors.accentViolet.withValues(alpha: 0.4)),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.swap_horiz_rounded,
-                color: AppColors.accentViolet, size: 10),
-            const SizedBox(width: 2),
-            Text(
-              '${crossfade.toStringAsFixed(0)}s',
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.w700,
-                color: AppColors.accentViolet,
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 }

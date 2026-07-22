@@ -287,16 +287,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       },
                       tooltip: 'Subtitles',
                     ),
-                    // Background audio
-                    IconButton(
-                      icon: const Icon(Icons.headphones_rounded,
-                          color: Colors.white70, size: 22),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        Navigator.of(context).pop();
-                      },
-                      tooltip: 'Background audio',
-                    ),
                   ],
                 ),
               ),

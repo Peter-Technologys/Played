@@ -75,9 +75,6 @@ dependencies:
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.2
 
-  # Battery — used by OtyaVideoPanel to show level in fullscreen
-  battery_plus: ^6.2.1
-
   # Connectivity
   connectivity_plus: ^6.0.3
   network_info_plus: ^6.0.1

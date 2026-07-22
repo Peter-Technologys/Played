@@ -437,7 +437,6 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     builder: (_) => _OptionsSheet(
       mediaItem: widget.mediaItem,
       onFileInfo:        () { Navigator.pop(context); _showFileInfo(); },
-      onOpenInStudio:    () { Navigator.pop(context); context.push('/studio'); },
       onTrimForWhatsApp: () {
         Navigator.pop(context);
         context.push('/tools/whatsapp', extra: widget.mediaItem);
@@ -933,12 +932,10 @@ class _SecondaryBtn extends StatelessWidget {
 class _OptionsSheet extends ConsumerWidget {
   final MediaItem mediaItem;
   final VoidCallback onFileInfo;
-  final VoidCallback onOpenInStudio;
   final VoidCallback onTrimForWhatsApp;
   const _OptionsSheet({
     required this.mediaItem,
     required this.onFileInfo,
-    required this.onOpenInStudio,
     required this.onTrimForWhatsApp,
   });
 
@@ -967,41 +964,13 @@ class _OptionsSheet extends ConsumerWidget {
         Navigator.pop(context);
         context.go('/airdrop');
       }),
-      _Opt(Icons.graphic_eq_rounded,    'Open in Studio',      AppColors.accentViolet, onOpenInStudio),
-      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent,       onTrimForWhatsApp),
+      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent, onTrimForWhatsApp),
       _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
         Navigator.pop(context);
         await FfmpegService.instance.extractAudio(
             videoPath: mediaItem.filePath, onProgress: (_) {});
         if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Audio extracted to Downloads'))); }
-      }),
-      _Opt(Icons.cast_rounded, 'Cast to Device', AppColors.textSecondary, () {
-        Navigator.pop(context);
-        showDialog(
-          context: context,
-          builder: (_) => AlertDialog(
-            backgroundColor: AppColors.surface,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            title: const Text('Cast to Device',
-                style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
-            content: const Text(
-              'Chromecast / DLNA casting is coming in a future update.\n\n'
-              'For now, use Air-Drop to send files to nearby devices.',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.6),
-            ),
-            actions: [
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.accent,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                ),
-                child: const Text('Got it', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
-              ),
-            ],
-          ),
-        );
       }),
       _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
     ];
