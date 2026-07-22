@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
-import 'privacy_policy_screen.dart';
 
 /// Standalone About screen — reached via /about route.
 /// Shows app logo, version, description, and support links.
@@ -98,10 +99,7 @@ class _AboutScreenState extends State<AboutScreen> {
               label: 'Privacy Policy',
               subtitle: 'How we handle your data',
               color: AppColors.textSecondary,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const PrivacyPolicyScreen()),
-              ),
+              onTap: () => context.push('/privacy'),
             ),
             _Divider(),
             _NavTile(

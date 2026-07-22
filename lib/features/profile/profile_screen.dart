@@ -3,6 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -16,7 +17,6 @@ import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/storage_folder_service.dart';
 import '../../features/my_space/presentation/providers/my_space_provider.dart';
-import '../settings/presentation/privacy_policy_screen.dart';
 import '../../shared/widgets/played_logo.dart';
 import '../settings/settings_provider.dart';
 
@@ -203,9 +203,7 @@ class ProfileScreen extends ConsumerWidget {
             icon: Icons.new_releases_outlined,
             label: "What's New",
             subtitle: 'See what changed in this version',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const WhatsNewScreen()),
-            ),
+            onTap: () => context.push('/whats-new'),
           ),
           const SizedBox(height: 8),
           _TappableTile(
@@ -218,9 +216,7 @@ class ProfileScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.privacy_tip_outlined,
             label: 'Privacy Policy',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-            ),
+            onTap: () => context.push('/privacy'),
           ),
           const SizedBox(height: 8),
           _TappableTile(

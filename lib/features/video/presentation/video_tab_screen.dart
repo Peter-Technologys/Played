@@ -8,10 +8,11 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/vault_service.dart';
+import '../../../core/services/file_ops_service.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
-import '../../my_space/presentation/playback_history_screen.dart';
-import '../../../features/playlists/playlist_screen.dart' show playlistsProvider;
+import '../../../shared/widgets/playlists_view.dart';
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -116,7 +117,7 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
       case _VideoFilter.folders:
         return _VideoFoldersTab(items: videos);
       case _VideoFilter.playlists:
-        return const _PlaylistsView();
+        return const PlaylistsView(showCreateButton: true);
     }
   }
 }
@@ -216,10 +217,7 @@ class _VideoHeader extends ConsumerWidget {
           // History
           _IconBtn(
             icon: Icons.history_rounded,
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => const PlaybackHistoryScreen()),
-            ),
+            onTap: () => context.push('/history'),
           ),
           const SizedBox(width: 6),
           // Refresh
@@ -681,6 +679,86 @@ class _VideoContextMenu extends StatelessWidget {
   final VoidCallback onPlay;
   const _VideoContextMenu({required this.item, required this.onPlay});
 
+  Future<void> _addToVault(BuildContext context) async {
+    Navigator.pop(context);
+    try {
+      await VaultService.instance.lockItem(item);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('"${item.title}" moved to Vault'),
+            backgroundColor: AppColors.surface,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to add to Vault: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _confirmDelete(BuildContext context) async {
+    Navigator.pop(context);
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text(
+          'Delete Video?',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
+          ),
+        ),
+        content: Text(
+          'This will permanently delete "${item.title}". This action cannot be undone.',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            height: 1.5,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel',
+                style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.error,
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
+            ),
+            child: const Text('Delete',
+                style: TextStyle(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted) return;
+    final ok = await FileOpsService.instance.deleteFile(item.filePath);
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(ok
+            ? '"${item.title}" deleted'
+            : 'Failed to delete "${item.title}"'),
+        backgroundColor: ok ? AppColors.surface : AppColors.error,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -764,29 +842,13 @@ class _VideoContextMenu extends StatelessWidget {
             icon: Icons.lock_rounded,
             label: 'Add to Vault',
             color: AppColors.accentViolet,
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Vault feature coming soon'),
-                  backgroundColor: AppColors.surface,
-                ),
-              );
-            },
+            onTap: () => _addToVault(context),
           ),
           _ContextOption(
             icon: Icons.delete_outline_rounded,
             label: 'Delete',
             color: AppColors.error,
-            onTap: () {
-              Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Delete not implemented'),
-                  backgroundColor: AppColors.surface,
-                ),
-              );
-            },
+            onTap: () => _confirmDelete(context),
           ),
         ],
       ),
@@ -900,11 +962,9 @@ class _VideoFoldersTab extends StatelessWidget {
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    _VideoFolderDetailPage(name: name, items: files),
-              ),
+            onTap: () => context.push(
+              '/video/folder',
+              extra: {'name': name, 'items': files},
             ),
           ),
         );
@@ -913,11 +973,12 @@ class _VideoFoldersTab extends StatelessWidget {
   }
 }
 
-class _VideoFolderDetailPage extends ConsumerWidget {
+// Public so it can be referenced from router.dart via GoRoute.
+class VideoFolderDetailPage extends ConsumerWidget {
   final String name;
   final List<MediaItem> items;
-  const _VideoFolderDetailPage(
-      {required this.name, required this.items});
+  const VideoFolderDetailPage(
+      {super.key, required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -980,104 +1041,7 @@ class _VideoFolderDetailPage extends ConsumerWidget {
   }
 }
 
-// ── Playlists view ────────────────────────────────────────────────────────
-
-class _PlaylistsView extends ConsumerWidget {
-  const _PlaylistsView();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playlists = ref.watch(playlistsProvider);
-
-    if (playlists.isEmpty) {
-      return Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const _EmptyState(
-            icon: Icons.queue_music_rounded,
-            label: 'No playlists yet',
-          ),
-          const SizedBox(height: 16),
-          GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.push('/playlists');
-            },
-            child: Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [AppColors.accent, AppColors.accentViolet],
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Text(
-                'Create Playlist',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 14,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-          ),
-        ],
-      );
-    }
-
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
-      itemCount: playlists.length,
-      itemBuilder: (context, i) {
-        final pl = playlists[i];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            tileColor: AppColors.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.border),
-            ),
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accentViolet.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.queue_music_rounded,
-                  color: AppColors.accentViolet, size: 22),
-            ),
-            title: Text(
-              pl.name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            subtitle: Text(
-              '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              context.push('/playlists');
-            },
-          ),
-        );
-      },
-    );
-  }
-}
+// PlaylistsView is now in lib/shared/widgets/playlists_view.dart
 
 // ── Search delegate ───────────────────────────────────────────────────────
 

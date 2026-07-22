@@ -10,7 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../settings_provider.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
-import 'privacy_policy_screen.dart';
+
 
 /// Grouped settings screen pushed from My Space hub.
 /// Groups: Playback / Storage & Privacy / Updates & About
@@ -346,10 +346,7 @@ class SettingsDetailScreen extends ConsumerWidget {
               icon: Icons.privacy_tip_outlined,
               label: 'Privacy Policy',
               color: AppColors.textSecondary,
-              onTap: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                    builder: (_) => const PrivacyPolicyScreen()),
-              ),
+              onTap: () => context.push('/privacy'),
             ),
             _Divider(),
             _NavTile(

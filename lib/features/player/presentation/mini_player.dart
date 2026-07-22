@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -6,114 +5,12 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../features/settings/settings_provider.dart';
+import '../../../shared/widgets/album_art_thumb.dart';
 import 'audio_player_screen.dart';
-
-// ── Shared album-art resolution cache ──────────────────────────────
-// Shared with _AlbumArtThumb in music_tab_screen.dart via the same
-// MethodChannel. Kept here to avoid a cross-file static dependency.
-final _miniArtCache = <String, String?>{};
-const _miniArtMaxCache = 200;
-const _miniArtChannel = MethodChannel('com.otyaplayer.app/media_store');
-
-void _miniArtCacheSet(String key, String? value) {
-  if (_miniArtCache.length >= _miniArtMaxCache) {
-    _miniArtCache.remove(_miniArtCache.keys.first);
-  }
-  _miniArtCache[key] = value;
-}
 
 // ── Provider ────────────────────────────────────────────────────────
 
 final miniPlayerItemProvider = StateProvider<MediaItem?>((_) => null);
-
-// ── Mini album art widget ────────────────────────────────────────────
-
-/// Resolves `albumid:` paths via the MediaStore MethodChannel and displays
-/// the album art. Falls back to [fallback] when art is unavailable.
-class _MiniArtWidget extends StatefulWidget {
-  final String? albumArtPath;
-  final Widget fallback;
-  const _MiniArtWidget({this.albumArtPath, required this.fallback});
-
-  @override
-  State<_MiniArtWidget> createState() => _MiniArtWidgetState();
-}
-
-class _MiniArtWidgetState extends State<_MiniArtWidget> {
-  String? _resolvedPath;
-  bool _loading = true;
-  bool _disposed = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _resolve();
-  }
-
-  @override
-  void didUpdateWidget(_MiniArtWidget old) {
-    super.didUpdateWidget(old);
-    if (old.albumArtPath != widget.albumArtPath) {
-      setState(() { _resolvedPath = null; _loading = true; });
-      _resolve();
-    }
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
-
-  Future<void> _resolve() async {
-    final raw = widget.albumArtPath;
-    if (raw == null) {
-      if (!_disposed && mounted) setState(() => _loading = false);
-      return;
-    }
-    if (!raw.startsWith('albumid:')) {
-      if (!_disposed && mounted) {
-        setState(() { _resolvedPath = raw; _loading = false; });
-      }
-      return;
-    }
-    if (_miniArtCache.containsKey(raw)) {
-      if (!_disposed && mounted) {
-        setState(() { _resolvedPath = _miniArtCache[raw]; _loading = false; });
-      }
-      return;
-    }
-    try {
-      final albumId = raw.substring('albumid:'.length);
-      final path = await _miniArtChannel
-          .invokeMethod<String>('getAlbumArt', {'albumId': albumId});
-      _miniArtCacheSet(raw, path);
-      if (!_disposed && mounted) {
-        setState(() { _resolvedPath = path; _loading = false; });
-      }
-    } catch (_) {
-      _miniArtCacheSet(raw, null);
-      if (!_disposed && mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: 68,
-      height: 68,
-      child: _loading
-          ? Container(color: AppColors.border)
-          : _resolvedPath != null
-              ? Image.file(
-                  File(_resolvedPath!),
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => widget.fallback,
-                )
-              : widget.fallback,
-    );
-  }
-}
 
 // ── Mini Player Widget ──────────────────────────────────────────────
 
@@ -162,16 +59,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     setState(() => _dragOffset = 0);
   }
 
-  Widget _artFallback() => Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [AppColors.accent, AppColors.accentViolet],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
-    child: const Icon(Icons.music_note_rounded, color: Colors.black, size: 28),
-  );
+
 
   @override
   Widget build(BuildContext context) {
@@ -261,9 +149,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                         ClipRRect(
                           borderRadius: const BorderRadius.horizontal(
                               left: Radius.circular(24)),
-                          child: _MiniArtWidget(
+                          child: AlbumArtThumb(
                             albumArtPath: displayItem.albumArtPath,
-                            fallback: _artFallback(),
+                            size: 68,
+                            borderRadius: 0,
                           ),
                         ),
 
