@@ -1,16 +1,220 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/database/played_database.dart';
-import '../settings/settings_provider.dart';
+
+// ── Tools search delegate ─────────────────────────────────────────────────
+
+class _ToolEntry {
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final List<Color> gradient;
+  final VoidCallback Function(BuildContext) onTapBuilder;
+
+  const _ToolEntry({
+    required this.icon,
+    required this.label,
+    required this.subtitle,
+    required this.gradient,
+    required this.onTapBuilder,
+  });
+}
+
+class _ToolsSearchDelegate extends SearchDelegate<void> {
+  final List<_ToolEntry> tools;
+  _ToolsSearchDelegate({required this.tools});
+
+  @override
+  ThemeData appBarTheme(BuildContext context) {
+    return Theme.of(context).copyWith(
+      appBarTheme: AppBarTheme(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        border: InputBorder.none,
+        hintStyle: TextStyle(color: AppColors.textSecondary),
+      ),
+    );
+  }
+
+  @override
+  List<Widget> buildActions(BuildContext context) => [
+        IconButton(
+          icon: const Icon(Icons.clear, color: AppColors.textSecondary),
+          onPressed: () => query = '',
+        ),
+      ];
+
+  @override
+  Widget buildLeading(BuildContext context) => IconButton(
+        icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+        onPressed: () => close(context, null),
+      );
+
+  @override
+  Widget buildResults(BuildContext context) => _buildList(context);
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildList(context);
+
+  Widget _buildList(BuildContext context) {
+    final q = query.toLowerCase();
+    final results = q.isEmpty
+        ? tools
+        : tools
+            .where((t) =>
+                t.label.toLowerCase().contains(q) ||
+                t.subtitle.toLowerCase().contains(q))
+            .toList();
+
+    if (results.isEmpty) {
+      return Center(
+        child: Text(
+          'No tools found for "$query"',
+          style: const TextStyle(color: AppColors.textSecondary),
+        ),
+      );
+    }
+
+    return Container(
+      color: Theme.of(context).scaffoldBackgroundColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        itemCount: results.length,
+        itemBuilder: (context, i) {
+          final tool = results[i];
+          return Container(
+            margin: const EdgeInsets.only(bottom: 10),
+            child: ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              tileColor: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: AppColors.borderOf(context)),
+              ),
+              leading: Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: tool.gradient,
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Icon(tool.icon, color: Colors.white, size: 22),
+              ),
+              title: Text(
+                tool.label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              subtitle: Text(
+                tool.subtitle,
+                style: const TextStyle(
+                    fontSize: 11, color: AppColors.textSecondary),
+              ),
+              trailing: const Icon(Icons.chevron_right_rounded,
+                  color: AppColors.textSecondary, size: 20),
+              onTap: () {
+                close(context, null);
+                tool.onTapBuilder(context)();
+              },
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
 
 class ToolsScreen extends ConsumerWidget {
   const ToolsScreen({super.key});
 
+  List<_ToolEntry> _buildToolEntries(BuildContext context, WidgetRef ref) => [
+        _ToolEntry(
+          icon: Icons.lock_rounded,
+          label: 'Vault',
+          subtitle: 'Private storage',
+          gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
+          onTapBuilder: (ctx) => () => ctx.push('/vault'),
+        ),
+        _ToolEntry(
+          icon: Icons.wifi_tethering_rounded,
+          label: 'Air-Drop',
+          subtitle: 'P2P transfer',
+          gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
+          onTapBuilder: (ctx) => () => ctx.push('/airdrop'),
+        ),
+        _ToolEntry(
+          icon: Icons.audiotrack_rounded,
+          label: 'MP3 Convert',
+          subtitle: 'Extract audio',
+          gradient: const [Color(0xFF34D399), Color(0xFF059669)],
+          onTapBuilder: (ctx) => () => _showComingSoon(ctx, 'MP3 Converter',
+              'Open a video from Music or Video tab, tap ⋮ → Extract Audio (MP3).'),
+        ),
+        _ToolEntry(
+          icon: Icons.content_cut_rounded,
+          label: 'Trimmer',
+          subtitle: 'Clip & compress',
+          gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
+          onTapBuilder: (ctx) => () => _showComingSoon(ctx, 'Video Trimmer',
+              'Open a video from the Video tab, tap ⋮ → Trim for WhatsApp.'),
+        ),
+        _ToolEntry(
+          icon: Icons.palette_rounded,
+          label: 'Theme',
+          subtitle: 'Appearance',
+          gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
+          onTapBuilder: (ctx) => () => ctx.push('/theme'),
+        ),
+        _ToolEntry(
+          icon: Icons.graphic_eq_rounded,
+          label: 'Equalizer',
+          subtitle: 'Audio tuner',
+          gradient: const [Color(0xFF00D2FF), Color(0xFF8C52FF)],
+          onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
+        ),
+        _ToolEntry(
+          icon: Icons.history_rounded,
+          label: 'History',
+          subtitle: 'Recently played',
+          gradient: const [Color(0xFF8C52FF), Color(0xFF00D2FF)],
+          onTapBuilder: (ctx) => () => ctx.push('/history'),
+        ),
+        _ToolEntry(
+          icon: Icons.cleaning_services_rounded,
+          label: 'Cleaner',
+          subtitle: 'Free up space',
+          gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
+          onTapBuilder: (ctx) => () => _showStorageCleaner(ctx, ref),
+        ),
+        _ToolEntry(
+          icon: Icons.delete_sweep_rounded,
+          label: 'Recycle Bin',
+          subtitle: 'Deleted media',
+          gradient: const [Color(0xFF6B7280), Color(0xFF374151)],
+          onTapBuilder: (ctx) => () => _showComingSoon(ctx, 'Recycle Bin',
+              'Deleted media recovery is coming in a future update.'),
+        ),
+      ];
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final tools = _buildToolEntries(context, ref);
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
@@ -54,18 +258,27 @@ class ToolsScreen extends ConsumerWidget {
                         ],
                       ),
                     ),
-                    Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: AppColors.surface,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: AppColors.border),
-                      ),
-                      child: const Icon(
-                        Icons.search_rounded,
-                        color: AppColors.textSecondary,
-                        size: 20,
+                    GestureDetector(
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        showSearch(
+                          context: context,
+                          delegate: _ToolsSearchDelegate(tools: tools),
+                        );
+                      },
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: AppColors.border),
+                        ),
+                        child: const Icon(
+                          Icons.search_rounded,
+                          color: AppColors.textSecondary,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ],
@@ -85,74 +298,15 @@ class ToolsScreen extends ConsumerWidget {
                   mainAxisSpacing: 12,
                   childAspectRatio: 0.95,
                 ),
-                delegate: SliverChildListDelegate([
-                  _ToolCard(
-                    icon: Icons.lock_rounded,
-                    label: 'Vault',
-                    subtitle: 'Private storage',
-                    gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
-                    onTap: () => context.push('/vault'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.wifi_tethering_rounded,
-                    label: 'Air-Drop',
-                    subtitle: 'P2P transfer',
-                    gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
-                    onTap: () => context.push('/airdrop'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.audiotrack_rounded,
-                    label: 'MP3 Convert',
-                    subtitle: 'Extract audio',
-                    gradient: const [Color(0xFF34D399), Color(0xFF059669)],
-                    onTap: () => _showComingSoon(context, 'MP3 Converter',
-                        'Open a video from Music or Video tab, tap ⋮ → Extract Audio (MP3).'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.content_cut_rounded,
-                    label: 'Trimmer',
-                    subtitle: 'Clip & compress',
-                    gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
-                    onTap: () => _showComingSoon(context, 'Video Trimmer',
-                        'Open a video from the Video tab, tap ⋮ → Trim for WhatsApp.'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.palette_rounded,
-                    label: 'Theme',
-                    subtitle: 'Appearance',
-                    gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
-                    onTap: () => context.push('/profile'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.graphic_eq_rounded,
-                    label: 'Equalizer',
-                    subtitle: 'Audio tuner',
-                    gradient: const [Color(0xFF00D2FF), Color(0xFF8C52FF)],
-                    onTap: () => context.push('/player/equalizer'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.history_rounded,
-                    label: 'History',
-                    subtitle: 'Recently played',
-                    gradient: const [Color(0xFF8C52FF), Color(0xFF00D2FF)],
-                    onTap: () => context.push('/history'),
-                  ),
-                  _ToolCard(
-                    icon: Icons.cleaning_services_rounded,
-                    label: 'Cleaner',
-                    subtitle: 'Free up space',
-                    gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
-                    onTap: () => _showStorageCleaner(context, ref),
-                  ),
-                  _ToolCard(
-                    icon: Icons.delete_sweep_rounded,
-                    label: 'Recycle Bin',
-                    subtitle: 'Deleted media',
-                    gradient: const [Color(0xFF6B7280), Color(0xFF374151)],
-                    onTap: () => _showComingSoon(context, 'Recycle Bin',
-                        'Deleted media recovery is coming in a future update.'),
-                  ),
-                ]),
+                delegate: SliverChildListDelegate(
+                  tools.map((t) => _ToolCard(
+                    icon: t.icon,
+                    label: t.label,
+                    subtitle: t.subtitle,
+                    gradient: t.gradient,
+                    onTap: t.onTapBuilder(context),
+                  )).toList(),
+                ),
               ),
             ),
 

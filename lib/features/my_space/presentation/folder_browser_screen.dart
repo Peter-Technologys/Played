@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:go_router/go_router.dart';
@@ -117,14 +118,13 @@ class _FolderList extends StatelessWidget {
             ? parts[parts.length - 2]
             : parts.last.isEmpty ? path : parts.last;
         return GestureDetector(
-          onTap: () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => _FolderDetailScreen(
-                folderName: folderName,
-                fullPath: path,
-                items: files,
-              ),
-            ),
+          onTap: () => context.push(
+            '/tools/folder-detail',
+            extra: {
+              'folderName': folderName,
+              'fullPath': path,
+              'items': files,
+            },
           ),
           child: Container(
             padding: const EdgeInsets.all(14),
@@ -183,11 +183,13 @@ class _FolderList extends StatelessWidget {
   }
 }
 
-class _FolderDetailScreen extends StatelessWidget {
+// Public so it can be referenced from router.dart via GoRoute.
+class FolderDetailScreen extends StatelessWidget {
   final String folderName;
   final String fullPath;
   final List<MediaItem> items;
-  const _FolderDetailScreen({
+  const FolderDetailScreen({
+    super.key,
     required this.folderName,
     required this.fullPath,
     required this.items,

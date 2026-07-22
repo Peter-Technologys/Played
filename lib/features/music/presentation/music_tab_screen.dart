@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -11,7 +10,8 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
-import '../../playlists/playlist_screen.dart' show playlistsProvider;
+import '../../../shared/widgets/album_art_thumb.dart';
+import '../../../shared/widgets/playlists_view.dart';
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -127,7 +127,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
       case _MusicFilter.allSongs:
         return _SongListView(songs: songs);
       case _MusicFilter.playlist:
-        return const _PlaylistsView();
+        return const PlaylistsView(showCreateButton: false);
       case _MusicFilter.folder:
         return _FoldersView(songs: songs);
       case _MusicFilter.album:
@@ -488,7 +488,7 @@ class _SongRow extends ConsumerWidget {
               ),
               const SizedBox(width: 12),
               // Album art
-              _AlbumArtThumb(albumArtPath: item.albumArtPath),
+              AlbumArtThumb(albumArtPath: item.albumArtPath),
               const SizedBox(width: 12),
               // Title + artist
               Expanded(
@@ -737,118 +737,7 @@ class _OptionTile extends StatelessWidget {
   }
 }
 
-// ── Album art thumbnail ───────────────────────────────────────────────────
-
-class _AlbumArtThumb extends StatefulWidget {
-  final String? albumArtPath;
-  const _AlbumArtThumb({this.albumArtPath});
-
-  @override
-  State<_AlbumArtThumb> createState() => _AlbumArtThumbState();
-}
-
-class _AlbumArtThumbState extends State<_AlbumArtThumb> {
-  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
-  String? _resolvedPath;
-  bool _loading = true;
-  bool _disposed = false;
-
-  static final Map<String, String?> _cache = {};
-  static const _maxCache = 200;
-
-  static void _cacheSet(String key, String? value) {
-    if (_cache.length >= _maxCache) {
-      // Evict the oldest entry (insertion-order first key in a LinkedHashMap)
-      _cache.remove(_cache.keys.first);
-    }
-    _cache[key] = value;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _resolve();
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
-
-  Future<void> _resolve() async {
-    final raw = widget.albumArtPath;
-    if (raw == null) {
-      if (!_disposed && mounted) setState(() => _loading = false);
-      return;
-    }
-    if (!raw.startsWith('albumid:')) {
-      if (!_disposed && mounted) {
-        setState(() {
-          _resolvedPath = raw;
-          _loading = false;
-        });
-      }
-      return;
-    }
-    if (_cache.containsKey(raw)) {
-      if (!_disposed && mounted) {
-        setState(() {
-          _resolvedPath = _cache[raw];
-          _loading = false;
-        });
-      }
-      return;
-    }
-    try {
-      final albumId = raw.substring('albumid:'.length);
-      final path = await _channel
-          .invokeMethod<String>('getAlbumArt', {'albumId': albumId});
-      _cacheSet(raw, path);
-      if (!_disposed && mounted) {
-        setState(() {
-          _resolvedPath = path;
-          _loading = false;
-        });
-      }
-    } catch (_) {
-      _cacheSet(raw, null);
-      if (!_disposed && mounted) setState(() => _loading = false);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(8),
-      child: SizedBox(
-        width: 44,
-        height: 44,
-        child: _loading
-            ? Container(color: AppColors.border)
-            : _resolvedPath != null
-                ? Image.file(
-                    File(_resolvedPath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _placeholder(),
-                  )
-                : _placeholder(),
-      ),
-    );
-  }
-
-  Widget _placeholder() => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.accentViolet, AppColors.accent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-        ),
-        child: const Icon(Icons.music_note_rounded,
-            color: Colors.white, size: 20),
-      );
-}
+// AlbumArtThumb is now in lib/shared/widgets/album_art_thumb.dart
 
 // ── Mini waveform ─────────────────────────────────────────────────────────
 
@@ -882,66 +771,7 @@ class _MiniWave extends StatelessWidget {
   }
 }
 
-// ── Playlists view ────────────────────────────────────────────────────────
-
-class _PlaylistsView extends ConsumerWidget {
-  const _PlaylistsView();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final playlists = ref.watch(playlistsProvider);
-    if (playlists.isEmpty) {
-      return const _EmptyState(
-          icon: Icons.queue_music_rounded, label: 'No playlists yet');
-    }
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
-      itemCount: playlists.length,
-      itemBuilder: (context, i) {
-        final pl = playlists[i];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            tileColor: AppColors.surface,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.border),
-            ),
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accentViolet.withValues(alpha: 0.12),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.queue_music_rounded,
-                  color: AppColors.accentViolet, size: 22),
-            ),
-            title: Text(
-              pl.name,
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            subtitle: Text(
-              '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
-            onTap: () => context.push('/playlists'),
-          ),
-        );
-      },
-    );
-  }
-}
+// PlaylistsView is now in lib/shared/widgets/playlists_view.dart
 
 // ── Folders view ──────────────────────────────────────────────────────────
 

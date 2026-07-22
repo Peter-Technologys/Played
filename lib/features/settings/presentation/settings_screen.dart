@@ -1,21 +1,23 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/settings_service.dart';
 import '../../../core/widgets/rate_us_sheet.dart';
 import '../../../core/widgets/report_problem_sheet.dart';
-import 'about_screen.dart';
-import 'privacy_policy_screen.dart';
-import 'storage_analyzer_screen.dart';
+import '../../settings/settings_provider.dart';
 
-class SettingsScreen extends StatefulWidget {
+
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   final _s = SettingsService.instance;
 
   @override
@@ -36,6 +38,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final sp  = ref.watch(settingsProvider);
+    final spn = ref.read(settingsProvider.notifier);
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
@@ -88,10 +92,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accentAmber,
             title: 'Cache',
             sub: 'Clear thumbnail & media cache',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                  builder: (_) => const StorageAnalyzerScreen()),
-            ),
+            onTap: () => context.push('/settings/storage'),
           ),
           const _Div(),
           _Tile(
@@ -117,8 +118,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accentGreen,
             title: 'Gapless Playback',
             sub: 'Seamless transitions between tracks',
-            value: _s.skipSilence, // reuse closest available toggle
-            onChanged: _s.setSkipSilence,
+            value: sp.gaplessPlayback,
+            onChanged: spn.setGaplessPlayback,
           ),
           const _Div(),
           _switchTile(
@@ -126,8 +127,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accent,
             title: 'Skip Silence',
             sub: 'Auto-skip silent sections',
-            value: _s.skipSilence,
-            onChanged: _s.setSkipSilence,
+            value: sp.skipSilence,
+            onChanged: spn.setSkipSilence,
           ),
           const _Div(),
           _speedTile(),
@@ -149,8 +150,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accentViolet,
             title: 'App Lock',
             sub: 'Require biometric to open app',
-            value: _s.showLyrics, // placeholder — closest available
-            onChanged: _s.setShowLyrics,
+            value: sp.appLockEnabled,
+            onChanged: spn.setAppLock,
           ),
           const _Div(),
           _switchTile(
@@ -158,8 +159,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accentViolet,
             title: 'Hide Vault',
             sub: 'Hide vault from home screen',
-            value: _s.showLyrics,
-            onChanged: _s.setShowLyrics,
+            value: sp.hideVaultFromRecents,
+            onChanged: spn.setHideVaultFromRecents,
           ),
 
           // ── ABOUT & SUPPORT ───────────────────────────────────────
@@ -169,8 +170,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accent,
             title: 'Check for Updates',
             sub: 'See if a newer version is available',
-            onTap: () => IntentLauncher.openUrl(
-                'https://getotya.petersmartlink.com/download'),
+            onTap: () => launchUrl(
+              Uri.parse('https://getotya.petersmartlink.com/download'),
+              mode: LaunchMode.externalApplication,
+            ),
           ),
           const _Div(),
           _Tile(
@@ -178,9 +181,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.textSecondary,
             title: 'About OTYA Player',
             sub: 'Version, credits & privacy policy',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const AboutScreen()),
-            ),
+            onTap: () => context.push('/about'),
           ),
           const _Div(),
           _Tile(
@@ -204,9 +205,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: AppColors.accent,
             title: 'Privacy Policy',
             sub: 'How we handle your data',
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(builder: (_) => const PrivacyPolicyScreen()),
-            ),
+            onTap: () => context.push('/privacy'),
           ),
         ],
       ),
@@ -219,7 +218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String sub,
     required bool value,
-    required Future<void> Function(bool) onChanged,
+    required void Function(bool) onChanged,
   }) =>
       ListTile(
         contentPadding:

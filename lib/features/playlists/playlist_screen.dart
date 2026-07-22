@@ -118,11 +118,7 @@ class PlaylistsScreen extends ConsumerWidget {
                 final pl = playlists[i];
                 return _PlaylistTile(
                   playlist: pl,
-                  onTap: () => Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => PlaylistDetailScreen(playlist: pl),
-                    ),
-                  ),
+                  onTap: () => context.push('/playlist/${pl.id}'),
                   onRename: () => _showRenameDialog(context, ref, pl),
                   onDelete: () => _confirmDelete(context, ref, pl),
                 ).animate().fadeIn(duration: 300.ms,
@@ -298,6 +294,37 @@ class _PlaylistTile extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// ── Playlist Detail Screen (by ID — for GoRouter) ─────────────
+
+/// GoRouter-compatible wrapper: looks up the playlist by [playlistId] from
+/// [playlistsProvider] and delegates to [PlaylistDetailScreen].
+class PlaylistDetailScreenById extends ConsumerWidget {
+  final String playlistId;
+  const PlaylistDetailScreenById({super.key, required this.playlistId});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final playlists = ref.watch(playlistsProvider);
+    final playlist = playlists.where((p) => p.id == playlistId).firstOrNull;
+    if (playlist == null) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+        ),
+        body: const Center(
+          child: Text('Playlist not found',
+              style: TextStyle(color: AppColors.textSecondary)),
+        ),
+      );
+    }
+    return PlaylistDetailScreen(playlist: playlist);
   }
 }
 

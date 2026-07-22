@@ -3,22 +3,24 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/my_space/presentation/my_space_hub_screen.dart';
-import '../features/my_space/presentation/folder_browser_screen.dart';
+import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
 import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
 import '../features/player/presentation/equalizer_screen.dart';
 import '../features/player/presentation/mini_player.dart';
-import '../features/profile/profile_screen.dart';
+import '../features/profile/profile_screen.dart' show ProfileScreen, WhatsNewScreen;
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
 import '../features/tools/tools_screen.dart';
-import '../features/playlists/playlist_screen.dart';
+import '../features/playlists/playlist_screen.dart' show PlaylistsScreen, PlaylistDetailScreenById;
 import '../features/settings/presentation/settings_detail_screen.dart';
 import '../features/settings/presentation/about_screen.dart';
 import '../features/settings/presentation/theme_selection_screen.dart';
-import '../features/video/presentation/video_tab_screen.dart';
+import '../features/settings/presentation/privacy_policy_screen.dart';
+import '../features/settings/presentation/storage_analyzer_screen.dart';
+import '../features/video/presentation/video_tab_screen.dart' show VideoTabScreen, VideoFolderDetailPage;
 import '../features/music/presentation/music_tab_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
@@ -49,9 +51,39 @@ class AppRouter {
       GoRoute(path: '/about',           builder: (_, __) => const AboutScreen()),
       GoRoute(path: '/theme',           builder: (_, __) => const ThemeSelectionScreen()),
       GoRoute(path: '/tools/folders',   builder: (_, __) => const FolderBrowserScreen()),
+      GoRoute(
+        path: '/tools/folder-detail',
+        builder: (_, s) {
+          final args = s.extra as Map<String, dynamic>;
+          return FolderDetailScreen(
+            folderName: args['folderName'] as String,
+            fullPath: args['fullPath'] as String,
+            items: args['items'] as List<MediaItem>,
+          );
+        },
+      ),
       GoRoute(path: '/history',         builder: (_, __) => const PlaybackHistoryScreen()),
       GoRoute(path: '/playlists',       builder: (_, __) => const PlaylistsScreen()),
+      GoRoute(
+        path: '/playlist/:id',
+        builder: (_, s) => PlaylistDetailScreenById(
+          playlistId: s.pathParameters['id']!,
+        ),
+      ),
       GoRoute(path: '/vault',           builder: (_, __) => const VaultLockScreen()),
+      GoRoute(path: '/privacy',         builder: (_, __) => const PrivacyPolicyScreen()),
+      GoRoute(path: '/whats-new',       builder: (_, __) => const WhatsNewScreen()),
+      GoRoute(
+        path: '/video/folder',
+        builder: (_, s) {
+          final args = s.extra as Map<String, dynamic>;
+          return VideoFolderDetailPage(
+            name: args['name'] as String,
+            items: args['items'] as List<MediaItem>,
+          );
+        },
+      ),
+      GoRoute(path: '/settings/storage', builder: (_, __) => const StorageAnalyzerScreen()),
       GoRoute(
         path: '/player/equalizer',
         builder: (_, __) => const ProGate(
