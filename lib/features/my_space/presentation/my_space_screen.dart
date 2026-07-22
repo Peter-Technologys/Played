@@ -209,7 +209,7 @@ class _MySpaceScreenState extends ConsumerState<MySpaceScreen>
     final sort = ref.watch(_sortProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [

@@ -51,4 +51,29 @@ abstract class AppColors {
   static const Color error   = Color(0xFFFF4D6A);
   static const Color success = Color(0xFF34D399);
   static const Color warning = Color(0xFFFBBF24);
+
+  // ── Theme-aware helpers ───────────────────────────────────────────────
+  /// Returns the scaffold background colour for the current theme.
+  static Color backgroundOf(BuildContext context) =>
+      Theme.of(context).scaffoldBackgroundColor;
+
+  /// Returns the surface colour for the current theme.
+  static Color surfaceOf(BuildContext context) =>
+      Theme.of(context).colorScheme.surface;
+
+  /// Returns the primary text colour for the current theme.
+  static Color textPrimaryOf(BuildContext context) =>
+      Theme.of(context).colorScheme.onSurface;
+
+  /// Returns the border colour for the current theme.
+  static Color borderOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF2A2F45)
+          : const Color(0xFFE5E7EB);
+
+  /// Returns the card background colour for the current theme.
+  static Color cardOf(BuildContext context) =>
+      Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF1B1E2B)
+          : Colors.white;
 }

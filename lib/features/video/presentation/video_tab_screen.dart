@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,7 +29,12 @@ class VideoTabScreen extends ConsumerStatefulWidget {
 }
 
 class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  Timer? _refreshDebounce;
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -38,23 +44,28 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+      _refreshDebounce?.cancel();
+      _refreshDebounce = Timer(const Duration(seconds: 2), () {
+        ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+      });
     }
   }
 
   @override
   void dispose() {
+    _refreshDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_videoFilterProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -909,21 +920,21 @@ class _VideoFolderDetailPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded,
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           name,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 16,
           ),
         ),

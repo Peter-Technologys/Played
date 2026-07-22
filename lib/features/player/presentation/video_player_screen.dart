@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:media_kit/media_kit.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/media_item.dart';
@@ -42,6 +43,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _isPlaying       = true;
   Duration _position    = Duration.zero;
   Duration _duration    = Duration.zero;
+
+  // ── MediaKit player reference (set by MediaKitEngine callback) ─────
+  Player? _player;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
+  StreamSubscription? _playingSub;
 
   static const _aspectRatioLabels = ['Fit to Screen', 'Center Crop', 'Stretch'];
 
@@ -168,7 +175,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   onTap: () {
                     HapticFeedback.selectionClick();
                     setState(() => _playbackSpeed = s);
-                    // TODO: wire to MediaKitEngine player speed
+                    _player?.setRate(s);
                     Navigator.of(context).pop();
                   },
                   child: Container(
@@ -307,7 +314,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 onTap: () {
                   HapticFeedback.selectionClick();
                   setState(() => _isMuted = !_isMuted);
-                  // TODO: wire to MediaKitEngine player volume
+                  _player?.setVolume(_isMuted ? 0 : 100);
                 },
                 child: Icon(
                   _isMuted
@@ -411,7 +418,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                               onChanged: (v) => setState(
                                   () => _position = Duration(seconds: v.toInt())),
                               onChangeEnd: (v) {
-                                // TODO: wire to MediaKitEngine seek
+                                _player?.seek(Duration(seconds: v.toInt()));
                               },
                             ),
                           ),
@@ -434,7 +441,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            // TODO: wire to player
+                            final newPos = _position - const Duration(seconds: 10);
+                            _player?.seek(newPos < Duration.zero ? Duration.zero : newPos);
                           },
                           child: const Icon(Icons.replay_10_rounded,
                               color: Colors.white, size: 32),
@@ -444,8 +452,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            setState(() => _isPlaying = !_isPlaying);
-                            // TODO: wire to player
+                            if (_isPlaying) {
+                              _player?.pause();
+                            } else {
+                              _player?.play();
+                            }
                           },
                           child: Icon(
                             _isPlaying
@@ -460,7 +471,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            // TODO: wire to player
+                            final newPos = _position + const Duration(seconds: 10);
+                            _player?.seek(newPos > _duration ? _duration : newPos);
                           },
                           child: const Icon(Icons.forward_10_rounded,
                               color: Colors.white, size: 32),
@@ -595,9 +607,32 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     );
   }
 
+  // ── Player wiring ──────────────────────────────────────────────────
+
+  void _attachPlayer(Player player) {
+    if (_player == player) return; // already attached
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _playingSub?.cancel();
+    _player = player;
+
+    _positionSub = player.stream.position.listen((p) {
+      if (mounted) setState(() => _position = p);
+    });
+    _durationSub = player.stream.duration.listen((d) {
+      if (mounted) setState(() => _duration = d);
+    });
+    _playingSub = player.stream.playing.listen((playing) {
+      if (mounted) setState(() => _isPlaying = playing);
+    });
+  }
+
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _playingSub?.cancel();
     _restoreOrientation();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
@@ -617,35 +652,43 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTap: _resetHideTimer,
-        child: Stack(
-          children: [
-            // 1. Video engine (full screen)
-            VideoGestureLayer(
-              child: MediaKitEngine(
-                filePath:      widget.mediaItem.filePath,
-                title:         widget.mediaItem.title,
-                startPosition: _savedPosition,
-                autoPlay:      true,
+      body: Stack(
+        children: [
+          // 1. Video engine (full screen)
+          VideoGestureLayer(
+            child: MediaKitEngine(
+              filePath:      widget.mediaItem.filePath,
+              title:         widget.mediaItem.title,
+              startPosition: _savedPosition,
+              autoPlay:      true,
+              onPlayerReady: _attachPlayer,
+            ),
+          ),
+
+          // 2. Full-screen tap catcher — ALWAYS active, catches taps even
+          //    when controls are hidden behind IgnorePointer.
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTap: _resetHideTimer,
+              child: const SizedBox.expand(),
+            ),
+          ),
+
+          // 3. Controls overlay (animated, hidden when locked)
+          if (!_isLocked)
+            AnimatedOpacity(
+              opacity: _controlsVisible ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: IgnorePointer(
+                ignoring: !_controlsVisible,
+                child: _buildControlsOverlay(),
               ),
             ),
 
-            // 2. Controls overlay (animated, hidden when locked)
-            if (!_isLocked)
-              AnimatedOpacity(
-                opacity: _controlsVisible ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: IgnorePointer(
-                  ignoring: !_controlsVisible,
-                  child: _buildControlsOverlay(),
-                ),
-              ),
-
-            // 3. Lock screen (always visible when locked)
-            if (_isLocked) _buildLockOverlay(),
-          ],
-        ),
+          // 4. Lock screen (always visible when locked)
+          if (_isLocked) _buildLockOverlay(),
+        ],
       ),
     );
   }

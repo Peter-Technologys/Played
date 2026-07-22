@@ -28,7 +28,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),

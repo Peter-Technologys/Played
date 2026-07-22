@@ -1,8 +1,12 @@
+import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:share_plus/share_plus.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
@@ -20,6 +24,16 @@ final _musicFilterProvider =
 
 final _musicNowPlayingIdProvider = StateProvider<String?>((_) => null);
 
+// ── Sorted songs provider ─────────────────────────────────────────────────
+// Derived provider so the sort runs once when data arrives, not on every
+// build. Riverpod caches the result until mediaLibraryProvider changes.
+final _sortedSongsProvider = Provider<List<MediaItem>>((ref) {
+  final items = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
+  final songs = items.where((e) => !e.isVideo).toList();
+  songs.sort((a, b) => a.title.compareTo(b.title));
+  return songs;
+});
+
 // ── Music Tab Screen ──────────────────────────────────────────────────────
 
 class MusicTabScreen extends ConsumerStatefulWidget {
@@ -30,7 +44,12 @@ class MusicTabScreen extends ConsumerStatefulWidget {
 }
 
 class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  Timer? _refreshDebounce;
+
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -40,23 +59,28 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+      _refreshDebounce?.cancel();
+      _refreshDebounce = Timer(const Duration(seconds: 2), () {
+        ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
+      });
     }
   }
 
   @override
   void dispose() {
+    _refreshDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_musicFilterProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: Column(
           children: [
@@ -96,8 +120,8 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   Widget _buildContent(
       BuildContext context, List<MediaItem> items, _MusicFilter filter) {
-    final songs = items.where((e) => !e.isVideo).toList()
-      ..sort((a, b) => a.title.compareTo(b.title));
+    // Use the pre-sorted provider to avoid re-sorting on every build.
+    final songs = ref.watch(_sortedSongsProvider);
 
     switch (filter) {
       case _MusicFilter.allSongs:
@@ -202,7 +226,18 @@ class _MusicHeader extends ConsumerWidget {
               final songs = items.where((e) => !e.isVideo).toList();
               showSearch(
                 context: context,
-                delegate: _MusicSearchDelegate(songs: songs, ref: ref),
+                delegate: _MusicSearchDelegate(
+                  songs: songs,
+                  onPlay: (queue, index, item) {
+                    ref
+                        .read(queueProvider.notifier)
+                        .setQueue(queue, startIndex: index);
+                    ref
+                        .read(_musicNowPlayingIdProvider.notifier)
+                        .state = item.id;
+                    context.push('/player/audio', extra: item);
+                  },
+                ),
               );
             },
           ),
@@ -330,7 +365,7 @@ class _SongListView extends ConsumerWidget {
               },
               childCount: songs.length,
               addAutomaticKeepAlives: false,
-              addRepaintBoundaries: false,
+              addRepaintBoundaries: true,
             ),
           ),
         ),
@@ -503,10 +538,201 @@ class _SongRow extends ConsumerWidget {
                   ),
                 ),
               ),
+              // 3-dot options menu
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  _showSongOptions(context, ref, item);
+                },
+                child: const Padding(
+                  padding: EdgeInsets.only(left: 4),
+                  child: Icon(
+                    Icons.more_vert_rounded,
+                    color: AppColors.textSecondary,
+                    size: 18,
+                  ),
+                ),
+              ),
             ],
           ),
         ),
       ),
+    );
+  }
+
+  void _showSongOptions(BuildContext context, WidgetRef ref, MediaItem item) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _SongOptionsSheet(item: item, ref: ref),
+    );
+  }
+}
+
+// ── Song options bottom sheet ─────────────────────────────────────────────
+
+class _SongOptionsSheet extends StatelessWidget {
+  final MediaItem item;
+  final WidgetRef ref;
+  const _SongOptionsSheet({required this.item, required this.ref});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(
+            child: Container(
+              width: 40, height: 4,
+              decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Title row
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Row(
+              children: [
+                Container(
+                  width: 44, height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.accentViolet.withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(Icons.music_note_rounded,
+                      color: AppColors.accentViolet, size: 22),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(item.title,
+                          style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700,
+                            color: AppColors.textPrimary, fontFamily: 'Inter',
+                          ),
+                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Text(item.artist ?? 'Unknown Artist',
+                          style: const TextStyle(
+                              fontSize: 12, color: AppColors.textSecondary)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const Divider(color: AppColors.border, height: 1),
+          _OptionTile(
+            icon: Icons.skip_next_rounded,
+            label: 'Play Next',
+            color: AppColors.accent,
+            onTap: () {
+              Navigator.pop(context);
+              ref.read(queueProvider.notifier).addToQueue(item);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Added to play next'),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
+          ),
+          _OptionTile(
+            icon: Icons.playlist_add_rounded,
+            label: 'Add to Playlist',
+            color: AppColors.accentViolet,
+            onTap: () {
+              Navigator.pop(context);
+              context.push('/playlists');
+            },
+          ),
+          _OptionTile(
+            icon: Icons.share_rounded,
+            label: 'Share',
+            color: AppColors.accentGreen,
+            onTap: () async {
+              Navigator.pop(context);
+              await Share.shareXFiles(
+                [XFile(item.filePath)],
+                text: item.title,
+              );
+            },
+          ),
+          _OptionTile(
+            icon: Icons.info_outline_rounded,
+            label: 'File Info',
+            color: AppColors.textSecondary,
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text(
+                    '${item.title}\n${item.filePath}\n${item.formattedSize}',
+                  ),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
+          ),
+          _OptionTile(
+            icon: Icons.delete_outline_rounded,
+            label: 'Delete',
+            color: AppColors.error,
+            onTap: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Delete not implemented'),
+                  backgroundColor: AppColors.surface,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _OptionTile extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  const _OptionTile({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: Container(
+        width: 36, height: 36,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: color, size: 18),
+      ),
+      title: Text(label,
+          style: const TextStyle(
+            fontSize: 14, color: AppColors.textPrimary,
+            fontFamily: 'Inter', fontWeight: FontWeight.w500,
+          )),
+      onTap: onTap,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 20),
+      dense: true,
     );
   }
 }
@@ -528,6 +754,15 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
   bool _disposed = false;
 
   static final Map<String, String?> _cache = {};
+  static const _maxCache = 200;
+
+  static void _cacheSet(String key, String? value) {
+    if (_cache.length >= _maxCache) {
+      // Evict the oldest entry (insertion-order first key in a LinkedHashMap)
+      _cache.remove(_cache.keys.first);
+    }
+    _cache[key] = value;
+  }
 
   @override
   void initState() {
@@ -569,7 +804,7 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
       final albumId = raw.substring('albumid:'.length);
       final path = await _channel
           .invokeMethod<String>('getAlbumArt', {'albumId': albumId});
-      _cache[raw] = path;
+      _cacheSet(raw, path);
       if (!_disposed && mounted) {
         setState(() {
           _resolvedPath = path;
@@ -577,7 +812,7 @@ class _AlbumArtThumbState extends State<_AlbumArtThumb> {
         });
       }
     } catch (_) {
-      _cache[raw] = null;
+      _cacheSet(raw, null);
       if (!_disposed && mounted) setState(() => _loading = false);
     }
   }
@@ -628,12 +863,20 @@ class _MiniWave extends StatelessWidget {
       children: List.generate(3, (i) {
         return Container(
           width: 3,
+          height: 12,
           margin: const EdgeInsets.only(left: 2),
           decoration: BoxDecoration(
             color: AppColors.accentViolet,
             borderRadius: BorderRadius.circular(2),
           ),
-        );
+        )
+            .animate(onPlay: (c) => c.repeat(reverse: true))
+            .scaleY(
+              begin: 0.2,
+              end: 1.0,
+              duration: Duration(milliseconds: 300 + (i * 100)),
+              curve: Curves.easeInOut,
+            );
       }),
     );
   }
@@ -778,11 +1021,9 @@ class _FoldersView extends ConsumerWidget {
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
-            onTap: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) =>
-                    _FolderDetailPage(name: name, items: files),
-              ),
+            onTap: () => context.push(
+              '/music/folder',
+              extra: {'name': name, 'items': files},
             ),
           ),
         );
@@ -791,29 +1032,30 @@ class _FoldersView extends ConsumerWidget {
   }
 }
 
-class _FolderDetailPage extends ConsumerWidget {
+// Public so it can be referenced from router.dart via GoRoute.
+class MusicFolderDetailPage extends ConsumerWidget {
   final String name;
   final List<MediaItem> items;
-  const _FolderDetailPage({required this.name, required this.items});
+  const MusicFolderDetailPage({super.key, required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded,
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
           name,
-          style: const TextStyle(
+          style: TextStyle(
             fontFamily: 'Inter',
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontSize: 16,
           ),
         ),
@@ -1018,8 +1260,8 @@ class _ArtistsView extends StatelessWidget {
 
 class _MusicSearchDelegate extends SearchDelegate<MediaItem?> {
   final List<MediaItem> songs;
-  final WidgetRef ref;
-  _MusicSearchDelegate({required this.songs, required this.ref});
+  final void Function(List<MediaItem> queue, int index, MediaItem item) onPlay;
+  _MusicSearchDelegate({required this.songs, required this.onPlay});
 
   @override
   ThemeData appBarTheme(BuildContext context) {
@@ -1086,11 +1328,8 @@ class _MusicSearchDelegate extends SearchDelegate<MediaItem?> {
             item: item,
             index: i,
             onTap: () {
-              ref
-                  .read(queueProvider.notifier)
-                  .setQueue(results, startIndex: i);
+              onPlay(results, i, item);
               close(context, item);
-              context.push('/player/audio', extra: item);
             },
           );
         },
@@ -1174,47 +1413,38 @@ class _MusicShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      itemCount: 12,
-      itemBuilder: (_, i) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-                width: 28,
-                height: 14,
-                decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(4))),
-            const SizedBox(width: 12),
-            Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(8))),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                      height: 14,
-                      decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(4))),
-                  const SizedBox(height: 6),
-                  Container(
-                      width: 100,
-                      height: 11,
-                      decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(4))),
-                ],
+    return Shimmer.fromColors(
+      baseColor: AppColors.surface,
+      highlightColor: AppColors.surfaceElevated,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        itemCount: 12,
+        itemBuilder: (_, i) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                  width: 28,
+                  height: 14,
+                  color: Colors.white),
+              const SizedBox(width: 12),
+              Container(
+                  width: 44,
+                  height: 44,
+                  color: Colors.white),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(height: 14, color: Colors.white),
+                    const SizedBox(height: 6),
+                    Container(width: 100, height: 11, color: Colors.white),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
