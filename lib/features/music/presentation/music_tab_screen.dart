@@ -1426,20 +1426,33 @@ class _MusicShimmer extends StatelessWidget {
               Container(
                   width: 28,
                   height: 14,
-                  color: Colors.white),
+                  decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(4))),
               const SizedBox(width: 12),
               Container(
                   width: 44,
                   height: 44,
-                  color: Colors.white),
+                  decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8))),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Container(height: 14, color: Colors.white),
+                    Container(
+                        height: 14,
+                        decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(4))),
                     const SizedBox(height: 6),
-                    Container(width: 100, height: 11, color: Colors.white),
+                    Container(
+                        width: 100,
+                        height: 11,
+                        decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(4))),
                   ],
                 ),
               ),

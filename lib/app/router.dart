@@ -32,18 +32,17 @@ class AppRouter {
       ShellRoute(
         builder: (context, state, child) => _MainShell(child: child),
         routes: [
-          // Tab 0 — Video Library (dedicated)
+          // Tab 0 — Video Library
           GoRoute(path: '/',        builder: (_, __) => const VideoTabScreen()),
-          // Tab 1 — Music Library (dedicated)
+          // Tab 1 — Music Library
           GoRoute(path: '/music',   builder: (_, __) => const MusicTabScreen()),
-          // Tab 2 — Tools
-          GoRoute(path: '/tools',   builder: (_, __) => const ToolsScreen()),
-          // Tab 3 — My Space hub (account + playlists + history)
+          // Tab 2 — My Space hub (account + quick tools + settings)
           GoRoute(path: '/myspace', builder: (_, __) => const MySpaceHubScreen()),
-          // Air-Drop (accessible from Tools)
-          GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
         ],
       ),
+      // Tools & AirDrop remain as push routes (not shell tabs)
+      GoRoute(path: '/tools',   builder: (_, __) => const ToolsScreen()),
+      GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
       GoRoute(path: '/profile',         builder: (_, __) => const ProfileScreen()),
       GoRoute(path: '/settings',        builder: (_, __) => const SettingsDetailScreen()),
       GoRoute(path: '/settings-detail', builder: (_, __) => const SettingsDetailScreen()),
@@ -105,7 +104,14 @@ class _MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<_MainShell> {
   int _currentIndex = 0;
 
-  static const _routes = ['/', '/music', '/tools', '/myspace'];
+  static const _routes = ['/', '/music', '/myspace'];
+
+  // IndexedStack pages — preserves tab state between switches
+  final List<Widget> _pages = const [
+    VideoTabScreen(),
+    MusicTabScreen(),
+    MySpaceHubScreen(),
+  ];
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
@@ -125,7 +131,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
         mainAxisSize: MainAxisSize.min,
         children: [
           // Mini-player — only rendered when a track is loaded
-          if (hasMini) const MiniPlayer(),
+          if (hasMini) const RepaintBoundary(child: MiniPlayer()),
           const AdBannerSlot(),
           SafeArea(
             child: Container(
@@ -155,27 +161,21 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   children: [
                     _NavItem(
                       icon: Icons.play_circle_rounded,
-                      label: 'Video',
+                      label: 'VIDEO',
                       isActive: _currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
                     _NavItem(
                       icon: Icons.music_note_rounded,
-                      label: 'Music',
+                      label: 'MUSIC',
                       isActive: _currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
                     _NavItem(
-                      icon: Icons.grid_view_rounded,
-                      label: 'Tools',
+                      icon: Icons.person_rounded,
+                      label: 'MY SPACE',
                       isActive: _currentIndex == 2,
                       onTap: () => _onTap(2),
-                    ),
-                    _NavItem(
-                      icon: Icons.person_rounded,
-                      label: 'My Space',
-                      isActive: _currentIndex == 3,
-                      onTap: () => _onTap(3),
                     ),
                   ],
                 ),
