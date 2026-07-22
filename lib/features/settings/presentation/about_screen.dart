@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -296,7 +295,7 @@ class _AppCard extends StatelessWidget {
               ),
               child: Text(
                 version.isEmpty
-                    ? 'Version 1.4.0 (build 2007)'
+                    ? 'Loading...'
                     : 'Version $version (build $buildNumber)',
                 style: const TextStyle(
                   fontSize: 12,

@@ -415,16 +415,16 @@ class _TrackMenuSheet extends StatelessWidget {
 /// Wraps the Video widget with gesture controls and the neon HUD overlay.
 ///
 /// Gesture map:
-///   Left vertical drag   → brightness (overlay filter)
-///   Right vertical drag  → volume (player.setVolume)
-///   Horizontal drag      → seek (player.seek)
-///   Double-tap left      → rewind 10 s
-///   Double-tap right     → forward 10 s
+///   Double-tap left      → rewind 10 s (via _onDoubleTapDown)
+///   Double-tap right     → forward 10 s (via _onDoubleTapDown)
+///   Tap                  → toggle transport controls
+///
+/// Brightness/volume/seek swipe gestures are handled by VideoGestureLayer
+/// (the parent widget) which uses real platform channels for brightness and
+/// volume. Conflicting handlers have been removed from this wrapper to avoid
+/// gesture arena conflicts.
 ///
 /// Performance:
-///   All gesture state is stored in plain fields (not setState) during
-///   the drag phase. setState is called only once per drag update to
-///   update the HUD value — a single cheap rebuild of the HUD subtree.
 ///   RepaintBoundary around the Video widget ensures the video surface
 ///   never repaints due to HUD changes.
 class MediaKitGestureWrapper extends StatefulWidget {
@@ -456,9 +456,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 
   // ── Gesture tracking (plain fields — no setState during drag) ───────────────
   double _volume      = 1.0;
-  double _brightness  = 0.5;  // simulated; real brightness via platform channel
-  bool   _dragLeft    = false;
-  double _seekDragMs  = -1;   // -1 = not seeking
 
   // ── Controls visibility ─────────────────────────────────────────────────────────
   bool   _showControls = false;
@@ -552,58 +549,14 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
     _showHud(_HudType.seek, newPos.inMilliseconds / _duration.inMilliseconds.clamp(1, 999999));
   }
 
-  void _onVerticalDragStart(DragStartDetails d) {
-    _dragLeft = d.localPosition.dx < context.size!.width / 2;
-  }
-
-  void _onVerticalDragUpdate(DragUpdateDetails d) {
-    // Negative delta = finger moving up = increase value
-    final delta = -(d.primaryDelta! / (context.size?.height ?? 600));
-    if (_dragLeft) {
-      // Brightness — apply as a dark overlay opacity (0 = full dark, 1 = full bright)
-      _brightness = (_brightness + delta).clamp(0.05, 1.0);
-      _showHud(_HudType.brightness, _brightness);
-    } else {
-      // Volume — media_kit uses 0–100 scale
-      _volume = (_volume + delta).clamp(0.0, 1.0);
-      widget.player.setVolume(_volume * 100);
-      _showHud(_HudType.volume, _volume);
-    }
-  }
-
-  void _onVerticalDragEnd(DragEndDetails _) {
-    // HUD auto-dismisses via timer; nothing extra needed
-  }
-
-  void _onHorizontalDragUpdate(DragUpdateDetails d) {
-    if (_duration == Duration.zero) return;
-    final durMs  = _duration.inMilliseconds.toDouble();
-    final base   = _seekDragMs >= 0 ? _seekDragMs : _position.inMilliseconds.toDouble();
-    // 300 ms per logical pixel — tuned for comfortable seeking
-    _seekDragMs  = (base + d.delta.dx * 300).clamp(0.0, durMs);
-    _showHud(_HudType.seek, _seekDragMs / durMs);
-  }
-
-  void _onHorizontalDragEnd(DragEndDetails _) {
-    if (_seekDragMs >= 0) {
-      widget.player.seek(Duration(milliseconds: _seekDragMs.toInt()));
-      _seekDragMs = -1;
-    }
-  }
-
   // ── Build ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap:                  _onTap,
-      onDoubleTapDown:        _onDoubleTapDown,
-      onVerticalDragStart:    _onVerticalDragStart,
-      onVerticalDragUpdate:   _onVerticalDragUpdate,
-      onVerticalDragEnd:      _onVerticalDragEnd,
-      onHorizontalDragUpdate: _onHorizontalDragUpdate,
-      onHorizontalDragEnd:    _onHorizontalDragEnd,
+      onTap:           _onTap,
+      onDoubleTapDown: _onDoubleTapDown,
       child: Stack(
         children: [
           // ── Video surface (RepaintBoundary isolates it from HUD repaints) ─────
@@ -618,24 +571,13 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
             ),
           ),
 
-          // ── Brightness overlay ───────────────────────────────────────────────────
-          // A dark overlay that dims the video to simulate brightness control.
-          // Opacity 1 = fully dark (brightness 0%), opacity 0 = full bright.
-          IgnorePointer(
-            child: Opacity(
-              opacity: (1.0 - _brightness).clamp(0.0, 0.9),
-              child: const ColoredBox(color: Colors.black,
-                  child: SizedBox.expand()),
-            ),
-          ),
-
           // ── Neon HUD overlay ───────────────────────────────────────────────────
           _NeonHud(
-            visible:    _hudVisible,
-            type:       _hudType,
-            value:      _hudValue,
-            seekMs:     _seekDragMs >= 0 ? _seekDragMs.toInt() : null,
-            duration:   _duration,
+            visible:  _hudVisible,
+            type:     _hudType,
+            value:    _hudValue,
+            seekMs:   null,
+            duration: _duration,
           ),
 
           // ── Transport controls ───────────────────────────────────────────────────
