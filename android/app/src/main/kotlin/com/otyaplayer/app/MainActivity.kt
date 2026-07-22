@@ -227,6 +227,55 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // ── Brightness channel ────────────────────────────────────────────
+        // Controls the window's screen brightness so VideoGestureLayer can
+        // adjust brightness via a real platform call instead of a fake overlay.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.otyaplayer.app/brightness")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setBrightness" -> {
+                        val value = call.argument<Double>("value")?.toFloat() ?: 0.5f
+                        val lp = window.attributes
+                        lp.screenBrightness = value.coerceIn(0.01f, 1.0f)
+                        window.attributes = lp
+                        result.success(null)
+                    }
+                    "getBrightness" -> {
+                        val lp = window.attributes
+                        val brightness = if (lp.screenBrightness < 0) 0.5f else lp.screenBrightness
+                        result.success(brightness.toDouble())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
+
+        // ── Volume channel ────────────────────────────────────────────────
+        // Controls the system music stream volume so VideoGestureLayer can
+        // adjust device volume via a real platform call.
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.otyaplayer.app/volume")
+            .setMethodCallHandler { call, result ->
+                when (call.method) {
+                    "setVolume" -> {
+                        val value = call.argument<Double>("value") ?: 0.5
+                        val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                        val maxVol = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                        am.setStreamVolume(
+                            android.media.AudioManager.STREAM_MUSIC,
+                            (value * maxVol).toInt().coerceIn(0, maxVol),
+                            0
+                        )
+                        result.success(null)
+                    }
+                    "getVolume" -> {
+                        val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
+                        val maxVol = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
+                        val curVol = am.getStreamVolume(android.media.AudioManager.STREAM_MUSIC)
+                        result.success(curVol.toDouble() / maxVol.toDouble())
+                    }
+                    else -> result.notImplemented()
+                }
+            }
     }
 
     // ── MediaStore observer ───────────────────────────────────────────────

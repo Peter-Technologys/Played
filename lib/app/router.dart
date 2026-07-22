@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../features/my_space/presentation/my_space_hub_screen.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
 import '../features/my_space/presentation/playback_history_screen.dart';
+import '../features/my_space/presentation/providers/my_space_provider.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
@@ -245,6 +246,225 @@ class AppRouter {
   );
 }
 
+// ── Global Search Delegate ────────────────────────────────────────────
+
+/// A [SearchDelegate] that searches across both videos and music from
+/// [mediaLibraryProvider] and presents results in two labelled sections.
+class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
+  final List<MediaItem> _allItems;
+
+  _GlobalSearchDelegate(this._allItems)
+      : super(searchFieldLabel: 'Search videos & music…');
+
+  // ── Helpers ──────────────────────────────────────────────────────────
+
+  List<MediaItem> get _videos => _allItems.where((i) => i.isVideo).toList();
+  List<MediaItem> get _music  => _allItems.where((i) => !i.isVideo).toList();
+
+  List<MediaItem> _filter(List<MediaItem> items) {
+    final q = query.trim().toLowerCase();
+    if (q.isEmpty) return items;
+    return items.where((i) {
+      return i.title.toLowerCase().contains(q) ||
+          i.fileName.toLowerCase().contains(q) ||
+          (i.artist?.toLowerCase().contains(q) ?? false) ||
+          (i.album?.toLowerCase().contains(q) ?? false);
+    }).toList();
+  }
+
+  // ── AppBar actions ───────────────────────────────────────────────────
+
+  @override
+  List<Widget> buildActions(BuildContext context) => [
+        if (query.isNotEmpty)
+          IconButton(
+            icon: const Icon(Icons.clear),
+            tooltip: 'Clear',
+            onPressed: () {
+              query = '';
+              showSuggestions(context);
+            },
+          ),
+      ];
+
+  @override
+  Widget buildLeading(BuildContext context) => IconButton(
+        icon: const Icon(Icons.arrow_back),
+        tooltip: 'Back',
+        onPressed: () => close(context, null),
+      );
+
+  // ── Results & suggestions share the same layout ──────────────────────
+
+  @override
+  Widget buildResults(BuildContext context) => _buildResultsView(context);
+
+  @override
+  Widget buildSuggestions(BuildContext context) => _buildResultsView(context);
+
+  Widget _buildResultsView(BuildContext context) {
+    final filteredVideos = _filter(_videos);
+    final filteredMusic  = _filter(_music);
+
+    if (filteredVideos.isEmpty && filteredMusic.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.search_off_rounded,
+                size: 56,
+                color: AppColors.textSecondary.withValues(alpha: 0.5)),
+            const SizedBox(height: 12),
+            Text(
+              query.isEmpty ? 'Start typing to search…' : 'No results for "$query"',
+              style: const TextStyle(color: AppColors.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return CustomScrollView(
+      slivers: [
+        if (filteredVideos.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.play_circle_rounded,
+            label: 'Videos',
+            count: filteredVideos.length,
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (ctx, i) => _MediaResultTile(
+                item: filteredVideos[i],
+                onTap: () {
+                  close(context, filteredVideos[i]);
+                  GoRouter.of(context).push('/player/video', extra: filteredVideos[i]);
+                },
+              ),
+              childCount: filteredVideos.length,
+            ),
+          ),
+        ],
+        if (filteredMusic.isNotEmpty) ...[
+          _SectionHeader(
+            icon: Icons.music_note_rounded,
+            label: 'Music',
+            count: filteredMusic.length,
+          ),
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (ctx, i) => _MediaResultTile(
+                item: filteredMusic[i],
+                onTap: () {
+                  close(context, filteredMusic[i]);
+                  GoRouter.of(context).push('/player/audio', extra: filteredMusic[i]);
+                },
+              ),
+              childCount: filteredMusic.length,
+            ),
+          ),
+        ],
+        // Bottom padding so the last item isn't hidden behind the nav bar
+        const SliverToBoxAdapter(child: SizedBox(height: 24)),
+      ],
+    );
+  }
+}
+
+// ── Section header sliver ─────────────────────────────────────────────
+
+class _SectionHeader extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final int count;
+
+  const _SectionHeader({
+    required this.icon,
+    required this.label,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SliverToBoxAdapter(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
+        child: Row(
+          children: [
+            Icon(icon, size: 18, color: AppColors.accent),
+            const SizedBox(width: 6),
+            Text(
+              label.toUpperCase(),
+              style: const TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                color: AppColors.accent,
+                letterSpacing: 1.2,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              '($count)',
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Individual result tile ────────────────────────────────────────────
+
+class _MediaResultTile extends StatelessWidget {
+  final MediaItem item;
+  final VoidCallback onTap;
+
+  const _MediaResultTile({required this.item, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      leading: CircleAvatar(
+        backgroundColor: item.isVideo
+            ? AppColors.accent.withValues(alpha: 0.15)
+            : AppColors.accentViolet.withValues(alpha: 0.15),
+        child: Icon(
+          item.isVideo ? Icons.play_circle_outline_rounded : Icons.music_note_rounded,
+          color: item.isVideo ? AppColors.accent : AppColors.accentViolet,
+          size: 20,
+        ),
+      ),
+      title: Text(
+        item.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
+      ),
+      subtitle: Text(
+        [
+          if (item.artist != null) item.artist!,
+          item.formattedDuration,
+          item.formattedSize,
+        ].join(' · '),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: const TextStyle(
+          fontSize: 12,
+          color: AppColors.textSecondary,
+          fontFamily: 'Inter',
+        ),
+      ),
+      onTap: onTap,
+    );
+  }
+}
+
 // ── Main Shell ────────────────────────────────────────────────────────
 
 class _MainShell extends ConsumerStatefulWidget {
@@ -275,8 +495,29 @@ class _MainShellState extends ConsumerState<_MainShell> {
   Widget build(BuildContext context) {
     final miniItem = ref.watch(miniPlayerItemProvider);
     final hasMini  = miniItem != null;
+    final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
 
     return Scaffold(
+      appBar: AppBar(
+        // Transparent / blends with the page content behind it
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        scrolledUnderElevation: 0,
+        // No title — only the search action on the right
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search_rounded),
+            tooltip: 'Search',
+            color: AppColors.textSecondary,
+            onPressed: () {
+              showSearch<MediaItem?>(
+                context: context,
+                delegate: _GlobalSearchDelegate(allItems),
+              );
+            },
+          ),
+        ],
+      ),
       body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,

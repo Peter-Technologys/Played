@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -184,3 +185,12 @@ final settingsProvider =
     StateNotifierProvider<SettingsNotifier, AppSettings>(
   (_) => SettingsNotifier(const AppSettings()),
 );
+
+/// Derives a [Locale] from [settingsProvider].language.
+/// Supported language codes: en, fr, es, sw.
+/// Watches [settingsProvider] so any call to [SettingsNotifier.setLanguage]
+/// immediately propagates a new [Locale] to [MaterialApp].
+final localeProvider = Provider<Locale>((ref) {
+  final language = ref.watch(settingsProvider).language;
+  return Locale(language);
+});

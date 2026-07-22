@@ -10,7 +10,6 @@ import '../../../core/models/media_item.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../features/settings/settings_provider.dart';
-import 'widgets/video_gesture_layer.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
