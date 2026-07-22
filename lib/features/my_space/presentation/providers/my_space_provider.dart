@@ -118,10 +118,10 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       );
       for (final item in items) {
         if (!existing.contains(item.id)) {
-          // recordPlay stamps lastPlayedAt = now, which is fine — these
-          // items will appear in the Phase 1b seed on the next cold start,
-          // and the background scan immediately replaces the state anyway.
-          await db.recordPlay(item);
+          // seedLibraryItem writes the item WITHOUT stamping lastPlayedAt,
+          // so library items never appear as 'recently played' with today's
+          // timestamp, preserving the integrity of play history.
+          await db.seedLibraryItem(item);
         }
       }
     } catch (e) {

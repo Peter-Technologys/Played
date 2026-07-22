@@ -415,13 +415,14 @@ class _TrackMenuSheet extends StatelessWidget {
 /// Wraps the Video widget with gesture controls and the neon HUD overlay.
 ///
 /// Gesture map:
-///   Double-tap left/right → rewind / forward 10 s
-///   Tap                   → toggle transport controls
+///   Double-tap left      → rewind 10 s (via _onDoubleTapDown)
+///   Double-tap right     → forward 10 s (via _onDoubleTapDown)
+///   Tap                  → toggle transport controls
 ///
-/// Note: brightness and volume vertical-drag gestures are handled exclusively
-/// by VideoGestureLayer (which calls real platform channels). This wrapper
-/// intentionally does NOT handle vertical or horizontal drags to avoid
-/// competing with VideoGestureLayer.
+/// Brightness/volume/seek swipe gestures are handled by VideoGestureLayer
+/// (the parent widget) which uses real platform channels for brightness and
+/// volume. Conflicting handlers have been removed from this wrapper to avoid
+/// gesture arena conflicts.
 ///
 /// Performance:
 ///   RepaintBoundary around the Video widget ensures the video surface
@@ -452,6 +453,9 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   double   _hudValue    = 0.0;   // 0.0 – 1.0
   _HudType _hudType     = _HudType.seek;
   Timer?   _hudTimer;
+
+  // ── Gesture tracking (plain fields — no setState during drag) ───────────────
+  double _volume      = 1.0;
 
   // ── Controls visibility ─────────────────────────────────────────────────────────
   bool   _showControls = false;
@@ -566,12 +570,12 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
             ),
           ),
 
-          // ── Neon HUD overlay (seek only) ──────────────────────────────────────
-          // Brightness and volume HUDs are rendered by VideoGestureLayer.
+          // ── Neon HUD overlay ───────────────────────────────────────────────────
           _NeonHud(
             visible:  _hudVisible,
             type:     _hudType,
             value:    _hudValue,
+            seekMs:   null,
             duration: _duration,
           ),
 

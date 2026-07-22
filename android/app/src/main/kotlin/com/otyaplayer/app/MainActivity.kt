@@ -228,9 +228,7 @@ class MainActivity : FlutterActivity() {
                 }
             }
 
-        // ── Brightness channel ────────────────────────────────────────────
-        // Controls the window's screen brightness so VideoGestureLayer can
-        // adjust brightness via a real platform call instead of a fake overlay.
+        // ── Brightness ────────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.otyaplayer.app/brightness")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -243,16 +241,14 @@ class MainActivity : FlutterActivity() {
                     }
                     "getBrightness" -> {
                         val lp = window.attributes
-                        val brightness = if (lp.screenBrightness < 0) 0.5f else lp.screenBrightness
-                        result.success(brightness.toDouble())
+                        val b = if (lp.screenBrightness < 0) 0.5f else lp.screenBrightness
+                        result.success(b.toDouble())
                     }
                     else -> result.notImplemented()
                 }
             }
 
-        // ── Volume channel ────────────────────────────────────────────────
-        // Controls the system music stream volume so VideoGestureLayer can
-        // adjust device volume via a real platform call.
+        // ── Volume ────────────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.otyaplayer.app/volume")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
@@ -260,11 +256,8 @@ class MainActivity : FlutterActivity() {
                         val value = call.argument<Double>("value") ?: 0.5
                         val am = getSystemService(AUDIO_SERVICE) as android.media.AudioManager
                         val maxVol = am.getStreamMaxVolume(android.media.AudioManager.STREAM_MUSIC)
-                        am.setStreamVolume(
-                            android.media.AudioManager.STREAM_MUSIC,
-                            (value * maxVol).toInt().coerceIn(0, maxVol),
-                            0
-                        )
+                        am.setStreamVolume(android.media.AudioManager.STREAM_MUSIC,
+                            (value * maxVol).toInt().coerceIn(0, maxVol), 0)
                         result.success(null)
                     }
                     "getVolume" -> {

@@ -683,7 +683,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               final newPos = _position + delta;
               final clamped = newPos < Duration.zero
                   ? Duration.zero
-                  : newPos > _duration ? _duration : newPos;
+                  : (newPos > _duration ? _duration : newPos);
               _player!.seek(clamped);
               if (mounted) setState(() => _position = clamped);
             },
@@ -696,8 +696,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ),
           ),
 
-          // 2. Transparent tap catcher — only active when controls are
-          //    hidden, so it doesn't block taps on visible control widgets.
+          // 2. Only catch taps to show controls when they are hidden.
+          //    When controls ARE visible this layer is absent so taps reach
+          //    the controls overlay (layer 3) unobstructed.
           if (!_controlsVisible && !_isLocked)
             Positioned.fill(
               child: GestureDetector(

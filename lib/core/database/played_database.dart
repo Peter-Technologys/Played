@@ -148,6 +148,20 @@ class PlayedDatabase {
     }
   }
 
+  /// Seeds a MediaItem into history WITHOUT updating lastPlayedAt.
+  /// Used by MediaLibraryNotifier._writeBackToHive() to populate the
+  /// Phase 1b seed without corrupting play history timestamps.
+  Future<void> seedLibraryItem(MediaItem item) async {
+    try {
+      // Only write if not already in history (preserve existing lastPlayedAt)
+      if (!_history.containsKey(item.id)) {
+        await _history.put(item.id, item);
+      }
+    } catch (e) {
+      debugPrint('[PlayedDB] seedLibraryItem error: $e');
+    }
+  }
+
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
     try {
       final items = _history.values.toList()
