@@ -40,6 +40,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   double _playbackSpeed = 1.0;
   int _aspectRatioIndex = 0; // 0=Fit, 1=CenterCrop, 2=Stretch
   bool _isPlaying       = true;
+  bool _isSeeking       = false;
   Duration _position    = Duration.zero;
   Duration _duration    = Duration.zero;
 
@@ -141,9 +142,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   // ── Duration formatter ─────────────────────────────────────────────
 
   String _formatDuration(Duration d) {
+    final h = d.inHours;
     final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
   // ── Speed picker ───────────────────────────────────────────────────
@@ -426,10 +428,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                               max: _duration.inSeconds
                                   .toDouble()
                                   .clamp(1, double.infinity),
+                              onChangeStart: (_) =>
+                                  setState(() => _isSeeking = true),
                               onChanged: (v) => setState(
                                   () => _position = Duration(seconds: v.toInt())),
                               onChangeEnd: (v) {
                                 _player?.seek(Duration(seconds: v.toInt()));
+                                setState(() => _isSeeking = false);
                               },
                             ),
                           ),
@@ -453,7 +458,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           onTap: () {
                             HapticFeedback.lightImpact();
                             final newPos = _position - const Duration(seconds: 10);
-                            _player?.seek(newPos < Duration.zero ? Duration.zero : newPos);
+                            final clamped = newPos < Duration.zero ? Duration.zero : newPos;
+                            _player?.seek(clamped);
+                            setState(() => _position = clamped);
                           },
                           child: const Icon(Icons.replay_10_rounded,
                               color: Colors.white, size: 32),
@@ -465,8 +472,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             HapticFeedback.mediumImpact();
                             if (_isPlaying) {
                               _player?.pause();
+                              setState(() => _isPlaying = false);
                             } else {
                               _player?.play();
+                              setState(() => _isPlaying = true);
                             }
                           },
                           child: Icon(
@@ -483,7 +492,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           onTap: () {
                             HapticFeedback.lightImpact();
                             final newPos = _position + const Duration(seconds: 10);
-                            _player?.seek(newPos > _duration ? _duration : newPos);
+                            final clamped = newPos > _duration ? _duration : newPos;
+                            _player?.seek(clamped);
+                            setState(() => _position = clamped);
                           },
                           child: const Icon(Icons.forward_10_rounded,
                               color: Colors.white, size: 32),
@@ -628,7 +639,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _player = player;
 
     _positionSub = player.stream.position.listen((p) {
-      if (mounted) setState(() => _position = p);
+      if (mounted && !_isSeeking) setState(() => _position = p);
     });
     _durationSub = player.stream.duration.listen((d) {
       if (mounted) setState(() => _duration = d);
@@ -665,32 +676,36 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Video engine (full screen).
-          // MediaKitEngine wraps MediaKitGestureWrapper which already handles
-          // all gestures (tap, double-tap seek, vertical drag for
-          // volume/brightness, horizontal drag for seek) via its own
-          // GestureDetector(behavior: HitTestBehavior.opaque).
-          // VideoGestureLayer has been removed: it added a second competing
-          // GestureDetector above MediaKitGestureWrapper that intercepted
-          // onDoubleTapDown and onHorizontalDragEnd before they could reach
-          // the inner handler, breaking double-tap seek and swipe-to-seek.
-          MediaKitEngine(
-            filePath:      widget.mediaItem.filePath,
-            title:         widget.mediaItem.title,
-            startPosition: _savedPosition,
-            autoPlay:      true,
-            onPlayerReady: _attachPlayer,
-          ),
-
-          // 2. Full-screen tap catcher — ALWAYS active, catches taps even
-          //    when controls are hidden behind IgnorePointer.
-          Positioned.fill(
-            child: GestureDetector(
-              behavior: HitTestBehavior.translucent,
-              onTap: _resetHideTimer,
-              child: const SizedBox.expand(),
+          // 1. Video engine (full screen) with gesture handling
+          VideoGestureLayer(
+            onSeek: (delta) {
+              if (_player == null) return;
+              final newPos = _position + delta;
+              final clamped = newPos < Duration.zero
+                  ? Duration.zero
+                  : newPos > _duration ? _duration : newPos;
+              _player!.seek(clamped);
+              if (mounted) setState(() => _position = clamped);
+            },
+            child: MediaKitEngine(
+              filePath:      widget.mediaItem.filePath,
+              title:         widget.mediaItem.title,
+              startPosition: _savedPosition,
+              autoPlay:      true,
+              onPlayerReady: _attachPlayer,
             ),
           ),
+
+          // 2. Transparent tap catcher — only active when controls are
+          //    hidden, so it doesn't block taps on visible control widgets.
+          if (!_controlsVisible && !_isLocked)
+            Positioned.fill(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: _resetHideTimer,
+                child: const SizedBox.expand(),
+              ),
+            ),
 
           // 3. Controls overlay (animated, hidden when locked)
           if (!_isLocked)
@@ -699,7 +714,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               duration: const Duration(milliseconds: 300),
               child: IgnorePointer(
                 ignoring: !_controlsVisible,
-                child: _buildControlsOverlay(),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _resetHideTimer,
+                  child: _buildControlsOverlay(),
+                ),
               ),
             ),
 
