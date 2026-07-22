@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
@@ -66,6 +67,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   @override
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
+    final locale = ref.watch(localeProvider);
     final isDark = settings.themeMode != AppThemeMode.light;
 
     // Update status-bar icon brightness whenever theme changes.
@@ -144,6 +146,18 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             AppThemeMode.amoled => ThemeMode.dark,
             AppThemeMode.light  => ThemeMode.light,
           },
+          locale: locale,
+          supportedLocales: const [
+            Locale('en'),
+            Locale('fr'),
+            Locale('es'),
+            Locale('sw'),
+          ],
+          localizationsDelegates: const [
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
           routerConfig: AppRouter.router,
           builder: (context, child) {
             final isAmoled = settings.themeMode == AppThemeMode.amoled;

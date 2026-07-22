@@ -345,42 +345,51 @@ class _VideoGrid extends ConsumerWidget {
       return const _EmptyState(
           icon: Icons.videocam_rounded, label: 'No videos found');
     }
-    return Column(
-      children: [
+    final crossAxisCount =
+        MediaQuery.of(context).size.width > 600 ? 3 : 2;
+    return CustomScrollView(
+      physics: const BouncingScrollPhysics(),
+      cacheExtent: 400,
+      slivers: [
         // ── Shuffle all bar ──────────────────────────────────────────
-        GestureDetector(
-          onTap: () {
-            HapticFeedback.selectionClick();
-            final shuffled = List<MediaItem>.from(items)..shuffle();
-            ref.read(queueProvider.notifier).setQueue(shuffled, startIndex: 0);
-            context.push('/player/video', extra: shuffled.first);
-          },
-          child: Container(
-            margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.shuffle_rounded,
-                    color: AppColors.accent, size: 20),
-                const SizedBox(width: 10),
-                Text(
-                  'Shuffle all (${items.length})',
-                  style: const TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.textPrimary,
-                    fontFamily: 'Inter',
+        SliverToBoxAdapter(
+          child: GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              final shuffled = List<MediaItem>.from(items)..shuffle();
+              ref
+                  .read(queueProvider.notifier)
+                  .setQueue(shuffled, startIndex: 0);
+              context.push('/player/video', extra: shuffled.first);
+            },
+            child: Container(
+              margin: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(14),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.shuffle_rounded,
+                      color: AppColors.accent, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Shuffle all (${items.length})',
+                    style: const TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                    ),
                   ),
-                ),
-                const Spacer(),
-                const Icon(Icons.play_arrow_rounded,
-                    color: AppColors.accent, size: 20),
-              ],
+                  const Spacer(),
+                  const Icon(Icons.play_arrow_rounded,
+                      color: AppColors.accent, size: 20),
+                ],
+              ),
             ),
           ),
         ),
