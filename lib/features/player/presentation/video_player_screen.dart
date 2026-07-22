@@ -10,7 +10,6 @@ import '../../../core/models/media_item.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../features/settings/settings_provider.dart';
-import 'widgets/video_gesture_layer.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
@@ -666,15 +665,21 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Video engine (full screen)
-          VideoGestureLayer(
-            child: MediaKitEngine(
-              filePath:      widget.mediaItem.filePath,
-              title:         widget.mediaItem.title,
-              startPosition: _savedPosition,
-              autoPlay:      true,
-              onPlayerReady: _attachPlayer,
-            ),
+          // 1. Video engine (full screen).
+          // MediaKitEngine wraps MediaKitGestureWrapper which already handles
+          // all gestures (tap, double-tap seek, vertical drag for
+          // volume/brightness, horizontal drag for seek) via its own
+          // GestureDetector(behavior: HitTestBehavior.opaque).
+          // VideoGestureLayer has been removed: it added a second competing
+          // GestureDetector above MediaKitGestureWrapper that intercepted
+          // onDoubleTapDown and onHorizontalDragEnd before they could reach
+          // the inner handler, breaking double-tap seek and swipe-to-seek.
+          MediaKitEngine(
+            filePath:      widget.mediaItem.filePath,
+            title:         widget.mediaItem.title,
+            startPosition: _savedPosition,
+            autoPlay:      true,
+            onPlayerReady: _attachPlayer,
           ),
 
           // 2. Full-screen tap catcher — ALWAYS active, catches taps even
