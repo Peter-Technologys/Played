@@ -10,6 +10,7 @@ import '../features/my_space/presentation/providers/my_space_provider.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
+import '../features/player/presentation/car_mode_screen.dart';
 import '../features/player/presentation/equalizer_screen.dart';
 import '../features/player/presentation/mini_player.dart';
 import '../features/profile/profile_screen.dart' show ProfileScreen, WhatsNewScreen;
@@ -246,6 +247,14 @@ class AppRouter {
           context: c,
           state: s,
           child: AudioPlayerScreen(mediaItem: s.extra as MediaItem),
+        ),
+      ),
+      GoRoute(
+        path: '/player/car-mode',
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const CarModeScreen(),
         ),
       ),
       GoRoute(

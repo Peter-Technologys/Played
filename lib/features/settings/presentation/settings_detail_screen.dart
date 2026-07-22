@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -8,6 +10,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/database/played_database.dart';
 import '../settings_provider.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 
@@ -413,147 +416,138 @@ class SettingsDetailScreen extends ConsumerWidget {
         builder: (ctx, sheetRef, __) {
           final s  = sheetRef.watch(settingsProvider);
           final sn = sheetRef.read(settingsProvider.notifier);
-          return StatefulBuilder(
-            builder: (ctx2, setSheetState) {
-              // Local stub state for search-history toggle (no backing store yet).
-              bool searchHistoryEnabled = true;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20, 16, 20,
+              MediaQuery.of(ctx).viewInsets.bottom + 32,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sheetHeader('General'),
 
-              return Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20, 16, 20,
-                  MediaQuery.of(ctx2).viewInsets.bottom + 32,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sheetHeader('General'),
-
-                      // Language selector
-                      const Text(
-                        'Language',
-                        style: TextStyle(
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      ...{
-                        'en': 'English',
-                        'fr': 'French',
-                        'es': 'Spanish',
-                        'sw': 'Swahili',
-                      }.entries.map((e) {
-                        final selected = s.language == e.key;
-                        return RadioListTile<String>(
-                          value: e.key,
-                          groupValue: s.language,
-                          onChanged: (v) {
-                            if (v != null) {
-                              HapticFeedback.selectionClick();
-                              sn.setLanguage(v);
-                            }
-                          },
-                          title: Text(
-                            e.value,
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: selected
-                                  ? AppColors.accent
-                                  : AppColors.textPrimary,
-                              fontFamily: 'Inter',
-                              fontWeight: selected
-                                  ? FontWeight.w700
-                                  : FontWeight.w400,
-                            ),
-                          ),
-                          activeColor: AppColors.accent,
-                          contentPadding: EdgeInsets.zero,
-                          dense: true,
-                        );
-                      }),
-
-                      const Divider(color: AppColors.border, height: 24),
-
-                      // Search history toggle (stub)
-                      SwitchListTile(
-                        value: searchHistoryEnabled,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          setSheetState(() => searchHistoryEnabled = v);
-                        },
-                        title: const Text(
-                          'Search History',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Remember recent searches',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        activeThumbColor: Colors.black,
-                        activeTrackColor: AppColors.accent,
-                        inactiveThumbColor: AppColors.textSecondary,
-                        inactiveTrackColor: AppColors.border,
-                        contentPadding: EdgeInsets.zero,
-                      ),
-
-                      const Divider(color: AppColors.border, height: 24),
-
-                      // Clear cache button
-                      ListTile(
-                        contentPadding: EdgeInsets.zero,
-                        leading: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.redAccent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(Icons.delete_sweep_rounded,
-                              color: Colors.redAccent, size: 18),
-                        ),
-                        title: const Text(
-                          'Clear Cache',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        subtitle: const Text(
-                          'Free up temporary storage',
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded,
-                            color: AppColors.textSecondary, size: 18),
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          Navigator.pop(ctx2);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cache cleared')),
-                          );
-                        },
-                      ),
-                    ],
+                  // Language selector
+                  const Text(
+                    'Language',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Inter',
+                    ),
                   ),
-                ),
-              );
-            },
+                  const SizedBox(height: 8),
+                  ...{
+                    'en': 'English',
+                    'fr': 'French',
+                    'es': 'Spanish',
+                    'sw': 'Swahili',
+                  }.entries.map((e) {
+                    final selected = s.language == e.key;
+                    return RadioListTile<String>(
+                      value: e.key,
+                      groupValue: s.language,
+                      onChanged: (v) {
+                        if (v != null) {
+                          HapticFeedback.selectionClick();
+                          sn.setLanguage(v);
+                        }
+                      },
+                      title: Text(
+                        e.value,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: selected
+                              ? AppColors.accent
+                              : AppColors.textPrimary,
+                          fontFamily: 'Inter',
+                          fontWeight: selected
+                              ? FontWeight.w700
+                              : FontWeight.w400,
+                        ),
+                      ),
+                      activeColor: AppColors.accent,
+                      contentPadding: EdgeInsets.zero,
+                      dense: true,
+                    );
+                  }),
+
+                  const Divider(color: AppColors.border, height: 24),
+
+                  // Search history toggle — persisted via settingsProvider
+                  SwitchListTile(
+                    value: s.searchHistory,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setSearchHistory(v);
+                    },
+                    title: const Text(
+                      'Search History',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Remember recent searches',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    activeThumbColor: Colors.black,
+                    activeTrackColor: AppColors.accent,
+                    inactiveThumbColor: AppColors.textSecondary,
+                    inactiveTrackColor: AppColors.border,
+                    contentPadding: EdgeInsets.zero,
+                  ),
+
+                  const Divider(color: AppColors.border, height: 24),
+
+                  // Clear cache button — real implementation
+                  ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.delete_sweep_rounded,
+                          color: Colors.redAccent, size: 18),
+                    ),
+                    title: const Text(
+                      'Clear Cache',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    subtitle: const Text(
+                      'Free up temporary storage',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right_rounded,
+                        color: AppColors.textSecondary, size: 18),
+                    onTap: () async {
+                      HapticFeedback.selectionClick();
+                      Navigator.pop(ctx);
+                      await _clearCache(context);
+                    },
+                  ),
+                ],
+              ),
+            ),
           );
         },
       ),
@@ -574,88 +568,80 @@ class SettingsDetailScreen extends ConsumerWidget {
         builder: (ctx, sheetRef, __) {
           final s  = sheetRef.watch(settingsProvider);
           final sn = sheetRef.read(settingsProvider.notifier);
-          return StatefulBuilder(
-            builder: (ctx2, setSheetState) {
-              // Stub local state for toggles without a backing store yet.
-              bool orientationLocked = false;
-              bool continuousPlayback = true;
+          return Padding(
+            padding: EdgeInsets.fromLTRB(
+              20, 16, 20,
+              MediaQuery.of(ctx).viewInsets.bottom + 32,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _sheetHeader('Video'),
 
-              return Padding(
-                padding: EdgeInsets.fromLTRB(
-                  20, 16, 20,
-                  MediaQuery.of(ctx2).viewInsets.bottom + 32,
-                ),
-                child: SingleChildScrollView(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _sheetHeader('Video'),
-
-                      _SheetSwitch(
-                        label: 'Pop-up Play',
-                        subtitle: 'Float video when you leave the app',
-                        value: s.autoPip,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          sn.setAutoPip(v);
-                        },
-                      ),
-                      const Divider(color: AppColors.border, height: 1),
-                      _SheetSwitch(
-                        label: 'Lock Screen Orientation',
-                        subtitle: 'Prevent auto-rotate during playback',
-                        value: orientationLocked,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          setSheetState(() => orientationLocked = v);
-                        },
-                      ),
-                      const Divider(color: AppColors.border, height: 1),
-                      _SheetSwitch(
-                        label: 'Continuous Playback',
-                        subtitle: 'Auto-play next video in folder',
-                        value: continuousPlayback,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          setSheetState(() => continuousPlayback = v);
-                        },
-                      ),
-                      const Divider(color: AppColors.border, height: 1),
-                      _SheetSwitch(
-                        label: 'Auto-Resume',
-                        subtitle: 'Resume from where you left off',
-                        value: s.autoResume,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          sn.setAutoResume(v);
-                        },
-                      ),
-                      const Divider(color: AppColors.border, height: 1),
-                      _SheetSwitch(
-                        label: 'Auto-load Subtitles',
-                        subtitle: 'Load .srt/.ass from same folder',
-                        value: s.autoLoadSubtitles,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          sn.setAutoLoadSubtitles(v);
-                        },
-                      ),
-                      const Divider(color: AppColors.border, height: 1),
-                      _SheetSwitch(
-                        label: 'Battery Saver by Default',
-                        subtitle: 'Start video in audio-only mode',
-                        value: s.defaultBatterySaver,
-                        onChanged: (v) {
-                          HapticFeedback.selectionClick();
-                          sn.setDefaultBatterySaver(v);
-                        },
-                      ),
-                    ],
+                  _SheetSwitch(
+                    label: 'Pop-up Play',
+                    subtitle: 'Float video when you leave the app',
+                    value: s.autoPip,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setAutoPip(v);
+                    },
                   ),
-                ),
-              );
-            },
+                  const Divider(color: AppColors.border, height: 1),
+                  _SheetSwitch(
+                    label: 'Lock Screen Orientation',
+                    subtitle: 'Prevent auto-rotate during playback',
+                    value: s.orientationLocked,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setOrientationLocked(v);
+                    },
+                  ),
+                  const Divider(color: AppColors.border, height: 1),
+                  _SheetSwitch(
+                    label: 'Continuous Playback',
+                    subtitle: 'Auto-play next video in folder',
+                    value: s.continuousPlayback,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setContinuousPlayback(v);
+                    },
+                  ),
+                  const Divider(color: AppColors.border, height: 1),
+                  _SheetSwitch(
+                    label: 'Auto-Resume',
+                    subtitle: 'Resume from where you left off',
+                    value: s.autoResume,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setAutoResume(v);
+                    },
+                  ),
+                  const Divider(color: AppColors.border, height: 1),
+                  _SheetSwitch(
+                    label: 'Auto-load Subtitles',
+                    subtitle: 'Load .srt/.ass from same folder',
+                    value: s.autoLoadSubtitles,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setAutoLoadSubtitles(v);
+                    },
+                  ),
+                  const Divider(color: AppColors.border, height: 1),
+                  _SheetSwitch(
+                    label: 'Battery Saver by Default',
+                    subtitle: 'Start video in audio-only mode',
+                    value: s.defaultBatterySaver,
+                    onChanged: (v) {
+                      HapticFeedback.selectionClick();
+                      sn.setDefaultBatterySaver(v);
+                    },
+                  ),
+                ],
+              ),
+            ),
           );
         },
       ),
@@ -788,118 +774,36 @@ class SettingsDetailScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
-      builder: (_) => StatefulBuilder(
-        builder: (ctx, setSheetState) {
-          int maxConcurrent = 2; // stub default
-          String downloadPath = 'Loading…';
-
-          // Kick off async path resolution once.
-          getApplicationDocumentsDirectory().then((dir) {
-            if (ctx.mounted) {
-              setSheetState(() => downloadPath = dir.path);
-            }
-          });
-
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20, 16, 20,
-              MediaQuery.of(ctx).viewInsets.bottom + 32,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sheetHeader('Downloads'),
-
-                  // Download path (read-only)
-                  const Text(
-                    'Download Location',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Text(
-                      downloadPath,
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ),
-
-                  const Divider(color: AppColors.border, height: 28),
-
-                  // Max concurrent tasks
-                  const Text(
-                    'Max Concurrent Downloads',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [1, 2, 3].map((n) {
-                      final active = maxConcurrent == n;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 10),
-                        child: GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setSheetState(() => maxConcurrent = n);
-                          },
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 24, vertical: 12),
-                            decoration: BoxDecoration(
-                              color: active
-                                  ? AppColors.accent
-                                  : AppColors.background,
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: active
-                                    ? AppColors.accent
-                                    : AppColors.border,
-                              ),
-                            ),
-                            child: Text(
-                              '$n',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w700,
-                                color: active
-                                    ? Colors.black
-                                    : AppColors.textPrimary,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ],
-              ),
-            ),
-          );
+      builder: (_) => Consumer(
+        builder: (ctx, sheetRef, __) {
+          final s  = sheetRef.watch(settingsProvider);
+          final sn = sheetRef.read(settingsProvider.notifier);
+          return _DownloadsSheetBody(s: s, sn: sn);
         },
+      ),
+    );
+  }
+
+  // ── Cache clearing ────────────────────────────────────────────────────
+
+  Future<void> _clearCache(BuildContext context) async {
+    try {
+      await PlayedDatabase.instance.clearAllSeekPositions();
+      // Delete temp dirs if they exist
+      final tmpDir = await getTemporaryDirectory();
+      if (tmpDir.existsSync()) {
+        for (final entity in tmpDir.listSync()) {
+          try {
+            entity.deleteSync(recursive: true);
+          } catch (_) {}
+        }
+      }
+    } catch (_) {}
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Cache cleared ✅'),
+        backgroundColor: AppColors.surface,
       ),
     );
   }
@@ -1334,6 +1238,147 @@ class _SheetSwitch extends StatelessWidget {
       inactiveThumbColor: AppColors.textSecondary,
       inactiveTrackColor: AppColors.border,
       contentPadding: EdgeInsets.zero,
+    );
+  }
+}
+
+/// Downloads sheet body — uses Consumer so it can watch settingsProvider
+/// and persist maxConcurrentDownloads without a local StatefulBuilder.
+class _DownloadsSheetBody extends StatefulWidget {
+  final AppSettings s;
+  final SettingsNotifier sn;
+  const _DownloadsSheetBody({required this.s, required this.sn});
+
+  @override
+  State<_DownloadsSheetBody> createState() => _DownloadsSheetBodyState();
+}
+
+class _DownloadsSheetBodyState extends State<_DownloadsSheetBody> {
+  String _downloadPath = 'Loading…';
+
+  @override
+  void initState() {
+    super.initState();
+    getApplicationDocumentsDirectory().then((dir) {
+      if (mounted) setState(() => _downloadPath = dir.path);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        20, 16, 20,
+        MediaQuery.of(context).viewInsets.bottom + 32,
+      ),
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'Downloads',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Divider(color: AppColors.border, height: 24),
+
+            // Download path (read-only)
+            const Text(
+              'Download Location',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.background,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Text(
+                _downloadPath,
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textPrimary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+
+            const Divider(color: AppColors.border, height: 28),
+
+            // Max concurrent tasks — persisted via settingsProvider
+            const Text(
+              'Max Concurrent Downloads',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [1, 2, 3].map((n) {
+                final active = widget.s.maxConcurrentDownloads == n;
+                return Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: GestureDetector(
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      widget.sn.setMaxConcurrentDownloads(n);
+                    },
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 200),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: active ? AppColors.accent : AppColors.background,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: active ? AppColors.accent : AppColors.border,
+                        ),
+                      ),
+                      child: Text(
+                        '$n',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: active ? Colors.black : AppColors.textPrimary,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
