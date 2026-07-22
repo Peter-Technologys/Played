@@ -415,16 +415,15 @@ class _TrackMenuSheet extends StatelessWidget {
 /// Wraps the Video widget with gesture controls and the neon HUD overlay.
 ///
 /// Gesture map:
-///   Left vertical drag   → brightness (overlay filter)
-///   Right vertical drag  → volume (player.setVolume)
-///   Horizontal drag      → seek (player.seek)
-///   Double-tap left      → rewind 10 s
-///   Double-tap right     → forward 10 s
+///   Double-tap left/right → rewind / forward 10 s
+///   Tap                   → toggle transport controls
+///
+/// Note: brightness and volume vertical-drag gestures are handled exclusively
+/// by VideoGestureLayer (which calls real platform channels). This wrapper
+/// intentionally does NOT handle vertical or horizontal drags to avoid
+/// competing with VideoGestureLayer.
 ///
 /// Performance:
-///   All gesture state is stored in plain fields (not setState) during
-///   the drag phase. setState is called only once per drag update to
-///   update the HUD value — a single cheap rebuild of the HUD subtree.
 ///   RepaintBoundary around the Video widget ensures the video surface
 ///   never repaints due to HUD changes.
 class MediaKitGestureWrapper extends StatefulWidget {
@@ -445,20 +444,14 @@ class MediaKitGestureWrapper extends StatefulWidget {
   State<MediaKitGestureWrapper> createState() => _MediaKitGestureWrapperState();
 }
 
-enum _HudType { volume, brightness, seek }
+enum _HudType { seek }
 
 class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   // ── HUD state ───────────────────────────────────────────────────────────────
   bool     _hudVisible  = false;
   double   _hudValue    = 0.0;   // 0.0 – 1.0
-  _HudType _hudType     = _HudType.volume;
+  _HudType _hudType     = _HudType.seek;
   Timer?   _hudTimer;
-
-  // ── Gesture tracking (plain fields — no setState during drag) ───────────────
-  double _volume      = 1.0;
-  double _brightness  = 0.5;  // simulated; real brightness via platform channel
-  bool   _dragLeft    = false;
-  double _seekDragMs  = -1;   // -1 = not seeking
 
   // ── Controls visibility ─────────────────────────────────────────────────────────
   bool   _showControls = false;
@@ -479,7 +472,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   @override
   void initState() {
     super.initState();
-    _volume = widget.player.state.volume / 100.0;
     _stateSub = widget.player.stream.playing.listen((p) {
       if (mounted) setState(() => _playing = p);
     });
@@ -552,58 +544,14 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
     _showHud(_HudType.seek, newPos.inMilliseconds / _duration.inMilliseconds.clamp(1, 999999));
   }
 
-  void _onVerticalDragStart(DragStartDetails d) {
-    _dragLeft = d.localPosition.dx < context.size!.width / 2;
-  }
-
-  void _onVerticalDragUpdate(DragUpdateDetails d) {
-    // Negative delta = finger moving up = increase value
-    final delta = -(d.primaryDelta! / (context.size?.height ?? 600));
-    if (_dragLeft) {
-      // Brightness — apply as a dark overlay opacity (0 = full dark, 1 = full bright)
-      _brightness = (_brightness + delta).clamp(0.05, 1.0);
-      _showHud(_HudType.brightness, _brightness);
-    } else {
-      // Volume — media_kit uses 0–100 scale
-      _volume = (_volume + delta).clamp(0.0, 1.0);
-      widget.player.setVolume(_volume * 100);
-      _showHud(_HudType.volume, _volume);
-    }
-  }
-
-  void _onVerticalDragEnd(DragEndDetails _) {
-    // HUD auto-dismisses via timer; nothing extra needed
-  }
-
-  void _onHorizontalDragUpdate(DragUpdateDetails d) {
-    if (_duration == Duration.zero) return;
-    final durMs  = _duration.inMilliseconds.toDouble();
-    final base   = _seekDragMs >= 0 ? _seekDragMs : _position.inMilliseconds.toDouble();
-    // 300 ms per logical pixel — tuned for comfortable seeking
-    _seekDragMs  = (base + d.delta.dx * 300).clamp(0.0, durMs);
-    _showHud(_HudType.seek, _seekDragMs / durMs);
-  }
-
-  void _onHorizontalDragEnd(DragEndDetails _) {
-    if (_seekDragMs >= 0) {
-      widget.player.seek(Duration(milliseconds: _seekDragMs.toInt()));
-      _seekDragMs = -1;
-    }
-  }
-
   // ── Build ─────────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
-      onTap:                  _onTap,
-      onDoubleTapDown:        _onDoubleTapDown,
-      onVerticalDragStart:    _onVerticalDragStart,
-      onVerticalDragUpdate:   _onVerticalDragUpdate,
-      onVerticalDragEnd:      _onVerticalDragEnd,
-      onHorizontalDragUpdate: _onHorizontalDragUpdate,
-      onHorizontalDragEnd:    _onHorizontalDragEnd,
+      onTap:           _onTap,
+      onDoubleTapDown: _onDoubleTapDown,
       child: Stack(
         children: [
           // ── Video surface (RepaintBoundary isolates it from HUD repaints) ─────
@@ -618,24 +566,13 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
             ),
           ),
 
-          // ── Brightness overlay ───────────────────────────────────────────────────
-          // A dark overlay that dims the video to simulate brightness control.
-          // Opacity 1 = fully dark (brightness 0%), opacity 0 = full bright.
-          IgnorePointer(
-            child: Opacity(
-              opacity: (1.0 - _brightness).clamp(0.0, 0.9),
-              child: const ColoredBox(color: Colors.black,
-                  child: SizedBox.expand()),
-            ),
-          ),
-
-          // ── Neon HUD overlay ───────────────────────────────────────────────────
+          // ── Neon HUD overlay (seek only) ──────────────────────────────────────
+          // Brightness and volume HUDs are rendered by VideoGestureLayer.
           _NeonHud(
-            visible:    _hudVisible,
-            type:       _hudType,
-            value:      _hudValue,
-            seekMs:     _seekDragMs >= 0 ? _seekDragMs.toInt() : null,
-            duration:   _duration,
+            visible:  _hudVisible,
+            type:     _hudType,
+            value:    _hudValue,
+            duration: _duration,
           ),
 
           // ── Transport controls ───────────────────────────────────────────────────
@@ -664,57 +601,29 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 // ── Neon HUD ────────────────────────────────────────────────────────────────────────────
 
 /// Glassmorphic neon HUD that fades in/out over the video.
+/// Only used for seek feedback; brightness/volume HUDs live in VideoGestureLayer.
 /// Uses AnimatedOpacity so the fade is handled by the compositor —
 /// no Dart-side animation controller needed, zero CPU overhead.
 class _NeonHud extends StatelessWidget {
   final bool     visible;
   final _HudType type;
   final double   value;    // 0.0 – 1.0
-  final int?     seekMs;   // non-null when seeking
   final Duration duration;
 
   const _NeonHud({
     required this.visible,
     required this.type,
     required this.value,
-    required this.seekMs,
     required this.duration,
   });
 
-  static const _cyan   = Color(0xFF00D4FF);
-  static const _violet = Color(0xFF7C3AED);
-  static const _amber  = Color(0xFFF59E0B);
+  static const _amber = Color(0xFFF59E0B);
 
-  Color get _neonColor => switch (type) {
-    _HudType.volume     => _cyan,
-    _HudType.brightness => _violet,
-    _HudType.seek       => _amber,
-  };
+  Color get _neonColor => _amber;
 
-  IconData get _icon => switch (type) {
-    _HudType.volume     => value < 0.05
-        ? Icons.volume_off_rounded
-        : value < 0.5
-            ? Icons.volume_down_rounded
-            : Icons.volume_up_rounded,
-    _HudType.brightness => Icons.brightness_6_rounded,
-    _HudType.seek       => Icons.fast_forward_rounded,
-  };
+  IconData get _icon => Icons.fast_forward_rounded;
 
-  String get _label => switch (type) {
-    _HudType.volume     => 'Volume ${(value * 100).toInt()}%',
-    _HudType.brightness => 'Brightness ${(value * 100).toInt()}%',
-    _HudType.seek       => seekMs != null
-        ? _fmtDuration(Duration(milliseconds: seekMs!))
-        : '${(value * 100).toInt()}%',
-  };
-
-  static String _fmtDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
-  }
+  String get _label => '${(value * 100).toInt()}%';
 
   @override
   Widget build(BuildContext context) {
