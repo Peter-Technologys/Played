@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,6 +11,7 @@ import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/playlists_view.dart';
+import '../../../shared/widgets/permission_denied_screen.dart';
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -45,8 +45,6 @@ class MusicTabScreen extends ConsumerStatefulWidget {
 
 class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
-  Timer? _refreshDebounce;
-
   @override
   bool get wantKeepAlive => true;
 
@@ -58,17 +56,16 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A4: Debounce is now handled inside MediaLibraryNotifier.backgroundRefresh()
+    // so both VideoTabScreen and MusicTabScreen can call it directly without
+    // double-firing when both tabs are alive via AutomaticKeepAliveClientMixin.
     if (state == AppLifecycleState.resumed) {
-      _refreshDebounce?.cancel();
-      _refreshDebounce = Timer(const Duration(seconds: 2), () {
-        ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
-      });
+      ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
     }
   }
 
   @override
   void dispose() {
-    _refreshDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -97,11 +94,21 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
                     ? _buildContent(
                         context, libraryAsync.valueOrNull!, filter)
                     : const _MusicShimmer(),
-                error: (e, _) => _ErrorView(
-                  message: e.toString(),
-                  onRetry: () =>
-                      ref.read(mediaLibraryProvider.notifier).refresh(),
-                ),
+                error: (e, _) {
+                  // A2: Show permission recovery screen for storage errors.
+                  final msg = e.toString().toLowerCase();
+                  if (msg.contains('permission')) {
+                    return PermissionDeniedScreen(
+                      onRetry: () =>
+                          ref.read(mediaLibraryProvider.notifier).refresh(),
+                    );
+                  }
+                  return _ErrorView(
+                    message: e.toString(),
+                    onRetry: () =>
+                        ref.read(mediaLibraryProvider.notifier).refresh(),
+                  );
+                },
                 data: (items) => RefreshIndicator(
                   color: AppColors.accent,
                   backgroundColor: AppColors.surface,

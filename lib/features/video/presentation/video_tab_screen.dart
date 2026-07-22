@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -13,6 +12,7 @@ import '../../../core/services/file_ops_service.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
 import '../../../shared/widgets/playlists_view.dart';
+import '../../../shared/widgets/permission_denied_screen.dart';
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -32,9 +32,6 @@ class VideoTabScreen extends ConsumerStatefulWidget {
 
 class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
-  Timer? _refreshDebounce;
-
-
   @override
   bool get wantKeepAlive => true;
 
@@ -46,17 +43,16 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // A4: Debounce is now handled inside MediaLibraryNotifier.backgroundRefresh()
+    // so both VideoTabScreen and MusicTabScreen can call it directly without
+    // double-firing when both tabs are alive via AutomaticKeepAliveClientMixin.
     if (state == AppLifecycleState.resumed) {
-      _refreshDebounce?.cancel();
-      _refreshDebounce = Timer(const Duration(seconds: 2), () {
-        ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
-      });
+      ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
     }
   }
 
   @override
   void dispose() {
-    _refreshDebounce?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -85,11 +81,21 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
                     ? _buildContent(
                         context, libraryAsync.valueOrNull!, filter)
                     : const _VideoShimmer(),
-                error: (e, _) => _ErrorView(
-                  message: e.toString(),
-                  onRetry: () =>
-                      ref.read(mediaLibraryProvider.notifier).refresh(),
-                ),
+                error: (e, _) {
+                  // A2: Show permission recovery screen for storage errors.
+                  final msg = e.toString().toLowerCase();
+                  if (msg.contains('permission')) {
+                    return PermissionDeniedScreen(
+                      onRetry: () =>
+                          ref.read(mediaLibraryProvider.notifier).refresh(),
+                    );
+                  }
+                  return _ErrorView(
+                    message: e.toString(),
+                    onRetry: () =>
+                        ref.read(mediaLibraryProvider.notifier).refresh(),
+                  );
+                },
                 data: (items) => RefreshIndicator(
                   color: AppColors.accent,
                   backgroundColor: AppColors.surface,
@@ -374,15 +380,20 @@ class _VideoGrid extends ConsumerWidget {
             itemCount: items.length,
             itemBuilder: (context, i) {
               final item = items[i];
-              return _VideoCard(
-                item: item,
-                onTap: () {
-                  HapticFeedback.lightImpact();
-                  ref
-                      .read(queueProvider.notifier)
-                      .setQueue(items, startIndex: i);
-                  context.push('/player/video', extra: item);
-                },
+              // A3: RepaintBoundary isolates each card's repaint so that
+              // thumbnail loads and animations in one card don't trigger
+              // repaints in neighbouring cards.
+              return RepaintBoundary(
+                child: _VideoCard(
+                  item: item,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    ref
+                        .read(queueProvider.notifier)
+                        .setQueue(items, startIndex: i);
+                    context.push('/player/video', extra: item);
+                  },
+                ),
               );
             },
           ),
@@ -408,8 +419,19 @@ class _VideoCardState extends State<_VideoCard> {
   String? _thumbPath;
   bool _disposed = false;
 
-  // Session-level thumbnail cache shared across all instances
+  // A3: 200-entry LRU thumbnail cache (insertion-order eviction via LinkedHashMap).
+  // Replaces the previous unbounded Map to prevent unbounded memory growth on
+  // large video libraries.
   static final Map<String, String?> _thumbCache = {};
+  static const _maxThumbCache = 200;
+
+  static void _thumbCacheSet(String key, String? value) {
+    if (_thumbCache.length >= _maxThumbCache) {
+      // LinkedHashMap preserves insertion order — evict the oldest entry.
+      _thumbCache.remove(_thumbCache.keys.first);
+    }
+    _thumbCache[key] = value;
+  }
 
   @override
   void initState() {
@@ -437,12 +459,12 @@ class _VideoCardState extends State<_VideoCard> {
         'path': widget.item.filePath,
         'id': widget.item.id,
       });
-      _thumbCache[key] = path;
+      _thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
         setState(() => _thumbPath = path);
       }
     } catch (_) {
-      _thumbCache[key] = null;
+      _thumbCacheSet(key, null);
     }
   }
 
