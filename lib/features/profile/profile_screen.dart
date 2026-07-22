@@ -38,19 +38,19 @@ class ProfileScreen extends ConsumerWidget {
     final photoUrl    = ref.watch(photoUrlProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Profile & Settings',
+        title: Text('Profile & Settings',
             style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary, fontFamily: 'Inter',
+              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
             )),
       ),
       body: ListView(
@@ -562,12 +562,12 @@ class _UpdateCheckerTileState extends State<_UpdateCheckerTile> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
           border: Border.all(
             color: _state == _UpdateState.updateAvailable
                 ? AppColors.accent.withValues(alpha: 0.5)
-                : AppColors.border,
+                : AppColors.borderOf(context),
           ),
         ),
         child: Row(
@@ -583,9 +583,9 @@ class _UpdateCheckerTileState extends State<_UpdateCheckerTile> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Check for Updates',
+                  Text('Check for Updates',
                       style: TextStyle(
-                        fontSize: 14, color: AppColors.textPrimary,
+                        fontSize: 14, color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w500, fontFamily: 'Inter',
                       )),
                   const SizedBox(height: 2),
@@ -634,9 +634,9 @@ class _StorageSectionState extends State<_StorageSection> {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: AppColors.surface,
+              color: Theme.of(context).colorScheme.surface,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
+              border: Border.all(color: AppColors.borderOf(context)),
             ),
             child: Row(
               children: [
@@ -648,9 +648,9 @@ class _StorageSectionState extends State<_StorageSection> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(e.key,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                           )),
                       const SizedBox(height: 2),
                       Text(e.value,
@@ -703,7 +703,7 @@ class _AboutCardState extends State<_AboutCard> {
       child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
         ),
         child: Column(
@@ -720,10 +720,10 @@ class _AboutCardState extends State<_AboutCard> {
               ),
             ),
             const SizedBox(height: 12),
-            const Text('OTYA Player',
+            Text('OTYA Player',
                 style: TextStyle(
                   fontSize: 18, fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
+                  color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
                 )),
             const SizedBox(height: 4),
             const Text('Otya? Play. Your media, your rules.',
@@ -815,19 +815,19 @@ class WhatsNewScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text("What's New",
+        title: Text("What's New",
             style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary, fontFamily: 'Inter',
+              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
             )),
       ),
       body: ListView(
@@ -878,9 +878,9 @@ class _SectionWidget extends StatelessWidget {
         Row(
           children: [
             Text('v${section.version}',
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 18, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
+                  color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
                 )),
             const SizedBox(width: 10),
             if (section.isLatest)
@@ -925,9 +925,9 @@ class _SectionWidget extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(item.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 14, fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary, fontFamily: 'Inter',
+                              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
                             )),
                         const SizedBox(height: 2),
                         Text(item.description,
@@ -961,7 +961,7 @@ class _AccountCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
       ),
@@ -990,9 +990,9 @@ class _AccountCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(displayName ?? 'Google User',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 15, fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary, fontFamily: 'Inter',
+                      color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
                     )),
                 const SizedBox(height: 2),
                 Row(
@@ -1062,23 +1062,23 @@ class _GoogleSignInButton extends StatelessWidget {
       child: Container(
         height: 52,
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.borderOf(context)),
         ),
-        child: const Row(
+        child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text('G',
+            const Text('G',
                 style: TextStyle(
                   fontSize: 20, fontWeight: FontWeight.w700,
                   color: Color(0xFF4285F4),
                 )),
-            SizedBox(width: 12),
+            const SizedBox(width: 12),
             Text('Sign in with Google',
                 style: TextStyle(
                   fontSize: 15, fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
+                  color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
                 )),
           ],
         ),
@@ -1136,9 +1136,9 @@ class _SwitchTile extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       decoration: BoxDecoration(
-        color: AppColors.surface,
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
+        border: Border.all(color: AppColors.borderOf(context)),
       ),
       child: Row(
         children: [
@@ -1149,8 +1149,8 @@ class _SwitchTile extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: const TextStyle(
-                      fontSize: 14, color: AppColors.textPrimary,
+                    style: TextStyle(
+                      fontSize: 14, color: Theme.of(context).colorScheme.onSurface,
                       fontWeight: FontWeight.w500, fontFamily: 'Inter',
                     )),
                 if (subtitle != null) ...[  
@@ -1170,7 +1170,7 @@ class _SwitchTile extends StatelessWidget {
             activeThumbColor: Colors.black,
             activeTrackColor: AppColors.accent,
             inactiveThumbColor: AppColors.textSecondary,
-            inactiveTrackColor: AppColors.border,
+            inactiveTrackColor: AppColors.borderOf(context),
           ),
         ],
       ),
@@ -1195,9 +1195,9 @@ class _TappableTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.borderOf(context)),
         ),
         child: Row(
           children: [
@@ -1208,8 +1208,8 @@ class _TappableTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(label,
-                      style: const TextStyle(
-                        fontSize: 14, color: AppColors.textPrimary,
+                      style: TextStyle(
+                        fontSize: 14, color: Theme.of(context).colorScheme.onSurface,
                         fontWeight: FontWeight.w500, fontFamily: 'Inter',
                       )),
                   if (subtitle != null) ...[  

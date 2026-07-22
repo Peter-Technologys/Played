@@ -203,8 +203,8 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
-          title: const Text('Flash Share',
-              style: TextStyle(color: AppColors.textPrimary,
+          title: Text('Flash Share',
+              style: TextStyle(color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w800, fontFamily: 'Inter', fontSize: 18)),
           centerTitle: true,
           actions: [
