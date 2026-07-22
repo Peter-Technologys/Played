@@ -278,7 +278,7 @@ class _FilterPills extends ConsumerWidget {
     ];
 
     return SizedBox(
-      height: 52,
+      height: MediaQuery.of(context).size.width > 600 ? 60 : 52,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
@@ -350,7 +350,8 @@ class _SongListView extends ConsumerWidget {
 
         // Song list
         SliverPadding(
-          padding: const EdgeInsets.fromLTRB(0, 4, 0, 100),
+          padding: EdgeInsets.fromLTRB(0, 4, 0,
+              MediaQuery.of(context).padding.bottom + 90),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {
@@ -816,7 +817,8 @@ class _FoldersView extends ConsumerWidget {
     final keys = folders.keys.toList()..sort();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 12, 16,
+          MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
@@ -963,7 +965,8 @@ class _AlbumsView extends StatelessWidget {
     final keys = albums.keys.toList()..sort();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 12, 16,
+          MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final album = keys[i];
@@ -1047,7 +1050,8 @@ class _ArtistsView extends StatelessWidget {
     final keys = artists.keys.toList()..sort();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 12, 16,
+          MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final artist = keys[i];
@@ -1257,8 +1261,12 @@ class _MusicShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: AppColors.surface,
-      highlightColor: AppColors.surfaceElevated,
+      baseColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.surface
+          : const Color(0xFFE8ECF0),
+      highlightColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.surfaceElevated
+          : const Color(0xFFF5F7FA),
       child: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
         itemCount: 12,

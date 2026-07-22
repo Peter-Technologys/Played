@@ -378,10 +378,10 @@ class _VideoGrid extends ConsumerWidget {
                   const SizedBox(width: 10),
                   Text(
                     'Shuffle all (${items.length})',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontFamily: 'Inter',
                     ),
                   ),
@@ -395,10 +395,11 @@ class _VideoGrid extends ConsumerWidget {
         ),
 
         // ── List or Grid ──────────────────────────────────────────────
-        Expanded(
+        SliverFillRemaining(
           child: isListView
               ? ListView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16,
+                      MediaQuery.of(context).padding.bottom + 90),
                   cacheExtent: 600,
                   itemCount: items.length,
                   itemBuilder: (context, i) {
@@ -418,13 +419,16 @@ class _VideoGrid extends ConsumerWidget {
                   },
                 )
               : GridView.builder(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  padding: EdgeInsets.fromLTRB(16, 0, 16,
+                      MediaQuery.of(context).padding.bottom + 90),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount:
                         MediaQuery.of(context).size.width > 600 ? 3 : 2,
                     crossAxisSpacing: 12,
                     mainAxisSpacing: 12,
-                    childAspectRatio: 16 / 13,
+                    childAspectRatio: MediaQuery.of(context).size.width > 600
+                        ? 16 / 11
+                        : 16 / 13,
                   ),
                   cacheExtent: 400,
                   itemCount: items.length,
@@ -630,10 +634,10 @@ class _VideoListItemState extends State<_VideoListItem> {
                     widget.item.fileName.isNotEmpty
                         ? widget.item.fileName
                         : widget.item.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontFamily: 'Inter',
                     ),
                     maxLines: 2,
@@ -931,10 +935,10 @@ class _VideoCardState extends State<_VideoCard> {
                 children: [
                   Text(
                     widget.item.title,
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w600,
-                      color: AppColors.textPrimary,
+                      color: Theme.of(context).colorScheme.onSurface,
                       fontFamily: 'Inter',
                     ),
                     maxLines: 1,
@@ -1147,10 +1151,10 @@ class _VideoContextMenu extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(item.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary,
+                            color: Theme.of(context).colorScheme.onSurface,
                             fontFamily: 'Inter',
                           ),
                           maxLines: 1,
@@ -1222,9 +1226,9 @@ class _ContextOption extends StatelessWidget {
     return ListTile(
       leading: Icon(icon, color: color, size: 22),
       title: Text(label,
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 14,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontWeight: FontWeight.w500,
               fontFamily: 'Inter')),
       onTap: onTap,
@@ -1266,7 +1270,8 @@ class _VideoFoldersTab extends StatelessWidget {
     final keys = folders.keys.toList()..sort();
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 12, 16,
+          MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
@@ -1295,10 +1300,10 @@ class _VideoFoldersTab extends StatelessWidget {
             ),
             title: Text(
               name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter',
               ),
               maxLines: 1,
@@ -1364,12 +1369,15 @@ class VideoFolderDetailPage extends ConsumerWidget {
         ],
       ),
       body: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: EdgeInsets.fromLTRB(16, 12, 16,
+            MediaQuery.of(context).padding.bottom + 90),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 16 / 13,
+          childAspectRatio: MediaQuery.of(context).size.width > 600
+              ? 16 / 11
+              : 16 / 13,
         ),
         itemCount: items.length,
         itemBuilder: (context, i) {
@@ -1529,10 +1537,10 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontFamily: 'Inter',
             ),
           ),
@@ -1557,8 +1565,12 @@ class _VideoShimmer extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Shimmer.fromColors(
-      baseColor: AppColors.surface,
-      highlightColor: const Color(0xFF2A2F45),
+      baseColor: Theme.of(context).brightness == Brightness.dark
+          ? AppColors.surface
+          : const Color(0xFFE8ECF0),
+      highlightColor: Theme.of(context).brightness == Brightness.dark
+          ? const Color(0xFF2A2F45)
+          : const Color(0xFFF5F7FA),
       child: GridView.builder(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
@@ -1595,10 +1607,10 @@ class _ErrorView extends StatelessWidget {
             const Icon(Icons.error_outline_rounded,
                 color: AppColors.error, size: 48),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Could not load videos',
               style: TextStyle(
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
               ),

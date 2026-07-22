@@ -312,7 +312,8 @@ class ToolsScreen extends ConsumerWidget {
             // ── Promo / Info Banner ──────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                padding: EdgeInsets.fromLTRB(16, 0, 16,
+                    MediaQuery.of(context).padding.bottom + 90),
                 child: Container(
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(

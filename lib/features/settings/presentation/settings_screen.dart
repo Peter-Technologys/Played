@@ -251,8 +251,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         value: _s.playbackSpeed,
         dropdownColor: Theme.of(context).colorScheme.surface,
         underline: const SizedBox(),
-        style: const TextStyle(
-            color: AppColors.textPrimary,
+        style: TextStyle(
+            color: Theme.of(context).colorScheme.onSurface,
             fontFamily: 'Inter',
             fontSize: 13),
         items: speeds
@@ -276,10 +276,10 @@ class _Header extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(20, 24, 20, 6),
         child: Text(
           t.toUpperCase(),
-          style: const TextStyle(
+          style: TextStyle(
               fontSize: 11,
               fontWeight: FontWeight.w700,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
               letterSpacing: 1.4,
               fontFamily: 'Inter'),
         ),

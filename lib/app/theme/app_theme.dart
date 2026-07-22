@@ -162,11 +162,24 @@ class AppTheme {
         backgroundColor: Colors.white,
         elevation: 0,
         scrolledUnderElevation: 0,
+        systemOverlayStyle: SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: Brightness.dark,
+          systemNavigationBarColor: Color(0xFFF5F7FA),
+          systemNavigationBarIconBrightness: Brightness.dark,
+        ),
         titleTextStyle: TextStyle(
           fontSize: 20, fontWeight: FontWeight.w700,
           color: Color(0xFF0D1422), fontFamily: 'Inter',
         ),
         iconTheme: IconThemeData(color: Color(0xFF0D1422)),
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: Colors.white,
+        selectedItemColor: AppColors.accent,
+        unselectedItemColor: Color(0xFF8C94A8),
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
       ),
       sliderTheme: SliderThemeData(
         trackHeight: 4,
@@ -183,7 +196,10 @@ class AppTheme {
         contentTextStyle: const TextStyle(
           color: Color(0xFF0D1422), fontFamily: 'Inter', fontSize: 13,
         ),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
         behavior: SnackBarBehavior.floating,
         elevation: 2,
       ),
@@ -201,6 +217,58 @@ class AppTheme {
       ),
       splashColor: AppColors.accent.withValues(alpha: 0.06),
       highlightColor: AppColors.accent.withValues(alpha: 0.04),
+      // Input fields
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: const Color(0xFFF0F2F5),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(14),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
+        ),
+      ),
+      // Elevated buttons
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.accent,
+          foregroundColor: Colors.black,
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(14),
+          ),
+          textStyle: const TextStyle(
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
+          ),
+        ),
+      ),
+      // Text buttons
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(foregroundColor: AppColors.accent),
+      ),
+      // Chips
+      chipTheme: ChipThemeData(
+        backgroundColor: const Color(0xFFF0F2F5),
+        side: const BorderSide(color: Color(0xFFE5E7EB)),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
+      // Cards
+      cardTheme: CardThemeData(
+        color: Colors.white,
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Color(0xFFE5E7EB)),
+        ),
+      ),
     );
   }
 }
