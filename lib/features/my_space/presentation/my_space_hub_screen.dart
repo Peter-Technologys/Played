@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/services/auth_provider.dart';
-import '../../../core/services/auth_service.dart';
+
 import '../../../core/services/appwrite_service.dart';
 import '../../settings/settings_provider.dart';
 import 'providers/my_space_provider.dart';
@@ -19,7 +19,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isGoogle    = ref.watch(isGoogleSignedInProvider);
+    final isGoogle    = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
     final libraryAsync = ref.watch(mediaLibraryProvider);
@@ -271,7 +271,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              AuthService.instance.signOut();
+              AppwriteService.instance.signOut();
             },
             child: const Text('Sign out',
                 style: TextStyle(color: AppColors.error)),

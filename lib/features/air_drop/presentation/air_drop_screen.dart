@@ -9,7 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/media_scanner_service.dart';
-import '../../../core/widgets/modern_aura_background.dart';
+
 import '../../../core/widgets/modern_glass_container.dart';
 import '../../../core/theme/app_spacing.dart';
 import '../../my_space/data/media_repository.dart';
@@ -197,9 +197,41 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
   Widget build(BuildContext context) {
     final s   = ref.watch(_airDropProvider);
     final lib = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-    return ModernAuraBackground(
-      child: Scaffold(
-        backgroundColor: Colors.transparent,
+    return Stack(
+      children: [
+        // Aura background — two floating gradient orbs on dark background
+        Container(color: const Color(0xFF090D16)),
+        Builder(builder: (context) {
+          final size = MediaQuery.sizeOf(context);
+          return Stack(children: [
+            Positioned(
+              left: -size.width * 0.25, top: -size.height * 0.1,
+              child: Container(
+                width: size.width * 0.8, height: size.width * 0.8,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Color(0x2E00D4FF), Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              right: -size.width * 0.3, bottom: -size.height * 0.15,
+              child: Container(
+                width: size.width * 0.9, height: size.width * 0.9,
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: RadialGradient(
+                    colors: [Color(0x2E7C3AED), Colors.transparent],
+                  ),
+                ),
+              ),
+            ),
+          ]);
+        }),
+        Scaffold(
+          backgroundColor: Colors.transparent,
         appBar: AppBar(
           backgroundColor: Colors.transparent,
           elevation: 0,
@@ -270,6 +302,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
           ],
         ),
       ),
+      ],
     );
   }
 }

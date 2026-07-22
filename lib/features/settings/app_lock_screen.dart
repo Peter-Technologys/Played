@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:local_auth/local_auth.dart';
@@ -44,9 +43,10 @@ class _AppLockScreenState extends State<AppLockScreen> {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _authenticating = false;
   String? _error;
-  final _pinController = TextEditingController();
-  bool _showPin = false;
-  static const String _appPin = '0000'; // Replace with secure storage
+  // PIN unlock is not configured — biometrics only.
+  // To add PIN support, integrate a secure storage solution (e.g. flutter_secure_storage)
+  // and store/retrieve the PIN hash there instead of hardcoding it.
+  bool _showPinUnavailable = false;
 
   @override
   void initState() {
@@ -57,7 +57,6 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
   @override
   void dispose() {
-    _pinController.dispose();
     super.dispose();
   }
 
@@ -72,19 +71,9 @@ class _AppLockScreenState extends State<AppLockScreen> {
       if (ok) { widget.onUnlocked(); }
       else { setState(() => _error = 'Authentication failed.'); }
     } catch (_) {
-      setState(() => _showPin = true);
+      setState(() => _showPinUnavailable = true);
     } finally {
       setState(() => _authenticating = false);
-    }
-  }
-
-  void _verifyPin() {
-    if (_pinController.text == _appPin) {
-      widget.onUnlocked();
-    } else {
-      HapticFeedback.heavyImpact();
-      setState(() => _error = 'Wrong PIN. Try again.');
-      _pinController.clear();
     }
   }
 
@@ -135,38 +124,38 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
               const SizedBox(height: 32),
 
-              if (_showPin) ...
+              if (_showPinUnavailable) ...
                 [
-                  TextField(
-                    controller: _pinController,
-                    obscureText: true,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    autofocus: true,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                        color: AppColors.textPrimary,
-                        fontSize: 24,
-                        letterSpacing: 8),
-                    decoration: InputDecoration(
-                      counterText: '',
-                      hintText: '• • • •',
-                      hintStyle: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 24),
-                      enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide:
-                              const BorderSide(color: AppColors.border)),
-                      focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(14),
-                          borderSide:
-                              const BorderSide(color: AppColors.accent)),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 16, vertical: 14),
+                    decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(color: AppColors.border),
                     ),
-                    onSubmitted: (_) => _verifyPin(),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline_rounded,
+                            color: AppColors.textSecondary, size: 18),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'PIN unlock not configured. Please use biometrics.',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                              fontFamily: 'SpaceGrotesk',
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 16),
                   GestureDetector(
-                    onTap: _verifyPin,
+                    onTap: _authenticate,
                     child: Container(
                       width: double.infinity,
                       height: 52,
@@ -175,13 +164,21 @@ class _AppLockScreenState extends State<AppLockScreen> {
                         borderRadius: BorderRadius.circular(14),
                       ),
                       alignment: Alignment.center,
-                      child: const Text('Unlock',
-                          style: TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.black,
-                            fontFamily: 'SpaceGrotesk',
-                          )),
+                      child: const Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.fingerprint_rounded,
+                              color: Colors.black, size: 22),
+                          SizedBox(width: 8),
+                          Text('Try Biometrics Again',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.black,
+                                fontFamily: 'SpaceGrotesk',
+                              )),
+                        ],
+                      ),
                     ),
                   ),
                 ]
@@ -224,17 +221,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                           color: AppColors.error, fontSize: 12)),
                 ],
 
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: () =>
-                    setState(() => _showPin = !_showPin),
-                child: Text(
-                  _showPin ? 'Use Biometrics' : 'Use PIN instead',
-                  style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontFamily: 'SpaceGrotesk'),
-                ),
-              ),
+
             ],
           ),
         ),
