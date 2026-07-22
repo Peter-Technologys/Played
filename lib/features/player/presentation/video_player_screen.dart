@@ -94,24 +94,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   // ── Orientation helpers ────────────────────────────────────────────
 
-  /// Picks the starting orientation based on the video's aspect ratio.
-  /// Portrait videos (height > width) open in portrait.
-  /// Landscape videos (width >= height) open in landscape.
-  /// Unknown dimensions: unlock all orientations and let the device decide.
+  /// Never force orientation — unlock all and let the device/user decide.
+  /// The user can still toggle orientation manually with the button.
   Future<void> _initOrientationFromVideo() async {
-    final w = widget.mediaItem.width ?? 0;
-    final h = widget.mediaItem.height ?? 0;
-    if (w > 0 && h > 0) {
-      if (h > w) {
-        await _lockToPortrait();
-      } else {
-        await _lockToLandscape();
-      }
-    } else {
-      // Unknown dimensions — unlock all orientations, device decides
-      await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
-      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    }
+    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   Future<void> _lockToLandscape() async {
