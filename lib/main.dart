@@ -62,6 +62,13 @@ void main() async {
     await _initDatabase();
     final savedSettings = await AppSettings.load();
 
+    // AudioService.init() MUST be called before runApp() on Android.
+    // audio_service v0.18.x registers the foreground service connection
+    // during init; if called after runApp() the Android service binding
+    // races with the first Activity lifecycle event and the handler is
+    // never assigned, causing silent audio failures.
+    await _initAudioService();
+
     runApp(
       ProviderScope(
         overrides: [
@@ -147,8 +154,10 @@ Future<void> _initDatabase() async {
 }
 
 Future<void> _initBackground() async {
+  // Note: _initAudioService() is intentionally NOT listed here.
+  // It is called before runApp() to guarantee the AudioService handler
+  // is registered before the first Activity lifecycle event on Android.
   await Future.wait([
-    _initAudioService(),
     _initNotifications(),
     _initAppwrite(),
     _initWorkManager(),
