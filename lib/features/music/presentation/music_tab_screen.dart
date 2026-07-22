@@ -9,6 +9,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
+import '../../playlists/playlist_screen.dart' show playlistsProvider;
 import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/playlists_view.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
@@ -586,6 +587,92 @@ class _SongOptionsSheet extends StatelessWidget {
   final WidgetRef ref;
   const _SongOptionsSheet({required this.item, required this.ref});
 
+  void _showPlaylistPicker(BuildContext context, WidgetRef ref, MediaItem item) {
+    final playlists = ref.read(playlistsProvider);
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Text('Add to Playlist',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Inter',
+                  )),
+            ),
+            const SizedBox(height: 8),
+            if (playlists.isEmpty)
+              const Padding(
+                padding: EdgeInsets.all(20),
+                child: Text('No playlists yet. Create one first.',
+                    style: TextStyle(color: AppColors.textSecondary)),
+              )
+            else
+              ...playlists.map((pl) => ListTile(
+                    leading: Container(
+                      width: 40,
+                      height: 40,
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppColors.accent, AppColors.accentViolet],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(Icons.queue_music_rounded,
+                          color: Colors.black, size: 20),
+                    ),
+                    title: Text(pl.name,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontFamily: 'Inter',
+                        )),
+                    subtitle: Text(
+                        '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.textSecondary)),
+                    onTap: () async {
+                      Navigator.pop(context);
+                      await ref
+                          .read(playlistsProvider.notifier)
+                          .addTrack(pl.id, item);
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                                '"${item.title}" added to ${pl.name}'),
+                            backgroundColor: AppColors.surface,
+                          ),
+                        );
+                      }
+                    },
+                  )),
+          ],
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -661,7 +748,7 @@ class _SongOptionsSheet extends StatelessWidget {
             color: AppColors.accentViolet,
             onTap: () {
               Navigator.pop(context);
-              context.push('/playlists');
+              _showPlaylistPicker(context, ref, item);
             },
           ),
           _OptionTile(

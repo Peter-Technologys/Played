@@ -1,12 +1,16 @@
 import 'dart:async';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../features/player/presentation/widgets/video_gesture_layer.dart';
@@ -151,6 +155,144 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
+  // ── More options ───────────────────────────────────────────────
+
+  void _showMoreOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                    color: AppColors.border,
+                    borderRadius: BorderRadius.circular(2)),
+              ),
+            ),
+            const SizedBox(height: 12),
+            // Share
+            ListTile(
+              leading: const Icon(Icons.share_rounded,
+                  color: AppColors.accentGreen, size: 22),
+              title: const Text('Share',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500)),
+              onTap: () async {
+                Navigator.pop(context);
+                await Share.shareXFiles(
+                  [XFile(widget.mediaItem.filePath)],
+                  text: widget.mediaItem.title,
+                );
+              },
+            ),
+            // File Info
+            ListTile(
+              leading: const Icon(Icons.info_outline_rounded,
+                  color: AppColors.accent, size: 22),
+              title: const Text('File Info',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(context);
+                final file = File(widget.mediaItem.filePath);
+                final size = file.existsSync()
+                    ? '${(file.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB'
+                    : 'Unknown';
+                showDialog(
+                  context: context,
+                  builder: (_) => AlertDialog(
+                    backgroundColor: AppColors.surface,
+                    title: const Text('File Info',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w700)),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _InfoRow(label: 'Title', value: widget.mediaItem.title),
+                        _InfoRow(label: 'Path', value: widget.mediaItem.filePath),
+                        _InfoRow(label: 'Size', value: size),
+                        _InfoRow(
+                            label: 'Duration',
+                            value: widget.mediaItem.formattedDuration),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close',
+                            style: TextStyle(color: AppColors.accent)),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+            // Extract Audio
+            ListTile(
+              leading: const Icon(Icons.audiotrack_rounded,
+                  color: AppColors.accentViolet, size: 22),
+              title: const Text('Extract Audio',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500)),
+              onTap: () async {
+                Navigator.pop(context);
+                final messenger = ScaffoldMessenger.of(context);
+                messenger.showSnackBar(const SnackBar(
+                  content: Text('Extracting audio…'),
+                  duration: Duration(seconds: 30),
+                  backgroundColor: AppColors.surface,
+                ));
+                final result = await FfmpegService.instance.extractAudio(
+                  videoPath: widget.mediaItem.filePath,
+                );
+                messenger.hideCurrentSnackBar();
+                if (!mounted) return;
+                messenger.showSnackBar(SnackBar(
+                  content: Text(result != null
+                      ? 'Audio saved: $result'
+                      : 'Failed to extract audio'),
+                  backgroundColor:
+                      result != null ? AppColors.surface : AppColors.error,
+                ));
+              },
+            ),
+            // Trim for WhatsApp
+            ListTile(
+              leading: const Icon(Icons.content_cut_rounded,
+                  color: AppColors.accentAmber, size: 22),
+              title: const Text('Trim for WhatsApp',
+                  style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w500)),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/tools/whatsapp', extra: widget.mediaItem);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Speed picker ───────────────────────────────────────────────────
 
   void _showSpeedPicker() {
@@ -286,6 +428,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         setState(() => _ccEnabled = !_ccEnabled);
                       },
                       tooltip: 'Subtitles',
+                    ),
+                    // More options
+                    IconButton(
+                      icon: const Icon(Icons.more_vert_rounded,
+                          color: Colors.white70, size: 22),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        _showMoreOptions();
+                      },
+                      tooltip: 'More options',
                     ),
                   ],
                 ),
@@ -768,6 +920,48 @@ class _AudioWaveAnimation extends StatelessWidget {
               curve: Curves.easeInOut,
             );
       }),
+    );
+  }
+}
+
+// ── File info row ─────────────────────────────────────────────────────────
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 70,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 12,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../features/my_space/presentation/my_space_hub_screen.dart';
+import '../features/my_space/presentation/usage_stats_dashboard.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
 import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/my_space/presentation/providers/my_space_provider.dart';
@@ -188,9 +189,36 @@ class AppRouter {
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const StorageAnalyzerScreen()),
       ),
       GoRoute(
-        path: '/player/car-mode',
+        path: '/stats',
         pageBuilder: (c, s) => _fadePage(
-          context: c, state: s, child: const CarModeScreen()),
+          context: c,
+          state: s,
+          child: Scaffold(
+            backgroundColor: Theme.of(c).scaffoldBackgroundColor,
+            appBar: AppBar(
+              backgroundColor: Theme.of(c).scaffoldBackgroundColor,
+              elevation: 0,
+              leading: IconButton(
+                icon: Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Theme.of(c).colorScheme.onSurface, size: 20),
+                onPressed: () => Navigator.of(c).pop(),
+              ),
+              title: Text(
+                'Your Stats',
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.w700,
+                  color: Theme.of(c).colorScheme.onSurface,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+            body: const SingleChildScrollView(
+              padding: EdgeInsets.symmetric(vertical: 16),
+              child: UsageStatsDashboard(),
+            ),
+          ),
+        ),
       ),
       GoRoute(
         path: '/player/equalizer',
