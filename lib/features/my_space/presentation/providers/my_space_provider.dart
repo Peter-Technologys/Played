@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -24,6 +25,11 @@ final mediaLibraryProvider =
 );
 
 class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
+  // A4: Single debounce guard inside the notifier so that multiple callers
+  // (VideoTabScreen + MusicTabScreen both alive via AutomaticKeepAliveClientMixin)
+  // never double-fire a background refresh within 2 seconds of each other.
+  Timer? _resumeDebounce;
+
   @override
   Future<List<MediaItem>> build() async {
     StreamSubscription<dynamic>? sub;
@@ -44,6 +50,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
 
     ref.onDispose(() {
       debounce?.cancel();
+      _resumeDebounce?.cancel();
       sub?.cancel();
       periodicTimer.cancel();
     });
@@ -86,6 +93,12 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
         } catch (_) {
           // Ref disposed — ignore silently
         }
+
+        // A1: Write fresh scan results back to Hive history so the next
+        // cold start can seed from them instantly (Phase 1b). We only
+        // upsert items that are not already in history to avoid overwriting
+        // lastPlayedAt timestamps for recently played tracks.
+        _writeBackToHive(fresh).ignore();
       }
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
@@ -93,10 +106,40 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
-  /// Silent background refresh — never shows loading shimmer.
+  /// A1: Upsert fresh scan results into the Hive history box so Phase 1b
+  /// seed is always populated after the first scan. Only items not already
+  /// in history are written, preserving lastPlayedAt for played tracks.
+  Future<void> _writeBackToHive(List<MediaItem> items) async {
+    try {
+      final db = PlayedDatabase.instance;
+      // Build a set of IDs already in history for O(1) lookup.
+      final existing = LinkedHashSet<String>.from(
+        db.getRecentlyPlayed(limit: 9999).map((e) => e.id),
+      );
+      for (final item in items) {
+        if (!existing.contains(item.id)) {
+          // recordPlay stamps lastPlayedAt = now, which is fine — these
+          // items will appear in the Phase 1b seed on the next cold start,
+          // and the background scan immediately replaces the state anyway.
+          await db.recordPlay(item);
+        }
+      }
+    } catch (e) {
+      debugPrint('[MediaLibrary] Hive write-back failed: $e');
+    }
+  }
+
+  /// A4: Silent background refresh with a single debounce guard.
+  /// Both VideoTabScreen and MusicTabScreen call this on app resume.
+  /// The guard ensures only one actual refresh fires within 2 seconds,
+  /// preventing the double-fire caused by AutomaticKeepAliveClientMixin
+  /// keeping both tabs alive simultaneously.
   Future<void> backgroundRefresh() async {
-    MediaRepository.instance.invalidate();
-    await _backgroundRefresh();
+    _resumeDebounce?.cancel();
+    _resumeDebounce = Timer(const Duration(seconds: 2), () async {
+      MediaRepository.instance.invalidate();
+      await _backgroundRefresh();
+    });
   }
 
   /// refresh() also runs silently.
