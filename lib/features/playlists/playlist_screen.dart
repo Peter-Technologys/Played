@@ -118,7 +118,10 @@ class PlaylistsScreen extends ConsumerWidget {
                 final pl = playlists[i];
                 return _PlaylistTile(
                   playlist: pl,
-                  onTap: () => context.push('/playlist/${pl.id}'),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    context.push('/playlist/${pl.id}');
+                  },
                   onRename: () => _showRenameDialog(context, ref, pl),
                   onDelete: () => _confirmDelete(context, ref, pl),
                 ).animate().fadeIn(duration: 300.ms,

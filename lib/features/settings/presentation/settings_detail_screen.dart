@@ -315,7 +315,8 @@ class SettingsDetailScreen extends ConsumerWidget {
               label: 'Check for Updates',
               subtitle: 'Tap to check for a new version',
               color: AppColors.accent,
-              onTap: () {},
+              onTap: () => _launchUrl(
+                  context, 'https://getotya.petersmartlink.com/download'),
             ),
             _Divider(),
             _NavTile(
@@ -331,7 +332,7 @@ class SettingsDetailScreen extends ConsumerWidget {
               label: "What's New",
               subtitle: 'See what changed in this version',
               color: AppColors.textSecondary,
-              onTap: () {},
+              onTap: () => context.push('/whats-new'),
             ),
             _Divider(),
             _NavTile(

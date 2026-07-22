@@ -1,3 +1,4 @@
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -11,6 +12,48 @@ import 'audio_player_screen.dart';
 // ── Provider ────────────────────────────────────────────────────────
 
 final miniPlayerItemProvider = StateProvider<MediaItem?>((_) => null);
+
+// ── TASK 3: Audio output route provider ────────────────────────────
+// Detects the current audio output device name using audio_session.
+// Returns null when detection fails so the label is hidden entirely.
+
+final _audioOutputLabelProvider = FutureProvider<String?>((ref) async {
+  try {
+    final session = await AudioSession.instance;
+    final devices = await session.getDevices(includeInputs: false);
+    if (devices.isEmpty) return null;
+    // Prefer the first active output device.
+    final active = devices.firstWhere(
+      (d) => d.isOutput,
+      orElse: () => devices.first,
+    );
+    return active.name.isNotEmpty ? active.name : null;
+  } catch (_) {
+    return null;
+  }
+});
+
+// ── TASK 2: Granular selectors — each rebuilds only its own subtree ─
+
+/// Watches only [isPlaying] — rebuilds on play/pause toggle only.
+final _miniIsPlayingProvider = Provider<bool>((ref) {
+  return ref.watch(audioPlayerProvider.select((s) => s.isPlaying));
+});
+
+/// Watches only [position] — rebuilds on every position tick.
+final _miniPositionProvider = Provider<Duration>((ref) {
+  return ref.watch(audioPlayerProvider.select((s) => s.position));
+});
+
+/// Watches only [duration] — rebuilds when duration changes (once per track).
+final _miniDurationProvider = Provider<Duration>((ref) {
+  return ref.watch(audioPlayerProvider.select((s) => s.duration));
+});
+
+/// Watches only crossfade duration from settings.
+final _miniCrossfadeProvider = Provider<double>((ref) {
+  return ref.watch(settingsProvider.select((s) => s.crossfadeDuration));
+});
 
 // ── Mini Player Widget ──────────────────────────────────────────────
 
@@ -59,12 +102,9 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     setState(() => _dragOffset = 0);
   }
 
-
-
   @override
   Widget build(BuildContext context) {
     final item = ref.watch(miniPlayerItemProvider);
-    final playerState = ref.watch(audioPlayerProvider);
 
     if (item != null && _lastItem == null) {
       WidgetsBinding.instance.addPostFrameCallback(
@@ -183,67 +223,15 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
-                              // Audio output indicator
-                              Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: const [
-                                  Icon(Icons.volume_up_rounded,
-                                      size: 10, color: AppColors.textSecondary),
-                                  SizedBox(width: 3),
-                                  Text(
-                                    'Phone speaker',
-                                    style: TextStyle(
-                                        fontSize: 9,
-                                        color: AppColors.textSecondary,
-                                        fontFamily: 'Inter'),
-                                  ),
-                                ],
-                              ),
+                              // TASK 3: Dynamic audio output label.
+                              // Hidden when detection fails.
+                              const _AudioOutputLabel(),
                             ],
                           ),
                         ),
 
-                        // Crossfade indicator — shown when crossfade > 0
-                        // Wrapped in try/catch via Builder to prevent settings
-                        // provider errors from crashing the whole mini player
-                        Builder(builder: (ctx) {
-                          try {
-                            final settings = ref.watch(settingsProvider);
-                            if (settings.crossfadeDuration <= 0) return const SizedBox.shrink();
-                            return Padding(
-                              padding: const EdgeInsets.only(right: 4),
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: AppColors.accentViolet.withValues(alpha: 0.15),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                      color: AppColors.accentViolet
-                                          .withValues(alpha: 0.4)),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    const Icon(Icons.swap_horiz_rounded,
-                                        color: AppColors.accentViolet, size: 10),
-                                    const SizedBox(width: 2),
-                                    Text(
-                                      '${settings.crossfadeDuration.toStringAsFixed(0)}s',
-                                      style: const TextStyle(
-                                        fontSize: 9,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.accentViolet,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          } catch (_) {
-                            return const SizedBox.shrink();
-                          }
-                        }),
+                        // TASK 2: Crossfade indicator — isolated selector widget
+                        const _CrossfadeIndicator(),
 
                         // Queue button
                         GestureDetector(
@@ -258,45 +246,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                           ),
                         ),
 
-                        // Progress ring + play/pause
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 8),
-                          child: SizedBox(
-                            width: 36,
-                            height: 36,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                CircularProgressIndicator(
-                                  value: playerState.duration.inMilliseconds > 0
-                                      ? (playerState.position.inMilliseconds /
-                                              playerState.duration.inMilliseconds)
-                                          .clamp(0.0, 1.0)
-                                      : 0,
-                                  strokeWidth: 2.5,
-                                  backgroundColor: AppColors.border,
-                                  valueColor: const AlwaysStoppedAnimation<Color>(
-                                      AppColors.accent),
-                                ),
-                                GestureDetector(
-                                  onTap: () {
-                                    HapticFeedback.lightImpact();
-                                    ref
-                                        .read(audioPlayerProvider.notifier)
-                                        .togglePlay();
-                                  },
-                                  child: Icon(
-                                    playerState.isPlaying
-                                        ? Icons.pause_rounded
-                                        : Icons.play_arrow_rounded,
-                                    color: AppColors.accent,
-                                    size: 20,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                        // TASK 2: Progress ring + play/pause — isolated widget
+                        const _PlayPauseRing(),
 
                         // Close
                         GestureDetector(
@@ -311,47 +262,213 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                     ),
                   ),
 
-                  // ── Seek bar (tappable, at bottom of mini player) ──
-                  Builder(builder: (ctx) {
-                    final totalMs = playerState.duration.inMilliseconds;
-                    final progress = totalMs > 0
-                        ? (playerState.position.inMilliseconds / totalMs)
-                            .clamp(0.0, 1.0)
-                        : 0.0;
-                    return GestureDetector(
-                      onTapDown: (details) {
-                        HapticFeedback.selectionClick();
-                        final box = ctx.findRenderObject() as RenderBox?;
-                        if (box == null || totalMs <= 0) return;
-                        final fraction =
-                            (details.localPosition.dx / box.size.width)
-                                .clamp(0.0, 1.0);
-                        final seekTo = Duration(
-                            milliseconds: (fraction * totalMs).toInt());
-                        ref
-                            .read(audioPlayerProvider.notifier)
-                            .seek(seekTo);
-                      },
-                      child: ClipRRect(
-                        borderRadius: const BorderRadius.only(
-                          bottomLeft: Radius.circular(24),
-                          bottomRight: Radius.circular(24),
-                        ),
-                        child: SizedBox(
-                          height: 2.5,
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            backgroundColor: AppColors.border,
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                                AppColors.accent),
-                          ),
-                        ),
-                      ),
-                    );
-                  }),
+                  // TASK 5: Draggable seek bar
+                  const _MiniSeekBar(),
                 ],
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── TASK 3: Audio output label widget ──────────────────────────────
+
+class _AudioOutputLabel extends ConsumerWidget {
+  const _AudioOutputLabel();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final labelAsync = ref.watch(_audioOutputLabelProvider);
+    return labelAsync.when(
+      data: (label) {
+        if (label == null) return const SizedBox.shrink();
+        return Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.volume_up_rounded,
+                size: 10, color: AppColors.textSecondary),
+            const SizedBox(width: 3),
+            Flexible(
+              child: Text(
+                label,
+                style: const TextStyle(
+                    fontSize: 9,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Inter'),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        );
+      },
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+    );
+  }
+}
+
+// ── TASK 2: Crossfade indicator — only rebuilds when crossfade changes ──
+
+class _CrossfadeIndicator extends ConsumerWidget {
+  const _CrossfadeIndicator();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final crossfade = ref.watch(_miniCrossfadeProvider);
+    if (crossfade <= 0) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(right: 4),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+        decoration: BoxDecoration(
+          color: AppColors.accentViolet.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(4),
+          border: Border.all(
+              color: AppColors.accentViolet.withValues(alpha: 0.4)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.swap_horiz_rounded,
+                color: AppColors.accentViolet, size: 10),
+            const SizedBox(width: 2),
+            Text(
+              '${crossfade.toStringAsFixed(0)}s',
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: AppColors.accentViolet,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── TASK 2: Play/pause ring — only rebuilds on isPlaying / position / duration ──
+
+class _PlayPauseRing extends ConsumerWidget {
+  const _PlayPauseRing();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPlaying = ref.watch(_miniIsPlayingProvider);
+    final position  = ref.watch(_miniPositionProvider);
+    final duration  = ref.watch(_miniDurationProvider);
+
+    final progress = duration.inMilliseconds > 0
+        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: SizedBox(
+        width: 36,
+        height: 36,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            CircularProgressIndicator(
+              value: progress,
+              strokeWidth: 2.5,
+              backgroundColor: AppColors.border,
+              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
+            ),
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.mediumImpact();
+                ref.read(audioPlayerProvider.notifier).togglePlay();
+              },
+              child: Icon(
+                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                color: AppColors.accent,
+                size: 20,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── TASK 5: Draggable seek bar ──────────────────────────────────────
+
+class _MiniSeekBar extends ConsumerStatefulWidget {
+  const _MiniSeekBar();
+
+  @override
+  ConsumerState<_MiniSeekBar> createState() => _MiniSeekBarState();
+}
+
+class _MiniSeekBarState extends ConsumerState<_MiniSeekBar> {
+  bool _isDragging = false;
+  double _dragProgress = 0.0;
+
+  @override
+  Widget build(BuildContext context) {
+    final position = ref.watch(_miniPositionProvider);
+    final duration = ref.watch(_miniDurationProvider);
+    final totalMs  = duration.inMilliseconds;
+
+    final progress = _isDragging
+        ? _dragProgress
+        : (totalMs > 0
+            ? (position.inMilliseconds / totalMs).clamp(0.0, 1.0)
+            : 0.0);
+
+    return GestureDetector(
+      // Tap to seek
+      onTapDown: (details) {
+        HapticFeedback.selectionClick();
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null || totalMs <= 0) return;
+        final fraction =
+            (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
+        ref.read(audioPlayerProvider.notifier)
+            .seek(Duration(milliseconds: (fraction * totalMs).toInt()));
+      },
+      // TASK 5: Drag to seek
+      onHorizontalDragStart: (_) {
+        HapticFeedback.lightImpact();
+        setState(() {
+          _isDragging = true;
+          _dragProgress = progress;
+        });
+      },
+      onHorizontalDragUpdate: (details) {
+        final box = context.findRenderObject() as RenderBox?;
+        if (box == null) return;
+        final fraction =
+            (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
+        setState(() => _dragProgress = fraction);
+      },
+      onHorizontalDragEnd: (_) {
+        if (totalMs > 0) {
+          ref.read(audioPlayerProvider.notifier).seek(
+              Duration(milliseconds: (_dragProgress * totalMs).toInt()));
+        }
+        setState(() => _isDragging = false);
+      },
+      child: ClipRRect(
+        borderRadius: const BorderRadius.only(
+          bottomLeft: Radius.circular(24),
+          bottomRight: Radius.circular(24),
+        ),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 100),
+          height: _isDragging ? 4.0 : 2.5,
+          child: LinearProgressIndicator(
+            value: progress,
+            backgroundColor: AppColors.border,
+            valueColor:
+                const AlwaysStoppedAnimation<Color>(AppColors.accent),
           ),
         ),
       ),

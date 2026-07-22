@@ -83,7 +83,7 @@ class _AboutScreenState extends State<AboutScreen> {
               label: "What's New",
               subtitle: 'See what changed in this version',
               color: AppColors.accentViolet,
-              onTap: () {},
+              onTap: () => context.push('/whats-new'),
             ),
             _Divider(),
             _NavTile(

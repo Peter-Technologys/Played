@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
@@ -81,6 +82,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
             biometricOnly: false, stickyAuth: true),
       );
       if (ok) {
+        HapticFeedback.mediumImpact();
         ref.read(vaultUnlockedProvider.notifier).state = true;
       } else {
         setState(() => _errorMessage = 'Authentication failed. Try again.');
@@ -228,8 +230,14 @@ class _PinDialogState extends State<_PinDialog> {
     final ok = await _verifyPin(_controller.text);
     if (!mounted) return;
     setState(() => _loading = false);
-    if (ok) { Navigator.of(context).pop(); widget.onSuccess(); }
-    else { setState(() => _error = true); _controller.clear(); }
+    if (ok) {
+      HapticFeedback.mediumImpact();
+      Navigator.of(context).pop();
+      widget.onSuccess();
+    } else {
+      setState(() => _error = true);
+      _controller.clear();
+    }
   }
 
   @override void dispose() { _controller.dispose(); super.dispose(); }
@@ -382,6 +390,7 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
   }
 
   Future<void> _removeItem(VaultItem item) async {
+    HapticFeedback.mediumImpact();
     await VaultService.instance.unlockItem(item.mediaId);
     await _load();
   }

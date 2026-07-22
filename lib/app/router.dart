@@ -24,99 +24,221 @@ import '../features/video/presentation/video_tab_screen.dart' show VideoTabScree
 import '../features/music/presentation/music_tab_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
-import '../shared/widgets/ad_banner_slot.dart';
 import '../shared/widgets/pro_gate.dart';
+
+// ── Shared fade transition (200 ms) used for shell/tab routes ─────────────
+
+CustomTransitionPage<void> _fadePage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) =>
+    CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 200),
+      reverseTransitionDuration: const Duration(milliseconds: 200),
+      transitionsBuilder: (_, animation, __, child) =>
+          FadeTransition(opacity: animation, child: child),
+    );
+
+// ── Slide-up transition (300 ms) used for full-screen player routes ───────
+
+CustomTransitionPage<void> _slideUpPage({
+  required BuildContext context,
+  required GoRouterState state,
+  required Widget child,
+}) =>
+    CustomTransitionPage<void>(
+      key: state.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 300),
+      reverseTransitionDuration: const Duration(milliseconds: 300),
+      transitionsBuilder: (_, animation, __, child) => SlideTransition(
+        position: Tween<Offset>(
+          begin: const Offset(0, 1),
+          end: Offset.zero,
+        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOut)),
+        child: child,
+      ),
+    );
 
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/',
     routes: [
       ShellRoute(
-        builder: (context, state, child) => _MainShell(child: child),
+        pageBuilder: (context, state, child) => _fadePage(
+          context: context,
+          state: state,
+          child: _MainShell(child: child),
+        ),
         routes: [
           // Tab 0 — Video Library
-          GoRoute(path: '/',        builder: (_, __) => const VideoTabScreen()),
+          GoRoute(
+            path: '/',
+            pageBuilder: (context, state) => _fadePage(
+              context: context, state: state, child: const VideoTabScreen()),
+          ),
           // Tab 1 — Music Library
-          GoRoute(path: '/music',   builder: (_, __) => const MusicTabScreen()),
+          GoRoute(
+            path: '/music',
+            pageBuilder: (context, state) => _fadePage(
+              context: context, state: state, child: const MusicTabScreen()),
+          ),
           // Tab 2 — My Space hub (account + quick tools + settings)
-          GoRoute(path: '/myspace', builder: (_, __) => const MySpaceHubScreen()),
+          GoRoute(
+            path: '/myspace',
+            pageBuilder: (context, state) => _fadePage(
+              context: context, state: state, child: const MySpaceHubScreen()),
+          ),
         ],
       ),
       // Tools & AirDrop remain as push routes (not shell tabs)
-      GoRoute(path: '/tools',   builder: (_, __) => const ToolsScreen()),
-      GoRoute(path: '/airdrop', builder: (_, __) => const AirDropScreen()),
-      GoRoute(path: '/profile',         builder: (_, __) => const ProfileScreen()),
-      GoRoute(path: '/settings',        builder: (_, __) => const SettingsDetailScreen()),
-      GoRoute(path: '/settings-detail', builder: (_, __) => const SettingsDetailScreen()),
-      GoRoute(path: '/about',           builder: (_, __) => const AboutScreen()),
-      GoRoute(path: '/theme',           builder: (_, __) => const ThemeSelectionScreen()),
-      GoRoute(path: '/tools/folders',   builder: (_, __) => const FolderBrowserScreen()),
+      GoRoute(
+        path: '/tools',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ToolsScreen()),
+      ),
+      GoRoute(
+        path: '/airdrop',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AirDropScreen()),
+      ),
+      GoRoute(
+        path: '/profile',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ProfileScreen()),
+      ),
+      GoRoute(
+        path: '/settings',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const SettingsDetailScreen()),
+      ),
+      // TASK 10: /settings-detail removed — was a duplicate of /settings.
+      GoRoute(
+        path: '/about',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AboutScreen()),
+      ),
+      GoRoute(
+        path: '/theme',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ThemeSelectionScreen()),
+      ),
+      GoRoute(
+        path: '/tools/folders',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const FolderBrowserScreen()),
+      ),
       GoRoute(
         path: '/tools/folder-detail',
-        builder: (_, s) {
+        pageBuilder: (c, s) {
           final args = s.extra as Map<String, dynamic>;
-          return FolderDetailScreen(
-            folderName: args['folderName'] as String,
-            fullPath: args['fullPath'] as String,
-            items: args['items'] as List<MediaItem>,
+          return _fadePage(
+            context: c,
+            state: s,
+            child: FolderDetailScreen(
+              folderName: args['folderName'] as String,
+              fullPath: args['fullPath'] as String,
+              items: args['items'] as List<MediaItem>,
+            ),
           );
         },
       ),
-      GoRoute(path: '/history',         builder: (_, __) => const PlaybackHistoryScreen()),
-      GoRoute(path: '/playlists',       builder: (_, __) => const PlaylistsScreen()),
+      GoRoute(
+        path: '/history',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const PlaybackHistoryScreen()),
+      ),
+      GoRoute(
+        path: '/playlists',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const PlaylistsScreen()),
+      ),
       GoRoute(
         path: '/playlist/:id',
-        builder: (_, s) => PlaylistDetailScreenById(
-          playlistId: s.pathParameters['id']!,
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: PlaylistDetailScreenById(playlistId: s.pathParameters['id']!),
         ),
       ),
-      GoRoute(path: '/vault',           builder: (_, __) => const VaultLockScreen()),
-      GoRoute(path: '/privacy',         builder: (_, __) => const PrivacyPolicyScreen()),
-      GoRoute(path: '/whats-new',       builder: (_, __) => const WhatsNewScreen()),
+      GoRoute(
+        path: '/vault',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const VaultLockScreen()),
+      ),
+      GoRoute(
+        path: '/privacy',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const PrivacyPolicyScreen()),
+      ),
+      GoRoute(
+        path: '/whats-new',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const WhatsNewScreen()),
+      ),
       GoRoute(
         path: '/video/folder',
-        builder: (_, s) {
+        pageBuilder: (c, s) {
           final args = s.extra as Map<String, dynamic>;
-          return VideoFolderDetailPage(
-            name: args['name'] as String,
-            items: args['items'] as List<MediaItem>,
+          return _fadePage(
+            context: c,
+            state: s,
+            child: VideoFolderDetailPage(
+              name: args['name'] as String,
+              items: args['items'] as List<MediaItem>,
+            ),
           );
         },
       ),
-      GoRoute(path: '/settings/storage', builder: (_, __) => const StorageAnalyzerScreen()),
       GoRoute(
-        path: '/player/equalizer',
-        builder: (_, __) => const ProGate(
-          featureName: 'Equalizer',
-          featureDescription: 'Fine-tune your audio with a 5-band equalizer.',
-          child: EqualizerScreen(),
-        ),
+        path: '/settings/storage',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const StorageAnalyzerScreen()),
       ),
       GoRoute(
+        path: '/player/equalizer',
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const ProGate(
+            featureName: 'Equalizer',
+            featureDescription: 'Fine-tune your audio with a 5-band equalizer.',
+            child: EqualizerScreen(),
+          ),
+        ),
+      ),
+      // TASK 4: slide-up transition for full-screen player routes
+      GoRoute(
         path: '/player/video',
-        builder: (_, s) => VideoPlayerScreen(mediaItem: s.extra as MediaItem),
+        pageBuilder: (c, s) => _slideUpPage(
+          context: c,
+          state: s,
+          child: VideoPlayerScreen(mediaItem: s.extra as MediaItem),
+        ),
       ),
       GoRoute(
         path: '/player/audio',
-        builder: (_, s) => AudioPlayerScreen(mediaItem: s.extra as MediaItem),
+        pageBuilder: (c, s) => _slideUpPage(
+          context: c,
+          state: s,
+          child: AudioPlayerScreen(mediaItem: s.extra as MediaItem),
+        ),
       ),
       GoRoute(
         path: '/music/folder',
-        builder: (_, s) {
+        pageBuilder: (c, s) {
           final args = s.extra as Map<String, dynamic>;
-          return MusicFolderDetailPage(
-            name: args['name'] as String,
-            items: args['items'] as List<MediaItem>,
+          return _fadePage(
+            context: c,
+            state: s,
+            child: MusicFolderDetailPage(
+              name: args['name'] as String,
+              items: args['items'] as List<MediaItem>,
+            ),
           );
         },
       ),
       GoRoute(
         path: '/tools/whatsapp',
-        builder: (_, s) => ProGate(
-          featureName: 'WhatsApp Trimmer',
-          featureDescription:
-              'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
-          child: WhatsAppTrimmerScreen(mediaItem: s.extra as MediaItem),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: ProGate(
+            featureName: 'WhatsApp Trimmer',
+            featureDescription:
+                'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
+            child: WhatsAppTrimmerScreen(mediaItem: s.extra as MediaItem),
+          ),
         ),
       ),
     ],
@@ -138,12 +260,9 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   static const _routes = ['/', '/music', '/myspace'];
 
-  // IndexedStack pages — preserves tab state between switches
-  final List<Widget> _pages = const [
-    VideoTabScreen(),
-    MusicTabScreen(),
-    MySpaceHubScreen(),
-  ];
+  // TASK 1: Removed IndexedStack + _pages list.
+  // Tab state is preserved by AutomaticKeepAliveClientMixin on each tab screen.
+  // widget.child from ShellRoute is the single source of truth.
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
@@ -164,7 +283,8 @@ class _MainShellState extends ConsumerState<_MainShell> {
         children: [
           // Mini-player — only rendered when a track is loaded
           if (hasMini) const RepaintBoundary(child: MiniPlayer()),
-          const AdBannerSlot(),
+          // TASK 11: AdBannerSlot already returns SizedBox.shrink() when ads
+          // are disabled — no visual gap. No additional guard needed.
           SafeArea(
             child: Container(
               margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),

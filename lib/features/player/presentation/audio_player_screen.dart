@@ -606,14 +606,18 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: Icon(Icons.skip_previous_rounded,
                         color: AppColors.textPrimary, size: skipIconSize),
-                    onPressed: () =>
-                        ref.read(audioPlayerProvider.notifier).skipPrevious(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(audioPlayerProvider.notifier).skipPrevious();
+                    },
                   ),
                   IconButton(
                     icon: Icon(Icons.replay_10_rounded,
                         color: AppColors.textPrimary, size: skipIconSize),
-                    onPressed: () =>
-                        ref.read(audioPlayerProvider.notifier).skipBack(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(audioPlayerProvider.notifier).skipBack();
+                    },
                   ),
       // Gradient play button (doubles as retry button when load timed out)
                   GestureDetector(
@@ -623,6 +627,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         setState(() => _showRetry = false);
                         _startLoad();
                       } else {
+                        HapticFeedback.mediumImpact();
                         ref.read(audioPlayerProvider.notifier).togglePlay();
                       }
                     },
@@ -668,14 +673,18 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   IconButton(
                     icon: Icon(Icons.forward_10_rounded,
                         color: AppColors.textPrimary, size: skipIconSize),
-                    onPressed: () =>
-                        ref.read(audioPlayerProvider.notifier).skipForward(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(audioPlayerProvider.notifier).skipForward();
+                    },
                   ),
                   IconButton(
                     icon: Icon(Icons.skip_next_rounded,
                         color: AppColors.textPrimary, size: skipIconSize),
-                    onPressed: () =>
-                        ref.read(audioPlayerProvider.notifier).skipNext(),
+                    onPressed: () {
+                      HapticFeedback.lightImpact();
+                      ref.read(audioPlayerProvider.notifier).skipNext();
+                    },
                   ),
                 ],
               ),
