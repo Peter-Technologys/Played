@@ -21,6 +21,10 @@ enum _VideoFilter { videos, folders, playlists }
 final _videoFilterProvider =
     StateProvider<_VideoFilter>((_) => _VideoFilter.videos);
 
+// ── List / Grid toggle — true = list view (default), false = grid view ────
+
+final _videoListViewProvider = StateProvider<bool>((_) => true);
+
 // ── Video Tab Screen ──────────────────────────────────────────────────────
 
 class VideoTabScreen extends ConsumerStatefulWidget {
@@ -119,7 +123,8 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 
     switch (filter) {
       case _VideoFilter.videos:
-        return _VideoGrid(items: videos);
+        final isListView = ref.watch(_videoListViewProvider);
+        return _VideoGrid(items: videos, isListView: isListView);
       case _VideoFilter.folders:
         return _VideoFoldersTab(items: videos);
       case _VideoFilter.playlists:
@@ -220,6 +225,18 @@ class _VideoHeader extends ConsumerWidget {
             },
           ),
           const SizedBox(width: 6),
+          // List / Grid toggle
+          _IconBtn(
+            icon: ref.watch(_videoListViewProvider)
+                ? Icons.grid_view_rounded
+                : Icons.view_list_rounded,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(_videoListViewProvider.notifier).state =
+                  !ref.read(_videoListViewProvider);
+            },
+          ),
+          const SizedBox(width: 6),
           // History
           _IconBtn(
             icon: Icons.history_rounded,
@@ -314,11 +331,13 @@ class _FilterPills extends ConsumerWidget {
   }
 }
 
-// ── Video Grid ────────────────────────────────────────────────────────────
+// ── Video Grid / List ─────────────────────────────────────────────────────
 
 class _VideoGrid extends ConsumerWidget {
   final List<MediaItem> items;
-  const _VideoGrid({required this.items});
+  /// When true, renders a list view; when false, renders the grid view.
+  final bool isListView;
+  const _VideoGrid({required this.items, this.isListView = true});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -375,42 +394,339 @@ class _VideoGrid extends ConsumerWidget {
           ),
         ),
 
-        // ── Grid ─────────────────────────────────────────────────────
-        SliverPadding(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: crossAxisCount,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 16 / 13,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final item = items[i];
-                // A3: RepaintBoundary isolates each card's repaint so that
-                // thumbnail loads and animations in one card don't trigger
-                // repaints in neighbouring cards.
-                return RepaintBoundary(
-                  child: _VideoCard(
-                    item: item,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      ref
-                          .read(queueProvider.notifier)
-                          .setQueue(items, startIndex: i);
-                      context.push('/player/video', extra: item);
-                    },
+        // ── List or Grid ──────────────────────────────────────────────
+        Expanded(
+          child: isListView
+              ? ListView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  cacheExtent: 600,
+                  itemCount: items.length,
+                  itemBuilder: (context, i) {
+                    final item = items[i];
+                    return RepaintBoundary(
+                      child: _VideoListItem(
+                        item: item,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          ref
+                              .read(queueProvider.notifier)
+                              .setQueue(items, startIndex: i);
+                          context.push('/player/video', extra: item);
+                        },
+                      ),
+                    );
+                  },
+                )
+              : GridView.builder(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount:
+                        MediaQuery.of(context).size.width > 600 ? 3 : 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 16 / 13,
                   ),
-                );
-              },
-              childCount: items.length,
-            ),
-          ),
+                  cacheExtent: 400,
+                  itemCount: items.length,
+                  itemBuilder: (context, i) {
+                    final item = items[i];
+                    // A3: RepaintBoundary isolates each card's repaint so that
+                    // thumbnail loads and animations in one card don't trigger
+                    // repaints in neighbouring cards.
+                    return RepaintBoundary(
+                      child: _VideoCard(
+                        item: item,
+                        onTap: () {
+                          HapticFeedback.lightImpact();
+                          ref
+                              .read(queueProvider.notifier)
+                              .setQueue(items, startIndex: i);
+                          context.push('/player/video', extra: item);
+                        },
+                      ),
+                    );
+                  },
+                ),
         ),
       ],
     );
   }
+}
+
+// ── Video List Item ───────────────────────────────────────────────────────
+
+/// Row-layout list item used when the Videos tab is in list-view mode.
+///
+/// Layout: [Thumbnail Stack (130×75) | Metadata Column | 3-dot menu]
+class _VideoListItem extends StatefulWidget {
+  final MediaItem item;
+  final VoidCallback onTap;
+  const _VideoListItem({required this.item, required this.onTap});
+
+  @override
+  State<_VideoListItem> createState() => _VideoListItemState();
+}
+
+class _VideoListItemState extends State<_VideoListItem> {
+  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
+  String? _thumbPath;
+  bool _disposed = false;
+
+  // Share the same LRU cache as _VideoCardState so thumbnails loaded in
+  // grid mode are instantly available when switching to list mode.
+  static final Map<String, String?> _thumbCache = _VideoCardState._thumbCache;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadThumb();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
+  }
+
+  Future<void> _loadThumb() async {
+    final key = widget.item.id;
+    if (_thumbCache.containsKey(key)) {
+      final cached = _thumbCache[key];
+      if (!_disposed && mounted && cached != null) {
+        setState(() => _thumbPath = cached);
+      }
+      return;
+    }
+    try {
+      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
+        'path': widget.item.filePath,
+        'id': widget.item.id,
+      });
+      _VideoCardState._thumbCacheSet(key, path);
+      if (!_disposed && mounted && path != null) {
+        setState(() => _thumbPath = path);
+      }
+    } catch (_) {
+      _VideoCardState._thumbCacheSet(key, null);
+    }
+  }
+
+  /// Infer a resolution badge from the file path (same logic as _VideoCardState).
+  String _resolutionBadge() {
+    final p = widget.item.filePath.toLowerCase();
+    if (p.contains('1080')) return '1080p';
+    if (p.contains('720')) return '720p';
+    if (p.contains('480')) return '480p';
+    if (p.contains('4k') || p.contains('2160')) return '4K';
+    return '720p';
+  }
+
+  /// Extract the immediate parent folder name from the file path.
+  String _folderName() {
+    final parts = widget.item.filePath.split('/');
+    if (parts.length >= 2) return parts[parts.length - 2];
+    return 'Local';
+  }
+
+  /// Infer a source icon from the folder path.
+  IconData _sourceIcon() {
+    final p = widget.item.filePath.toLowerCase();
+    if (p.contains('dcim') || p.contains('camera')) return Icons.camera_alt;
+    if (p.contains('whatsapp')) return Icons.chat;
+    return Icons.videocam;
+  }
+
+  void _showContextMenu(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (_) => _VideoContextMenu(
+        item: widget.item,
+        onPlay: widget.onTap,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: widget.onTap,
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 10),
+        padding: const EdgeInsets.all(10),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.border),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accent.withValues(alpha: 0.05),
+              blurRadius: 8,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            // ── LEFT: Thumbnail (130×75) ──────────────────────────────
+            ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: SizedBox(
+                width: 130,
+                height: 75,
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    // Thumbnail or placeholder
+                    _thumbPath != null
+                        ? Image.file(
+                            File(_thumbPath!),
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) =>
+                                _thumbnailPlaceholder(),
+                          )
+                        : _thumbnailPlaceholder(),
+
+                    // Duration badge — bottom-right
+                    Positioned(
+                      bottom: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.72),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '▶ ${widget.item.formattedDuration}',
+                          style: const TextStyle(
+                            fontSize: 9,
+                            color: Colors.white,
+                            fontWeight: FontWeight.w600,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            const SizedBox(width: 10),
+
+            // ── MIDDLE: Metadata ──────────────────────────────────────
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  // Title
+                  Text(
+                    widget.item.fileName.isNotEmpty
+                        ? widget.item.fileName
+                        : widget.item.title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                    ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  // Resolution + size row
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 1),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(
+                              color: AppColors.accent.withValues(alpha: 0.3)),
+                        ),
+                        child: Text(
+                          _resolutionBadge(),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.accent,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          '| ${widget.item.formattedSize}',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  // Source icon + folder name row
+                  Row(
+                    children: [
+                      Icon(_sourceIcon(),
+                          color: AppColors.textSecondary, size: 13),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          _folderName(),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            const SizedBox(width: 4),
+
+            // ── RIGHT: 3-dot menu ─────────────────────────────────────
+            GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                _showContextMenu(context);
+              },
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(Icons.more_vert,
+                    color: AppColors.textSecondary, size: 20),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _thumbnailPlaceholder() => Container(
+    color: const Color(0xFF1B1E2B),
+    child: const Center(
+      child: Icon(Icons.movie, color: Colors.white24, size: 24),
+    ),
+  );
 }
 
 // ── Video Card ────────────────────────────────────────────────────────────
