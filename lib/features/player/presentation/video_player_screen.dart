@@ -9,6 +9,7 @@ import '../../../core/database/played_database.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
+import '../../../features/player/presentation/widgets/video_gesture_layer.dart';
 import '../../../features/settings/settings_provider.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
