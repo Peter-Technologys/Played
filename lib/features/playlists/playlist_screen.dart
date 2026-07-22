@@ -116,16 +116,88 @@ class PlaylistsScreen extends ConsumerWidget {
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
                 final pl = playlists[i];
-                return _PlaylistTile(
-                  playlist: pl,
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    context.push('/playlist/${pl.id}');
+                return Dismissible(
+                  key: ValueKey(pl.id),
+                  direction: DismissDirection.endToStart,
+                  background: Container(
+                    alignment: Alignment.centerRight,
+                    padding: const EdgeInsets.only(right: 24),
+                    decoration: BoxDecoration(
+                      color: AppColors.error,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: const Icon(Icons.delete_rounded,
+                        color: Colors.white, size: 28),
+                  ),
+                  confirmDismiss: (_) async {
+                    return await showDialog<bool>(
+                      context: context,
+                      builder: (_) => AlertDialog(
+                        backgroundColor: AppColors.surface,
+                        title: Text('Delete "${pl.name}"?',
+                            style: const TextStyle(
+                                color: AppColors.textPrimary,
+                                fontFamily: 'Inter')),
+                        content: const Text(
+                          'This will remove the playlist but not the files.',
+                          style:
+                              TextStyle(color: AppColors.textSecondary),
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () =>
+                                Navigator.pop(context, false),
+                            child: const Text('Cancel',
+                                style: TextStyle(
+                                    color: AppColors.textSecondary)),
+                          ),
+                          ElevatedButton(
+                            onPressed: () =>
+                                Navigator.pop(context, true),
+                            style: ElevatedButton.styleFrom(
+                                backgroundColor: AppColors.error),
+                            child: const Text('Delete',
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                        ],
+                      ),
+                    ) ??
+                        false;
                   },
-                  onRename: () => _showRenameDialog(context, ref, pl),
-                  onDelete: () => _confirmDelete(context, ref, pl),
-                ).animate().fadeIn(duration: 300.ms,
-                    delay: Duration(milliseconds: i * 40));
+                  onDismissed: (_) async {
+                    final deletedName = pl.name;
+                    final deletedId = pl.id;
+                    await ref
+                        .read(playlistsProvider.notifier)
+                        .delete(deletedId);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content:
+                              Text('"$deletedName" deleted'),
+                          action: SnackBarAction(
+                            label: 'UNDO',
+                            onPressed: () async {
+                              await ref
+                                  .read(playlistsProvider.notifier)
+                                  .create(deletedName);
+                            },
+                          ),
+                        ),
+                      );
+                    }
+                  },
+                  child: _PlaylistTile(
+                    playlist: pl,
+                    onTap: () {
+                      HapticFeedback.selectionClick();
+                      context.push('/playlist/${pl.id}');
+                    },
+                    onRename: () => _showRenameDialog(context, ref, pl),
+                    onDelete: () => _confirmDelete(context, ref, pl),
+                  ).animate().fadeIn(duration: 300.ms,
+                      delay: Duration(milliseconds: i * 40)),
+                );
               },
             ),
       floatingActionButton: FloatingActionButton.extended(
@@ -398,6 +470,22 @@ class PlaylistDetailScreen extends ConsumerWidget {
             ),
           ],
         ],
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Go to the Music tab → tap ⋮ on any track to add it to a playlist.',
+              ),
+            ),
+          );
+        },
+        backgroundColor: AppColors.accentViolet,
+        foregroundColor: Colors.white,
+        icon: const Icon(Icons.add_rounded),
+        label: const Text('Add Songs',
+            style: TextStyle(fontWeight: FontWeight.w700)),
       ),
       body: tracks.isEmpty
           ? Center(
