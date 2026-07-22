@@ -445,13 +445,13 @@ class MediaKitGestureWrapper extends StatefulWidget {
   State<MediaKitGestureWrapper> createState() => _MediaKitGestureWrapperState();
 }
 
-enum _HudType { volume, brightness, seek }
+enum _HudType { seek }
 
 class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   // ── HUD state ───────────────────────────────────────────────────────────────
   bool     _hudVisible  = false;
   double   _hudValue    = 0.0;   // 0.0 – 1.0
-  _HudType _hudType     = _HudType.volume;
+  _HudType _hudType     = _HudType.seek;
   Timer?   _hudTimer;
 
   // ── Gesture tracking (plain fields — no setState during drag) ───────────────
@@ -476,7 +476,6 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   @override
   void initState() {
     super.initState();
-    _volume = widget.player.state.volume / 100.0;
     _stateSub = widget.player.stream.playing.listen((p) {
       if (mounted) setState(() => _playing = p);
     });
@@ -606,57 +605,29 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 // ── Neon HUD ────────────────────────────────────────────────────────────────────────────
 
 /// Glassmorphic neon HUD that fades in/out over the video.
+/// Only used for seek feedback; brightness/volume HUDs live in VideoGestureLayer.
 /// Uses AnimatedOpacity so the fade is handled by the compositor —
 /// no Dart-side animation controller needed, zero CPU overhead.
 class _NeonHud extends StatelessWidget {
   final bool     visible;
   final _HudType type;
   final double   value;    // 0.0 – 1.0
-  final int?     seekMs;   // non-null when seeking
   final Duration duration;
 
   const _NeonHud({
     required this.visible,
     required this.type,
     required this.value,
-    required this.seekMs,
     required this.duration,
   });
 
-  static const _cyan   = Color(0xFF00D4FF);
-  static const _violet = Color(0xFF7C3AED);
-  static const _amber  = Color(0xFFF59E0B);
+  static const _amber = Color(0xFFF59E0B);
 
-  Color get _neonColor => switch (type) {
-    _HudType.volume     => _cyan,
-    _HudType.brightness => _violet,
-    _HudType.seek       => _amber,
-  };
+  Color get _neonColor => _amber;
 
-  IconData get _icon => switch (type) {
-    _HudType.volume     => value < 0.05
-        ? Icons.volume_off_rounded
-        : value < 0.5
-            ? Icons.volume_down_rounded
-            : Icons.volume_up_rounded,
-    _HudType.brightness => Icons.brightness_6_rounded,
-    _HudType.seek       => Icons.fast_forward_rounded,
-  };
+  IconData get _icon => Icons.fast_forward_rounded;
 
-  String get _label => switch (type) {
-    _HudType.volume     => 'Volume ${(value * 100).toInt()}%',
-    _HudType.brightness => 'Brightness ${(value * 100).toInt()}%',
-    _HudType.seek       => seekMs != null
-        ? _fmtDuration(Duration(milliseconds: seekMs!))
-        : '${(value * 100).toInt()}%',
-  };
-
-  static String _fmtDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
-  }
+  String get _label => '${(value * 100).toInt()}%';
 
   @override
   Widget build(BuildContext context) {

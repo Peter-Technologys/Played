@@ -10,7 +10,6 @@ import '../../../core/models/media_item.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../features/settings/settings_provider.dart';
-import 'widgets/video_gesture_layer.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
@@ -677,7 +676,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Video engine (full screen)
+          // 1. Video engine (full screen) with gesture handling
           VideoGestureLayer(
             onSeek: (delta) {
               if (_player == null) return;
@@ -716,7 +715,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               duration: const Duration(milliseconds: 300),
               child: IgnorePointer(
                 ignoring: !_controlsVisible,
-                child: _buildControlsOverlay(),
+                child: GestureDetector(
+                  behavior: HitTestBehavior.translucent,
+                  onTap: _resetHideTimer,
+                  child: _buildControlsOverlay(),
+                ),
               ),
             ),
 
