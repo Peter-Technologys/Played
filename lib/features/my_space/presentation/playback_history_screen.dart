@@ -126,7 +126,8 @@ class _PlaybackHistoryScreenState
               ),
             )
           : ListView.builder(
-              padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+              padding: EdgeInsets.fromLTRB(0, 8, 0,
+                  MediaQuery.of(context).padding.bottom + 90),
               itemCount: _history.length,
               itemBuilder: (context, i) {
                 final item = _history[i];

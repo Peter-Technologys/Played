@@ -111,7 +111,8 @@ class PlaylistsScreen extends ConsumerWidget {
       body: playlists.isEmpty
           ? _EmptyState(onCreate: () => _showCreateDialog(context, ref))
           : ListView.separated(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+              padding: EdgeInsets.fromLTRB(16, 16, 16,
+                  MediaQuery.of(context).padding.bottom + 90),
               itemCount: playlists.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {

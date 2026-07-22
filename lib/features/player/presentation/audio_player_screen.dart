@@ -102,8 +102,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _attachedPlayer = player;
     _playerStateSub = player.playerStateStream.listen((s) {
       if (!mounted) return;
+      final isReady = s.processingState != ProcessingState.loading &&
+          s.processingState != ProcessingState.buffering;
       state = state.copyWith(
-        isPlaying: s.playing,
+        isPlaying: isReady ? s.playing : state.isPlaying,
         isLoading: s.processingState == ProcessingState.loading ||
             s.processingState == ProcessingState.buffering,
       );
@@ -248,13 +250,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void togglePlay() {
     // Optimistic update so the button reflects the new state immediately,
     // even if the stream subscription is momentarily stale.
-    final willPlay = _player?.playing != true;
+    final willPlay = !state.isPlaying;
     state = state.copyWith(isPlaying: willPlay);
-    if (willPlay) {
-      _handler?.play();
-    } else {
-      _handler?.pause();
-    }
+    if (willPlay) { _handler?.play(); } else { _handler?.pause(); }
   }
   void pause()      => _handler?.pause();
   Future<void> seek(Duration p) async => _handler?.seek(p);
@@ -448,10 +446,14 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   Widget build(BuildContext context) {
     final ps = ref.watch(audioPlayerProvider);
     final screenHeight = MediaQuery.of(context).size.height;
-    final isSmall = screenHeight < 700;
-    final artPadding = isSmall ? 16.0 : 36.0;
-    final playBtnSize = isSmall ? 60.0 : 68.0;
-    final skipIconSize = isSmall ? 26.0 : 30.0;
+    final screenWidth = MediaQuery.of(context).size.width;
+    final isSmall = screenHeight < 680;
+    final isMedium = screenHeight < 780;
+    final isTablet = screenWidth > 600;
+    final artPadding = isTablet ? 80.0 : isSmall ? 12.0 : isMedium ? 24.0 : 36.0;
+    final playBtnSize = isTablet ? 80.0 : isSmall ? 56.0 : 68.0;
+    final skipIconSize = isTablet ? 34.0 : isSmall ? 24.0 : 30.0;
+    final vSpace = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -463,8 +465,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               child: Row(
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.keyboard_arrow_down_rounded,
-                        color: AppColors.textPrimary, size: 30),
+                    icon: Icon(Icons.keyboard_arrow_down_rounded,
+                        color: Theme.of(context).colorScheme.onSurface, size: 30),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
@@ -497,7 +499,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ),
               ),
             ),
-            SizedBox(height: isSmall ? 8 : 16),
+            SizedBox(height: vSpace),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -507,9 +509,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(widget.mediaItem.title,
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 20, fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
+                              color: Theme.of(context).colorScheme.onSurface,
                               fontFamily: 'Inter',
                             ),
                             maxLines: 1, overflow: TextOverflow.ellipsis),
@@ -542,7 +544,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 20),
+            SizedBox(height: vSpace),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _SeekBar(
@@ -552,7 +554,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     ref.read(audioPlayerProvider.notifier).seek(d),
               ),
             ),
-            const SizedBox(height: 8),
+            SizedBox(height: vSpace / 2),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -596,7 +598,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: vSpace / 2),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
@@ -605,7 +607,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 children: [
                   IconButton(
                     icon: Icon(Icons.skip_previous_rounded,
-                        color: AppColors.textPrimary, size: skipIconSize),
+                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipPrevious();
@@ -613,7 +615,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   ),
                   IconButton(
                     icon: Icon(Icons.replay_10_rounded,
-                        color: AppColors.textPrimary, size: skipIconSize),
+                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipBack();
@@ -672,7 +674,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   ),
                   IconButton(
                     icon: Icon(Icons.forward_10_rounded,
-                        color: AppColors.textPrimary, size: skipIconSize),
+                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipForward();
@@ -680,7 +682,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   ),
                   IconButton(
                     icon: Icon(Icons.skip_next_rounded,
-                        color: AppColors.textPrimary, size: skipIconSize),
+                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipNext();
@@ -689,39 +691,42 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            SizedBox(height: vSpace),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _SecondaryBtn(
-                    icon: Icons.lyrics_rounded,
-                    label: 'Lyrics',
-                    onTap: () => _showLyrics(ps.position),
-                  ),
-                  _SecondaryBtn(
-                    icon: Icons.graphic_eq_rounded,
-                    label: 'EQ',
-                    onTap: () => context.push('/player/equalizer'),
-                  ),
-                  _SecondaryBtn(
-                    icon: Icons.queue_music_rounded,
-                    label: 'Queue',
-                    onTap: _showQueue,
-                  ),
-                  _SecondaryBtn(
-                    icon: Icons.share_rounded,
-                    label: 'Share',
-                    onTap: () => Share.shareXFiles(
-                      [XFile(widget.mediaItem.filePath)],
-                      text: widget.mediaItem.title,
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _SecondaryBtn(
+                      icon: Icons.lyrics_rounded,
+                      label: 'Lyrics',
+                      onTap: () => _showLyrics(ps.position),
                     ),
-                  ),
-                ],
+                    _SecondaryBtn(
+                      icon: Icons.graphic_eq_rounded,
+                      label: 'EQ',
+                      onTap: () => context.push('/player/equalizer'),
+                    ),
+                    _SecondaryBtn(
+                      icon: Icons.queue_music_rounded,
+                      label: 'Queue',
+                      onTap: _showQueue,
+                    ),
+                    _SecondaryBtn(
+                      icon: Icons.share_rounded,
+                      label: 'Share',
+                      onTap: () => Share.shareXFiles(
+                        [XFile(widget.mediaItem.filePath)],
+                        text: widget.mediaItem.title,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            SizedBox(height: isSmall ? 12 : 24),
+            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
           ],
         ),
       ),

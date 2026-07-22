@@ -91,7 +91,9 @@ class QueueScreen extends ConsumerWidget {
     final queue = ref.watch(queueProvider);
 
     return Container(
-      height: MediaQuery.of(context).size.height * 0.8,
+      height: MediaQuery.of(context).size.width > 600
+          ? MediaQuery.of(context).size.height * 0.6
+          : MediaQuery.of(context).size.height * 0.8,
       decoration: const BoxDecoration(
         color: AppColors.surface,
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -206,7 +208,8 @@ class QueueScreen extends ConsumerWidget {
                     ),
                   )
                 : ReorderableListView.builder(
-                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    padding: EdgeInsets.fromLTRB(0, 8, 0,
+                        MediaQuery.of(context).padding.bottom + 90),
                     itemCount: queue.items.length,
                     onReorder: (oldIndex, newIndex) {
                       HapticFeedback.mediumImpact();
