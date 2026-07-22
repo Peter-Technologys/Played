@@ -20,18 +20,18 @@ class AppTheme {
         onSurface: AppColors.textPrimary,
         surfaceContainerHighest: AppColors.surfaceHighlight,
       ),
-      appBarTheme: const AppBarTheme(
+      appBarTheme: AppBarTheme(
         backgroundColor: AppColors.background,
         elevation: 0,
         scrolledUnderElevation: 0,
-        systemOverlayStyle: SystemUiOverlayStyle(
+        systemOverlayStyle: const SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: Brightness.light,
           systemNavigationBarColor: AppColors.background,
           systemNavigationBarIconBrightness: Brightness.light,
         ),
         titleTextStyle: AppTextStyles.heading2,
-        iconTheme: IconThemeData(color: AppColors.textPrimary),
+        iconTheme: const IconThemeData(color: AppColors.textPrimary),
       ),
       bottomNavigationBarTheme: const BottomNavigationBarThemeData(
         backgroundColor: AppColors.surface,
