@@ -19,6 +19,7 @@ import '../../core/services/storage_folder_service.dart';
 import '../../features/my_space/presentation/providers/my_space_provider.dart';
 import '../../shared/widgets/played_logo.dart';
 import '../settings/settings_provider.dart';
+import '../../core/config/changelog.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile & Settings Screen
@@ -756,57 +757,8 @@ class _AboutCardState extends State<_AboutCard> {
 class WhatsNewScreen extends StatelessWidget {
   const WhatsNewScreen({super.key});
 
-  static const _sections = [
-    _ChangeSection(
-      version: '1.4.0',
-      date: 'July 2026',
-      isLatest: true,
-      items: [
-        _ChangeItem(Icons.play_circle_fill_rounded, AppColors.accent,
-            'New Video Engine', 'Migrated to media_kit — faster startup, hardware-accelerated, supports MKV/AVI/4K.'),
-        _ChangeItem(Icons.wifi_tethering_rounded, AppColors.accentViolet,
-            'Flash Share', 'Pure-Dart HTTP file sharing — no Bluetooth pairing needed.'),
-        _ChangeItem(Icons.lock_rounded, AppColors.accent,
-            'Vault in Nav Bar', 'One-tap access to your private vault from the bottom nav.'),
-        _ChangeItem(Icons.construction_rounded, AppColors.accentViolet,
-            'UI Refresh', 'Readable dark theme, logo-only header, less crowded screens.'),
-        _ChangeItem(Icons.system_update_rounded, AppColors.accent,
-            'Auto Update Check', 'In-app update checker now enabled by default.'),
-        _ChangeItem(Icons.share_rounded, AppColors.accentViolet,
-            'Share App', 'Share the app download link directly from Settings.'),
-      ],
-    ),
-    _ChangeSection(
-      version: '1.2.0',
-      date: 'June 2026',
-      isLatest: false,
-      items: [
-        _ChangeItem(Icons.video_library_rounded, AppColors.accent,
-            'Video Thumbnails', 'Real video frames shown in the grid.'),
-        _ChangeItem(Icons.album_rounded, AppColors.accentViolet,
-            'Album Art', 'Real cover art from your music files.'),
-        _ChangeItem(Icons.directions_car_rounded, AppColors.accent,
-            'Car Mode', 'Large-button layout for safe driving.'),
-        _ChangeItem(Icons.lyrics_rounded, AppColors.accentViolet,
-            'Offline Lyrics', 'Lyrics cached locally after first fetch.'),
-        _ChangeItem(Icons.subtitles_rounded, AppColors.accent,
-            'Auto Subtitles', 'Loads .srt/.ass automatically with videos.'),
-      ],
-    ),
-    _ChangeSection(
-      version: '1.1.0',
-      date: 'May 2026',
-      isLatest: false,
-      items: [
-        _ChangeItem(Icons.queue_music_rounded, AppColors.accent,
-            'Playlists', 'Create, rename, reorder and play playlists.'),
-        _ChangeItem(Icons.picture_in_picture_alt_rounded, AppColors.accentViolet,
-            'PiP Auto-Mode', 'Video floats when you leave the app.'),
-        _ChangeItem(Icons.folder_special_rounded, AppColors.accent,
-            'Full SD Card Access', 'MANAGE_EXTERNAL_STORAGE support.'),
-      ],
-    ),
-  ];
+  // Changelog data is sourced from lib/core/config/changelog.dart.
+  static const _sections = changelog;
 
   @override
   Widget build(BuildContext context) {
@@ -842,27 +794,8 @@ class WhatsNewScreen extends StatelessWidget {
   }
 }
 
-class _ChangeSection {
-  final String version;
-  final String date;
-  final bool isLatest;
-  final List<_ChangeItem> items;
-  const _ChangeSection({
-    required this.version, required this.date,
-    required this.isLatest, required this.items,
-  });
-}
-
-class _ChangeItem {
-  final IconData icon;
-  final Color color;
-  final String title;
-  final String description;
-  const _ChangeItem(this.icon, this.color, this.title, this.description);
-}
-
 class _SectionWidget extends StatelessWidget {
-  final _ChangeSection section;
+  final ChangeSection section;
   const _SectionWidget({required this.section});
 
   @override
