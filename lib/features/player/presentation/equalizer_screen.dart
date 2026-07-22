@@ -196,10 +196,10 @@ class EqualizerScreen extends ConsumerWidget {
                     margin: const EdgeInsets.only(right: 8),
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
-                      color: active ? AppColors.accent : AppColors.surface,
+                      color: active ? AppColors.accent : Theme.of(context).colorScheme.surface,
                       borderRadius: BorderRadius.circular(20),
                       border: Border.all(
-                        color: active ? AppColors.accent : AppColors.border,
+                        color: active ? AppColors.accent : AppColors.borderOf(context),
                       ),
                     ),
                     child: Text(name,
@@ -246,9 +246,9 @@ class EqualizerScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: 52,
                 decoration: BoxDecoration(
-                  color: AppColors.surface,
+                  color: Theme.of(context).colorScheme.surface,
                   borderRadius: BorderRadius.circular(14),
-                  border: Border.all(color: AppColors.border),
+                  border: Border.all(color: AppColors.borderOf(context)),
                 ),
                 alignment: Alignment.center,
                 child: const Text('Reset to Flat',
@@ -293,7 +293,7 @@ class _BandSlider extends StatelessWidget {
               data: SliderThemeData(
                 trackHeight: 4,
                 activeTrackColor: AppColors.accent,
-                inactiveTrackColor: AppColors.border,
+                inactiveTrackColor: AppColors.borderOf(context),
                 thumbColor: AppColors.accent,
                 overlayColor: AppColors.accent.withValues(alpha: 0.15),
                 thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),

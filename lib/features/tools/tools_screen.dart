@@ -12,7 +12,7 @@ class ToolsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -391,9 +391,9 @@ class _ToolCard extends StatelessWidget {
       },
       child: Container(
         decoration: BoxDecoration(
-          color: const Color(0xFF1B1E2B),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: const Color(0xFF2A2F45)),
+          border: Border.all(color: AppColors.borderOf(context)),
           boxShadow: [
             BoxShadow(
               color: gradient.first.withValues(alpha: 0.12),
@@ -429,10 +429,10 @@ class _ToolCard extends StatelessWidget {
             const SizedBox(height: 10),
             Text(
               label,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
-                color: Color(0xFFF0F6FF),
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter',
               ),
               textAlign: TextAlign.center,

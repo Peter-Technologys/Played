@@ -231,7 +231,7 @@ class _AppCard extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(24),
         decoration: BoxDecoration(
-          color: const Color(0xFF1B1E2B),
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(18),
         ),
         child: Column(
@@ -386,9 +386,9 @@ class _GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF1B1E2B),
+        color: Theme.of(context).colorScheme.surface,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF2A2F45)),
+        border: Border.all(color: AppColors.borderOf(context)),
       ),
       child: Column(children: children),
     );
@@ -398,10 +398,10 @@ class _GroupCard extends StatelessWidget {
 class _Divider extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return const Divider(
+    return Divider(
       height: 1,
       thickness: 1,
-      color: Color(0xFF2A2F45),
+      color: AppColors.borderOf(context),
       indent: 16,
       endIndent: 16,
     );
@@ -440,10 +440,10 @@ class _NavTile extends StatelessWidget {
       ),
       title: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
+          color: Theme.of(context).colorScheme.onSurface,
           fontFamily: 'Inter',
         ),
       ),

@@ -84,20 +84,20 @@ class PlaylistsScreen extends ConsumerWidget {
     final playlists = ref.watch(playlistsProvider);
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded,
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Playlists',
+        title: Text('Playlists',
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 18,
             )),
         actions: [
@@ -218,9 +218,9 @@ class _PlaylistTile extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.borderOf(context)),
         ),
         child: Row(
           children: [
@@ -243,9 +243,9 @@ class _PlaylistTile extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(playlist.name,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 15, fontWeight: FontWeight.w700,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontFamily: 'Inter',
                       ),
                       maxLines: 1,
@@ -323,20 +323,20 @@ class PlaylistDetailScreen extends ConsumerWidget {
         .toList();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded,
+              color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(playlist.name,
-            style: const TextStyle(
+            style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontSize: 18,
             )),
         actions: [
@@ -433,9 +433,9 @@ class PlaylistDetailScreen extends ConsumerWidget {
                     ),
                   ),
                   title: Text(item.title,
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontSize: 14, fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
+                        color: Theme.of(context).colorScheme.onSurface,
                         fontFamily: 'Inter',
                       ),
                       maxLines: 1,
@@ -492,14 +492,14 @@ class _NameDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      backgroundColor: AppColors.surface,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       title: Text(title,
-          style: const TextStyle(
-              color: AppColors.textPrimary, fontFamily: 'Inter')),
+          style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
       content: TextField(
         controller: controller,
         autofocus: true,
-        style: const TextStyle(color: AppColors.textPrimary),
+        style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         decoration: InputDecoration(
           hintText: hint,
           hintStyle:
@@ -554,10 +554,10 @@ class _EmptyState extends StatelessWidget {
               .scaleXY(begin: 1.0, end: 1.08,
                   duration: 1000.ms, curve: Curves.easeInOut),
           const SizedBox(height: 20),
-          const Text('No playlists yet',
+          Text('No playlists yet',
               style: TextStyle(
                 fontSize: 18, fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
               )).animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 8),
           const Text(

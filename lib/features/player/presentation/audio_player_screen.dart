@@ -575,9 +575,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       padding: const EdgeInsets.symmetric(
                           horizontal: 10, vertical: 5),
                       decoration: BoxDecoration(
-                        color: AppColors.surface,
+                        color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.border),
+                        border: Border.all(color: AppColors.borderOf(context)),
                       ),
                       child: Text(
                           '${ps.speed == ps.speed.truncateToDouble() ? ps.speed.toInt() : ps.speed}x',

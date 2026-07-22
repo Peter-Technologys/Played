@@ -233,10 +233,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
           child: Icon(icon, color: color, size: 20),
         ),
         title: Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter')),
         subtitle: Text(sub,
             style: const TextStyle(
@@ -249,7 +249,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           activeColor: AppColors.accent,
           activeTrackColor: AppColors.accent.withValues(alpha: 0.3),
           inactiveThumbColor: AppColors.textSecondary,
-          inactiveTrackColor: AppColors.border,
+          inactiveTrackColor: AppColors.borderOf(context),
         ),
       );
 
@@ -267,11 +267,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: const Icon(Icons.speed_rounded,
             color: AppColors.accentPink, size: 20),
       ),
-      title: const Text('Default Speed',
+      title: Text('Default Speed',
           style: TextStyle(
               fontSize: 14,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontFamily: 'Inter')),
       subtitle: Text('${_s.playbackSpeed}\u00d7',
           style: const TextStyle(
@@ -280,7 +280,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               fontFamily: 'Inter')),
       trailing: DropdownButton<double>(
         value: _s.playbackSpeed,
-        dropdownColor: AppColors.surfaceElevated,
+        dropdownColor: Theme.of(context).colorScheme.surface,
         underline: const SizedBox(),
         style: const TextStyle(
             color: AppColors.textPrimary,
@@ -321,11 +321,11 @@ class _Div extends StatelessWidget {
   const _Div();
 
   @override
-  Widget build(BuildContext context) => const Divider(
+  Widget build(BuildContext context) => Divider(
       height: 1,
       indent: 72,
       endIndent: 20,
-      color: AppColors.borderSubtle);
+      color: AppColors.borderOf(context));
 }
 
 class _Tile extends StatelessWidget {
@@ -355,10 +355,10 @@ class _Tile extends StatelessWidget {
           child: Icon(icon, color: color, size: 20),
         ),
         title: Text(title,
-            style: const TextStyle(
+            style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter')),
         subtitle: Text(sub,
             style: const TextStyle(

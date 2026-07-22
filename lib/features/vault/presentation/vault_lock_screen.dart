@@ -113,11 +113,11 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
     if (ref.watch(vaultUnlockedProvider)) return const VaultGalleryScreen();
 
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
         elevation: 0,
@@ -144,9 +144,9 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                     begin: const Offset(0.8, 0.8), end: const Offset(1, 1),
                     duration: 500.ms, curve: Curves.elasticOut),
               const SizedBox(height: 28),
-              const Text('Private Vault',
+              Text('Private Vault',
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary))
+                      color: Theme.of(context).colorScheme.onSurface))
                   .animate().fadeIn(delay: 200.ms),
               const SizedBox(height: 8),
               const Text(
@@ -422,17 +422,17 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
+          icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Private Vault',
+        title: Text('Private Vault',
             style: TextStyle(fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary, fontSize: 18)),
+                color: Theme.of(context).colorScheme.onSurface, fontSize: 18)),
         actions: [
           if (_vaultSizeBytes != null)
             Padding(
@@ -469,9 +469,9 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
                             color: AppColors.textSecondary, size: 36),
                       ),
                       const SizedBox(height: 20),
-                      const Text('Vault is empty',
+                      Text('Vault is empty',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary)),
+                              color: Theme.of(context).colorScheme.onSurface)),
                       const SizedBox(height: 8),
                       const Text(
                         'Long-press any file and tap\n"Move to Vault" to protect it.',
@@ -511,9 +511,9 @@ class _VaultCard extends StatelessWidget {
       onTap: onPlay,
       child: Container(
         decoration: BoxDecoration(
-          color: AppColors.surface,
+          color: Theme.of(context).colorScheme.surface,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border),
+          border: Border.all(color: AppColors.borderOf(context)),
         ),
         child: Column(
           children: [
@@ -562,8 +562,8 @@ class _VaultCard extends StatelessWidget {
                 children: [
                   Text(
                     item.originalPath.split('/').last,
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary),
+                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface),
                     maxLines: 2, overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 6),
