@@ -14,7 +14,7 @@ import '../../core/services/appwrite_service.dart';
 import '../../core/services/update_service.dart';
 import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
-import '../../core/services/auth_service.dart';
+
 import '../../core/services/storage_folder_service.dart';
 import '../../features/my_space/presentation/providers/my_space_provider.dart';
 import '../../shared/widgets/played_logo.dart';
@@ -34,7 +34,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final s           = ref.watch(settingsProvider);
     final sn          = ref.read(settingsProvider.notifier);
-    final isGoogle    = ref.watch(isGoogleSignedInProvider);
+    final isGoogle    = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
 
@@ -424,7 +424,7 @@ class ProfileScreen extends ConsumerWidget {
           TextButton(
             onPressed: () {
               Navigator.pop(context);
-              AuthService.instance.signOut();
+              AppwriteService.instance.signOut();
             },
             child: const Text('Sign out',
                 style: TextStyle(color: AppColors.error)),

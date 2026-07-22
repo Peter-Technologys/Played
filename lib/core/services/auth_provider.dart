@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'appwrite_service.dart';
@@ -21,15 +22,11 @@ Stream<void> _authChangeStream() async* {
 }
 
 class _AuthCompleter {
-  bool _done = false;
-
-  Future<void> get future async {
-    while (!_done) {
-      await Future<void>.delayed(const Duration(milliseconds: 100));
-    }
+  final _completer = Completer<void>();
+  Future<void> get future => _completer.future;
+  void complete() {
+    if (!_completer.isCompleted) _completer.complete();
   }
-
-  void complete() => _done = true;
 }
 
 /// True when a real user is signed in.
@@ -78,5 +75,4 @@ final photoUrlProvider = Provider<String?>((ref) {
   );
 });
 
-// Compatibility aliases
-final isGoogleSignedInProvider = isSignedInProvider;
+

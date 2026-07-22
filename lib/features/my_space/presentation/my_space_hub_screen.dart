@@ -18,7 +18,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final isGoogle    = ref.watch(isGoogleSignedInProvider);
+    final isGoogle    = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
     final libraryAsync = ref.watch(mediaLibraryProvider);

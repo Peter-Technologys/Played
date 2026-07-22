@@ -345,6 +345,10 @@ class _LrcView extends StatelessWidget {
 
 class _PlainView extends StatelessWidget {
   final List<String> lines;
+  // position is kept in the constructor signature for API compatibility
+  // but is intentionally unused — plain-text lyrics have no timestamp data,
+  // so any position-based highlight would be a false approximation.
+  // ignore: unused_field
   final Duration position;
 
   const _PlainView({required this.lines, required this.position});
@@ -353,36 +357,39 @@ class _PlainView extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView.builder(
       padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
-      itemCount: lines.length,
+      // +1 for the sync-unavailable notice at the top
+      itemCount: lines.length + 1,
       itemBuilder: (context, i) {
-        // Estimate active line proportionally using playback position.
-        // We don't know total duration here, so we use a rolling 3-min
-        // assumption (180 s) which is reasonable for most songs.
-        // This is still an approximation — only LRC files give true sync.
-        const estimatedTotalSec = 180;
-        final fraction = lines.isEmpty
-            ? 0.0
-            : (position.inSeconds / estimatedTotalSec).clamp(0.0, 1.0);
-        final approxLine =
-            (fraction * (lines.length - 1)).round().clamp(0, lines.length - 1);
-        final isActive = i == approxLine;
+        if (i == 0) {
+          // Honest UX: tell the user why there is no highlight
+          return const Padding(
+            padding: EdgeInsets.only(bottom: 12),
+            child: Text(
+              'Sync unavailable for plain-text lyrics',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+                fontFamily: 'Inter',
+              ),
+              textAlign: TextAlign.center,
+            ),
+          );
+        }
+        final lineIndex = i - 1;
         return Padding(
           padding: const EdgeInsets.symmetric(vertical: 6),
           child: Text(
-            lines[i],
-            style: TextStyle(
-              fontSize: isActive ? 17 : 14,
-              fontWeight:
-                  isActive ? FontWeight.w700 : FontWeight.w400,
-              color: isActive
-                  ? AppColors.accent
-                  : AppColors.textSecondary,
+            lines[lineIndex],
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w400,
+              color: AppColors.textSecondary,
               height: 1.5,
               fontFamily: 'Inter',
             ),
           ),
-        ).animate(target: isActive ? 1 : 0).scaleXY(
-              begin: 1, end: 1.02, duration: 200.ms);
+        );
       },
     );
   }

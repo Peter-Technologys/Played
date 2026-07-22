@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../app/theme/app_colors.dart';
-import '../../core/widgets/modern_neon_container.dart';
+
 
 // ── Track models ─────────────────────────────────────────────────────────────────────
 
@@ -259,52 +259,69 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     child: Center(
       child: Padding(
         padding: const EdgeInsets.all(32),
-        child: ModernNeonContainer(
-          neonColor: AppColors.error,
-          borderRadius: 20,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.error_outline_rounded,
-                  color: AppColors.error, size: 48),
-              const SizedBox(height: 16),
-              const Text('Cannot play this file',
-                  style: TextStyle(
-                    fontSize: 16, fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary, fontFamily: 'Inter',
-                  )),
-              const SizedBox(height: 8),
-              Text(
-                _errorMsg,
-                textAlign: TextAlign.center,
-                style: const TextStyle(
-                  fontSize: 12, color: AppColors.textSecondary,
-                  fontFamily: 'Inter', height: 1.5,
-                ),
-              ),
-              const SizedBox(height: 20),
-              ElevatedButton.icon(
-                onPressed: () {
-                  setState(() { _hasError = false; _errorMsg = ''; _initialized = false; });
-                  _initPlayer();
-                },
-                icon: const Icon(Icons.refresh_rounded, size: 18),
-                label: const Text('Retry'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.error,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12)),
-                ),
-              ),
-              const SizedBox(height: 8),
-              TextButton(
-                onPressed: () => Navigator.of(context).maybePop(),
-                child: const Text('Go back',
-                    style: TextStyle(
-                        color: AppColors.textSecondary, fontFamily: 'Inter')),
-              ),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: [
+              BoxShadow(color: AppColors.error.withValues(alpha: 0.55), blurRadius: 6,  spreadRadius: -2),
+              BoxShadow(color: AppColors.error.withValues(alpha: 0.30), blurRadius: 16, spreadRadius: -1),
+              BoxShadow(color: AppColors.error.withValues(alpha: 0.15), blurRadius: 32, spreadRadius:  0),
             ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFF090D16),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.error.withValues(alpha: 0.35), width: 1.2),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(Icons.error_outline_rounded,
+                      color: AppColors.error, size: 48),
+                  const SizedBox(height: 16),
+                  const Text('Cannot play this file',
+                      style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary, fontFamily: 'Inter',
+                      )),
+                  const SizedBox(height: 8),
+                  Text(
+                    _errorMsg,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      fontSize: 12, color: AppColors.textSecondary,
+                      fontFamily: 'Inter', height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      setState(() { _hasError = false; _errorMsg = ''; _initialized = false; });
+                      _initPlayer();
+                    },
+                    icon: const Icon(Icons.refresh_rounded, size: 18),
+                    label: const Text('Retry'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.error,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  TextButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: const Text('Go back',
+                        style: TextStyle(
+                            color: AppColors.textSecondary, fontFamily: 'Inter')),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
       ),

@@ -222,6 +222,14 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/player/car-mode',
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const CarModeScreen(),
+        ),
+      ),
+      GoRoute(
         path: '/music/folder',
         pageBuilder: (c, s) {
           final args = s.extra as Map<String, dynamic>;
