@@ -54,8 +54,8 @@ class MediaKitEngine extends StatefulWidget {
 }
 
 class _MediaKitEngineState extends State<MediaKitEngine> {
-  late final Player          _player;
-  late final VideoController _controller;
+  Player?          _player;
+  VideoController? _controller;
 
   bool   _initialized = false;
   bool   _hasError    = false;
@@ -86,7 +86,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
         ),
       );
       _controller = VideoController(
-        _player,
+        _player!,
         configuration: const VideoControllerConfiguration(
           // Use hardware decoding on all Android devices.
           // Falls back to software automatically if unsupported.
@@ -95,25 +95,26 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
       );
 
       // Listen for track changes (fires after media opens)
-      _trackSub = _player.stream.tracks.listen(_onTracksChanged);
+      _trackSub = _player!.stream.tracks.listen(_onTracksChanged);
 
       // Listen for player errors
-      _errorSub = _player.stream.error.listen((err) {
+      _errorSub = _player!.stream.error.listen((err) {
         if (mounted && err.isNotEmpty) {
-          setState(() { _hasError = true; _errorMsg = err; });
+          setState(() { _hasError = true; _errorMsg = err; _initialized = true; });
         }
       });
 
       // Open the file before marking initialized so the Video widget only
       // renders once the player has a valid source ready.
       await _openFile();
+      if (!mounted) return;
 
       // Notify the parent widget that the player is ready for external control.
-      widget.onPlayerReady?.call(_player);
+      widget.onPlayerReady?.call(_player!);
 
       if (mounted) setState(() => _initialized = true);
     } catch (e) {
-      if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); });
+      if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
     }
   }
 
@@ -121,25 +122,30 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        setState(() {
-          _hasError = true;
-          _errorMsg = 'File not found:\n${widget.filePath}';
-        });
+        if (mounted) {
+          setState(() {
+            _hasError    = true;
+            _errorMsg    = 'File not found:\n${widget.filePath}';
+            _initialized = true;
+          });
+        }
         return;
       }
 
-      await _player.open(
+      await _player!.open(
         Media(widget.filePath),
         play: false, // seek first, then play
       );
+      if (!mounted) return;
 
       if (widget.startPosition > Duration.zero) {
-        await _player.seek(widget.startPosition);
+        await _player!.seek(widget.startPosition);
       }
+      if (!mounted) return;
 
-      if (widget.autoPlay) await _player.play();
+      if (widget.autoPlay) await _player!.play();
     } catch (e) {
-      if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); });
+      if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
     }
   }
 
@@ -180,11 +186,11 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
   Future<void> _setSubtitleTrack(String id) async {
     try {
       if (id == 'no') {
-        await _player.setSubtitleTrack(SubtitleTrack.no());
+        await _player!.setSubtitleTrack(SubtitleTrack.no());
       } else {
-        final track = _player.state.tracks.subtitle
+        final track = _player!.state.tracks.subtitle
             .firstWhere((t) => t.id == id, orElse: () => SubtitleTrack.no());
-        await _player.setSubtitleTrack(track);
+        await _player!.setSubtitleTrack(track);
       }
       setState(() => _activeSubId = id);
     } catch (e) {
@@ -194,9 +200,9 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
 
   Future<void> _setAudioTrack(String id) async {
     try {
-      final track = _player.state.tracks.audio
+      final track = _player!.state.tracks.audio
           .firstWhere((t) => t.id == id, orElse: () => AudioTrack.auto());
-      await _player.setAudioTrack(track);
+      await _player!.setAudioTrack(track);
       setState(() => _activeAudioId = id);
     } catch (e) {
       debugPrint('[MediaKit] setAudioTrack error: $e');
@@ -213,7 +219,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     _errorSub = null;
     // Dispose releases all native MPV/MediaCodec resources.
     // Must be called to prevent memory leaks on track navigation.
-    _player.dispose();
+    _player?.dispose();
     super.dispose();
   }
 
@@ -223,8 +229,8 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     if (!_initialized) return _buildLoadingState();
 
     return MediaKitGestureWrapper(
-      player:     _player,
-      controller: _controller,
+      player:     _player!,
+      controller: _controller!,
       title:      widget.title,
       onTracksTap: _subtitleTracks.length > 1 || _audioTracks.length > 1
           ? () => _showTrackMenu(context)
@@ -274,8 +280,8 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
               const SizedBox(height: 20),
               ElevatedButton.icon(
                 onPressed: () {
-                  setState(() { _hasError = false; _errorMsg = ''; });
-                  _openFile();
+                  setState(() { _hasError = false; _errorMsg = ''; _initialized = false; });
+                  _initPlayer();
                 },
                 icon: const Icon(Icons.refresh_rounded, size: 18),
                 label: const Text('Retry'),
@@ -449,9 +455,11 @@ enum _HudType { seek }
 
 class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
   // ── HUD state ───────────────────────────────────────────────────────────────
-  bool     _hudVisible  = false;
-  double   _hudValue    = 0.0;   // 0.0 – 1.0
-  _HudType _hudType     = _HudType.seek;
+  bool     _hudVisible   = false;
+  double   _hudValue     = 0.0;   // 0.0 – 1.0
+  _HudType _hudType      = _HudType.seek;
+  bool     _seekForward  = true;
+  Duration _seekPosition = Duration.zero;
   Timer?   _hudTimer;
 
   // ── Gesture tracking (plain fields — no setState during drag) ───────────────
@@ -509,10 +517,16 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 
   // ── HUD helpers ─────────────────────────────────────────────────────────────────
 
-  void _showHud(_HudType type, double value) {
+  void _showHud(_HudType type, double value, {bool seekForward = true, Duration seekPosition = Duration.zero}) {
     _hudTimer?.cancel();
     // Single setState per drag update — only the HUD subtree rebuilds.
-    setState(() { _hudVisible = true; _hudType = type; _hudValue = value; });
+    setState(() {
+      _hudVisible   = true;
+      _hudType      = type;
+      _hudValue     = value;
+      _seekForward  = seekForward;
+      _seekPosition = seekPosition;
+    });
     _hudTimer = Timer(const Duration(milliseconds: 1500), () {
       if (mounted) setState(() => _hudVisible = false);
     });
@@ -544,8 +558,13 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
         : _clampDuration(_position + delta, Duration.zero, _duration);
     widget.player.seek(newPos);
     HapticFeedback.selectionClick();
-    // Show seek HUD briefly
-    _showHud(_HudType.seek, newPos.inMilliseconds / _duration.inMilliseconds.clamp(1, 999999));
+    // Show seek HUD briefly — pass direction and actual position for timestamp
+    _showHud(
+      _HudType.seek,
+      newPos.inMilliseconds / _duration.inMilliseconds.clamp(1, 999999),
+      seekForward:  !isLeft,
+      seekPosition: newPos,
+    );
   }
 
   // ── Build ─────────────────────────────────────────────────────────────────────────
@@ -572,11 +591,12 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 
           // ── Neon HUD overlay ───────────────────────────────────────────────────
           _NeonHud(
-            visible:  _hudVisible,
-            type:     _hudType,
-            value:    _hudValue,
-            seekMs:   null,
-            duration: _duration,
+            visible:      _hudVisible,
+            type:         _hudType,
+            value:        _hudValue,
+            duration:     _duration,
+            seekPosition: _seekPosition,
+            seekForward:  _seekForward,
           ),
 
           // ── Transport controls ───────────────────────────────────────────────────
@@ -611,23 +631,42 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 class _NeonHud extends StatelessWidget {
   final bool     visible;
   final _HudType type;
-  final double   value;    // 0.0 – 1.0
+  final double   value;       // 0.0 – 1.0
   final Duration duration;
+  final Duration? seekPosition; // actual seek position for timestamp label
+  final bool     seekForward;  // true = fast-forward, false = rewind
 
   const _NeonHud({
     required this.visible,
     required this.type,
     required this.value,
     required this.duration,
+    this.seekPosition,
+    this.seekForward = true,
   });
 
   static const _amber = Color(0xFFF59E0B);
 
   Color get _neonColor => _amber;
 
-  IconData get _icon => Icons.fast_forward_rounded;
+  IconData get _icon => seekForward
+      ? Icons.fast_forward_rounded
+      : Icons.fast_rewind_rounded;
 
-  String get _label => '${(value * 100).toInt()}%';
+  static String _fmt(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
+
+  String get _label {
+    final pos = seekPosition;
+    if (pos != null && duration > Duration.zero) {
+      return '${_fmt(pos)} / ${_fmt(duration)}';
+    }
+    return '${(value * 100).toInt()}%';
+  }
 
   @override
   Widget build(BuildContext context) {

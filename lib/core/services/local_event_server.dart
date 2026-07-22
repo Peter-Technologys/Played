@@ -22,7 +22,10 @@ class LocalEventServer {
       debugPrint('[EventServer] Client: ${socket.remoteAddress.address}');
       _clients.add(socket);
       socket.done.then((_) { _clients.remove(socket); });
-    }, onError: (Object e) => debugPrint('[EventServer] Error: $e'), cancelOnError: false);
+    }, onError: (Object e) {
+      debugPrint('[EventServer] Error: $e');
+      stop();
+    }, cancelOnError: false);
   }
 
   void broadcastEvent(String eventType, Map<String, dynamic> data) {

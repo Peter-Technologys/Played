@@ -4,6 +4,68 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
 
+// ── Top-level helpers for compute() ──────────────────────────────────────────
+// compute() requires a top-level (or static) function — closures and instance
+// methods are not supported because they cannot be sent across isolate boundaries.
+
+/// Entry point for the filesystem scan isolate.
+/// Receives the list of root paths to scan and returns all found [MediaItem]s.
+Future<List<MediaItem>> _filesystemScanIsolate(List<String> roots) async {
+  final results = <MediaItem>[];
+  for (final root in roots) {
+    await _scanDirIsolate(Directory(root), results);
+  }
+  return results;
+}
+
+const _kVideoExtensions = {
+  'mp4', 'mkv', 'avi', 'mov', 'flv', 'ts', 'webm', 'wmv', '3gp', 'm4v',
+  'f4v', 'rm', 'rmvb', 'vob', 'divx', 'xvid',
+};
+
+const _kAudioExtensions = {
+  'mp3', 'aac', 'flac', 'wav', 'ogg', 'm4a', 'opus', 'wma', 'aiff',
+  'amr', 'mid', 'midi', 'ape', 'ac3', 'dts', 'mka',
+};
+
+const _kSkipDirs = {
+  'Android', '.thumbnails', '.cache', 'cache', 'obb',
+  '.trash', 'lost+found', '.nomedia', 'tmp', 'temp',
+  'proc', 'sys', 'dev',
+};
+
+String _stableIdIsolate(String path) => Uri.encodeComponent(path);
+
+Future<void> _scanDirIsolate(Directory dir, List<MediaItem> out) async {
+  try {
+    await for (final entity in dir.list(followLinks: false)) {
+      if (entity is Directory) {
+        if (_kSkipDirs.contains(entity.path.split('/').last)) continue;
+        await _scanDirIsolate(entity, out);
+      } else if (entity is File) {
+        final ext     = entity.path.split('.').last.toLowerCase();
+        final isVideo = _kVideoExtensions.contains(ext);
+        final isAudio = _kAudioExtensions.contains(ext);
+        if (!isVideo && !isAudio) continue;
+        try {
+          final stat = await entity.stat();
+          if (stat.size < 10 * 1024) continue;
+          final fileName = entity.path.split('/').last;
+          out.add(MediaItem(
+            id:            _stableIdIsolate(entity.path),
+            title:         fileName.replaceAll(RegExp(r'\.[^.]+$'), ''),
+            fileName:      fileName,
+            filePath:      entity.path,
+            isVideo:       isVideo,
+            addedAt:       stat.modified,
+            fileSizeBytes: stat.size,
+          ));
+        } catch (_) {}
+      }
+    }
+  } catch (_) {}
+}
+
 /// Scans the device for ALL audio and video files regardless of how they
 /// were added — USB, file manager, SD card copy, Xender, Bluetooth,
 /// WhatsApp, Telegram, ShareIt, AirDrop, Downloads, DCIM, etc.
@@ -171,7 +233,7 @@ class MediaScannerService {
     return results;
   }
 
-  // FALLBACK: full filesystem walk
+  // FALLBACK: full filesystem walk (runs off the main isolate via compute())
   Future<List<String>> _discoverRoots() async {
     final roots = <String>[];
     const internal = '/storage/emulated/0';
@@ -190,42 +252,12 @@ class MediaScannerService {
   }
 
   Future<List<MediaItem>> _filesystemScan() async {
-    final results = <MediaItem>[];
-    for (final root in await _discoverRoots()) {
-      await _scanDir(Directory(root), results);
-    }
+    final roots = await _discoverRoots();
+    // Run the recursive walk on a background isolate so the main thread
+    // (and therefore the UI) is never blocked during a deep filesystem scan.
+    final results = await compute(_filesystemScanIsolate, roots);
     debugPrint('[Scanner] Filesystem fallback: ${results.length} items.');
     return results;
-  }
-
-  Future<void> _scanDir(Directory dir, List<MediaItem> out) async {
-    try {
-      await for (final entity in dir.list(followLinks: false)) {
-        if (entity is Directory) {
-          if (_skipDirs.contains(entity.path.split('/').last)) continue;
-          await _scanDir(entity, out);
-        } else if (entity is File) {
-          final ext     = entity.path.split('.').last.toLowerCase();
-          final isVideo = _videoExtensions.contains(ext);
-          final isAudio = _audioExtensions.contains(ext);
-          if (!isVideo && !isAudio) continue;
-          try {
-            final stat = await entity.stat();
-            if (stat.size < 10 * 1024) continue;
-            final fileName = entity.path.split('/').last;
-            out.add(MediaItem(
-              id:            _stableId(entity.path),
-              title:         fileName.replaceAll(RegExp(r'\.[^.]+$'), ''),
-              fileName:      fileName,
-              filePath:      entity.path,
-              isVideo:       isVideo,
-              addedAt:       stat.modified,
-              fileSizeBytes: stat.size,
-            ));
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
   }
 
   // PUBLIC API

@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../models/media_item.dart';
 import '../models/playlist.dart';
 import '../models/vault_item.dart';
@@ -125,16 +127,30 @@ class PlayedDatabase {
     } catch (e) {
       debugPrint('[PlayedDB] ANDROID_ID fallback failed: $e');
     }
-    // Absolute last resort: key derived from app ID + extra salt so it is
-    // not a bare fixed constant.
-    debugPrint('[PlayedDB] Using app-ID-derived vault key (last resort).');
-    const appId = 'com.otyaplayer.app:vault:v1:otya_salt_2025';
-    final bytes = appId.codeUnits;
-    final key = Uint8List(32);
-    for (var i = 0; i < 32; i++) {
-      key[i] = bytes[i % bytes.length] ^ ((i * 53 + 7) & 0xFF);
+    // Absolute last resort: generate a random UUID seed once and persist it
+    // in SharedPreferences so the key is unique per device and stable across
+    // restarts (unlike a bare fixed constant which is identical for all users).
+    debugPrint('[PlayedDB] Using SharedPreferences-seeded vault key (last resort).');
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      const prefKey = 'otya_vault_fallback_seed';
+      String? seed = prefs.getString(prefKey);
+      if (seed == null) {
+        seed = const Uuid().v4();
+        await prefs.setString(prefKey, seed);
+      }
+      final bytes = seed.codeUnits;
+      final key = Uint8List(32);
+      for (var i = 0; i < 32; i++) {
+        key[i] = bytes[i % bytes.length] ^ ((i * 53 + 7) & 0xFF);
+      }
+      return key;
+    } catch (e) {
+      debugPrint('[PlayedDB] SharedPreferences fallback failed: $e — using random session key');
+      // True last resort: random key (vault data lost on restart, but avoids crash)
+      final rng = Random.secure();
+      return Uint8List.fromList(List<int>.generate(32, (_) => rng.nextInt(256)));
     }
-    return key;
   }
 
   // ── Playback History ──────────────────────────────────────────────────────
@@ -358,6 +374,11 @@ class PlayedDatabase {
 
   Future<void> close() async {
     try { await Hive.close(); } catch (_) {}
-    _initialized = false;
+    _historyBox      = null;
+    _playlistBox     = null;
+    _seekPositionBox = null;
+    _shelfCacheBox   = null;
+    _vaultBox        = null;
+    _initialized     = false;
   }
 }

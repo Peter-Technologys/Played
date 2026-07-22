@@ -598,7 +598,10 @@ class MainActivity : FlutterActivity() {
             val file    = File(path)
             if (!file.exists()) return null
             val newFile = File(file.parent ?: return null, newName)
-            if (file.renameTo(newFile)) newFile.absolutePath else null
+            if (file.renameTo(newFile)) {
+                triggerMediaScan(newFile.absolutePath)
+                newFile.absolutePath
+            } else null
         } catch (_: Exception) { null }
     }
 
