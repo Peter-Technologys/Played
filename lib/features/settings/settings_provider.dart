@@ -23,6 +23,10 @@ class AppSettings {
   final bool autoPip;
   final bool pauseDuringCalls;
   final bool autoLoadSubtitles;
+  final bool searchHistory;
+  final bool orientationLocked;
+  final bool continuousPlayback;
+  final int maxConcurrentDownloads;
 
   const AppSettings({
     this.themeMode = AppThemeMode.dark,
@@ -42,6 +46,10 @@ class AppSettings {
     this.autoPip = false,
     this.pauseDuringCalls = true,
     this.autoLoadSubtitles = true,
+    this.searchHistory = true,
+    this.orientationLocked = false,
+    this.continuousPlayback = true,
+    this.maxConcurrentDownloads = 2,
   });
 
   AppSettings copyWith({
@@ -62,6 +70,10 @@ class AppSettings {
     bool? autoPip,
     bool? pauseDuringCalls,
     bool? autoLoadSubtitles,
+    bool? searchHistory,
+    bool? orientationLocked,
+    bool? continuousPlayback,
+    int? maxConcurrentDownloads,
   }) =>
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
@@ -83,6 +95,11 @@ class AppSettings {
         autoPip: autoPip ?? this.autoPip,
         pauseDuringCalls: pauseDuringCalls ?? this.pauseDuringCalls,
         autoLoadSubtitles: autoLoadSubtitles ?? this.autoLoadSubtitles,
+        searchHistory: searchHistory ?? this.searchHistory,
+        orientationLocked: orientationLocked ?? this.orientationLocked,
+        continuousPlayback: continuousPlayback ?? this.continuousPlayback,
+        maxConcurrentDownloads:
+            maxConcurrentDownloads ?? this.maxConcurrentDownloads,
       );
 
   // ── SharedPreferences keys ──
@@ -101,8 +118,12 @@ class AppSettings {
   static const _kPlaybackSpeed = 'settings_playback_speed';
   static const _kAutoPip       = 'settings_auto_pip';
   static const _kPauseCalls    = 'settings_pause_calls';
-  static const _kAutoSubtitles = 'settings_auto_subtitles';
-  static const _kScanFolders   = 'settings_scan_folders';
+  static const _kAutoSubtitles          = 'settings_auto_subtitles';
+  static const _kScanFolders            = 'settings_scan_folders';
+  static const _kSearchHistory          = 'search_history';
+  static const _kOrientationLocked      = 'orientation_locked';
+  static const _kContinuousPlayback     = 'continuous_playback';
+  static const _kMaxConcurrentDownloads = 'max_concurrent_downloads';
 
   static Future<AppSettings> load() async {
     final p = await SharedPreferences.getInstance();
@@ -128,6 +149,10 @@ class AppSettings {
       pauseDuringCalls:       p.getBool(_kPauseCalls)    ?? true,
       autoLoadSubtitles:      p.getBool(_kAutoSubtitles) ?? true,
       scanFolders:            p.getStringList(_kScanFolders) ?? const [],
+      searchHistory:          p.getBool(_kSearchHistory)          ?? true,
+      orientationLocked:      p.getBool(_kOrientationLocked)      ?? false,
+      continuousPlayback:     p.getBool(_kContinuousPlayback)     ?? true,
+      maxConcurrentDownloads: p.getInt(_kMaxConcurrentDownloads)  ?? 2,
     );
   }
 
@@ -150,6 +175,10 @@ class AppSettings {
     await p.setBool(_kPauseCalls,       pauseDuringCalls);
     await p.setBool(_kAutoSubtitles,    autoLoadSubtitles);
     await p.setStringList(_kScanFolders, scanFolders);
+    await p.setBool(_kSearchHistory,          searchHistory);
+    await p.setBool(_kOrientationLocked,      orientationLocked);
+    await p.setBool(_kContinuousPlayback,     continuousPlayback);
+    await p.setInt(_kMaxConcurrentDownloads,  maxConcurrentDownloads);
   }
 }
 
@@ -179,6 +208,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   void setAutoPip(bool v)                 => _update(state.copyWith(autoPip: v));
   void setPauseDuringCalls(bool v)        => _update(state.copyWith(pauseDuringCalls: v));
   void setAutoLoadSubtitles(bool v)       => _update(state.copyWith(autoLoadSubtitles: v));
+  void setSearchHistory(bool v)           => _update(state.copyWith(searchHistory: v));
+  void setOrientationLocked(bool v)       => _update(state.copyWith(orientationLocked: v));
+  void setContinuousPlayback(bool v)      => _update(state.copyWith(continuousPlayback: v));
+  void setMaxConcurrentDownloads(int v)   => _update(state.copyWith(maxConcurrentDownloads: v));
 }
 
 final settingsProvider =

@@ -188,6 +188,11 @@ class AppRouter {
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const StorageAnalyzerScreen()),
       ),
       GoRoute(
+        path: '/player/car-mode',
+        pageBuilder: (c, s) => _fadePage(
+          context: c, state: s, child: const CarModeScreen()),
+      ),
+      GoRoute(
         path: '/player/equalizer',
         pageBuilder: (c, s) => _fadePage(
           context: c,
