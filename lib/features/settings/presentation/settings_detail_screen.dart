@@ -11,17 +11,56 @@ import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
+import '../../../core/services/update_service.dart';
+import '../../../core/widgets/update_dialog.dart';
 import '../settings_provider.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 
 
 /// Grouped settings screen pushed from My Space hub.
 /// Groups: Playback / Storage & Privacy / Updates & About
-class SettingsDetailScreen extends ConsumerWidget {
+class SettingsDetailScreen extends ConsumerStatefulWidget {
   const SettingsDetailScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SettingsDetailScreen> createState() => _SettingsDetailScreenState();
+}
+
+class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
+  bool _checkingUpdate = false;
+
+  Future<void> _checkForUpdate() async {
+    if (_checkingUpdate) return;
+    setState(() => _checkingUpdate = true);
+    try {
+      final update = await UpdateService.instance.checkForUpdate(force: true);
+      if (!mounted) return;
+      if (update != null) {
+        await showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (_) => UpdateDialog(info: update),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('You have the latest version ✅')),
+        );
+      }
+    } catch (_) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Could not check for updates. Check your connection.'),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _checkingUpdate = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final s  = ref.watch(settingsProvider);
     final sn = ref.read(settingsProvider.notifier);
 
@@ -316,10 +355,9 @@ class SettingsDetailScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.system_update_outlined,
               label: 'Check for Updates',
-              subtitle: 'Tap to check for a new version',
+              subtitle: _checkingUpdate ? 'Checking…' : 'Tap to check for a new version',
               color: AppColors.accent,
-              onTap: () => _launchUrl(
-                  context, 'https://getotya.petersmartlink.com/download'),
+              onTap: _checkingUpdate ? () {} : _checkForUpdate,
             ),
             _Divider(),
             _NavTile(
@@ -984,8 +1022,8 @@ class SettingsDetailScreen extends ConsumerWidget {
     try {
       final info = await PackageInfo.fromPlatform();
       await Share.share(
-        'Download OTYA Player v${info.version} — free offline media player:\n'
-        'https://getotya.petersmartlink.com/download',
+        'Download OTYA Player v${info.version} — free offline media player for Android:\n'
+        'https://petersmartlink.com/download/otya-player',
         subject: 'OTYA Player',
       );
     } catch (_) {}

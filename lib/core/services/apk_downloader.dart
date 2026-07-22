@@ -52,7 +52,9 @@ class ApkDownloader {
           if (total > 0) onProgress?.call(received / total);
         },
         options: Options(
-          headers: {'Accept': 'application/vnd.android.package-archive'},
+          headers: {
+            'Accept': 'application/vnd.android.package-archive, application/octet-stream, */*',
+          },
           responseType: ResponseType.bytes,
         ),
       );

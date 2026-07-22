@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../config/environment.dart';
 import '../services/apk_downloader.dart';
 import '../services/update_service.dart';
 import 'rate_us_sheet.dart';
@@ -38,8 +39,14 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
   Future<void> _startDownload() async {
     setState(() { _downloading = true; _progress = 0.0; _error = null; });
+    // Fallback chain: directUrl → downloadUrl → Environment.downloadUrl
+    final url = widget.info.directUrl.isNotEmpty
+        ? widget.info.directUrl
+        : widget.info.downloadUrl.isNotEmpty
+            ? widget.info.downloadUrl
+            : Environment.downloadUrl;
     await ApkDownloader.instance.downloadAndInstall(
-      url:     widget.info.directUrl,
+      url:     url,
       version: widget.info.version,
       onProgress: (p) { if (mounted) setState(() => _progress = p); },
       onError: (msg) {
