@@ -747,6 +747,7 @@ class _VideoContextMenu extends StatelessWidget {
       ),
     );
     if (confirmed != true || !context.mounted) return;
+    HapticFeedback.mediumImpact();
     final ok = await FileOpsService.instance.deleteFile(item.filePath);
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(

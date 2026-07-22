@@ -241,13 +241,29 @@ class _DebouncedResultsState extends ConsumerState<_DebouncedResults> {
             'Folders',
             Icons.folder_rounded,
             AppColors.accent,
-            folderMap.entries.map((e) => _ResultTile(
-                  icon: Icons.folder_rounded,
-                  color: AppColors.accent,
-                  title: e.key,
-                  subtitle: '${e.value} file${e.value == 1 ? '' : 's'}',
-                  onTap: () {},
-                )).toList(),
+            folderMap.entries.map((e) {
+              // Collect all items that belong to this folder name.
+              final folderItems = widget.allItems
+                  .where((item) {
+                    final parts = item.filePath.split('/');
+                    return parts.length > 1 &&
+                        parts[parts.length - 2] == e.key;
+                  })
+                  .toList();
+              final hasVideos = folderItems.any((i) => i.isVideo);
+              return _ResultTile(
+                icon: Icons.folder_rounded,
+                color: AppColors.accent,
+                title: e.key,
+                subtitle: '${e.value} file${e.value == 1 ? '' : 's'}',
+                onTap: () {
+                  context.push(
+                    hasVideos ? '/video/folder' : '/music/folder',
+                    extra: {'name': e.key, 'items': folderItems},
+                  );
+                },
+              );
+            }).toList(),
           ),
         ],
       ),

@@ -120,7 +120,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   Future<void> _toggleOrientation() async {
     HapticFeedback.selectionClick();
-    if (_isLandscape) {
+    // TASK 6: Read actual orientation from MediaQuery instead of relying on
+    // the potentially stale _isLandscape field (which can be wrong after
+    // auto-rotation or when the user rotates the device manually).
+    final isCurrentlyLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isCurrentlyLandscape) {
       await _lockToPortrait();
     } else {
       await _lockToLandscape();
@@ -447,7 +452,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         // Skip back 10s
                         GestureDetector(
                           onTap: () {
-                            HapticFeedback.selectionClick();
+                            HapticFeedback.lightImpact();
                             final newPos = _position - const Duration(seconds: 10);
                             _player?.seek(newPos < Duration.zero ? Duration.zero : newPos);
                           },
@@ -458,7 +463,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         // Play/Pause
                         GestureDetector(
                           onTap: () {
-                            HapticFeedback.selectionClick();
+                            HapticFeedback.mediumImpact();
                             if (_isPlaying) {
                               _player?.pause();
                             } else {
@@ -477,7 +482,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         // Skip forward 10s
                         GestureDetector(
                           onTap: () {
-                            HapticFeedback.selectionClick();
+                            HapticFeedback.lightImpact();
                             final newPos = _position + const Duration(seconds: 10);
                             _player?.seek(newPos > _duration ? _duration : newPos);
                           },

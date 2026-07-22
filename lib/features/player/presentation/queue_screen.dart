@@ -168,17 +168,40 @@ class QueueScreen extends ConsumerWidget {
           const Divider(color: AppColors.border, height: 1),
           Expanded(
             child: queue.items.isEmpty
-                ? const Center(
+                ? Center(
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.queue_music_rounded,
-                            color: AppColors.textSecondary, size: 40),
-                        SizedBox(height: 12),
-                        Text('Queue is empty',
-                            style: TextStyle(
-                                color: AppColors.textSecondary,
-                                fontFamily: 'Inter')),
+                        Container(
+                          width: 72,
+                          height: 72,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: 0.08),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(Icons.queue_music_rounded,
+                              color: AppColors.accent, size: 36),
+                        ),
+                        const SizedBox(height: 16),
+                        const Text(
+                          'Queue is empty',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Play a song or video to start a queue.',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
                     ),
                   )

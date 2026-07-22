@@ -180,7 +180,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                       label: 'Settings',
                       subtitle: 'Playback, privacy, library & more',
                       color: AppColors.accent,
-                      onTap: () => context.push('/settings-detail'),
+                      onTap: () => context.push('/settings'),
                     ),
                     const SizedBox(height: 8),
                     _QuickLink(
