@@ -9,6 +9,8 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # Media Playback
   # media_kit replaces flutter_vlc_player — no C++ CMake bloat, hardware
