@@ -509,7 +509,7 @@ class _SongRow extends ConsumerWidget {
                         fontWeight: FontWeight.w600,
                         color: isPlaying
                             ? AppColors.accentViolet
-                            : AppColors.textPrimary,
+                            : Theme.of(context).colorScheme.onSurface,
                         fontFamily: 'Inter',
                       ),
                       maxLines: 1,
@@ -622,14 +622,16 @@ class _SongOptionsSheet extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(item.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14, fontWeight: FontWeight.w700,
-                            color: AppColors.textPrimary, fontFamily: 'Inter',
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontFamily: 'Inter',
                           ),
                           maxLines: 1, overflow: TextOverflow.ellipsis),
                       Text(item.artist ?? 'Unknown Artist',
-                          style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary)),
+                          style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
                     ],
                   ),
                 ),
@@ -733,8 +735,9 @@ class _OptionTile extends StatelessWidget {
         child: Icon(icon, color: color, size: 18),
       ),
       title: Text(label,
-          style: const TextStyle(
-            fontSize: 14, color: AppColors.textPrimary,
+          style: TextStyle(
+            fontSize: 14,
+            color: Theme.of(context).colorScheme.onSurface,
             fontFamily: 'Inter', fontWeight: FontWeight.w500,
           )),
       onTap: onTap,
@@ -842,10 +845,10 @@ class _FoldersView extends ConsumerWidget {
             ),
             title: Text(
               name,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter',
               ),
               maxLines: 1,
@@ -853,8 +856,9 @@ class _FoldersView extends ConsumerWidget {
             ),
             subtitle: Text(
               '${files.length} song${files.length == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
@@ -991,10 +995,10 @@ class _AlbumsView extends StatelessWidget {
             ),
             title: Text(
               album,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter',
               ),
               maxLines: 1,
@@ -1002,8 +1006,9 @@ class _AlbumsView extends StatelessWidget {
             ),
             subtitle: Text(
               '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
@@ -1070,10 +1075,10 @@ class _ArtistsView extends StatelessWidget {
             ),
             title: Text(
               artist,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.w600,
-                color: AppColors.textPrimary,
+                color: Theme.of(context).colorScheme.onSurface,
                 fontFamily: 'Inter',
               ),
               maxLines: 1,
@@ -1081,8 +1086,9 @@ class _ArtistsView extends StatelessWidget {
             ),
             subtitle: Text(
               '${tracks.length} song${tracks.length == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
+              style: TextStyle(
+                  fontSize: 11,
+                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
@@ -1223,19 +1229,19 @@ class _EmptyState extends StatelessWidget {
           const SizedBox(height: 16),
           Text(
             label,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w600,
-              color: AppColors.textPrimary,
+              color: Theme.of(context).colorScheme.onSurface,
               fontFamily: 'Inter',
             ),
           ),
           const SizedBox(height: 6),
-          const Text(
+          Text(
             'Songs will appear here after scanning.',
             style: TextStyle(
               fontSize: 12,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
               fontFamily: 'Inter',
             ),
           ),

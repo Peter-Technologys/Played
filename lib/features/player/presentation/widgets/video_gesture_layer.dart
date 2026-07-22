@@ -109,7 +109,9 @@ class _VideoGestureLayerState extends State<VideoGestureLayer> {
               if (widget.onSeek == null) return;
               final v = d.primaryVelocity ?? 0;
               if (v.abs() < 200) return;
-              widget.onSeek!(Duration(seconds: v < 0 ? 10 : -10));
+              // Swipe left (negative velocity) = rewind = -10s
+              // Swipe right (positive velocity) = forward = +10s
+              widget.onSeek!(Duration(seconds: v < 0 ? -10 : 10));
             },
             child: Row(
               children: [

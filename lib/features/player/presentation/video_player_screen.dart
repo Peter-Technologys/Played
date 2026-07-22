@@ -53,6 +53,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   static const _aspectRatioLabels = ['Fit to Screen', 'Center Crop', 'Stretch'];
 
+  static const _aspectRatioFits = [BoxFit.contain, BoxFit.cover, BoxFit.fill];
+
   @override
   void initState() {
     super.initState();
@@ -295,21 +297,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       },
                       tooltip: 'Background audio',
                     ),
-                    // Queue
-                    IconButton(
-                      icon: const Icon(Icons.queue_music_rounded,
-                          color: Colors.white70, size: 22),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Queue not available for video'),
-                            backgroundColor: AppColors.surface,
-                          ),
-                        );
-                      },
-                      tooltip: 'Queue',
-                    ),
                   ],
                 ),
               ),
@@ -359,21 +346,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // Trim/Clip
-              GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Video trimmer coming soon'),
-                      backgroundColor: AppColors.surface,
-                    ),
-                  );
-                },
-                child: const Icon(Icons.content_cut_rounded,
-                    color: Colors.white70, size: 24),
-              ),
-              const SizedBox(height: 16),
               // Orientation lock
               GestureDetector(
                 onTap: _toggleOrientation,
@@ -693,6 +665,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               title:         widget.mediaItem.title,
               startPosition: _savedPosition,
               autoPlay:      true,
+              fit:           _aspectRatioFits[_aspectRatioIndex],
               onPlayerReady: _attachPlayer,
             ),
           ),

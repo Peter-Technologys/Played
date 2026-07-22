@@ -3,6 +3,7 @@ import 'dart:math' show min;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
+import '../permissions/permission_helper.dart';
 
 // ── Top-level helpers for compute() ──────────────────────────────────────────
 // compute() requires a top-level (or static) function — closures and instance
@@ -271,6 +272,20 @@ class MediaScannerService {
   ///
   /// Filesystem walk is last resort only if both above return nothing.
   Future<List<MediaItem>> scanAll() async {
+    // Check storage/media permissions before scanning.
+    // On Android 13+ this checks READ_MEDIA_VIDEO + READ_MEDIA_AUDIO.
+    // On Android <13 this checks READ_EXTERNAL_STORAGE.
+    // If denied, throw so the UI can surface PermissionDeniedScreen.
+    final hasPermission = await PermissionHelper.hasMediaPermissions();
+    if (!hasPermission) {
+      // Try requesting once before giving up.
+      final granted = await PermissionHelper.requestMediaPermissions();
+      if (!granted) {
+        throw Exception('permission: Storage permission denied. '
+            'Grant access to scan your media library.');
+      }
+    }
+
     // Run MediaStore first so we can pre-populate alreadySeen with its paths.
     // This prevents _scanReceiveDirs from re-processing files already returned
     // by MediaStore, saving redundant stat() calls on large libraries.
