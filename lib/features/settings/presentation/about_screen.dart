@@ -105,6 +105,15 @@ class _AboutScreenState extends State<AboutScreen> {
             ),
             _Divider(),
             _NavTile(
+              icon: Icons.open_in_new_rounded,
+              label: 'Privacy Policy (Web)',
+              subtitle: 'petersmartlink.com/privacy',
+              color: AppColors.accent,
+              onTap: () => _launchUrl(
+                  context, 'https://petersmartlink.com/privacy'),
+            ),
+            _Divider(),
+            _NavTile(
               icon: Icons.star_outline_rounded,
               label: 'Rate OTYA Player',
               subtitle: 'Enjoying the app? Leave a review!',
@@ -289,7 +298,7 @@ class _AppCard extends StatelessWidget {
               ),
               child: Text(
                 version.isEmpty
-                    ? 'Loading version…'
+                    ? 'Version 1.4.0 (build 2007)'
                     : 'Version $version (build $buildNumber)',
                 style: const TextStyle(
                   fontSize: 12,
@@ -297,6 +306,16 @@ class _AppCard extends StatelessWidget {
                   fontFamily: 'Inter',
                   fontWeight: FontWeight.w600,
                 ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Support email
+            const Text(
+              'support@petersmartlink.com',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontFamily: 'Inter',
               ),
             ),
             const SizedBox(height: 20),

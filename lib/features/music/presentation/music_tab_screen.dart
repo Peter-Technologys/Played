@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
@@ -30,7 +31,10 @@ class MusicTabScreen extends ConsumerStatefulWidget {
 }
 
 class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   @override
   void initState() {
     super.initState();
@@ -52,6 +56,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // required by AutomaticKeepAliveClientMixin
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_musicFilterProvider);
 
@@ -1174,47 +1179,51 @@ class _MusicShimmer extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      itemCount: 12,
-      itemBuilder: (_, i) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Row(
-          children: [
-            Container(
-                width: 28,
-                height: 14,
-                decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(4))),
-            const SizedBox(width: 12),
-            Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                    color: AppColors.surface,
-                    borderRadius: BorderRadius.circular(8))),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                      height: 14,
-                      decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(4))),
-                  const SizedBox(height: 6),
-                  Container(
-                      width: 100,
-                      height: 11,
-                      decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(4))),
-                ],
+    return Shimmer.fromColors(
+      baseColor: AppColors.surface,
+      highlightColor: const Color(0xFF2A2F45),
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+        itemCount: 12,
+        itemBuilder: (_, i) => Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          child: Row(
+            children: [
+              Container(
+                  width: 28,
+                  height: 14,
+                  decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(4))),
+              const SizedBox(width: 12),
+              Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                      color: AppColors.surface,
+                      borderRadius: BorderRadius.circular(8))),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                        height: 14,
+                        decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(4))),
+                    const SizedBox(height: 6),
+                    Container(
+                        width: 100,
+                        height: 11,
+                        decoration: BoxDecoration(
+                            color: AppColors.surface,
+                            borderRadius: BorderRadius.circular(4))),
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

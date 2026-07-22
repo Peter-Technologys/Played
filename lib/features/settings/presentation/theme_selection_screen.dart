@@ -68,54 +68,8 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          // ── COLOUR THEME ──────────────────────────────────────────
+          // ── THEME CARDS (2-column, aspect ratio ~0.72) ───────────
           _SectionHeader(label: 'Colour Theme'),
-          const SizedBox(height: 12),
-          GridView.count(
-            crossAxisCount: 3,
-            crossAxisSpacing: 10,
-            mainAxisSpacing: 10,
-            childAspectRatio: 0.85,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            children: [
-              _ThemeCard(
-                name: 'Dark',
-                gradientColors: const [Color(0xFF1B232A), Color(0xFF0F111A)],
-                isSelected: settings.themeMode == AppThemeMode.dark,
-                labelColor: Colors.white,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  sn.setThemeMode(AppThemeMode.dark);
-                },
-              ),
-              _ThemeCard(
-                name: 'AMOLED',
-                gradientColors: const [Color(0xFF0A0A0A), Colors.black],
-                isSelected: settings.themeMode == AppThemeMode.amoled,
-                labelColor: Colors.white,
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  sn.setThemeMode(AppThemeMode.amoled);
-                },
-              ),
-              _ThemeCard(
-                name: 'Light',
-                gradientColors: const [Color(0xFFEBEFF5), Color(0xFFC3CFE2)],
-                isSelected: settings.themeMode == AppThemeMode.light,
-                labelColor: const Color(0xFF1B232A),
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  sn.setThemeMode(AppThemeMode.light);
-                },
-              ),
-            ],
-          ),
-
-          const SizedBox(height: 28),
-
-          // ── WALLPAPER ─────────────────────────────────────────────
-          _SectionHeader(label: 'Wallpaper'),
           const SizedBox(height: 12),
           GridView.count(
             crossAxisCount: 2,
@@ -125,23 +79,52 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
-              // Card A — Customize (pick from gallery)
+              // Customize Theme — pick from gallery
               _CustomizeWallpaperCard(
                 isSelected: _wallpaperPath != null,
                 onTap: () => _pickFromGallery(context),
               ),
 
-              // Card B — No Wallpaper
-              _NoWallpaperCard(
-                isSelected: _wallpaperPath == null,
-                onTap: () async {
+              // Dark Colour
+              _ThemeCard(
+                name: 'Dark Colour',
+                gradientColors: const [Color(0xFF1B232A), Color(0xFF0F111A)],
+                isSelected: settings.themeMode == AppThemeMode.dark &&
+                    _wallpaperPath == null,
+                labelColor: Colors.white,
+                onTap: () {
                   HapticFeedback.selectionClick();
-                  await CustomThemeManager.instance.clearWallpaper();
-                  if (mounted) setState(() => _wallpaperPath = null);
+                  sn.setThemeMode(AppThemeMode.dark);
                 },
               ),
 
-              // Card C — Ramadan 2025 (VIP)
+              // Light Colour
+              _ThemeCard(
+                name: 'Light Colour',
+                gradientColors: const [Color(0xFFEBEFF5), Color(0xFFC3CFE2)],
+                isSelected: settings.themeMode == AppThemeMode.light &&
+                    _wallpaperPath == null,
+                labelColor: const Color(0xFF1B232A),
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  sn.setThemeMode(AppThemeMode.light);
+                },
+              ),
+
+              // AMOLED
+              _ThemeCard(
+                name: 'AMOLED Black',
+                gradientColors: const [Color(0xFF0A0A0A), Colors.black],
+                isSelected: settings.themeMode == AppThemeMode.amoled &&
+                    _wallpaperPath == null,
+                labelColor: Colors.white,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  sn.setThemeMode(AppThemeMode.amoled);
+                },
+              ),
+
+              // VIP Festive — Ramadan
               _VipPresetCard(
                 name: 'Ramadan 2025',
                 gradientColors: const [Color(0xFF1A0A2E), Color(0xFF4A1A6E)],
@@ -150,7 +133,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
                 onTap: () => _showVipSnackBar(context),
               ),
 
-              // Card D — Happy Diwali (VIP)
+              // VIP Festive — Diwali
               _VipPresetCard(
                 name: 'Happy Diwali',
                 gradientColors: const [Color(0xFF2D1B00), Color(0xFF8B4500)],
@@ -159,7 +142,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
                 onTap: () => _showVipSnackBar(context),
               ),
 
-              // Card E — Christmas (VIP)
+              // VIP Festive — Christmas
               _VipPresetCard(
                 name: 'Christmas',
                 gradientColors: const [Color(0xFF0A2A0A), Color(0xFF1A5C1A)],
@@ -168,7 +151,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
                 onTap: () => _showVipSnackBar(context),
               ),
 
-              // Card F — New Year (VIP)
+              // VIP Festive — New Year
               _VipPresetCard(
                 name: 'New Year',
                 gradientColors: const [Color(0xFF0A0A2A), Color(0xFF1A1A6E)],
@@ -261,12 +244,12 @@ class _ThemeCard extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
           border: isSelected
-              ? Border.all(color: AppColors.accent, width: 2)
+              ? Border.all(color: const Color(0xFF00D2FF), width: 2)
               : Border.all(color: AppColors.border, width: 1),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.35),
+                    color: const Color(0xFF00D2FF).withValues(alpha: 0.35),
                     blurRadius: 16,
                     spreadRadius: 1,
                   ),
@@ -313,7 +296,7 @@ class _ThemeCard extends StatelessWidget {
                 ),
               ),
 
-              // Selected checkmark
+              // Selected checkmark badge
               if (isSelected)
                 Positioned(
                   bottom: 6,
@@ -322,7 +305,7 @@ class _ThemeCard extends StatelessWidget {
                     width: 20,
                     height: 20,
                     decoration: const BoxDecoration(
-                      color: AppColors.accent,
+                      color: Color(0xFF00D2FF),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
@@ -361,17 +344,15 @@ class _CustomizeWallpaperCard extends StatelessWidget {
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(16),
           border: isSelected
-              ? Border.all(color: AppColors.accent, width: 2)
+              ? Border.all(color: const Color(0xFF00D2FF), width: 2)
               : Border.all(
-                  color: AppColors.accent.withValues(alpha: 0.5),
+                  color: const Color(0xFF00D2FF).withValues(alpha: 0.5),
                   width: 1.5,
-                  // Dashed border approximated via solid with lower opacity;
-                  // Flutter's Border.all doesn't support dashes natively.
                 ),
           boxShadow: isSelected
               ? [
                   BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.35),
+                    color: const Color(0xFF00D2FF).withValues(alpha: 0.35),
                     blurRadius: 16,
                     spreadRadius: 1,
                   ),
@@ -414,7 +395,7 @@ class _CustomizeWallpaperCard extends StatelessWidget {
               ],
             ),
 
-            // Selected checkmark
+            // Selected checkmark badge
             if (isSelected)
               Positioned(
                 bottom: 8,
@@ -423,7 +404,7 @@ class _CustomizeWallpaperCard extends StatelessWidget {
                   width: 20,
                   height: 20,
                   decoration: const BoxDecoration(
-                    color: AppColors.accent,
+                    color: Color(0xFF00D2FF),
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
@@ -511,7 +492,7 @@ class _NoWallpaperCard extends StatelessWidget {
                 ],
               ),
 
-              // Selected checkmark
+              // Selected checkmark badge
               if (isSelected)
                 Positioned(
                   bottom: 8,
@@ -520,7 +501,7 @@ class _NoWallpaperCard extends StatelessWidget {
                     width: 20,
                     height: 20,
                     decoration: const BoxDecoration(
-                      color: AppColors.accent,
+                      color: Color(0xFF00D2FF),
                       shape: BoxShape.circle,
                     ),
                     child: const Icon(
