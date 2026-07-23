@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/foundation.dart';
 
 /// MediaSender — pure Dart HTTP file server.
@@ -24,8 +25,18 @@ class MediaSender {
   String?     _filePath;
   String?     _apkPath;
   String?     _localIp;
+  /// One-time random token appended to the URL as a query parameter.
+  /// Prevents any device on the same LAN from downloading the file
+  /// without scanning the QR code (which contains the token).
+  String?     _token;
 
   String? get localIp => _localIp;
+
+  /// Generates a cryptographically random 16-char hex token.
+  static String _generateToken() {
+    final rng = Random.secure();
+    return List.generate(16, (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+  }
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -39,12 +50,13 @@ class MediaSender {
     if (!await file.exists()) throw FileSystemException('File not found', filePath);
     _filePath = filePath;
     _localIp  = await _getLocalIp();
+    _token    = _generateToken();
     _server   = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
-    debugPrint('[MediaSender] Serving $filePath on http://$_localIp:$port/media');
+    debugPrint('[MediaSender] Serving $filePath on http://$_localIp:$port/media?t=$_token');
     _server!.listen(_handleRequest,
         onError: (Object e) => debugPrint('[MediaSender] Error: $e'),
         cancelOnError: false);
-    return 'http://$_localIp:$port/media';
+    return 'http://$_localIp:$port/media?t=$_token';
   }
 
   Future<String?> startServingApk() async {
@@ -55,7 +67,7 @@ class MediaSender {
 
   Future<void> stop() async {
     await _server?.close(force: true);
-    _server = null; _localIp = null; _filePath = null;
+    _server = null; _localIp = null; _filePath = null; _token = null;
     debugPrint('[MediaSender] Stopped.');
   }
 
@@ -67,6 +79,18 @@ class MediaSender {
     final isApk   = path == '/apk';
     if (!isMedia && !isApk) {
       req.response..statusCode = HttpStatus.notFound..write('Not found')..close();
+      return;
+    }
+    // Token validation — reject requests without the correct one-time token.
+    // This prevents any device on the same Wi-Fi from downloading the file
+    // without scanning the QR code.
+    final requestToken = req.uri.queryParameters['t'];
+    if (_token != null && requestToken != _token) {
+      req.response
+        ..statusCode = HttpStatus.forbidden
+        ..write('Forbidden: invalid token')
+        ..close();
+      debugPrint('[MediaSender] Rejected request with invalid token: $requestToken');
       return;
     }
     final filePath = isApk ? (await _resolveApkPath()) : _filePath;
