@@ -12,8 +12,10 @@ class CarModeScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final ps   = ref.watch(audioPlayerProvider);
-    final item = ref.watch(miniPlayerItemProvider);
+    final ps       = ref.watch(audioPlayerProvider);
+    final item     = ref.watch(miniPlayerItemProvider);
+    // Shuffle state is owned by QueueNotifier — single source of truth.
+    final isShuffle = ref.watch(queueProvider.select((q) => q.shuffle));
 
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -174,7 +176,7 @@ class CarModeScreen extends ConsumerWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
                   _CarSmallBtn(
-                    icon: Icons.shuffle_rounded, active: ps.isShuffle,
+                    icon: Icons.shuffle_rounded, active: isShuffle,
                     onTap: () => ref.read(audioPlayerProvider.notifier).toggleShuffle(),
                   ),
                   _CarSmallBtn(

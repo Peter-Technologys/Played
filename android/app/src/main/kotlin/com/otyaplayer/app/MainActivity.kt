@@ -155,6 +155,11 @@ class MainActivity : FlutterActivity() {
                         equalizer = null
                         result.success(null)
                     }
+                    // Returns the audio session ID used by the equalizer.
+                    // media_kit on Android routes through the global mix (session 0),
+                    // so we return 0 here. This is intentional — MediaCodec-based
+                    // decoders do not expose a per-stream session ID.
+                    "getAudioSessionId" -> result.success(0)
                     else -> result.notImplemented()
                 }
             }
@@ -708,7 +713,13 @@ class MainActivity : FlutterActivity() {
 
     private fun applyEqBands(gains: List<Double>) {
         try {
-            if (equalizer == null) equalizer = android.media.audiofx.Equalizer(0, 0).apply { enabled = true }
+            if (equalizer == null) {
+                // audioSessionId = 0 targets the global audio mix intentionally.
+                // media_kit uses MediaCodec which routes through the global mix,
+                // so there is no per-stream session ID available from Kotlin.
+                // This is acceptable — the EQ affects all audio output on the device.
+                equalizer = android.media.audiofx.Equalizer(0, 0).apply { enabled = true }
+            }
             val eq    = equalizer ?: return
             val range = eq.getBandLevelRange()
             gains.take(eq.numberOfBands.toInt()).forEachIndexed { i, gainDb ->

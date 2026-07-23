@@ -35,10 +35,6 @@ dependencies:
   qr_flutter: ^4.1.0
   mobile_scanner: ^5.2.3
 
-  # Appwrite — cloud sync, auth, backup, release tracking
-  # v17.x uses flutter_web_auth_2 ^4.x which is Kotlin 2.x compatible
-  appwrite: ^17.1.0
-
   # HTTP
   http: ^1.1.0
 

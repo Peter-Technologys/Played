@@ -269,7 +269,17 @@ class PlayedDatabase {
   }
 
   Future<void> invalidateShelfCache() async {
-    try { await _shelfCache.clear(); } catch (_) {}
+    try {
+      // Only delete shelf/playlist cache keys — preserve favorites ('fav_')
+      // and lyrics ('lyrics_') which share the same Hive box.
+      final keysToDelete = _shelfCache.keys
+          .where((k) {
+            final s = k.toString();
+            return !s.startsWith(_kFavPrefix) && !s.startsWith(_kLyricsPrefix);
+          })
+          .toList();
+      await _shelfCache.deleteAll(keysToDelete);
+    } catch (_) {}
   }
 
   // ── Vault ───────────────────────────────────────────────────────────────────

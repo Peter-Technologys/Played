@@ -1,97 +1,72 @@
-import 'dart:async';
-import 'package:appwrite/models.dart' as models;
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'appwrite_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Streams the current Appwrite user.
-/// Re-emits whenever sign-in or sign-out happens.
-final authUserProvider = StreamProvider<models.User?>((ref) async* {
-  yield await AppwriteService.instance.getCurrentUser();
-  await for (final _ in _authChangeStream()) {
-    yield await AppwriteService.instance.getCurrentUser();
-  }
-});
+/// Auth state based on SharedPreferences (userId stored by Google Sign-In).
+/// Appwrite has been removed — auth is now handled by Google Sign-In only,
+/// with the userId persisted under 'appwrite_user_id' for Cloudflare calls.
 
-/// STABILITY 1: Fixed auth change stream that does NOT leak _AuthCompleter
-/// instances. The original while(true) loop added a new listener on every
-/// iteration without ever removing the old one, causing the listener list
-/// to grow unboundedly across sign-in/sign-out cycles.
-///
-/// Fix: use a single persistent callback that resets a shared completer
-/// after each completion, and remove the callback when the stream is done.
-Stream<void> _authChangeStream() async* {
-  // Single completer shared across all iterations.
-  var completer = _AuthCompleter();
+class _AuthState {
+  final String? userId;
+  final String? displayName;
+  final String? email;
+  final String? photoUrl;
 
-  // Single persistent callback — registered once, never duplicated.
-  void callback() => completer.complete();
-  AppwriteService.instance.addAuthListener(callback);
+  const _AuthState({
+    this.userId,
+    this.displayName,
+    this.email,
+    this.photoUrl,
+  });
 
-  try {
-    while (true) {
-      await completer.future;
-      yield null;
-      // Reset for the next auth event before looping.
-      completer = _AuthCompleter();
-    }
-  } finally {
-    // STABILITY 1: Remove the listener when the stream subscription is
-    // cancelled (e.g. provider disposed) to prevent a dangling reference.
-    // AppwriteService.removeAuthListener is added below.
-    AppwriteService.instance.removeAuthListener(callback);
-  }
+  bool get isSignedIn => userId != null && userId!.isNotEmpty;
 }
 
-class _AuthCompleter {
-  final _completer = Completer<void>();
-  Future<void> get future => _completer.future;
-  void complete() {
-    if (!_completer.isCompleted) _completer.complete();
-  }
+Future<_AuthState> _loadAuthState() async {
+  final prefs = await SharedPreferences.getInstance();
+  final userId = prefs.getString('appwrite_user_id');
+  final displayName = prefs.getString('auth_display_name');
+  final email = prefs.getString('auth_email');
+  final photoUrl = prefs.getString('auth_photo_url');
+  return _AuthState(
+    userId: userId,
+    displayName: displayName,
+    email: email,
+    photoUrl: photoUrl,
+  );
 }
 
-/// True when a real user is signed in.
+/// Provides the current auth state loaded from SharedPreferences.
+final authStateProvider = FutureProvider<_AuthState>((_) => _loadAuthState());
+
+/// True when a user is signed in (userId is non-empty in SharedPreferences).
 final isSignedInProvider = Provider<bool>((ref) {
-  return ref.watch(authUserProvider).maybeWhen(
-    data: (user) => user != null,
+  return ref.watch(authStateProvider).maybeWhen(
+    data: (state) => state.isSignedIn,
     orElse: () => false,
   );
 });
 
 /// The signed-in user's display name, or null.
 final displayNameProvider = Provider<String?>((ref) {
-  return ref.watch(authUserProvider).maybeWhen(
-    data: (user) => user?.name.isNotEmpty == true ? user!.name : null,
+  return ref.watch(authStateProvider).maybeWhen(
+    data: (state) =>
+        state.displayName?.isNotEmpty == true ? state.displayName : null,
     orElse: () => null,
   );
 });
 
 /// The signed-in user's email, or null.
 final userEmailProvider = Provider<String?>((ref) {
-  return ref.watch(authUserProvider).maybeWhen(
-    data: (user) => user?.email.isNotEmpty == true ? user!.email : null,
+  return ref.watch(authStateProvider).maybeWhen(
+    data: (state) => state.email?.isNotEmpty == true ? state.email : null,
     orElse: () => null,
   );
 });
 
-/// Google profile photo URL.
-/// Appwrite stores it in user prefs after OAuth under key 'avatarUrl'.
-/// Falls back to the Appwrite avatar API which generates an initials avatar.
+/// Google profile photo URL, or null.
 final photoUrlProvider = Provider<String?>((ref) {
-  return ref.watch(authUserProvider).maybeWhen(
-    data: (user) {
-      if (user == null) return null;
-      // Check prefs for Google avatar stored after OAuth
-      final prefs = user.prefs.data;
-      final avatar = prefs['avatarUrl'] as String?;
-      if (avatar != null && avatar.isNotEmpty) return avatar;
-      // Fallback: Appwrite initials avatar
-      if (user.name.isNotEmpty) {
-        final encoded = Uri.encodeComponent(user.name);
-        return 'https://nyc.cloud.appwrite.io/v1/avatars/initials?name=$encoded&project=6a3011f1003b1a6cc74d';
-      }
-      return null;
-    },
+  return ref.watch(authStateProvider).maybeWhen(
+    data: (state) => state.photoUrl?.isNotEmpty == true ? state.photoUrl : null,
     orElse: () => null,
   );
 });

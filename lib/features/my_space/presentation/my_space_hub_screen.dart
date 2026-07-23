@@ -7,8 +7,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/auth_provider.dart';
-import '../../../core/services/appwrite_service.dart';
 import '../../../core/services/cloudflare_service.dart';
 import '../../settings/settings_provider.dart';
 import 'providers/my_space_provider.dart';
@@ -252,17 +252,14 @@ class MySpaceHubScreen extends ConsumerWidget {
   }
 
   Future<void> _signIn(BuildContext context) async {
-    try {
-      await AppwriteService.instance.signInWithGoogle();
-    } catch (_) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sign-in failed. Please try again.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+    // Google Sign-In is handled natively; userId is stored in SharedPreferences.
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google sign-in is handled via the native flow.'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
     }
   }
 
@@ -290,9 +287,13 @@ class MySpaceHubScreen extends ConsumerWidget {
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              AppwriteService.instance.signOut();
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('appwrite_user_id');
+              await prefs.remove('auth_display_name');
+              await prefs.remove('auth_email');
+              await prefs.remove('auth_photo_url');
             },
             child: const Text('Sign out',
                 style: TextStyle(color: AppColors.error)),
@@ -303,10 +304,9 @@ class MySpaceHubScreen extends ConsumerWidget {
   }
 
   Future<void> _runBackup(BuildContext context) async {
-    // BUG 3: Use CloudflareService (the active backend) instead of the
-    // legacy AppwriteService.backupAll(). Requires the current userId.
-    final userId = (await AppwriteService.instance.getCurrentUser())?.$id;
-    if (userId == null) {
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('appwrite_user_id') ?? '';
+    if (userId.isEmpty) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
         content: Text('Sign in first to back up your data.'),

@@ -34,7 +34,6 @@ class AudioPlayerState {
   final double speed;
   final bool isLoading;
   final bool isFavorite;
-  final bool isShuffle;
   final RepeatState repeat;
 
   const AudioPlayerState({
@@ -44,14 +43,13 @@ class AudioPlayerState {
     this.speed = 1.0,
     this.isLoading = true,
     this.isFavorite = false,
-    this.isShuffle = false,
     this.repeat = RepeatState.off,
   });
 
   AudioPlayerState copyWith({
     bool? isPlaying, Duration? position, Duration? duration,
     double? speed, bool? isLoading, bool? isFavorite,
-    bool? isShuffle, RepeatState? repeat,
+    RepeatState? repeat,
   }) => AudioPlayerState(
     isPlaying: isPlaying ?? this.isPlaying,
     position: position ?? this.position,
@@ -59,7 +57,6 @@ class AudioPlayerState {
     speed: speed ?? this.speed,
     isLoading: isLoading ?? this.isLoading,
     isFavorite: isFavorite ?? this.isFavorite,
-    isShuffle: isShuffle ?? this.isShuffle,
     repeat: repeat ?? this.repeat,
   );
 }
@@ -225,13 +222,11 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
     final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);
     final speed       = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
-    final skipSilence = settings?.skipSilence ?? false;
 
     try {
       await _handler!.loadAndPlay(
         item,
         speed: speed,
-        skipSilence: skipSilence,
         savedPosition: saved,
       );
       // Attach streams AFTER loadAndPlay() completes so we always subscribe
@@ -309,7 +304,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     }
   }
 
-  void toggleShuffle()  => state = state.copyWith(isShuffle: !state.isShuffle);
+  void toggleShuffle() {
+    // Delegate shuffle state entirely to QueueNotifier — single source of truth.
+    _container?.read(queueProvider.notifier).toggleShuffle();
+  }
 
   void cycleRepeat() {
     final next = RepeatState.values[
@@ -452,6 +450,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   @override
   Widget build(BuildContext context) {
     final ps = ref.watch(audioPlayerProvider);
+    // Shuffle state is owned by QueueNotifier — single source of truth.
+    final isShuffle = ref.watch(queueProvider.select((q) => q.shuffle));
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmall = screenHeight < 680;
@@ -569,7 +569,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 children: [
                   _ToggleIconBtn(
                     icon: Icons.shuffle_rounded,
-                    active: ps.isShuffle,
+                    active: isShuffle,
                     onTap: () =>
                         ref.read(audioPlayerProvider.notifier).toggleShuffle(),
                   ),
