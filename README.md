@@ -4,8 +4,8 @@
 
 # OTYA Player
 
-**Premium offline audio player — built for Android.**  
-Play any audio file, 100% offline. No account required.
+**Premium offline media player — built for Android.**  
+Play any audio or video file, 100% offline. No account required.
 
 [![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
 [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev)
@@ -21,8 +21,9 @@ Play any audio file, 100% offline. No account required.
 
 | Screen | What it does |
 |---|---|
-| **My Space** | Unified media hub — songs, folders tabs, recently played, search, sort, pin folders |
+| **My Space** | Unified media hub — songs, videos, folders tabs, recently played, search, sort, pin folders |
 | **Audio Player** | Shuffle, repeat, speed (0.5×–2×), 5-band EQ, LRC lyrics, queue, sleep timer, share |
+| **Video Player** | Hardware-accelerated VLC, subtitles (.srt/.ass), aspect ratio, PiP, battery saver, gesture controls |
 | **Air-Drop** | Zero-data file sharing via Wi-Fi Direct + Bluetooth (Nearby Connections) |
 | **Vault** | Private media vault with biometric + PIN unlock |
 | **Playlists** | Create, rename, reorder, play playlists |
@@ -51,13 +52,15 @@ lib/
 │   ├── services/           # Auth, Cloudflare backup, Notification, Vault
 │   └── utils/              # Formatters, helpers
 ├── features/
-│   ├── my_space/           # Home tab — audio library
-│   ├── player/             # Audio player, mini player, lyrics, EQ
+│   ├── my_space/           # Home tab — media library
+│   ├── player/             # Audio + Video players, mini player, lyrics, EQ
 │   ├── air_drop/           # Nearby Connections file sharing
 │   ├── vault/              # Encrypted media vault
 │   ├── playlists/          # Playlist management
 │   ├── profile/            # Profile & Settings screen
-│   └── settings/           # Settings provider, privacy policy
+│   ├── settings/           # Settings provider, privacy policy
+│   ├── video/              # Video tab screen
+│   └── tools/              # Tools tab screen
 └── shared/
     ├── extensions/         # BuildContext extensions
     └── widgets/            # AdBannerSlot, LoadingShimmer, Logo
@@ -69,8 +72,9 @@ lib/
 
 | Layer | Library |
 |---|---|
-| Audio playback | `media_kit` — hardware-accelerated, unified engine |
+| Video & Audio playback | `media_kit` — hardware-accelerated, MKV/AVI/4K, unified engine |
 | Background audio | `audio_service` — lock screen controls, OS media notifications |
+| Offline trim/extract | Android `MediaExtractor` + `MediaMuxer` (native, no FFmpeg binary) |
 | Database | `hive` — 100% offline, AES-256 encrypted vault box |
 | Cloud backup | Cloudflare Workers — playlist + history sync |
 | Nearby sharing | `nearby_connections` — Wi-Fi Direct + Bluetooth |

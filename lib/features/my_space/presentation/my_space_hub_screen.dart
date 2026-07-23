@@ -43,8 +43,9 @@ class MySpaceHubScreen extends ConsumerWidget {
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final total = libraryAsync.valueOrNull?.length ?? 0;
     final songs = libraryAsync.valueOrNull?.where((e) => !e.isVideo).length ?? 0;
+    final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
-    // My Space tools: file management, sharing & audio features only.
+    // My Space tools: file management, sharing & conversion features only.
     // Player features (Equalizer, Car Mode, History) live in the Tools tab.
     // Theme lives in Settings. Air-Drop and Web Share merged (same screen).
     final tools = <_ToolItem>[
@@ -61,6 +62,20 @@ class MySpaceHubScreen extends ConsumerWidget {
         subtitle: 'AirDrop & web stream',
         gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
         onTap: () => context.push('/airdrop'),
+      ),
+      _ToolItem(
+        icon: Icons.audiotrack_rounded,
+        label: 'MP3 Convert',
+        subtitle: 'Extract audio',
+        gradient: const [Color(0xFF34D399), Color(0xFF059669)],
+        onTap: () => _showMp3Sheet(context),
+      ),
+      _ToolItem(
+        icon: Icons.content_cut_rounded,
+        label: 'Trimmer',
+        subtitle: 'Clip & compress',
+        gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
+        onTap: () => _showTrimmerSheet(context),
       ),
       _ToolItem(
         icon: Icons.cleaning_services_rounded,
@@ -194,9 +209,16 @@ class MySpaceHubScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 10),
                       _StatCard(
+                        icon: Icons.video_library_rounded,
+                        value: '$videos',
+                        label: 'Videos',
+                        color: AppColors.accent,
+                      ),
+                      const SizedBox(width: 10),
+                      _StatCard(
                         icon: Icons.folder_rounded,
                         value: '$total',
-                        label: 'Files',
+                        label: 'Total',
                         color: AppColors.accentGreen,
                       ),
                     ],
