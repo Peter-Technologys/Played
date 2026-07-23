@@ -10,7 +10,6 @@ import '../../../core/database/played_database.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
-import '../../settings/settings_provider.dart';
 import 'providers/my_space_provider.dart';
 import 'usage_stats_dashboard.dart';
 
@@ -189,14 +188,6 @@ class MySpaceHubScreen extends ConsumerWidget {
                     ),
                     const SizedBox(height: 8),
                     _QuickLink(
-                      icon: Icons.build_rounded,
-                      label: 'Tools',
-                      subtitle: 'Vault, AirDrop, Equalizer & more',
-                      color: AppColors.accent,
-                      onTap: () => context.push('/tools'),
-                    ),
-                    const SizedBox(height: 8),
-                    _QuickLink(
                       icon: Icons.history_rounded,
                       label: 'Play History',
                       subtitle: 'Recently played tracks',
@@ -226,14 +217,6 @@ class MySpaceHubScreen extends ConsumerWidget {
                       subtitle: 'Listening time, tracks played & more',
                       color: AppColors.accentGreen,
                       onTap: () => context.push('/stats'),
-                    ),
-                    const SizedBox(height: 8),
-                    _QuickLink(
-                      icon: Icons.info_outline_rounded,
-                      label: 'About OTYA Player',
-                      subtitle: 'Version, support & what\'s new',
-                      color: AppColors.textSecondary,
-                      onTap: () => context.push('/about'),
                     ),
                   ],
                 ),
