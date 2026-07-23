@@ -57,7 +57,9 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
 
   // Swipe-to-dismiss tracking
   double _dragOffset = 0;
-  static const _dismissThreshold = 40.0;
+  // Raised from 40 → 80 px to prevent accidental dismissal during normal
+  // vertical scrolling gestures on the home screen.
+  static const _dismissThreshold = 80.0;
 
   @override
   void initState() {

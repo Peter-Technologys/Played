@@ -416,19 +416,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // CC toggle
-                    IconButton(
-                      icon: Icon(
-                        Icons.closed_caption_rounded,
-                        color: _ccEnabled ? AppColors.accent : Colors.white70,
-                        size: 22,
-                      ),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        setState(() => _ccEnabled = !_ccEnabled);
-                      },
-                      tooltip: 'Subtitles',
-                    ),
+                    // CC toggle — hidden until subtitle feature is wired
+                    // to MediaKitEngine._setSubtitleTrack. Showing a button
+                    // that does nothing is worse UX than hiding it.
+                    // TODO: implement subtitle selection via MediaKitEngine track menu.
                     // More options
                     IconButton(
                       icon: const Icon(Icons.more_vert_rounded,
@@ -770,7 +761,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
-    _restoreOrientation();
+    // _restoreOrientation() is async but dispose() cannot be async.
+    // Schedule it as a fire-and-forget microtask so SystemChrome calls
+    // still execute after the widget tree is torn down.
+    Future.microtask(_restoreOrientation);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
