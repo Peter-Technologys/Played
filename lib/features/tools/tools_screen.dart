@@ -141,7 +141,23 @@ class _ToolsSearchDelegate extends SearchDelegate<void> {
 class ToolsScreen extends ConsumerWidget {
   const ToolsScreen({super.key});
 
+  // 9 tools = 3x3 grid. Each tool lives ONLY here.
+  // AirDrop + Web Share merged (same screen). Car Mode accessed from player.
   List<_ToolEntry> _buildToolEntries(BuildContext context, WidgetRef ref) => [
+        _ToolEntry(
+          icon: Icons.folder_open_rounded,
+          label: 'Media Manage',
+          subtitle: 'Browse & organise',
+          gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
+          onTapBuilder: (ctx) => () => ctx.push('/tools/folders'),
+        ),
+        _ToolEntry(
+          icon: Icons.audiotrack_rounded,
+          label: 'MP3 Converter',
+          subtitle: 'Extract audio',
+          gradient: const [Color(0xFF34D399), Color(0xFF059669)],
+          onTapBuilder: (ctx) => () => _showMp3InstructionSheet(ctx),
+        ),
         _ToolEntry(
           icon: Icons.lock_rounded,
           label: 'Vault',
@@ -151,24 +167,10 @@ class ToolsScreen extends ConsumerWidget {
         ),
         _ToolEntry(
           icon: Icons.wifi_tethering_rounded,
-          label: 'Air-Drop',
-          subtitle: 'P2P transfer',
+          label: 'Share & Transfer',
+          subtitle: 'AirDrop & web stream',
           gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
           onTapBuilder: (ctx) => () => ctx.push('/airdrop'),
-        ),
-        _ToolEntry(
-          icon: Icons.audiotrack_rounded,
-          label: 'MP3 Convert',
-          subtitle: 'Extract audio',
-          gradient: const [Color(0xFF34D399), Color(0xFF059669)],
-          onTapBuilder: (ctx) => () => _showMp3InstructionSheet(ctx),
-        ),
-        _ToolEntry(
-          icon: Icons.content_cut_rounded,
-          label: 'Trimmer',
-          subtitle: 'Clip & compress',
-          gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
-          onTapBuilder: (ctx) => () => _showTrimmerInstructionSheet(ctx),
         ),
         _ToolEntry(
           icon: Icons.palette_rounded,
@@ -176,13 +178,6 @@ class ToolsScreen extends ConsumerWidget {
           subtitle: 'Appearance',
           gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
           onTapBuilder: (ctx) => () => ctx.push('/theme'),
-        ),
-        _ToolEntry(
-          icon: Icons.graphic_eq_rounded,
-          label: 'Equalizer',
-          subtitle: 'Audio tuner',
-          gradient: const [Color(0xFF00D2FF), Color(0xFF8C52FF)],
-          onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
         ),
         _ToolEntry(
           icon: Icons.history_rounded,
@@ -199,18 +194,18 @@ class ToolsScreen extends ConsumerWidget {
           onTapBuilder: (ctx) => () => _showStorageCleaner(ctx, ref),
         ),
         _ToolEntry(
-          icon: Icons.directions_car_rounded,
-          label: 'Car Mode',
-          subtitle: 'Distraction-free',
-          gradient: const [Color(0xFF1DB954), Color(0xFF0D8A3C)],
-          onTapBuilder: (ctx) => () => ctx.push('/player/car-mode'),
+          icon: Icons.bar_chart_rounded,
+          label: 'Stats',
+          subtitle: 'Your activity',
+          gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
+          onTapBuilder: (ctx) => () => ctx.push('/stats'),
         ),
         _ToolEntry(
-          icon: Icons.cast_rounded,
-          label: 'Web Share',
-          subtitle: 'Stream to browser',
-          gradient: const [Color(0xFF00D2FF), Color(0xFF0066CC)],
-          onTapBuilder: (ctx) => () => ctx.push('/airdrop'),
+          icon: Icons.graphic_eq_rounded,
+          label: 'Equalizer',
+          subtitle: 'Audio tuner',
+          gradient: const [Color(0xFF00D2FF), Color(0xFF8C52FF)],
+          onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
         ),
       ];
 
