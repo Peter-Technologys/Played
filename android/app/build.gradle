@@ -41,6 +41,37 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
+
+        // Broad locale support — covers all major markets
+        resConfigs "en", "fr", "es", "ar", "pt", "hi", "sw", "zh", "ru", "de", "tr", "id", "vi"
+
+        // Support library vector drawables for all screen densities
+        vectorDrawables.useSupportLibrary = true
+    }
+
+    // ABI splits: produce a separate smaller APK per CPU architecture.
+    // Users on arm64 devices (99% of modern phones) get a ~30% smaller APK.
+    // The universal APK is also produced for sideload / unknown devices.
+    splits {
+        abi {
+            enable true
+            reset()
+            include 'arm64-v8a', 'armeabi-v7a', 'x86_64'
+            universalApk true // always produce a fat APK for sideload
+        }
+    }
+
+    // Assign unique version codes per ABI so the Play Store can serve
+    // the correct APK. The base versionCode is multiplied by 10 and
+    // offset by ABI index so codes never collide.
+    ext.abiCodes = ['armeabi-v7a': 1, 'arm64-v8a': 2, 'x86_64': 3]
+    applicationVariants.configureEach { variant ->
+        variant.outputs.each { output ->
+            def abiFilter = output.getFilter(com.android.build.OutputFile.ABI)
+            def abiCode = project.ext.abiCodes.get(abiFilter, 0)
+            output.versionCodeOverride =
+                variant.versionCode * 10 + abiCode
+        }
     }
 
     // No product flavors — single standard build for Google Play / sideload
