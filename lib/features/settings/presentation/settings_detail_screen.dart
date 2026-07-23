@@ -4,11 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/services/update_service.dart';
@@ -89,93 +86,14 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
         padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).padding.bottom + 100),
         children: [
 
-          // ── Appearance ────────────────────────────────────────────
-          _SectionHeader(label: 'Appearance'),
-          const SizedBox(height: 10),
-          Container(
-            padding: const EdgeInsets.all(4),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.borderOf(context)),
-            ),
-            child: Row(
-              children: AppThemeMode.values.map((mode) {
-                final label = switch (mode) {
-                  AppThemeMode.dark   => 'Dark',
-                  AppThemeMode.amoled => 'AMOLED',
-                  AppThemeMode.light  => 'Light',
-                };
-                final icon = switch (mode) {
-                  AppThemeMode.dark   => Icons.dark_mode_rounded,
-                  AppThemeMode.amoled => Icons.brightness_1_rounded,
-                  AppThemeMode.light  => Icons.light_mode_rounded,
-                };
-                final active = s.themeMode == mode;
-                return Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      sn.setThemeMode(mode);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      decoration: BoxDecoration(
-                        gradient: active
-                            ? const LinearGradient(
-                                colors: [AppColors.accent, AppColors.accentViolet],
-                              )
-                            : null,
-                        borderRadius: BorderRadius.circular(12),
-                        boxShadow: active
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.accent.withValues(alpha: 0.3),
-                                  blurRadius: 10,
-                                ),
-                              ]
-                            : null,
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(icon,
-                              color: active
-                                  ? Colors.black
-                                  : AppColors.textSecondary,
-                              size: 18),
-                          const SizedBox(height: 4),
-                          Text(
-                            label,
-                            style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                              color: active
-                                  ? Colors.black
-                                  : AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-
-          const SizedBox(height: 12),
+          // ── Theme & Appearance ────────────────────────────────────
           _GroupCard(children: [
             _NavTile(
-              icon: Icons.wallpaper_rounded,
-              label: 'Customize Wallpaper',
-              subtitle: 'Pick a photo or festive theme',
+              icon: Icons.palette_rounded,
+              label: 'Theme & Appearance',
+              subtitle: 'Dark, AMOLED, Light & wallpaper',
               color: AppColors.accentViolet,
-              onTap: () {
-                HapticFeedback.selectionClick();
-                context.push('/theme');
-              },
+              onTap: () => context.push('/theme'),
             ),
           ]),
 
@@ -213,7 +131,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
 
           const SizedBox(height: 8),
 
-          // Inline audio toggles
+          // Default Speed (not duplicated in any sheet)
           _GroupCard(children: [
             _SwitchRow(
               icon: Icons.speed_rounded,
@@ -222,50 +140,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
                 label: '${s.playbackSpeed}x',
                 onTap: () => _showSpeedPicker(context, sn, s.playbackSpeed),
               ),
-            ),
-            _Divider(),
-            _SwitchRow(
-              icon: Icons.headphones_rounded,
-              label: 'Resume on Headset',
-              subtitle: 'Auto-play when headphones connect',
-              value: s.autoResume,
-              onChanged: sn.setAutoResume,
-            ),
-            _Divider(),
-            _SwitchRow(
-              icon: Icons.phone_in_talk_rounded,
-              label: 'Pause During Calls',
-              value: s.pauseDuringCalls,
-              onChanged: sn.setPauseDuringCalls,
-            ),
-          ]),
-
-          const SizedBox(height: 8),
-
-          // Video toggles
-          _GroupCard(children: [
-            _SwitchRow(
-              icon: Icons.picture_in_picture_alt_rounded,
-              label: 'Auto Picture-in-Picture',
-              subtitle: 'Float video when you leave the app',
-              value: s.autoPip,
-              onChanged: sn.setAutoPip,
-            ),
-            _Divider(),
-            _SwitchRow(
-              icon: Icons.subtitles_rounded,
-              label: 'Auto-load Subtitles',
-              subtitle: 'Load .srt/.ass from same folder',
-              value: s.autoLoadSubtitles,
-              onChanged: sn.setAutoLoadSubtitles,
-            ),
-            _Divider(),
-            _SwitchRow(
-              icon: Icons.battery_saver_rounded,
-              label: 'Battery Saver by Default',
-              subtitle: 'Start video in audio-only mode',
-              value: s.defaultBatterySaver,
-              onChanged: sn.setDefaultBatterySaver,
             ),
           ]),
 
@@ -330,8 +204,8 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
           _GroupCard(children: [
             _NavTile(
               icon: Icons.info_outline_rounded,
-              label: 'About OTYA Player',
-              subtitle: 'Version, support & what\'s new',
+              label: 'About & Support',
+              subtitle: 'Version, links & what\'s new',
               color: AppColors.accent,
               onTap: () => context.push('/about'),
             ),
@@ -342,46 +216,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
               subtitle: _checkingUpdate ? 'Checking…' : 'Tap to check for a new version',
               color: AppColors.accent,
               onTap: _checkingUpdate ? () {} : _checkForUpdate,
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.email_outlined,
-              label: 'Contact Support',
-              subtitle: 'support@petersmartlink.com',
-              color: AppColors.textSecondary,
-              onTap: () => _launchEmail(context),
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.new_releases_outlined,
-              label: "What's New",
-              subtitle: 'See what changed in this version',
-              color: AppColors.textSecondary,
-              onTap: () => context.push('/whats-new'),
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.share_rounded,
-              label: 'Share App',
-              subtitle: 'Send OTYA Player to a friend',
-              color: AppColors.textSecondary,
-              onTap: () => _shareApp(context),
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.privacy_tip_outlined,
-              label: 'Privacy Policy',
-              color: AppColors.textSecondary,
-              onTap: () => context.push('/privacy'),
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.star_outline_rounded,
-              label: 'Rate OTYA Player',
-              subtitle: 'Enjoying the app? Leave a review!',
-              color: AppColors.accentAmber,
-              onTap: () => _launchUrl(context,
-                  'https://play.google.com/store/apps/details?id=com.otyaplayer.app'),
             ),
           ]),
 
@@ -969,39 +803,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
     );
   }
 
-  Future<void> _launchEmail(BuildContext context) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: 'support@petersmartlink.com',
-      queryParameters: {'subject': 'OTYA Player Support'},
-    );
-    if (!await launchUrl(uri) && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open email app.')),
-      );
-    }
-  }
-
-  Future<void> _shareApp(BuildContext context) async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      await Share.share(
-        'Download OTYA Player v${info.version} — free offline media player for Android:\n'
-        'https://petersmartlink.com/download/otya-player',
-        subject: 'OTYA Player',
-      );
-    } catch (_) {}
-  }
-
-  Future<void> _launchUrl(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    if (!await launchUrl(uri, mode: LaunchMode.externalApplication) &&
-        context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open link.')),
-      );
-    }
-  }
 }
 
 // ── Shared widgets ────────────────────────────────────────────────────
