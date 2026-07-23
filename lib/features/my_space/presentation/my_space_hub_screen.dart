@@ -45,6 +45,9 @@ class MySpaceHubScreen extends ConsumerWidget {
     final songs = libraryAsync.valueOrNull?.where((e) => !e.isVideo).length ?? 0;
     final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
+    // My Space tools: file management, sharing & conversion features only.
+    // Player features (Equalizer, Car Mode, History) live in the Tools tab.
+    // Theme lives in Settings. Air-Drop and Web Share merged (same screen).
     final tools = <_ToolItem>[
       _ToolItem(
         icon: Icons.lock_rounded,
@@ -55,8 +58,8 @@ class MySpaceHubScreen extends ConsumerWidget {
       ),
       _ToolItem(
         icon: Icons.wifi_tethering_rounded,
-        label: 'Air-Drop',
-        subtitle: 'P2P transfer',
+        label: 'Share & Transfer',
+        subtitle: 'AirDrop & web stream',
         gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
         onTap: () => context.push('/airdrop'),
       ),
@@ -75,27 +78,6 @@ class MySpaceHubScreen extends ConsumerWidget {
         onTap: () => _showTrimmerSheet(context),
       ),
       _ToolItem(
-        icon: Icons.palette_rounded,
-        label: 'Theme',
-        subtitle: 'Appearance',
-        gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
-        onTap: () => context.push('/theme'),
-      ),
-      _ToolItem(
-        icon: Icons.graphic_eq_rounded,
-        label: 'Equalizer',
-        subtitle: 'Audio tuner',
-        gradient: const [Color(0xFF00D2FF), Color(0xFF8C52FF)],
-        onTap: () => context.push('/player/equalizer'),
-      ),
-      _ToolItem(
-        icon: Icons.history_rounded,
-        label: 'History',
-        subtitle: 'Recently played',
-        gradient: const [Color(0xFF8C52FF), Color(0xFF00D2FF)],
-        onTap: () => context.push('/history'),
-      ),
-      _ToolItem(
         icon: Icons.cleaning_services_rounded,
         label: 'Cleaner',
         subtitle: 'Free up space',
@@ -103,18 +85,11 @@ class MySpaceHubScreen extends ConsumerWidget {
         onTap: () => _showStorageCleaner(context),
       ),
       _ToolItem(
-        icon: Icons.directions_car_rounded,
-        label: 'Car Mode',
-        subtitle: 'Distraction-free',
+        icon: Icons.queue_music_rounded,
+        label: 'Playlists',
+        subtitle: 'Manage playlists',
         gradient: const [Color(0xFF1DB954), Color(0xFF0D8A3C)],
-        onTap: () => context.push('/player/car-mode'),
-      ),
-      _ToolItem(
-        icon: Icons.cast_rounded,
-        label: 'Web Share',
-        subtitle: 'Stream to browser',
-        gradient: const [Color(0xFF00D2FF), Color(0xFF0066CC)],
-        onTap: () => context.push('/airdrop'),
+        onTap: () => context.push('/playlists'),
       ),
     ];
 
@@ -300,36 +275,13 @@ class MySpaceHubScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   children: [
+                    // Vault, Playlists, History are in the tools grid above.
                     _QuickLink(
                       icon: Icons.settings_rounded,
                       label: 'Profile & Settings',
                       subtitle: 'Account, appearance, playback & more',
                       color: AppColors.accent,
                       onTap: () => context.push('/settings'),
-                    ),
-                    const SizedBox(height: 8),
-                    _QuickLink(
-                      icon: Icons.history_rounded,
-                      label: 'Play History',
-                      subtitle: 'Recently played tracks',
-                      color: AppColors.accentViolet,
-                      onTap: () => context.push('/history'),
-                    ),
-                    const SizedBox(height: 8),
-                    _QuickLink(
-                      icon: Icons.queue_music_rounded,
-                      label: 'Playlists',
-                      subtitle: 'Manage your playlists',
-                      color: AppColors.accentGreen,
-                      onTap: () => context.push('/playlists'),
-                    ),
-                    const SizedBox(height: 8),
-                    _QuickLink(
-                      icon: Icons.lock_rounded,
-                      label: 'Vault',
-                      subtitle: 'Private encrypted media',
-                      color: AppColors.accentViolet,
-                      onTap: () => context.push('/vault'),
                     ),
                     const SizedBox(height: 8),
                     _QuickLink(
