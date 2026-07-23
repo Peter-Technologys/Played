@@ -46,50 +46,6 @@ class MySpaceHubScreen extends ConsumerWidget {
     final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
     // Tools live in the Tools tab — no tools grid duplicated here.
-    final tools = <_ToolItem>[
-      _ToolItem(
-        icon: Icons.lock_rounded,
-        label: 'Vault',
-        subtitle: 'Private storage',
-        gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
-        onTap: () => context.push('/vault'),
-      ),
-      _ToolItem(
-        icon: Icons.wifi_tethering_rounded,
-        label: 'Share & Transfer',
-        subtitle: 'AirDrop & web stream',
-        gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
-        onTap: () => context.push('/airdrop'),
-      ),
-      _ToolItem(
-        icon: Icons.audiotrack_rounded,
-        label: 'MP3 Convert',
-        subtitle: 'Extract audio',
-        gradient: const [Color(0xFF34D399), Color(0xFF059669)],
-        onTap: () => _showMp3Sheet(context),
-      ),
-      _ToolItem(
-        icon: Icons.content_cut_rounded,
-        label: 'Trimmer',
-        subtitle: 'Clip & compress',
-        gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
-        onTap: () => _showTrimmerSheet(context),
-      ),
-      _ToolItem(
-        icon: Icons.cleaning_services_rounded,
-        label: 'Cleaner',
-        subtitle: 'Free up space',
-        gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
-        onTap: () => _showStorageCleaner(context),
-      ),
-      _ToolItem(
-        icon: Icons.queue_music_rounded,
-        label: 'Playlists',
-        subtitle: 'Manage playlists',
-        gradient: const [Color(0xFF1DB954), Color(0xFF0D8A3C)],
-        onTap: () => context.push('/playlists'),
-      ),
-    ];
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
