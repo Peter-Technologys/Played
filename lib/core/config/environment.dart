@@ -14,16 +14,23 @@ abstract class Environment {
   static const String releasesCollection  = 'releases';
   static const String devicesCollection   = 'devices';
 
-  // ── Website & APK distribution ─────────────────────────────────────────────────────────────────────────────
-  // All APK downloads, version checks, and update notifications go through
-  // petersmartlink.com (Cloudflare Worker + R2). The old getotya subdomain
-  // is no longer used.
+  // ── Website & APK distribution ────────────────────────────────────────────
   static const String workerUrl           = 'https://petersmartlink.com';
   static const String versionUrl          = '$workerUrl/version';
   static const String latestUrl           = '$workerUrl/latest';
   static const String downloadUrl         = '$workerUrl/download';
   static const String arm64DownloadUrl    = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl    = '$workerUrl/apk/arm32';
+
+  // ── Cloudflare Worker API (D1-backed) ─────────────────────────────────────
+  // These replace the Appwrite database calls for playlists, history, pro status.
+  // Auth (Google OAuth) still goes through Appwrite.
+  static const String checkUpdateUrl      = '$workerUrl/check-update';
+  static const String registerDeviceUrl   = '$workerUrl/register-device';
+  static const String configsThemeUrl     = '$workerUrl/configs/theme';
+  static const String apiPlaylistsUrl     = '$workerUrl/api/playlists';
+  static const String apiHistoryUrl       = '$workerUrl/api/history';
+  static const String apiProUrl           = '$workerUrl/api/pro';
 
   // ── App Info ─────────────────────────────────────────────────────────────────────────────
   static const String appName             = 'OTYA Player';

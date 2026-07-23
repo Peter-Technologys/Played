@@ -10,6 +10,7 @@ import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
 import 'core/services/appwrite_service.dart';
+import 'core/services/cloudflare_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
@@ -203,6 +204,10 @@ Future<void> _initAppwrite() async {
     debugPrint('[Appwrite] Init error: $e');
   }
 }
+
+// CloudflareService has no init — it is stateless HTTP. Accessed via singleton.
+// ignore: unused_element
+CloudflareService get _cf => CloudflareService.instance;
 
 Future<void> _initWorkManager() async {
   try {
