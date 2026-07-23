@@ -15,17 +15,13 @@
 -keep class io.flutter.** { *; }
 -dontwarn io.flutter.**
 
-# just_audio — keep all player classes so release builds don't strip them
--keep class com.ryanheise.just_audio.** { *; }
--dontwarn com.ryanheise.just_audio.**
+# just_audio — REMOVED (replaced by media_kit for audio playback)
 
 # audio_service — keep service + handler so background playback works in release
 -keep class com.ryanheise.audioservice.** { *; }
 -dontwarn com.ryanheise.audioservice.**
 
-# audio_session
--keep class com.ryanheise.audio_session.** { *; }
--dontwarn com.ryanheise.audio_session.**
+# audio_session — REMOVED (was only needed by just_audio)
 
 # flutter_vlc_player — REMOVED (not in pubspec; flutter_vlc_player replaced by media_kit)
 

@@ -3,7 +3,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
@@ -68,19 +68,20 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   // Route all playback through the audio_service handler.
   // Guard against null — AudioService.init() runs in background after app start.
   PlayedAudioHandler? get _handler => globalAudioHandler;
-  AudioPlayer? get _player => _handler?.player;
+  Player? get _player => _handler?.player;
   String? _currentItemId;
   // Track which player instance the streams are attached to.
   // Reset to false whenever a new item is loaded so we re-attach
   // to the (potentially new) player instance.
   bool _streamsAttached = false;
-  AudioPlayer? _attachedPlayer;
+  Player? _attachedPlayer;
 
   // Held subscriptions — cancelled before re-attaching to prevent stacking.
-  StreamSubscription? _playerStateSub;
+  StreamSubscription? _playingSub;
+  StreamSubscription? _bufferingSub;
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
-  StreamSubscription? _processingStateSub;
+  StreamSubscription? _completedSub;
 
   AudioPlayerNotifier() : super(const AudioPlayerState());
 
@@ -94,37 +95,42 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     // The old guard `if (_streamsAttached && identical(_attachedPlayer, player)) return;`
     // was causing stale stream listeners when the user loads a second track,
     // because the flag prevented re-attachment even when the player instance changed.
-    _playerStateSub?.cancel();
+    _playingSub?.cancel();
+    _bufferingSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
-    _processingStateSub?.cancel();
+    _completedSub?.cancel();
     _streamsAttached = true;
     _attachedPlayer = player;
-    _playerStateSub = player.playerStateStream.listen((s) {
+
+    // playing stream — reflects actual play/pause state
+    _playingSub = player.stream.playing.listen((playing) {
       if (!mounted) return;
-      final isReady = s.processingState != ProcessingState.loading &&
-          s.processingState != ProcessingState.buffering;
-      state = state.copyWith(
-        isPlaying: isReady ? s.playing : state.isPlaying,
-        isLoading: s.processingState == ProcessingState.loading ||
-            s.processingState == ProcessingState.buffering,
-      );
+      state = state.copyWith(isPlaying: playing);
     });
-    _positionSub = player.positionStream.listen((p) {
+
+    // buffering stream — true while media is loading/buffering
+    _bufferingSub = player.stream.buffering.listen((buffering) {
+      if (!mounted) return;
+      state = state.copyWith(isLoading: buffering);
+    });
+
+    _positionSub = player.stream.position.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
       if (_currentItemId != null && p.inSeconds > 0 && p.inSeconds % 5 == 0) {
         PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
       }
     });
-    _durationSub = player.durationStream.listen((d) {
+
+    _durationSub = player.stream.duration.listen((d) {
       if (!mounted) return;
-      if (d != null) state = state.copyWith(duration: d);
+      state = state.copyWith(duration: d);
     });
-    _processingStateSub = player.processingStateStream.listen((ps) {
-      if (ps == ProcessingState.completed) {
-        _onTrackComplete();
-      }
+
+    // completed stream — fires true when the track finishes
+    _completedSub = player.stream.completed.listen((completed) {
+      if (completed) _onTrackComplete();
     });
   }
 
@@ -310,9 +316,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         (state.repeat.index + 1) % RepeatState.values.length];
     state = state.copyWith(repeat: next);
     switch (next) {
-      case RepeatState.off: _player?.setLoopMode(LoopMode.off);
-      case RepeatState.one: _player?.setLoopMode(LoopMode.one);
-      case RepeatState.all: _player?.setLoopMode(LoopMode.all);
+      case RepeatState.off: _player?.setPlaylistMode(PlaylistMode.none);
+      case RepeatState.one: _player?.setPlaylistMode(PlaylistMode.single);
+      case RepeatState.all: _player?.setPlaylistMode(PlaylistMode.loop);
     }
   }
 
@@ -322,10 +328,11 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   @override
   void dispose() {
     // Cancel stream subscriptions to prevent callbacks firing after disposal.
-    _playerStateSub?.cancel();
+    _playingSub?.cancel();
+    _bufferingSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
-    _processingStateSub?.cancel();
+    _completedSub?.cancel();
     // Do NOT stop the handler — it lives for the app lifetime
     super.dispose();
   }

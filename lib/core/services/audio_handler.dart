@@ -1,6 +1,6 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
-import 'package:just_audio/just_audio.dart';
+import 'package:media_kit/media_kit.dart';
 import 'package:flutter/foundation.dart';
 import '../../core/models/media_item.dart' as app;
 
@@ -9,7 +9,7 @@ PlayedAudioHandler? globalAudioHandler;
 
 class PlayedAudioHandler extends BaseAudioHandler
     with QueueHandler, SeekHandler {
-  final AudioPlayer _player = AudioPlayer();
+  final Player _player = Player();
 
   List<app.MediaItem> _playlist      = [];
   int                 _queueIndex     = 0;
@@ -20,17 +20,24 @@ class PlayedAudioHandler extends BaseAudioHandler
   void Function()? onSkipPrevious;
 
   double _speed       = 1.0;
-  bool   _skipSilence = false;
+
+  // Subscriptions to media_kit streams
+  StreamSubscription? _playingSub;
+  StreamSubscription? _positionSub;
+  StreamSubscription? _durationSub;
+  StreamSubscription? _bufferingSub;
+  StreamSubscription? _completedSub;
 
   PlayedAudioHandler() {
-    _player.playbackEventStream.listen(
-      (event) => playbackState.add(_transformEvent(event)),
-      onError: (Object e) =>
-          debugPrint('[AudioHandler] playbackEventStream error: $e'),
-    );
+    // Emit playback state updates whenever playing/buffering/position changes.
+    _playingSub = _player.stream.playing.listen((_) => _emitPlaybackState());
+    _bufferingSub = _player.stream.buffering.listen((_) => _emitPlaybackState());
+    _positionSub = _player.stream.position.listen((_) => _emitPlaybackState());
+    _durationSub = _player.stream.duration.listen((_) => _emitPlaybackState());
 
-    _player.playerStateStream.listen((state) {
-      if (state.processingState == ProcessingState.completed) {
+    // Track completion — advance to next track.
+    _completedSub = _player.stream.completed.listen((completed) {
+      if (completed) {
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.completed,
         ));
@@ -39,19 +46,18 @@ class PlayedAudioHandler extends BaseAudioHandler
     });
   }
 
-  AudioPlayer get player => _player;
+  Player get player => _player;
 
   Future<void> setPlaylist(
     List<app.MediaItem> items, {
     int    startIndex  = 0,
     double speed       = 1.0,
-    bool   skipSilence = false,
+    bool   skipSilence = false, // kept for API compatibility; not used by media_kit
   }) async {
     _loadGeneration++;
-    _playlist    = List.unmodifiable(items);
-    _queueIndex  = startIndex.clamp(0, items.isEmpty ? 0 : items.length - 1);
-    _speed       = speed;
-    _skipSilence = skipSilence;
+    _playlist   = List.unmodifiable(items);
+    _queueIndex = startIndex.clamp(0, items.isEmpty ? 0 : items.length - 1);
+    _speed      = speed;
     queue.add(_playlist.map(_toMediaItem).toList());
     if (_playlist.isNotEmpty) await _loadCurrent();
   }
@@ -59,10 +65,10 @@ class PlayedAudioHandler extends BaseAudioHandler
   Future<void> loadAndPlay(
     app.MediaItem item, {
     double    speed         = 1.0,
-    bool      skipSilence   = false,
+    bool      skipSilence   = false, // kept for API compatibility; not used by media_kit
     Duration? savedPosition,
   }) async {
-    await setPlaylist([item], speed: speed, skipSilence: skipSilence);
+    await setPlaylist([item], speed: speed);
     if (savedPosition != null && savedPosition.inSeconds > 0) {
       await _player.seek(savedPosition);
     }
@@ -77,7 +83,7 @@ class PlayedAudioHandler extends BaseAudioHandler
   @override Future<void> seek(Duration position) => _player.seek(position);
   @override Future<void> setSpeed(double speed) {
     _speed = speed;
-    return _player.setSpeed(speed);
+    return _player.setRate(speed);
   }
 
   @override
@@ -98,7 +104,7 @@ class PlayedAudioHandler extends BaseAudioHandler
   @override
   Future<void> skipToPrevious() async {
     if (_playlist.isEmpty) return;
-    if (_player.position.inSeconds > 3) {
+    if (_player.state.position.inSeconds > 3) {
       await _player.seek(Duration.zero);
       return;
     }
@@ -136,26 +142,21 @@ class PlayedAudioHandler extends BaseAudioHandler
       mediaItem.add(_toMediaItem(item));
       playbackState.add(playbackState.value.copyWith(queueIndex: _queueIndex));
 
-      if (_player.playing) await _player.pause();
+      if (_player.state.playing) await _player.pause();
       if (_loadGeneration != myGeneration) return;
 
       // FIX 2: Inner try/catch so a bad file path surfaces a clear error
       // and does NOT leave _loading = true forever via an early return that
       // bypasses the outer finally block.
       try {
-        // On Android 10+, MediaStore returns content:// URIs.
-        // Uri.file('content://...') produces file:///content:/... which is
-        // invalid. Parse content:// URIs directly; use Uri.file only for
-        // plain file-system paths.
-        final uri = item.filePath.startsWith('content://')
-            ? Uri.parse(item.filePath)
-            : Uri.file(item.filePath);
-        await _player.setAudioSource(
-          AudioSource.uri(uri),
-          preload: true,
+        // media_kit's Media() accepts both file paths and content:// URIs
+        // directly — no need to convert to Uri manually.
+        await _player.open(
+          Media(item.filePath),
+          play: false,
         );
       } catch (srcErr) {
-        debugPrint('[AudioHandler] setAudioSource failed: $srcErr\nPath: ${item.filePath}');
+        debugPrint('[AudioHandler] player.open failed: $srcErr\nPath: ${item.filePath}');
         playbackState.add(playbackState.value.copyWith(
           processingState: AudioProcessingState.error,
           playing: false,
@@ -165,8 +166,8 @@ class PlayedAudioHandler extends BaseAudioHandler
 
       if (_loadGeneration != myGeneration) return;
 
-      await _player.setSpeed(_speed);
-      await _player.setSkipSilenceEnabled(_skipSilence);
+      await _player.setRate(_speed);
+      // Note: media_kit does not support skip-silence natively; omitted.
       if (_loadGeneration != myGeneration) return;
 
       await play();
@@ -193,18 +194,26 @@ class PlayedAudioHandler extends BaseAudioHandler
         : null,
   );
 
-  PlaybackState _transformEvent(PlaybackEvent event) {
-    final processingState = switch (_player.processingState) {
-      ProcessingState.idle      => AudioProcessingState.idle,
-      ProcessingState.loading   => AudioProcessingState.loading,
-      ProcessingState.buffering => AudioProcessingState.buffering,
-      ProcessingState.ready     => AudioProcessingState.ready,
-      ProcessingState.completed => AudioProcessingState.completed,
-    };
-    return PlaybackState(
+  void _emitPlaybackState() {
+    final buffering = _player.state.buffering;
+    final playing   = _player.state.playing;
+    final completed = _player.state.completed;
+
+    final AudioProcessingState processingState;
+    if (completed) {
+      processingState = AudioProcessingState.completed;
+    } else if (buffering) {
+      processingState = AudioProcessingState.buffering;
+    } else if (playing || _player.state.duration > Duration.zero) {
+      processingState = AudioProcessingState.ready;
+    } else {
+      processingState = AudioProcessingState.idle;
+    }
+
+    playbackState.add(PlaybackState(
       controls: [
         MediaControl.skipToPrevious,
-        _player.playing ? MediaControl.pause : MediaControl.play,
+        playing ? MediaControl.pause : MediaControl.play,
         MediaControl.skipToNext,
       ],
       systemActions: const {
@@ -216,15 +225,20 @@ class PlayedAudioHandler extends BaseAudioHandler
       },
       androidCompactActionIndices: const [0, 1, 2],
       processingState: processingState,
-      playing:          _player.playing,
-      updatePosition:   _player.position,
-      bufferedPosition: _player.bufferedPosition,
-      speed:            _player.speed,
+      playing:          playing,
+      updatePosition:   _player.state.position,
+      bufferedPosition: _player.state.buffer,
+      speed:            _player.state.rate,
       queueIndex:       _queueIndex,
-    );
+    ));
   }
 
   Future<void> disposePlayer() async {
+    _playingSub?.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _bufferingSub?.cancel();
+    _completedSub?.cancel();
     try { await _player.dispose(); } catch (_) {}
   }
 }
