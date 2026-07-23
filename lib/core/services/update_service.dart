@@ -63,13 +63,25 @@ class UpdateService {
         }
       }
 
-      // Use /latest — returns structured JSON with downloads object
-      final response = await http
-          .get(Uri.parse(Environment.latestUrl))
-          .timeout(const Duration(seconds: 10));
+      // Try /latest first, fall back to /version if it fails
+      http.Response? response;
+      try {
+        response = await http
+            .get(Uri.parse(Environment.latestUrl))
+            .timeout(const Duration(seconds: 10));
+      } catch (_) {}
 
-      if (response.statusCode != 200) {
-        debugPrint('[UpdateService] HTTP ${response.statusCode} from version endpoint.');
+      if (response == null || response.statusCode != 200) {
+        debugPrint('[UpdateService] /latest failed, trying /version fallback…');
+        try {
+          response = await http
+              .get(Uri.parse(Environment.versionUrl))
+              .timeout(const Duration(seconds: 10));
+        } catch (_) {}
+      }
+
+      if (response == null || response.statusCode != 200) {
+        debugPrint('[UpdateService] Both endpoints failed.');
         return null;
       }
 

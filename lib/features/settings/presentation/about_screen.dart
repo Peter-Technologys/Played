@@ -41,16 +41,16 @@ class _AboutScreenState extends State<AboutScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text(
+        title: Text(
           'About OTYA Player',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
+            color: Theme.of(context).colorScheme.onSurface,
             fontFamily: 'Inter',
           ),
         ),
@@ -99,15 +99,6 @@ class _AboutScreenState extends State<AboutScreen> {
               subtitle: 'How we handle your data',
               color: AppColors.textSecondary,
               onTap: () => context.push('/privacy'),
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.open_in_new_rounded,
-              label: 'Privacy Policy (Web)',
-              subtitle: 'petersmartlink.com/privacy',
-              color: AppColors.accent,
-              onTap: () => _launchUrl(
-                  context, 'https://petersmartlink.com/privacy'),
             ),
             _Divider(),
             _NavTile(
@@ -172,7 +163,7 @@ class _AboutScreenState extends State<AboutScreen> {
       final info = await PackageInfo.fromPlatform();
       await Share.share(
         'Download OTYA Player v${info.version} — free offline media player for Android:\n'
-        'https://getotya.petersmartlink.com/download',
+        'https://petersmartlink.com/download/otya-player',
         subject: 'OTYA Player',
       );
     } catch (e) {

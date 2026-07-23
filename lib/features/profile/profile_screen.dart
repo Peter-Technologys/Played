@@ -465,7 +465,7 @@ class ProfileScreen extends ConsumerWidget {
       final info = await PackageInfo.fromPlatform();
       await Share.share(
         'Download OTYA Player v${info.version} — free offline media player for Android:\n'
-        'https://getotya.petersmartlink.com/download',
+        'https://petersmartlink.com/download/otya-player',
         subject: 'OTYA Player',
       );
     } catch (e) {
