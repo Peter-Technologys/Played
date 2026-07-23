@@ -167,34 +167,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             ),
           ]),
 
-          const SizedBox(height: 8),
-
-          _GroupCard(children: [
-            _SwitchRow(
-              icon: Icons.lock_rounded,
-              label: 'App Lock',
-              subtitle: 'Require biometrics to open OTYA Player',
-              value: s.appLockEnabled,
-              onChanged: sn.setAppLock,
-            ),
-            _Divider(),
-            _SwitchRow(
-              icon: Icons.visibility_off_rounded,
-              label: 'Hide Vault from Recents',
-              subtitle: 'Blur screenshot when switching apps',
-              value: s.hideVaultFromRecents,
-              onChanged: sn.setHideVaultFromRecents,
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.admin_panel_settings_rounded,
-              label: 'Manage App Permissions',
-              subtitle: 'Storage, Bluetooth, Notifications',
-              color: AppColors.textSecondary,
-              onTap: openAppSettings,
-            ),
-          ]),
-
           const SizedBox(height: 24),
 
           // ── GROUP 3: UPDATES & ABOUT ──────────────────────────────
