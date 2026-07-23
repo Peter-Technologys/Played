@@ -11,6 +11,8 @@ import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/widgets/update_dialog.dart';
 import '../core/services/custom_theme_manager.dart';
+import '../core/providers/theme_provider.dart';
+import '../core/widgets/announcement_dialog.dart';
 
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
@@ -29,8 +31,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     _checkOnboarding();
     CustomThemeManager.instance.load();
     _applyOverlayStyle(isDark: true);
+    // Init remote theme — loads cache instantly, fetches update in background
+    ThemeProvider.instance.initTheme();
     SchedulerBinding.instance.addPostFrameCallback((_) {
       if (mounted) UpdateDialog.checkAndShow(context);
+      // Show announcement dialog after first frame (non-blocking)
+      if (mounted) AnnouncementDialog.showIfPending(context);
     });
   }
 
@@ -134,13 +140,23 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     }
 
     return ListenableBuilder(
-      listenable: CustomThemeManager.instance,
+      // Listen to both wallpaper changes AND remote theme changes
+      listenable: Listenable.merge([
+        CustomThemeManager.instance,
+        ThemeProvider.instance,
+      ]),
       builder: (context, _) {
+        // Use remote theme when available and user is in dark mode,
+        // otherwise fall back to the static AppTheme.
+        final remoteTheme = ThemeProvider.instance.hasTheme
+            ? ThemeProvider.instance.currentThemeData
+            : null;
+
         return MaterialApp.router(
           title: 'OTYA Player',
           debugShowCheckedModeBanner: false,
           theme:     AppTheme.light,
-          darkTheme: AppTheme.dark,
+          darkTheme: remoteTheme ?? AppTheme.dark,
           themeMode: switch (settings.themeMode) {
             AppThemeMode.dark   => ThemeMode.dark,
             AppThemeMode.amoled => ThemeMode.dark,
