@@ -138,10 +138,188 @@ class _ToolsSearchDelegate extends SearchDelegate<void> {
   }
 }
 
+// ── ToolsScreen ───────────────────────────────────────────────────────────
+
 class ToolsScreen extends ConsumerWidget {
   const ToolsScreen({super.key});
 
-  // 9 tools = 3x3 grid. Each tool lives ONLY here.
+  // ── MP3 Converter instruction sheet ──────────────────────────────────────
+  // Explains how to extract audio from a video using the built-in FFmpeg
+  // service. Opened from the MP3 Converter tool card.
+  static void _showMp3InstructionSheet(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF34D399), Color(0xFF059669)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.audiotrack_rounded,
+                      color: Colors.white, size: 22),
+                ),
+                const SizedBox(width: 12),
+                const Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'MP3 Converter',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    Text(
+                      'Extract audio from any video',
+                      style: TextStyle(
+                          fontSize: 12, color: AppColors.textSecondary),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              'How to extract audio:',
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(height: 12),
+            ..._mp3Steps.asMap().entries.map((e) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 22,
+                    height: 22,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: 0.15),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Center(
+                      child: Text(
+                        '${e.key + 1}',
+                        style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      e.value,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                        fontFamily: 'Inter',
+                        height: 1.5,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            )),
+            const SizedBox(height: 8),
+            const Text(
+              'Tip: Open any video in the player, tap ⋮ → Extract Audio (MP3)',
+              style: TextStyle(
+                fontSize: 11,
+                color: AppColors.accent,
+                fontFamily: 'Inter',
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+            const SizedBox(height: 20),
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF34D399), Color(0xFF059669)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: const Text(
+                  'Got it',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.white,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static const _mp3Steps = [
+    'Open any video file in the OTYA Player video player.',
+    'Tap the ⋮ (more options) button in the top-right corner.',
+    'Select "Extract Audio" from the menu.',
+    'The audio is saved as an M4A file in your Downloads folder.',
+  ];
+
+  // ── Storage Cleaner sheet ─────────────────────────────────────────────────
+  // Shows seek-position cache info and lets the user clear it in one tap.
+  static void _showStorageCleaner(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: AppColors.surface,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => const _StorageCleanerSheet(),
+    );
+  }
+
+  // 9 tools = 3×3 grid. Each tool lives ONLY here.
   // AirDrop + Web Share merged (same screen). Car Mode accessed from player.
   List<_ToolEntry> _buildToolEntries(BuildContext context, WidgetRef ref) => [
         _ToolEntry(
@@ -298,24 +476,238 @@ class ToolsScreen extends ConsumerWidget {
                   childAspectRatio: 0.95,
                 ),
                 delegate: SliverChildListDelegate(
-                  tools.map((t) => _ToolCard(
-                    icon: t.icon,
-                    label: t.label,
-                    subtitle: t.subtitle,
-                    gradient: t.gradient,
-                    onTap: t.onTapBuilder(context),
-                  )).toList(),
+                  tools
+                      .map((t) => _ToolCard(
+                            icon: t.icon,
+                            label: t.label,
+                            subtitle: t.subtitle,
+                            gradient: t.gradient,
+                            onTap: t.onTapBuilder(context),
+                          ))
+                      .toList(),
                 ),
               ),
             ),
-
-
           ],
         ),
       ),
     );
   }
+}
 
+// ── Storage Cleaner Sheet ─────────────────────────────────────────────────
+
+class _StorageCleanerSheet extends ConsumerStatefulWidget {
+  const _StorageCleanerSheet();
+
+  @override
+  ConsumerState<_StorageCleanerSheet> createState() =>
+      _StorageCleanerSheetState();
+}
+
+class _StorageCleanerSheetState extends ConsumerState<_StorageCleanerSheet> {
+  bool _clearing = false;
+  bool _cleared = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Row(
+            children: [
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF4D6A), Color(0xFFCC2244)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(Icons.cleaning_services_rounded,
+                    color: Colors.white, size: 22),
+              ),
+              const SizedBox(width: 12),
+              const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Storage Cleaner',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  Text(
+                    'Free up space used by the app',
+                    style: TextStyle(
+                        fontSize: 12, color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          _CleanerItem(
+            icon: Icons.history_rounded,
+            label: 'Seek Position Cache',
+            description:
+                'Saved playback positions for all tracks. Safe to clear — '
+                'the app will start tracks from the beginning next time.',
+            color: AppColors.accent,
+          ),
+          const SizedBox(height: 24),
+          if (_cleared)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppColors.accentGreen.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                    color: AppColors.accentGreen.withValues(alpha: 0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.check_circle_rounded,
+                      color: AppColors.accentGreen, size: 18),
+                  SizedBox(width: 8),
+                  Text(
+                    'Cache cleared successfully!',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.accentGreen,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                ],
+              ),
+            )
+          else
+            GestureDetector(
+              onTap: _clearing
+                  ? null
+                  : () async {
+                      setState(() => _clearing = true);
+                      await PlayedDatabase.instance.clearAllSeekPositions();
+                      if (mounted) {
+                        setState(() {
+                          _clearing = false;
+                          _cleared = true;
+                        });
+                      }
+                    },
+              child: Container(
+                width: double.infinity,
+                height: 50,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF4D6A), Color(0xFFCC2244)],
+                  ),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: _clearing
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            color: Colors.white, strokeWidth: 2),
+                      )
+                    : const Text(
+                        'Clear Cache',
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+class _CleanerItem extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String description;
+  final Color color;
+
+  const _CleanerItem({
+    required this.icon,
+    required this.label,
+    required this.description,
+    required this.color,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: color.withValues(alpha: 0.2)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: color, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    color: color,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Inter',
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 // ── Tool Card ────────────────────────────────────────────────────────
