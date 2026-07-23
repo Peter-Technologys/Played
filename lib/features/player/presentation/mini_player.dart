@@ -1,4 +1,3 @@
-import 'package:audio_session/audio_session.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -14,24 +13,12 @@ import 'audio_player_screen.dart';
 final miniPlayerItemProvider = StateProvider<MediaItem?>((_) => null);
 
 // ── TASK 3: Audio output route provider ────────────────────────────
-// Detects the current audio output device name using audio_session.
-// Returns null when detection fails so the label is hidden entirely.
+// Previously used audio_session to detect the current output device.
+// audio_session has been removed (just_audio migration to media_kit).
+// Returns null so the label is hidden; can be re-implemented via
+// platform channels if needed in the future.
 
-final _audioOutputLabelProvider = FutureProvider<String?>((ref) async {
-  try {
-    final session = await AudioSession.instance;
-    final devices = await session.getDevices(includeInputs: false);
-    if (devices.isEmpty) return null;
-    // Prefer the first active output device.
-    final active = devices.firstWhere(
-      (d) => d.isOutput,
-      orElse: () => devices.first,
-    );
-    return active.name.isNotEmpty ? active.name : null;
-  } catch (_) {
-    return null;
-  }
-});
+final _audioOutputLabelProvider = FutureProvider<String?>((_) async => null);
 
 // ── TASK 2: Granular selectors — each rebuilds only its own subtree ─
 

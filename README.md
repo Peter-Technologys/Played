@@ -72,8 +72,8 @@ lib/
 
 | Layer | Library |
 |---|---|
-| Video playback | `flutter_vlc_player` — hardware-accelerated, MKV/AVI/4K |
-| Audio playback | `just_audio` + `audio_service` + `audio_session` |
+| Video & Audio playback | `media_kit` — hardware-accelerated, MKV/AVI/4K, unified engine |
+| Background audio | `audio_service` — lock screen controls, OS media notifications |
 | Offline trim/extract | Android `MediaExtractor` + `MediaMuxer` (native, no FFmpeg binary) |
 | Database | `hive` — 100% offline, AES-256 encrypted vault box |
 | Cloud auth & backup | `appwrite` — Google OAuth, playlist + history sync |
