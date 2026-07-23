@@ -160,36 +160,6 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-            // ── Tools Grid ───────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _SectionLabel(label: 'Tools'),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 10)),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.95,
-                ),
-                delegate: SliverChildListDelegate(
-                  tools.map((t) => _ToolMiniCard(
-                    icon: t.icon,
-                    label: t.label,
-                    subtitle: t.subtitle,
-                    gradient: t.gradient,
-                    onTap: t.onTap,
-                  )).toList(),
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
             // ── Account Card ─────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
@@ -253,13 +223,21 @@ class MySpaceHubScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   children: [
-                    // Vault, Playlists, History are in the tools grid above.
+                    // Settings, Playlists, Stats only. Tools live in the Tools tab.
                     _QuickLink(
                       icon: Icons.settings_rounded,
                       label: 'Profile & Settings',
                       subtitle: 'Account, appearance, playback & more',
                       color: AppColors.accent,
                       onTap: () => context.push('/settings'),
+                    ),
+                    const SizedBox(height: 8),
+                    _QuickLink(
+                      icon: Icons.queue_music_rounded,
+                      label: 'Playlists',
+                      subtitle: 'Manage your playlists',
+                      color: AppColors.accentGreen,
+                      onTap: () => context.push('/playlists'),
                     ),
                     const SizedBox(height: 8),
                     _QuickLink(
