@@ -45,9 +45,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     final songs = libraryAsync.valueOrNull?.where((e) => !e.isVideo).length ?? 0;
     final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
-    // My Space tools: file management, sharing & conversion features only.
-    // Player features (Equalizer, Car Mode, History) live in the Tools tab.
-    // Theme lives in Settings. Air-Drop and Web Share merged (same screen).
+    // Tools live in the Tools tab — no tools grid duplicated here.
     final tools = <_ToolItem>[
       _ToolItem(
         icon: Icons.lock_rounded,
