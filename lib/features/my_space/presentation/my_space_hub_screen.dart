@@ -43,9 +43,40 @@ class MySpaceHubScreen extends ConsumerWidget {
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final total = libraryAsync.valueOrNull?.length ?? 0;
     final songs = libraryAsync.valueOrNull?.where((e) => !e.isVideo).length ?? 0;
-    final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
-    // Tools live in the Tools tab — no tools grid duplicated here.
+    // My Space tools: file management, sharing & audio features only.
+    // Player features (Equalizer, Car Mode, History) live in the Tools tab.
+    // Theme lives in Settings. Air-Drop and Web Share merged (same screen).
+    final tools = <_ToolItem>[
+      _ToolItem(
+        icon: Icons.lock_rounded,
+        label: 'Vault',
+        subtitle: 'Private storage',
+        gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
+        onTap: () => context.push('/vault'),
+      ),
+      _ToolItem(
+        icon: Icons.wifi_tethering_rounded,
+        label: 'Share & Transfer',
+        subtitle: 'AirDrop & web stream',
+        gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
+        onTap: () => context.push('/airdrop'),
+      ),
+      _ToolItem(
+        icon: Icons.cleaning_services_rounded,
+        label: 'Cleaner',
+        subtitle: 'Free up space',
+        gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
+        onTap: () => _showStorageCleaner(context),
+      ),
+      _ToolItem(
+        icon: Icons.queue_music_rounded,
+        label: 'Playlists',
+        subtitle: 'Manage playlists',
+        gradient: const [Color(0xFF1DB954), Color(0xFF0D8A3C)],
+        onTap: () => context.push('/playlists'),
+      ),
+    ];
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -163,16 +194,9 @@ class MySpaceHubScreen extends ConsumerWidget {
                       ),
                       const SizedBox(width: 10),
                       _StatCard(
-                        icon: Icons.video_library_rounded,
-                        value: '$videos',
-                        label: 'Videos',
-                        color: AppColors.accent,
-                      ),
-                      const SizedBox(width: 10),
-                      _StatCard(
                         icon: Icons.folder_rounded,
                         value: '$total',
-                        label: 'Total',
+                        label: 'Files',
                         color: AppColors.accentGreen,
                       ),
                     ],
@@ -287,180 +311,6 @@ class MySpaceHubScreen extends ConsumerWidget {
                 style: TextStyle(color: AppColors.error)),
           ),
         ],
-      ),
-    );
-  }
-
-  void _showMp3Sheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Extract Audio (MP3)',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 16),
-            const _InstructionStep(number: '1', text: 'Go to the Video tab'),
-            const _InstructionStep(number: '2', text: 'Tap any video to open it'),
-            const _InstructionStep(number: '3', text: 'Tap the ⋮ menu (top-right)'),
-            const _InstructionStep(number: '4', text: "Tap 'Extract Audio'"),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      context.go('/');
-                    },
-                    icon: const Icon(Icons.play_circle_rounded,
-                        color: Colors.black, size: 18),
-                    label: const Text('Go to Videos',
-                        style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Inter')),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 20),
-                  ),
-                  child: const Text('Dismiss',
-                      style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter')),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showTrimmerSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Theme.of(context).colorScheme.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (ctx) => Padding(
-        padding: EdgeInsets.fromLTRB(
-            24, 16, 24, MediaQuery.of(ctx).viewInsets.bottom + 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'WhatsApp Trimmer',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 16),
-            const _InstructionStep(number: '1', text: 'Go to the Video tab'),
-            const _InstructionStep(number: '2', text: 'Tap any video to open it'),
-            const _InstructionStep(number: '3', text: 'Tap the ⋮ menu (top-right)'),
-            const _InstructionStep(number: '4', text: "Tap 'Trim for WhatsApp'"),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () {
-                      Navigator.pop(ctx);
-                      context.go('/');
-                    },
-                    icon: const Icon(Icons.play_circle_rounded,
-                        color: Colors.black, size: 18),
-                    label: const Text('Go to Videos',
-                        style: TextStyle(
-                            color: Colors.black,
-                            fontWeight: FontWeight.w700,
-                            fontFamily: 'Inter')),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.accent,
-                      shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12)),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                OutlinedButton(
-                  onPressed: () => Navigator.pop(ctx),
-                  style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.border),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12)),
-                    padding: const EdgeInsets.symmetric(
-                        vertical: 14, horizontal: 20),
-                  ),
-                  child: const Text('Dismiss',
-                      style: TextStyle(
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter')),
-                ),
-              ],
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -864,59 +714,6 @@ class _SectionLabel extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-// ── Instruction Step ─────────────────────────────────────────────────────────
-
-class _InstructionStep extends StatelessWidget {
-  final String number;
-  final String text;
-  const _InstructionStep({required this.number, required this.text});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 26,
-            height: 26,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.15),
-              shape: BoxShape.circle,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              number,
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: AppColors.accent,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(top: 4),
-              child: Text(
-                text,
-                style: const TextStyle(
-                  fontSize: 14,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                  height: 1.4,
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

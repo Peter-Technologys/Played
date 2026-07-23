@@ -1,11 +1,9 @@
-import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -16,16 +14,13 @@ import '../../core/services/update_service.dart';
 import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 
-import '../../core/services/storage_folder_service.dart';
-import '../../features/my_space/presentation/providers/my_space_provider.dart';
 import '../../shared/widgets/played_logo.dart';
 import '../settings/settings_provider.dart';
 import '../../core/config/changelog.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile & Settings Screen
-//   Appearance → Account → Audio → Video → Privacy & Security →
-//   Backup & Sync → Library → About
+//   Account → Privacy & Security → Backup & Sync → App Updates → About
 // ─────────────────────────────────────────────────────────────────────────────
 
 class ProfileScreen extends ConsumerWidget {
@@ -153,36 +148,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 4. LIBRARY ────────────────────────────────────────────────
-          const _SectionHeader(label: 'Library'),
-          const SizedBox(height: 12),
-          _TappableTile(
-            icon: Icons.refresh_rounded,
-            label: 'Rescan Library',
-            subtitle: 'Find new files added to your device',
-            onTap: () {
-              ref.read(mediaLibraryProvider.notifier).refresh();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Rescanning library in background…'),
-                  backgroundColor: AppColors.surface,
-                ),
-              );
-            },
-          ),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.delete_sweep_rounded,
-            label: 'Clear Cache',
-            subtitle: 'Remove temporary processing files',
-            onTap: () => _confirmClearCache(context),
-          ),
-          const SizedBox(height: 8),
-          _StorageSection(),
-
-          const SizedBox(height: 20),
-
-          // ── 5. APP UPDATES ────────────────────────────────────────────
+          // ── 4. APP UPDATES ────────────────────────────────────────────
           const _SectionHeader(label: 'App Updates'),
           const SizedBox(height: 12),
           const _UpdateCheckerTile(),
@@ -237,56 +203,6 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
-
-  Future<void> _confirmClearCache(BuildContext context) async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Clear Cache?',
-            style: TextStyle(
-                color: AppColors.textPrimary, fontWeight: FontWeight.w700)),
-        content: const Text(
-          'Temporary files will be deleted. Your media and playlists are safe.',
-          style: TextStyle(
-              color: AppColors.textSecondary, fontSize: 13, height: 1.5),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Clear',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-    if (ok != true || !context.mounted) return;
-    try {
-      final tmp = await getTemporaryDirectory();
-      for (final name in ['video_thumbs', 'album_art']) {
-        final dir = Directory('${tmp.path}/$name');
-        if (await dir.exists()) await dir.delete(recursive: true);
-      }
-    } catch (_) {}
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-          content: Text('Cache cleared'),
-          backgroundColor: AppColors.surface),
-    );
-  }
 
   Future<void> _runBackup(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -600,71 +516,6 @@ class _UpdateCheckerTileState extends State<_UpdateCheckerTile> {
           ],
         ),
       ),
-    );
-  }
-}
-
-// ── Storage Section ────────────────────────────────────────────────────────
-
-class _StorageSection extends StatefulWidget {
-  @override
-  State<_StorageSection> createState() => _StorageSectionState();
-}
-
-class _StorageSectionState extends State<_StorageSection> {
-  Map<String, String> _paths = {};
-
-  @override
-  void initState() {
-    super.initState();
-    StorageFolderService.instance.storageSummary().then((m) {
-      if (mounted) setState(() => _paths = m);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (_paths.isEmpty) return const SizedBox.shrink();
-    return Column(
-      children: _paths.entries.map((e) {
-        return Padding(
-          padding: const EdgeInsets.only(top: 8),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            decoration: BoxDecoration(
-              color: Theme.of(context).colorScheme.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.borderOf(context)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.folder_rounded,
-                    color: AppColors.accent, size: 18),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(e.key,
-                          style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w600,
-                            color: Theme.of(context).colorScheme.onSurface,
-                          )),
-                      const SizedBox(height: 2),
-                      Text(e.value,
-                          style: const TextStyle(
-                            fontSize: 10, color: AppColors.textSecondary,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        );
-      }).toList(),
     );
   }
 }
