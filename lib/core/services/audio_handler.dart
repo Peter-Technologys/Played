@@ -52,7 +52,6 @@ class PlayedAudioHandler extends BaseAudioHandler
     List<app.MediaItem> items, {
     int    startIndex  = 0,
     double speed       = 1.0,
-    bool   skipSilence = false, // kept for API compatibility; not used by media_kit
   }) async {
     _loadGeneration++;
     _playlist   = List.unmodifiable(items);
@@ -65,7 +64,6 @@ class PlayedAudioHandler extends BaseAudioHandler
   Future<void> loadAndPlay(
     app.MediaItem item, {
     double    speed         = 1.0,
-    bool      skipSilence   = false, // kept for API compatibility; not used by media_kit
     Duration? savedPosition,
   }) async {
     await setPlaylist([item], speed: speed);

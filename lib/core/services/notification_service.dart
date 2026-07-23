@@ -58,10 +58,13 @@ class NotificationService {
     required String body,
     required int progress,
   }) async {
+    // Separate channel ID for progress notifications (low importance — silent).
+    // Using the same channel ID as complete/error would cause Android to
+    // ignore the importance downgrade after the channel is created once.
     final androidDetails = AndroidNotificationDetails(
-      'com.otyaplayer.app.tools',
-      'OTYA Player Tools',
-      channelDescription: 'Audio extraction and video trim progress',
+      'com.otyaplayer.app.tools.progress',
+      'OTYA Player Tools — Progress',
+      channelDescription: 'Audio extraction and video trim progress (silent)',
       importance: Importance.low,
       priority: Priority.low,
       showProgress: true,
@@ -84,9 +87,11 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    // Separate channel ID for completion notifications (high importance — audible).
     const androidDetails = AndroidNotificationDetails(
-      'com.otyaplayer.app.tools',
-      'OTYA Player Tools',
+      'com.otyaplayer.app.tools.complete',
+      'OTYA Player Tools — Complete',
+      channelDescription: 'Audio extraction and video trim completion alerts',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
@@ -106,9 +111,11 @@ class NotificationService {
     required String body,
     String? payload,
   }) async {
+    // Reuse the complete channel for errors — both are high importance.
     const androidDetails = AndroidNotificationDetails(
-      'com.otyaplayer.app.tools',
-      'OTYA Player Tools',
+      'com.otyaplayer.app.tools.complete',
+      'OTYA Player Tools — Complete',
+      channelDescription: 'Audio extraction and video trim completion alerts',
       importance: Importance.high,
       priority: Priority.high,
     );

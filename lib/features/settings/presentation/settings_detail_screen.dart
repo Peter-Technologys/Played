@@ -225,22 +225,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             ),
             _Divider(),
             _SwitchRow(
-              icon: Icons.queue_music_rounded,
-              label: 'Gapless Playback',
-              subtitle: 'No silence between tracks',
-              value: s.gaplessPlayback,
-              onChanged: sn.setGaplessPlayback,
-            ),
-            _Divider(),
-            _SwitchRow(
-              icon: Icons.skip_next_rounded,
-              label: 'Skip Silence',
-              subtitle: 'Auto-skip silent sections',
-              value: s.skipSilence,
-              onChanged: sn.setSkipSilence,
-            ),
-            _Divider(),
-            _SwitchRow(
               icon: Icons.headphones_rounded,
               label: 'Resume on Headset',
               subtitle: 'Auto-play when headphones connect',
@@ -712,26 +696,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
                 children: [
                   _sheetHeader('Audio'),
 
-                  _SheetSwitch(
-                    label: 'Gapless Playback',
-                    subtitle: 'No silence between tracks',
-                    value: s.gaplessPlayback,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setGaplessPlayback(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Skip Silence',
-                    subtitle: 'Auto-skip silent sections',
-                    value: s.skipSilence,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setSkipSilence(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
                   _SheetSwitch(
                     label: 'Resume on Headset',
                     subtitle: 'Auto-play when headphones connect',

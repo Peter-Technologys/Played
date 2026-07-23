@@ -9,8 +9,8 @@ import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/audio_handler.dart';
-import 'core/services/appwrite_service.dart';
 import 'core/services/cloudflare_service.dart';
+import 'core/services/pip_service.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/storage_folder_service.dart';
@@ -71,6 +71,13 @@ void main() async {
     // races with the first Activity lifecycle event and the handler is
     // never assigned, causing silent audio failures.
     await _initAudioService();
+
+    // Wire up native pause/resume signals from MainActivity.kt (onPause/onResume).
+    // Must be called after _initAudioService() so globalAudioHandler is set.
+    PipService.listenForNativePause(
+      () => globalAudioHandler?.pause(),
+      () => globalAudioHandler?.play(),
+    );
 
     runApp(
       ProviderScope(
@@ -162,7 +169,6 @@ Future<void> _initBackground() async {
   // is registered before the first Activity lifecycle event on Android.
   await Future.wait([
     _initNotifications(),
-    _initAppwrite(),
     _initWorkManager(),
     StorageFolderService.instance.ensureCreated(),
   ]);
@@ -217,14 +223,6 @@ Future<void> _initNotifications() async {
     await UpdateNotificationService.instance.init();
   } catch (e) {
     debugPrint('[Notifications] Init error: $e');
-  }
-}
-
-Future<void> _initAppwrite() async {
-  try {
-    AppwriteService.instance.init();
-  } catch (e) {
-    debugPrint('[Appwrite] Init error: $e');
   }
 }
 

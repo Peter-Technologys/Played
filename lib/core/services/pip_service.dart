@@ -43,4 +43,33 @@ class PipService {
       debugPrint('[PiP] setVideoPlaying failed: ${e.message}');
     }
   }
+
+  /// Registers a [MethodCallHandler] on the PiP channel to handle
+  /// `playerPause` and `playerResume` calls sent by MainActivity.kt
+  /// from [onPause()] and [onResume()].
+  ///
+  /// Call this once after [AudioService.init()] in main.dart, passing
+  /// the audio handler's pause and play callbacks.
+  static void listenForNativePause(
+    VoidCallback onPause,
+    VoidCallback onResume,
+  ) {
+    _channel.setMethodCallHandler((call) async {
+      switch (call.method) {
+        case 'playerPause':
+          debugPrint('[PiP] Native playerPause received — pausing audio.');
+          onPause();
+          break;
+        case 'playerResume':
+          debugPrint('[PiP] Native playerResume received — resuming audio.');
+          onResume();
+          break;
+        default:
+          // Other methods (enterPip, isPipSupported, setVideoPlaying) are
+          // invoked from Dart → native, not native → Dart, so they are
+          // handled by the native side and never arrive here.
+          break;
+      }
+    });
+  }
 }

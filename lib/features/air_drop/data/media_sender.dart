@@ -31,6 +31,10 @@ class MediaSender {
 
   Future<String> startServing(String filePath) async {
     await stop();
+    // Give the OS a brief window to release the port after stop().
+    // Without this delay, rapid start→stop→start cycles can hit EADDRINUSE
+    // because the kernel TIME_WAIT state has not cleared yet.
+    await Future<void>.delayed(const Duration(milliseconds: 100));
     final file = File(filePath);
     if (!await file.exists()) throw FileSystemException('File not found', filePath);
     _filePath = filePath;

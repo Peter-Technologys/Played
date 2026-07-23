@@ -8,9 +8,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme/app_colors.dart';
-import '../../core/services/appwrite_service.dart';
+import '../../core/services/cloudflare_service.dart';
 import '../../core/services/update_service.dart';
 import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
@@ -303,7 +304,9 @@ class ProfileScreen extends ConsumerWidget {
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
-    final ok = await AppwriteService.instance.backupAll();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('appwrite_user_id') ?? '';
+    final ok = await CloudflareService.instance.backupAll(userId);
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
     messenger.showSnackBar(SnackBar(
@@ -365,7 +368,9 @@ class ProfileScreen extends ConsumerWidget {
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
-    final count = await AppwriteService.instance.restorePlaylists();
+    final prefs = await SharedPreferences.getInstance();
+    final userId = prefs.getString('appwrite_user_id') ?? '';
+    final count = await CloudflareService.instance.restorePlaylists(userId);
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
     messenger.showSnackBar(SnackBar(
@@ -377,25 +382,16 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
-    try {
-      await AppwriteService.instance.signInWithGoogle();
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Opening Google sign-in…'),
-            backgroundColor: AppColors.surface,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Sign-in failed. Please try again.'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
+    // Google Sign-In is handled natively; this is a placeholder.
+    // The userId is stored in SharedPreferences under 'appwrite_user_id'
+    // by the native Google Sign-In flow.
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Google sign-in is handled via the native flow.'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
     }
   }
 
@@ -422,9 +418,14 @@ class ProfileScreen extends ConsumerWidget {
                 style: TextStyle(color: AppColors.textSecondary)),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              AppwriteService.instance.signOut();
+              // Clear stored auth state
+              final prefs = await SharedPreferences.getInstance();
+              await prefs.remove('appwrite_user_id');
+              await prefs.remove('auth_display_name');
+              await prefs.remove('auth_email');
+              await prefs.remove('auth_photo_url');
             },
             child: const Text('Sign out',
                 style: TextStyle(color: AppColors.error)),

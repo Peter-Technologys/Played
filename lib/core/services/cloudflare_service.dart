@@ -1,15 +1,14 @@
 import 'dart:convert';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
 import '../database/played_database.dart';
 import '../models/playlist.dart';
+import '../utils/connectivity_utils.dart';
 
-/// CloudflareService — replaces Appwrite DB calls for playlists, history,
-/// and pro status. Auth (Google OAuth) still goes through AppwriteService.
-///
-/// All endpoints live at petersmartlink.com (Cloudflare Worker + D1).
+/// CloudflareService — handles playlists, history, and pro status via
+/// the Cloudflare Worker + D1 backend at petersmartlink.com.
+/// Auth (Google OAuth) is handled natively; userId is stored in SharedPreferences.
 /// Every method is fire-and-forget safe: errors are logged, never thrown.
 class CloudflareService {
   CloudflareService._();
@@ -25,22 +24,15 @@ class CloudflareService {
   /// Disposes the shared HTTP client. Call only on app shutdown.
   static void dispose() => _client.close();
 
-  // BUG 2: Connectivity check — returns false quickly when offline so we
+  // Connectivity check — returns false quickly when offline so we
   // avoid 12-second timeout hangs on every backup method.
-  static Future<bool> _isOnline() async {
-    try {
-      final result = await Connectivity().checkConnectivity();
-      return result.any((r) => r != ConnectivityResult.none);
-    } catch (_) {
-      return true; // assume online if check itself fails
-    }
-  }
+  // Delegates to the shared isOnline() utility in connectivity_utils.dart.
 
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<void> backupPlaylists(String userId) async {
     // BUG 2: Skip immediately when offline — prevents 12-second timeout hangs.
-    if (!await _isOnline()) {
+    if (!await isOnline()) {
       debugPrint('[Cloudflare] backupPlaylists: offline, skipping.');
       return;
     }
@@ -110,7 +102,7 @@ class CloudflareService {
 
   Future<void> backupHistory(String userId) async {
     // BUG 2: Skip immediately when offline.
-    if (!await _isOnline()) {
+    if (!await isOnline()) {
       debugPrint('[Cloudflare] backupHistory: offline, skipping.');
       return;
     }
@@ -148,7 +140,7 @@ class CloudflareService {
 
   Future<void> saveProExpiry(String userId, int expiryMs) async {
     // BUG 2: Skip immediately when offline.
-    if (!await _isOnline()) {
+    if (!await isOnline()) {
       debugPrint('[Cloudflare] saveProExpiry: offline, skipping.');
       return;
     }
@@ -165,7 +157,7 @@ class CloudflareService {
 
   Future<int> fetchProExpiry(String userId) async {
     // BUG 2: Skip immediately when offline.
-    if (!await _isOnline()) {
+    if (!await isOnline()) {
       debugPrint('[Cloudflare] fetchProExpiry: offline, skipping.');
       return 0;
     }

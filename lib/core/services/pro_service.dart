@@ -1,23 +1,25 @@
 import 'dart:async';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
-import 'appwrite_service.dart';
+import 'cloudflare_service.dart';
+import '../utils/connectivity_utils.dart';
 
 /// Manages the user's Pro status.
 ///
 /// Offline-first strategy:
 ///   1. In-memory cache (60s TTL) — zero disk/network reads within a session.
 ///   2. SharedPreferences — always written, works 100% offline.
-///   3. Appwrite — only consulted when the device is online AND local
+///   3. Cloudflare Worker — only consulted when the device is online AND local
 ///      Pro has expired (handles reinstall / multi-device restore).
 ///
-/// The app NEVER blocks on Appwrite. If offline, Pro status comes
+/// The app NEVER blocks on the network. If offline, Pro status comes
 /// entirely from SharedPreferences.
 class ProService {
   ProService._();
   static final ProService instance = ProService._();
 
   static const _kProExpiry = 'pro_expiry_ms';
+  // userId stored by Google Sign-In flow; Cloudflare ignores empty string gracefully.
+  static const _kUserId = 'appwrite_user_id';
 
   int? _cachedExpiryMs;
   DateTime? _cacheTime;
@@ -28,6 +30,11 @@ class ProService {
       _cacheTime != null &&
       DateTime.now().difference(_cacheTime!) < _cacheTtl;
 
+  Future<String> _getUserId() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_kUserId) ?? '';
+  }
+
   Future<bool> isProActive() async {
     final now = DateTime.now().millisecondsSinceEpoch;
 
@@ -37,11 +44,13 @@ class ProService {
     final prefs = await SharedPreferences.getInstance();
     int expiry = prefs.getInt(_kProExpiry) ?? 0;
 
-    // 2. Only hit Appwrite if local is expired AND device is online
+    // 2. Only hit Cloudflare if local is expired AND device is online
     if (expiry <= now) {
-      final online = await _isOnline();
+      final online = await isOnline();
       if (online) {
-        final remoteExpiry = await AppwriteService.instance.fetchProExpiry();
+        final userId = await _getUserId();
+        final remoteExpiry =
+            await CloudflareService.instance.fetchProExpiry(userId);
         if (remoteExpiry > expiry) {
           expiry = remoteExpiry;
           await prefs.setInt(_kProExpiry, expiry);
@@ -62,8 +71,9 @@ class ProService {
     await prefs.setInt(_kProExpiry, expiry);
     _cachedExpiryMs = expiry;
     _cacheTime = DateTime.now();
-    // Fire-and-forget Appwrite sync — offline is fine
-    unawaited(AppwriteService.instance.saveProExpiry(expiry));
+    // Fire-and-forget Cloudflare sync — offline is fine
+    final userId = await _getUserId();
+    unawaited(CloudflareService.instance.saveProExpiry(userId, expiry));
   }
 
   Future<Duration> remainingProTime() async {
@@ -78,17 +88,7 @@ class ProService {
     await prefs.remove(_kProExpiry);
     _cachedExpiryMs = 0;
     _cacheTime = DateTime.now();
-    unawaited(AppwriteService.instance.clearProExpiry());
-  }
-
-  /// Returns true only when the device has an active network connection.
-  Future<bool> _isOnline() async {
-    try {
-      final result = await Connectivity().checkConnectivity();
-      // connectivity_plus always returns List<ConnectivityResult>.
-      return !result.contains(ConnectivityResult.none);
-    } catch (_) {
-      return false;
-    }
+    final userId = await _getUserId();
+    unawaited(CloudflareService.instance.saveProExpiry(userId, 0));
   }
 }
