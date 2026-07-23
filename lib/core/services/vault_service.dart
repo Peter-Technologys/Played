@@ -1,9 +1,14 @@
 import 'dart:io';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 import '../database/played_database.dart';
 import '../models/vault_item.dart';
 import '../models/media_item.dart';
+
+// MethodChannel to trigger MediaStore re-index after vault operations.
+// Must match the channel registered in MainActivity.kt.
+const _kMediaChannel = MethodChannel('com.otyaplayer.app/media_store');
 
 /// Handles moving media files into and out of the Private Vault.
 /// Files are copied into a hidden app-private directory (not accessible
@@ -52,9 +57,15 @@ class VaultService {
     await PlayedDatabase.instance.addToVault(vaultItem);
 
     // Delete the original file so it no longer appears in the media library.
-    // Also remove from MediaStore so the system gallery doesn't show it.
     try {
       await source.delete();
+    } catch (_) {}
+
+    // Notify MediaStore immediately so the file disappears from the gallery
+    // and file managers without waiting for the next periodic scan.
+    // Without this, the ghost entry persists until Android re-indexes.
+    try {
+      await _kMediaChannel.invokeMethod<void>('triggerScan', {'path': item.filePath});
     } catch (_) {}
 
     debugPrint('[Vault] Locked: ${item.title}');
@@ -76,6 +87,12 @@ class VaultService {
     }
 
     await PlayedDatabase.instance.removeFromVault(mediaId);
+
+    // Re-index the restored file in MediaStore so it appears in the library.
+    try {
+      await _kMediaChannel.invokeMethod<void>('triggerScan', {'path': vaultItem.originalPath});
+    } catch (_) {}
+
     debugPrint('[Vault] Unlocked: $mediaId');
   }
 

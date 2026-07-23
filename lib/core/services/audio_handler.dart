@@ -32,7 +32,15 @@ class PlayedAudioHandler extends BaseAudioHandler
     // Emit playback state updates whenever playing/buffering/position changes.
     _playingSub = _player.stream.playing.listen((_) => _emitPlaybackState());
     _bufferingSub = _player.stream.buffering.listen((_) => _emitPlaybackState());
-    _positionSub = _player.stream.position.listen((_) => _emitPlaybackState());
+    // Throttle position updates to max 4/sec to avoid flooding the state stream.
+    DateTime lastPositionEmit = DateTime.fromMillisecondsSinceEpoch(0);
+    _positionSub = _player.stream.position.listen((_) {
+      final now = DateTime.now();
+      if (now.difference(lastPositionEmit).inMilliseconds >= 250) {
+        lastPositionEmit = now;
+        _emitPlaybackState();
+      }
+    });
     _durationSub = _player.stream.duration.listen((_) => _emitPlaybackState());
 
     // Track completion — advance to next track.

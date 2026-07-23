@@ -112,11 +112,19 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       state = state.copyWith(isLoading: buffering);
     });
 
+    // Debounce position saves: write to DB at most once every 5 seconds
+    // using a timestamp comparison instead of the modulo trick, which
+    // could fire multiple times per second if the stream emits faster than 1 Hz.
+    DateTime lastSave = DateTime.fromMillisecondsSinceEpoch(0);
     _positionSub = player.stream.position.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
-      if (_currentItemId != null && p.inSeconds > 0 && p.inSeconds % 5 == 0) {
-        PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
+      if (_currentItemId != null && p.inSeconds > 0) {
+        final now = DateTime.now();
+        if (now.difference(lastSave).inSeconds >= 5) {
+          lastSave = now;
+          PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
+        }
       }
     });
 
@@ -589,7 +597,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         border: Border.all(color: AppColors.borderOf(context)),
                       ),
                       child: Text(
-                          '${ps.speed == ps.speed.truncateToDouble() ? ps.speed.toInt() : ps.speed}x',
+                          _formatSpeed(ps.speed),
                           style: const TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w700,
                             color: AppColors.accent,
@@ -758,6 +766,9 @@ class _AlbumArt extends StatelessWidget {
           isPlaying ? 1.0 : 0.88,
           1.0),
       transformAlignment: Alignment.center,
+      // AnimatedScale delegates the transform to the compositor so the
+      // easing curve is applied correctly without a Dart-side rebuild per frame.
+      // Wrapping AnimatedContainer so shadow also animates.
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
@@ -1048,11 +1059,8 @@ class _OptionsSheet extends ConsumerWidget {
                       fontSize: 14, color: AppColors.textPrimary,
                       fontFamily: 'Inter',
                     )),
-                onTap: () {
-                  o.onTap?.call();
-                  // If no custom handler, just close the sheet
-                  if (o.onTap == null) Navigator.pop(context);
-                },
+                // All _Opt instances have non-null onTap; call directly.
+                onTap: o.onTap,
                 contentPadding: const EdgeInsets.symmetric(horizontal: 0),
                 dense: true,
               )),

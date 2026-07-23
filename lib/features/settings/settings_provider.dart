@@ -163,7 +163,14 @@ class AppSettings {
 
 // ── Notifier ──────────────────────────────────────────────────────────
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  SettingsNotifier(AppSettings initial) : super(initial);
+  SettingsNotifier(AppSettings initial) : super(initial) {
+    // Eagerly load from disk on construction so the provider always
+    // reflects persisted settings, even if loadSettingsForStartup() was
+    // not called before runApp().
+    AppSettings.load().then((s) {
+      if (mounted) state = s;
+    }).catchError((_) {});
+  }
 
   Future<void> _update(AppSettings s) async {
     state = s;
@@ -193,6 +200,17 @@ final settingsProvider =
     StateNotifierProvider<SettingsNotifier, AppSettings>(
   (_) => SettingsNotifier(const AppSettings()),
 );
+
+/// Call this in main() BEFORE runApp() to pre-load settings from disk.
+/// Returns the loaded [AppSettings] so it can be passed to [ProviderScope]
+/// as an override, ensuring the UI never flashes default values.
+Future<AppSettings> loadSettingsForStartup() async {
+  try {
+    return await AppSettings.load();
+  } catch (_) {
+    return const AppSettings();
+  }
+}
 
 /// Derives a [Locale] from [settingsProvider].language.
 /// Supported language codes: en, fr, es, sw.

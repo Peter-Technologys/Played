@@ -72,6 +72,16 @@
         </intent>
     </queries>
 
+    <!-- Declare support for all screen sizes so the app is not filtered
+         out on tablets, foldables, or large-screen devices in the Play Store. -->
+    <supports-screens
+        android:smallScreens="true"
+        android:normalScreens="true"
+        android:largeScreens="true"
+        android:xlargeScreens="true"
+        android:anyDensity="true"
+        android:resizeable="true" />
+
     <application
         android:label="OTYA Player"
         android:name="${applicationName}"
@@ -80,6 +90,7 @@
         android:requestLegacyExternalStorage="true"
         android:allowBackup="false"
         android:hardwareAccelerated="true"
+        android:extractNativeLibs="true"
         android:networkSecurityConfig="@xml/network_security_config">
 
         <activity
@@ -87,11 +98,13 @@
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode|navigation"
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"
             android:supportsPictureInPicture="true"
-            android:resizeableActivity="true">
+            android:resizeableActivity="true"
+            android:maxAspectRatio="2.4"
+            android:minAspectRatio="1.0">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
