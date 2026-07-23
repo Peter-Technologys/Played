@@ -113,14 +113,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             ),
             _Divider(),
             _NavTile(
-              icon: Icons.videocam_rounded,
-              label: 'Video',
-              subtitle: 'Pop-up play, orientation, auto-resume',
-              color: AppColors.accentViolet,
-              onTap: () => _showVideoSheet(context, ref),
-            ),
-            _Divider(),
-            _NavTile(
               icon: Icons.headphones_rounded,
               label: 'Audio',
               subtitle: 'Format, equalizer, .nomedia filters',
@@ -371,100 +363,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
                       HapticFeedback.selectionClick();
                       Navigator.pop(ctx);
                       await _clearCache(context);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Video ─────────────────────────────────────────────────────────────
-
-  void _showVideoSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Consumer(
-        builder: (ctx, sheetRef, __) {
-          final s  = sheetRef.watch(settingsProvider);
-          final sn = sheetRef.read(settingsProvider.notifier);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20, 16, 20,
-              MediaQuery.of(ctx).viewInsets.bottom + 32,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sheetHeader('Video'),
-
-                  _SheetSwitch(
-                    label: 'Pop-up Play',
-                    subtitle: 'Float video when you leave the app',
-                    value: s.autoPip,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoPip(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Lock Screen Orientation',
-                    subtitle: 'Prevent auto-rotate during playback',
-                    value: s.orientationLocked,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setOrientationLocked(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Continuous Playback',
-                    subtitle: 'Auto-play next video in folder',
-                    value: s.continuousPlayback,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setContinuousPlayback(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Auto-Resume',
-                    subtitle: 'Resume from where you left off',
-                    value: s.autoResume,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoResume(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Auto-load Subtitles',
-                    subtitle: 'Load .srt/.ass from same folder',
-                    value: s.autoLoadSubtitles,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoLoadSubtitles(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Battery Saver by Default',
-                    subtitle: 'Start video in audio-only mode',
-                    value: s.defaultBatterySaver,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setDefaultBatterySaver(v);
                     },
                   ),
                 ],
