@@ -12,12 +12,33 @@ final authUserProvider = StreamProvider<models.User?>((ref) async* {
   }
 });
 
+/// STABILITY 1: Fixed auth change stream that does NOT leak _AuthCompleter
+/// instances. The original while(true) loop added a new listener on every
+/// iteration without ever removing the old one, causing the listener list
+/// to grow unboundedly across sign-in/sign-out cycles.
+///
+/// Fix: use a single persistent callback that resets a shared completer
+/// after each completion, and remove the callback when the stream is done.
 Stream<void> _authChangeStream() async* {
-  while (true) {
-    final completer = _AuthCompleter();
-    AppwriteService.instance.addAuthListener(completer.complete);
-    await completer.future;
-    yield null;
+  // Single completer shared across all iterations.
+  var completer = _AuthCompleter();
+
+  // Single persistent callback — registered once, never duplicated.
+  void callback() => completer.complete();
+  AppwriteService.instance.addAuthListener(callback);
+
+  try {
+    while (true) {
+      await completer.future;
+      yield null;
+      // Reset for the next auth event before looping.
+      completer = _AuthCompleter();
+    }
+  } finally {
+    // STABILITY 1: Remove the listener when the stream subscription is
+    // cancelled (e.g. provider disposed) to prevent a dangling reference.
+    // AppwriteService.removeAuthListener is added below.
+    AppwriteService.instance.removeAuthListener(callback);
   }
 }
 

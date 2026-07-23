@@ -9,6 +9,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/appwrite_service.dart';
+import '../../../core/services/cloudflare_service.dart';
 import '../../settings/settings_provider.dart';
 import 'providers/my_space_provider.dart';
 import 'usage_stats_dashboard.dart';
@@ -302,13 +303,24 @@ class MySpaceHubScreen extends ConsumerWidget {
   }
 
   Future<void> _runBackup(BuildContext context) async {
+    // BUG 3: Use CloudflareService (the active backend) instead of the
+    // legacy AppwriteService.backupAll(). Requires the current userId.
+    final userId = (await AppwriteService.instance.getCurrentUser())?.$id;
+    if (userId == null) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('Sign in first to back up your data.'),
+        backgroundColor: AppColors.error,
+      ));
+      return;
+    }
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(
       content: Text('Backing up to cloud…'),
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
-    final ok = await AppwriteService.instance.backupAll();
+    final ok = await CloudflareService.instance.backupAll(userId);
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
     messenger.showSnackBar(SnackBar(

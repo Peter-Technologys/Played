@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
@@ -16,34 +17,66 @@ class CloudflareService {
 
   static const Duration _timeout = Duration(seconds: 12);
 
+  // PERFORMANCE 1: Single reusable HTTP client — avoids TCP setup overhead
+  // on every backup call. Dispose is documented but not called automatically
+  // because the singleton lives for the app lifetime.
+  static final http.Client _client = http.Client();
+
+  /// Disposes the shared HTTP client. Call only on app shutdown.
+  static void dispose() => _client.close();
+
+  // BUG 2: Connectivity check — returns false quickly when offline so we
+  // avoid 12-second timeout hangs on every backup method.
+  static Future<bool> _isOnline() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      return result.any((r) => r != ConnectivityResult.none);
+    } catch (_) {
+      return true; // assume online if check itself fails
+    }
+  }
+
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<void> backupPlaylists(String userId) async {
+    // BUG 2: Skip immediately when offline — prevents 12-second timeout hangs.
+    if (!await _isOnline()) {
+      debugPrint('[Cloudflare] backupPlaylists: offline, skipping.');
+      return;
+    }
     final playlists = PlayedDatabase.instance.getAllPlaylists();
     int synced = 0;
-    for (final pl in playlists) {
-      try {
-        final res = await http.post(
-          Uri.parse(Environment.apiPlaylistsUrl),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({
-            'id':        '${userId}_${pl.id}',
-            'user_id':   userId,
-            'name':      pl.name,
-            'media_ids': jsonEncode(pl.mediaIds),
-          }),
-        ).timeout(_timeout);
-        if (res.statusCode == 200) synced++;
-      } catch (e) {
-        debugPrint('[Cloudflare] backupPlaylists item failed: $e');
-      }
+    // BUG 1: Use Future.wait batches of 5 (same pattern as backupHistory)
+    // instead of sequential for-loop — prevents timeouts on large libraries.
+    const batchSize = 5;
+    for (var i = 0; i < playlists.length; i += batchSize) {
+      final batch = playlists.skip(i).take(batchSize);
+      final results = await Future.wait(batch.map((pl) async {
+        try {
+          final res = await _client.post(
+            Uri.parse(Environment.apiPlaylistsUrl),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'id':        '${userId}_${pl.id}',
+              'user_id':   userId,
+              'name':      pl.name,
+              'media_ids': jsonEncode(pl.mediaIds),
+            }),
+          ).timeout(_timeout);
+          return res.statusCode == 200;
+        } catch (e) {
+          debugPrint('[Cloudflare] backupPlaylists item failed: $e');
+          return false;
+        }
+      }));
+      synced += results.where((ok) => ok).length;
     }
     debugPrint('[Cloudflare] Synced $synced/${playlists.length} playlists.');
   }
 
   Future<int> restorePlaylists(String userId) async {
     try {
-      final res = await http
+      final res = await _client
           .get(Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'))
           .timeout(_timeout);
       if (res.statusCode != 200) return -1;
@@ -76,6 +109,11 @@ class CloudflareService {
   // ── Play history ──────────────────────────────────────────────────────────
 
   Future<void> backupHistory(String userId) async {
+    // BUG 2: Skip immediately when offline.
+    if (!await _isOnline()) {
+      debugPrint('[Cloudflare] backupHistory: offline, skipping.');
+      return;
+    }
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200);
     int synced = 0;
     const batchSize = 10;
@@ -83,7 +121,7 @@ class CloudflareService {
       final batch = history.skip(i).take(batchSize);
       final results = await Future.wait(batch.map((item) async {
         try {
-          final res = await http.post(
+          final res = await _client.post(
             Uri.parse(Environment.apiHistoryUrl),
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
@@ -109,8 +147,13 @@ class CloudflareService {
   // ── Pro status ────────────────────────────────────────────────────────────
 
   Future<void> saveProExpiry(String userId, int expiryMs) async {
+    // BUG 2: Skip immediately when offline.
+    if (!await _isOnline()) {
+      debugPrint('[Cloudflare] saveProExpiry: offline, skipping.');
+      return;
+    }
     try {
-      await http.post(
+      await _client.post(
         Uri.parse(Environment.apiProUrl),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'user_id': userId, 'expiry_ms': expiryMs}),
@@ -121,8 +164,13 @@ class CloudflareService {
   }
 
   Future<int> fetchProExpiry(String userId) async {
+    // BUG 2: Skip immediately when offline.
+    if (!await _isOnline()) {
+      debugPrint('[Cloudflare] fetchProExpiry: offline, skipping.');
+      return 0;
+    }
     try {
-      final res = await http
+      final res = await _client
           .get(Uri.parse('${Environment.apiProUrl}?user_id=$userId'))
           .timeout(_timeout);
       if (res.statusCode != 200) return 0;
