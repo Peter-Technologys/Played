@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/database/played_database.dart';
@@ -30,6 +31,11 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   // never double-fire a background refresh within 2 seconds of each other.
   Timer? _resumeDebounce;
 
+  // STABILITY 2: Incremental Set of known Hive IDs — populated once and
+  // updated incrementally so _writeBackToHive never does a full O(n) Hive
+  // read on every background refresh.
+  Set<String>? _knownHiveIds;
+
   @override
   Future<List<MediaItem>> build() async {
     StreamSubscription<dynamic>? sub;
@@ -45,7 +51,12 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
 
     final periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
-      _backgroundRefresh();
+      // BUG 7: Only refresh when the app is in the foreground — prevents
+      // unnecessary MediaStore scans while the app is backgrounded.
+      final lifecycle = WidgetsBinding.instance.lifecycleState;
+      if (lifecycle == AppLifecycleState.resumed) {
+        _backgroundRefresh();
+      }
     });
 
     ref.onDispose(() {
@@ -109,19 +120,25 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   /// A1: Upsert fresh scan results into the Hive history box so Phase 1b
   /// seed is always populated after the first scan. Only items not already
   /// in history are written, preserving lastPlayedAt for played tracks.
+  ///
+  /// STABILITY 2: Uses an incremental Set<String> (_knownHiveIds) that is
+  /// populated once and updated as new items are written — avoids the O(n)
+  /// getRecentlyPlayed(limit:9999) call on every background refresh.
   Future<void> _writeBackToHive(List<MediaItem> items) async {
     try {
       final db = PlayedDatabase.instance;
-      // Build a set of IDs already in history for O(1) lookup.
-      final existing = LinkedHashSet<String>.from(
+      // Populate the known-IDs set on first call only.
+      _knownHiveIds ??= LinkedHashSet<String>.from(
         db.getRecentlyPlayed(limit: 9999).map((e) => e.id),
       );
       for (final item in items) {
-        if (!existing.contains(item.id)) {
+        if (!_knownHiveIds!.contains(item.id)) {
           // seedLibraryItem writes the item WITHOUT stamping lastPlayedAt,
           // so library items never appear as 'recently played' with today's
           // timestamp, preserving the integrity of play history.
           await db.seedLibraryItem(item);
+          // Update the incremental set so subsequent calls stay O(1).
+          _knownHiveIds!.add(item.id);
         }
       }
     } catch (e) {

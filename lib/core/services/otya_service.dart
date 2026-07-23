@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -46,8 +47,11 @@ class OtyaService {
   OtyaRemoteTheme? _activeRemoteTheme;
   OtyaRemoteTheme? get activeRemoteTheme => _activeRemoteTheme;
 
-  // Notified whenever the remote theme is refreshed so widgets can rebuild.
-  final _themeListeners = <VoidCallback>[];
+  // PERFORMANCE 2: Use LinkedHashSet to prevent duplicate listener
+  // registrations — a plain List grows unboundedly if addThemeListener is
+  // called multiple times with the same callback (e.g. on hot-restart or
+  // widget rebuild without a matching removeThemeListener call).
+  final _themeListeners = LinkedHashSet<VoidCallback>();
   void addThemeListener(VoidCallback cb)    => _themeListeners.add(cb);
   void removeThemeListener(VoidCallback cb) => _themeListeners.remove(cb);
   void _notifyThemeListeners() {

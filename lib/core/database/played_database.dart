@@ -361,13 +361,23 @@ class PlayedDatabase {
   }
 
   // ── Lyrics Cache ────────────────────────────────────────────────────────────
+  //
+  // BUG 8: _shelfCacheBox stores three distinct namespaces. Key prefixes are
+  // documented here as static consts to prevent future collision:
+  //   _kFavPrefix   = 'fav_'    — favorite flags
+  //   _kLyricsPrefix = 'lyrics_' — cached lyrics
+  //   (no prefix)               — shelf/playlist cache (plain shelfKey strings)
+  //
+  // IMPORTANT: Never use a plain key that starts with 'fav_' or 'lyrics_'.
+
+  static const _kLyricsPrefix = 'lyrics_';
 
   Future<void> cacheLyrics(String mediaId, String rawLyrics) async {
-    try { await _shelfCache.put('lyrics_$mediaId', rawLyrics); } catch (_) {}
+    try { await _shelfCache.put('$_kLyricsPrefix$mediaId', rawLyrics); } catch (_) {}
   }
 
   String? getCachedLyrics(String mediaId) {
-    try { return _shelfCache.get('lyrics_$mediaId'); } catch (_) { return null; }
+    try { return _shelfCache.get('$_kLyricsPrefix$mediaId'); } catch (_) { return null; }
   }
 
   // ── Teardown ─────────────────────────────────────────────────────────────────

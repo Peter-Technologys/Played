@@ -7,6 +7,7 @@ import 'package:flutter/foundation.dart';
 import '../config/environment.dart';
 import '../database/played_database.dart';
 import '../models/playlist.dart';
+import 'cloudflare_service.dart';
 
 /// Appwrite service for OTYA Player.
 ///
@@ -58,6 +59,9 @@ class AppwriteService {
   // Notifies listeners (auth_provider) when sign-in state changes.
   final _authChangeCallbacks = <void Function()>[];
   void addAuthListener(void Function() cb) => _authChangeCallbacks.add(cb);
+  // STABILITY 1: removeAuthListener allows auth_provider to clean up the
+  // persistent callback when the stream subscription is cancelled.
+  void removeAuthListener(void Function() cb) => _authChangeCallbacks.remove(cb);
   void _notifyAuthChange() {
     for (final cb in _authChangeCallbacks) {
       cb();
@@ -113,9 +117,17 @@ class AppwriteService {
   }
 
   Future<void> _backupAfterSignIn() async {
+    // BUG 4: Route backup through CloudflareService (the active backend)
+    // instead of the legacy AppwriteService.backupAll() which writes to
+    // Appwrite DB collections that are no longer the primary data store.
     try {
-      await backupAll();
-      debugPrint('[Appwrite] Auto-backup after sign-in complete.');
+      final user = await getCurrentUser();
+      if (user == null) {
+        debugPrint('[Appwrite] _backupAfterSignIn: no user, skipping.');
+        return;
+      }
+      await CloudflareService.instance.backupAll(user.$id);
+      debugPrint('[Appwrite] Auto-backup after sign-in complete (via Cloudflare).');
     } catch (e) {
       debugPrint('[Appwrite] Auto-backup after sign-in failed: $e');
     }

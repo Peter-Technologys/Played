@@ -125,8 +125,18 @@ class AppSettings {
   static const _kContinuousPlayback     = 'continuous_playback';
   static const _kMaxConcurrentDownloads = 'max_concurrent_downloads';
 
+  // BUG 6: Cache the SharedPreferences instance after first load so that
+  // save() never calls SharedPreferences.getInstance() on every settings
+  // toggle — eliminates repeated async platform channel round-trips.
+  static SharedPreferences? _prefs;
+
+  static Future<SharedPreferences> _getPrefs() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
   static Future<AppSettings> load() async {
-    final p = await SharedPreferences.getInstance();
+    final p = await _getPrefs();
     return AppSettings(
       themeMode: AppThemeMode.values[
           (p.getInt(_kTheme) ?? AppThemeMode.dark.index)
@@ -157,7 +167,7 @@ class AppSettings {
   }
 
   Future<void> save() async {
-    final p = await SharedPreferences.getInstance();
+    final p = await _getPrefs();
     await p.setInt(_kTheme,            themeMode.index);
     await p.setBool(_kAutoResume,       autoResume);
     await p.setBool(_kBatterySaver,     defaultBatterySaver);
