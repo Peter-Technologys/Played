@@ -45,53 +45,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     final songs = libraryAsync.valueOrNull?.where((e) => !e.isVideo).length ?? 0;
     final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
-    // My Space tools: file management, sharing & conversion features only.
-    // Player features (Equalizer, Car Mode, History) live in the Tools tab.
-    // Theme lives in Settings. Air-Drop and Web Share merged (same screen).
-    final tools = <_ToolItem>[
-      _ToolItem(
-        icon: Icons.lock_rounded,
-        label: 'Vault',
-        subtitle: 'Private storage',
-        gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
-        onTap: () => context.push('/vault'),
-      ),
-      _ToolItem(
-        icon: Icons.wifi_tethering_rounded,
-        label: 'Share & Transfer',
-        subtitle: 'AirDrop & web stream',
-        gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
-        onTap: () => context.push('/airdrop'),
-      ),
-      _ToolItem(
-        icon: Icons.audiotrack_rounded,
-        label: 'MP3 Convert',
-        subtitle: 'Extract audio',
-        gradient: const [Color(0xFF34D399), Color(0xFF059669)],
-        onTap: () => _showMp3Sheet(context),
-      ),
-      _ToolItem(
-        icon: Icons.content_cut_rounded,
-        label: 'Trimmer',
-        subtitle: 'Clip & compress',
-        gradient: const [Color(0xFFF472B6), Color(0xFFDB2777)],
-        onTap: () => _showTrimmerSheet(context),
-      ),
-      _ToolItem(
-        icon: Icons.cleaning_services_rounded,
-        label: 'Cleaner',
-        subtitle: 'Free up space',
-        gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
-        onTap: () => _showStorageCleaner(context),
-      ),
-      _ToolItem(
-        icon: Icons.queue_music_rounded,
-        label: 'Playlists',
-        subtitle: 'Manage playlists',
-        gradient: const [Color(0xFF1DB954), Color(0xFF0D8A3C)],
-        onTap: () => context.push('/playlists'),
-      ),
-    ];
+    // Tools live in the Tools tab — no tools grid duplicated here.
 
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -175,36 +129,6 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-            // ── Tools Grid ───────────────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _SectionLabel(label: 'Tools'),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 10)),
-            SliverPadding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 0.95,
-                ),
-                delegate: SliverChildListDelegate(
-                  tools.map((t) => _ToolMiniCard(
-                    icon: t.icon,
-                    label: t.label,
-                    subtitle: t.subtitle,
-                    gradient: t.gradient,
-                    onTap: t.onTap,
-                  )).toList(),
-                ),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
             // ── Account Card ─────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
@@ -275,13 +199,21 @@ class MySpaceHubScreen extends ConsumerWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 16),
                 child: Column(
                   children: [
-                    // Vault, Playlists, History are in the tools grid above.
+                    // Settings, Playlists, Stats only. Tools live in the Tools tab.
                     _QuickLink(
                       icon: Icons.settings_rounded,
                       label: 'Profile & Settings',
                       subtitle: 'Account, appearance, playback & more',
                       color: AppColors.accent,
                       onTap: () => context.push('/settings'),
+                    ),
+                    const SizedBox(height: 8),
+                    _QuickLink(
+                      icon: Icons.queue_music_rounded,
+                      label: 'Playlists',
+                      subtitle: 'Manage your playlists',
+                      color: AppColors.accentGreen,
+                      onTap: () => context.push('/playlists'),
                     ),
                     const SizedBox(height: 8),
                     _QuickLink(

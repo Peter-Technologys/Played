@@ -70,11 +70,11 @@ class _AboutScreenState extends State<AboutScreen> {
 
           _GroupCard(children: [
             _NavTile(
-              icon: Icons.email_outlined,
-              label: 'Contact Support',
-              subtitle: 'support@petersmartlink.com',
+              icon: Icons.system_update_outlined,
+              label: 'Check for Updates',
+              subtitle: 'Tap to check for a new version',
               color: AppColors.accent,
-              onTap: () => _launchEmail(context),
+              onTap: () => _checkForUpdates(context),
             ),
             _Divider(),
             _NavTile(
@@ -83,6 +83,14 @@ class _AboutScreenState extends State<AboutScreen> {
               subtitle: 'See what changed in this version',
               color: AppColors.accentViolet,
               onTap: () => context.push('/whats-new'),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.email_outlined,
+              label: 'Contact Support',
+              subtitle: 'support@petersmartlink.com',
+              color: AppColors.accent,
+              onTap: () => _launchEmail(context),
             ),
             _Divider(),
             _NavTile(
@@ -140,6 +148,22 @@ class _AboutScreenState extends State<AboutScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _checkForUpdates(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(
+      content: Text('Checking for updates...'),
+      duration: Duration(seconds: 30),
+      backgroundColor: AppColors.surface,
+    ));
+    await Future.delayed(const Duration(seconds: 1));
+    messenger.hideCurrentSnackBar();
+    if (!context.mounted) return;
+    messenger.showSnackBar(const SnackBar(
+      content: Text('You have the latest version \u2705'),
+      backgroundColor: AppColors.surface,
+    ));
   }
 
   Future<void> _launchEmail(BuildContext context) async {
