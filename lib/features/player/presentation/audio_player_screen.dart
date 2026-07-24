@@ -747,6 +747,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       ),
     );
   }
+
+  String _formatSpeed(double speed) {
+    if (speed == speed.truncateToDouble()) {
+      return '${speed.toInt()}x';
+    }
+    return '${speed}x';
+  }
 }
 
 // ── Album Art ──────────────────────────────────────────────────
