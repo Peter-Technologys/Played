@@ -2,7 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show WidgetsBinding;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
-import '../theme/app_colors.dart';
+import '../../app/theme/app_colors.dart';
 import 'update_service.dart';
 
 /// Builds and shows high-priority update notifications.
