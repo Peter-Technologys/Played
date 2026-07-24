@@ -11,6 +11,11 @@ class PlaybackCoordinator {
   Player? _activePlayer;
   String? _activeType; // 'audio' or 'video'
 
+  /// The currently active media_kit [Player], or null if nothing is playing.
+  /// Used by [MediaNotificationService] to route notification action buttons
+  /// (prev / play-pause / next) to the correct player instance.
+  Player? get activePlayer => _activePlayer;
+
   /// Call this when a player is about to start playing.
   /// Pauses any other active player first.
   Future<void> register(Player player, String type) async {

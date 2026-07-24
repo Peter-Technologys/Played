@@ -10,9 +10,9 @@ import 'core/database/played_database.dart';
 import 'core/services/cloudflare_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/media_notification_service.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'core/services/push_notification_service.dart';
+import 'core/services/fcm_service.dart';
 import 'core/services/storage_folder_service.dart';
-import 'core/services/otya_service.dart';
 import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
@@ -156,27 +156,9 @@ Future<void> _initBackground() async {
 
   unawaited(UpdateService.instance.registerDevice());
   unawaited(UpdateService.instance.checkAndNotify());
-  // BUG 5: Wire up OtyaService.registerDevicePushToken using the FCM token
-  // and device ID already stored in SharedPreferences by UpdateService.
-  // This avoids adding firebase_messaging as a new dependency — the token
-  // is written to 'fcm_token' by the native layer (if present).
-  unawaited(_registerPushToken());
-}
-
-Future<void> _registerPushToken() async {
-  try {
-    final prefs    = await SharedPreferences.getInstance();
-    final deviceId = prefs.getString('update_device_id');
-    final fcmToken = prefs.getString('fcm_token');
-    if (deviceId != null && fcmToken != null && fcmToken.isNotEmpty) {
-      await OtyaService.instance.registerDevicePushToken(
-        deviceId: deviceId,
-        fcmToken: fcmToken,
-      );
-    }
-  } catch (e) {
-    debugPrint('[main] _registerPushToken failed (non-fatal): $e');
-  }
+  // FcmService handles FCM token retrieval, persistence, and backend
+  // registration — replaces the old manual _registerPushToken() call.
+  unawaited(FcmService.instance.init());
 }
 
 Future<void> _initNotifications() async {
@@ -184,6 +166,7 @@ Future<void> _initNotifications() async {
     await NotificationService.instance.init();
     await UpdateNotificationService.instance.init();
     await MediaNotificationService.instance.init();
+    await PushNotificationService.instance.init();
   } catch (e) {
     debugPrint('[Notifications] Init error: $e');
   }

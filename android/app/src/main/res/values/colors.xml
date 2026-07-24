@@ -2,4 +2,6 @@
 <resources>
     <color name="background">#FF080B12</color>
     <color name="accent">#FF00D4FF</color>
+    <!-- FCM default notification accent colour (cyan brand colour) -->
+    <color name="notification_color">#00E5FF</color>
 </resources>
