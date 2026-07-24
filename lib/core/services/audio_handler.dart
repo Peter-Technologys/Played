@@ -44,6 +44,8 @@ class PlayedAudioHandler extends BaseAudioHandler
     _durationSub = _player.stream.duration.listen((_) => _emitPlaybackState());
 
     // Track completion — advance to next track.
+    // NOTE: onSkipNext is wired by AudioPlayerNotifier and handles all
+    // queue advancement. Do NOT call skipToNext() here to avoid double-skip.
     _completedSub = _player.stream.completed.listen((completed) {
       if (completed) {
         playbackState.add(playbackState.value.copyWith(

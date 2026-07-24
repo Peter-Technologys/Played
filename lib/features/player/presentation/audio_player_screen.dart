@@ -106,10 +106,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       state = state.copyWith(isPlaying: playing);
     });
 
-    // buffering stream — true while media is loading/buffering
+    // buffering stream — true while media is loading/buffering.
+    // Only update isLoading during the initial load phase (before duration
+    // is known). Mid-playback buffering should not re-show the spinner.
     _bufferingSub = player.stream.buffering.listen((buffering) {
       if (!mounted) return;
-      state = state.copyWith(isLoading: buffering);
+      // Only show loading spinner if we don't have a duration yet
+      // (i.e. still in initial load). Mid-playback rebuffering is silent.
+      if (buffering && state.duration == Duration.zero) {
+        state = state.copyWith(isLoading: true);
+      } else if (!buffering) {
+        state = state.copyWith(isLoading: false);
+      }
     });
 
     // Debounce position saves: write to DB at most once every 5 seconds
@@ -133,9 +141,22 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       state = state.copyWith(duration: d);
     });
 
-    // completed stream — fires true when the track finishes
+    // completed stream — fires true when the track finishes.
+    // AudioPlayerHandler.onSkipNext already handles queue advancement
+    // via the handler's _completedSub. This subscription is kept only
+    // for repeat-one logic which must bypass the handler's skip.
     _completedSub = player.stream.completed.listen((completed) {
-      if (completed) _onTrackComplete();
+      if (completed && state.repeat == RepeatState.one) {
+        // Repeat-one: reload current track directly without going through
+        // the handler's onSkipNext (which would advance the queue).
+        final queue = _container?.read(queueProvider);
+        final current = queue?.current;
+        if (current != null) load(current);
+      } else if (completed) {
+        // For all other repeat modes, the handler's onSkipNext callback
+        // already fired — just update repeat-all / repeat-off state.
+        _onTrackComplete();
+      }
     });
   }
 
@@ -145,8 +166,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final notifier = _container!.read(queueProvider.notifier);
     switch (state.repeat) {
       case RepeatState.one:
-        final current = queue.current;
-        if (current != null) load(current);
+        // Handled directly in _completedSub to avoid double-load.
         break;
       case RepeatState.all:
         notifier.next();
