@@ -568,20 +568,23 @@ class _MainShellState extends ConsumerState<_MainShell> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         scrolledUnderElevation: 0,
-        // No title — only the search action on the right
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search_rounded),
-            tooltip: 'Search',
-            color: AppColors.textSecondary,
-            onPressed: () {
-              showSearch<MediaItem?>(
-                context: context,
-                delegate: _GlobalSearchDelegate(allItems),
-              );
-            },
-          ),
-        ],
+        // Search icon only shown on Video (0) and Music (1) tabs.
+        // My Space (2) has its own internal search for tools.
+        actions: _currentIndex == 2
+            ? const []
+            : [
+                IconButton(
+                  icon: const Icon(Icons.search_rounded),
+                  tooltip: 'Search',
+                  color: AppColors.textSecondary,
+                  onPressed: () {
+                    showSearch<MediaItem?>(
+                      context: context,
+                      delegate: _GlobalSearchDelegate(allItems),
+                    );
+                  },
+                ),
+              ],
       ),
       body: widget.child,
       bottomNavigationBar: Column(

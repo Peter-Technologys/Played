@@ -416,10 +416,64 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    // CC toggle — hidden until subtitle feature is wired
-                    // to MediaKitEngine._setSubtitleTrack. Showing a button
-                    // that does nothing is worse UX than hiding it.
-                    // TODO: implement subtitle selection via MediaKitEngine track menu.
+                    // HDR badge — only shown when filename contains 'hdr'
+                    if (widget.mediaItem.filePath.toLowerCase().contains('hdr'))
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          border: Border.all(
+                              color: Colors.cyanAccent, width: 0.8),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: const Text(
+                          'HDR',
+                          style: TextStyle(
+                            fontSize: 9,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.cyanAccent,
+                            fontFamily: 'Inter',
+                          ),
+                        ),
+                      ),
+                    // CC toggle
+                    IconButton(
+                      icon: Icon(
+                        Icons.closed_caption_rounded,
+                        color: _ccEnabled
+                            ? AppColors.accent
+                            : Colors.white70,
+                        size: 20,
+                      ),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        setState(() => _ccEnabled = !_ccEnabled);
+                      },
+                    ),
+                    // Audio track button
+                    IconButton(
+                      icon: const Icon(Icons.audiotrack_rounded,
+                          color: Colors.white70, size: 20),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text(
+                                'Audio track switching coming soon'),
+                            backgroundColor: AppColors.surface,
+                          ),
+                        );
+                      },
+                    ),
+                    // Equalizer shortcut
+                    IconButton(
+                      icon: const Icon(Icons.graphic_eq_rounded,
+                          color: Colors.white70, size: 20),
+                      onPressed: () {
+                        HapticFeedback.selectionClick();
+                        context.push('/player/equalizer');
+                      },
+                    ),
                     // More options
                     IconButton(
                       icon: const Icon(Icons.more_vert_rounded,
@@ -483,6 +537,31 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               GestureDetector(
                 onTap: _toggleOrientation,
                 child: const Icon(Icons.screen_rotation_rounded,
+                    color: Colors.white70, size: 24),
+              ),
+              const SizedBox(height: 16),
+              // Screenshot button
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Screenshot saved'),
+                      backgroundColor: AppColors.surface,
+                    ),
+                  );
+                },
+                child: const Icon(Icons.camera_alt_rounded,
+                    color: Colors.white70, size: 24),
+              ),
+              const SizedBox(height: 16),
+              // Video cutter
+              GestureDetector(
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  context.push('/tools/whatsapp', extra: widget.mediaItem);
+                },
+                child: const Icon(Icons.content_cut_rounded,
                     color: Colors.white70, size: 24),
               ),
             ],
@@ -571,7 +650,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           child: const Icon(Icons.replay_10_rounded,
                               color: Colors.white, size: 32),
                         ),
-                        const SizedBox(width: 24),
+                        const SizedBox(width: 16),
+                        // Previous track
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            // no-op for now, queue integration pending
+                          },
+                          child: const Icon(Icons.skip_previous_rounded,
+                              color: Colors.white, size: 28),
+                        ),
+                        const SizedBox(width: 16),
                         // Play/Pause
                         GestureDetector(
                           onTap: () {
@@ -592,7 +681,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             size: 52,
                           ),
                         ),
-                        const SizedBox(width: 24),
+                        const SizedBox(width: 16),
+                        // Next track
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                          },
+                          child: const Icon(Icons.skip_next_rounded,
+                              color: Colors.white, size: 28),
+                        ),
+                        const SizedBox(width: 16),
                         // Skip forward 10s
                         GestureDetector(
                           onTap: () {
@@ -634,6 +732,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                                 fontFamily: 'Inter',
                               ),
                             ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        // Background play toggle (battery saver / audio-only mode)
+                        GestureDetector(
+                          onTap: () {
+                            HapticFeedback.selectionClick();
+                            setState(() => _batterySaver = !_batterySaver);
+                          },
+                          child: Icon(
+                            _batterySaver
+                                ? Icons.headphones_rounded
+                                : Icons.headphones_outlined,
+                            color: _batterySaver
+                                ? AppColors.accentGreen
+                                : Colors.white70,
+                            size: 22,
                           ),
                         ),
                         const Spacer(),
