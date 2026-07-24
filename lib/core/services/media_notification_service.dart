@@ -51,9 +51,7 @@ class MediaNotificationService {
       showWhen: false,
       playSound: false,
       enableVibration: false,
-      styleInformation: const MediaStyleInformation(
-        showActionsInCompactView: [0, 1, 2],
-      ),
+      styleInformation: const MediaStyleInformation(),
       actions: [
         const AndroidNotificationAction(
           'prev',
