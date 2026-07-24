@@ -3,14 +3,23 @@ abstract class Environment {
   static const String workerUrl        = 'https://petersmartlink.com';
 
   // ── API endpoints (all HMAC-authenticated) ────────────────────────────────
-  static const String checkUpdateUrl   = '$workerUrl/check-update';
+  static const String checkUpdateUrl    = '$workerUrl/check-update';
   static const String registerDeviceUrl = '$workerUrl/register-device';
-  static const String apiThemeUrl      = '$workerUrl/api/theme';
-  static const String apiVersionUrl    = '$workerUrl/api/version';
-  static const String apiDeviceUrl     = '$workerUrl/api/device';
-  static const String apiPlaylistsUrl  = '$workerUrl/api/playlists';
-  static const String apiHistoryUrl    = '$workerUrl/api/history';
-  static const String apiProUrl        = '$workerUrl/api/pro';
+  static const String apiThemeUrl       = '$workerUrl/api/theme';
+  static const String apiVersionUrl     = '$workerUrl/api/version';
+  static const String apiDeviceUrl      = '$workerUrl/api/device';
+  static const String apiPlaylistsUrl   = '$workerUrl/api/playlists';
+  static const String apiHistoryUrl     = '$workerUrl/api/history';
+  static const String apiProUrl         = '$workerUrl/api/pro';
+
+  // ── Public version endpoints (no auth — used by update checker) ───────────
+  static const String latestUrl         = '$workerUrl/latest';
+  static const String versionUrl        = '$workerUrl/api/version';
+
+  // ── Appwrite (feedback & ratings — fire-and-forget) ───────────────────────
+  static const String appwriteEndpoint  = 'https://cloud.appwrite.io/v1';
+  static const String appwriteProjectId = '';
+  static const String databaseId        = '';
 
   // ── APK download ──────────────────────────────────────────────────────────
   static const String arm64DownloadUrl = '$workerUrl/apk/arm64';
