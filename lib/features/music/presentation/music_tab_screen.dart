@@ -508,7 +508,7 @@ class _SongRow extends ConsumerWidget {
                     Text(
                       item.title,
                       style: TextStyle(
-                        fontSize: 14,
+                        fontSize: 13,
                         fontWeight: FontWeight.w600,
                         color: isPlaying
                             ? AppColors.accentViolet
@@ -526,7 +526,7 @@ class _SongRow extends ConsumerWidget {
                           ? item.artist!
                           : 'Unknown Artist',
                       style: const TextStyle(
-                        fontSize: 12,
+                        fontSize: 11,
                         color: AppColors.textSecondary,
                       ),
                       maxLines: 1,
@@ -543,7 +543,7 @@ class _SongRow extends ConsumerWidget {
                   item.formattedDuration,
                   textAlign: TextAlign.right,
                   style: const TextStyle(
-                    fontSize: 11,
+                    fontSize: 10,
                     color: AppColors.textSecondary,
                   ),
                 ),

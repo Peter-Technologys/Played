@@ -10,7 +10,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
 import 'providers/my_space_provider.dart';
-import 'usage_stats_dashboard.dart';
 
 // ── Tool entry model (used by search delegate and grid) ──────────────────────
 
@@ -19,6 +18,7 @@ class _ToolEntry {
   final String label;
   final String subtitle;
   final List<Color> gradient;
+  final String? badge;
   final VoidCallback Function(BuildContext) onTapBuilder;
 
   const _ToolEntry({
@@ -26,6 +26,7 @@ class _ToolEntry {
     required this.label,
     required this.subtitle,
     required this.gradient,
+    this.badge,
     required this.onTapBuilder,
   });
 }
@@ -330,7 +331,8 @@ class MySpaceHubScreen extends ConsumerWidget {
           icon: Icons.folder_open_rounded,
           label: 'Media Manage',
           subtitle: 'Browse & organise',
-          gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
+          gradient: const [Color(0xFFFB923C), Color(0xFFEA580C)],
+          badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/tools/folders'),
         ),
         _ToolEntry(
@@ -338,6 +340,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           label: 'MP3 Converter',
           subtitle: 'Extract audio',
           gradient: const [Color(0xFF34D399), Color(0xFF059669)],
+          badge: null,
           onTapBuilder: (ctx) => () => _showMp3InstructionSheet(ctx),
         ),
         _ToolEntry(
@@ -345,13 +348,15 @@ class MySpaceHubScreen extends ConsumerWidget {
           label: 'Vault',
           subtitle: 'Private storage',
           gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
+          badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/vault'),
         ),
         _ToolEntry(
           icon: Icons.wifi_tethering_rounded,
           label: 'Share & Transfer',
           subtitle: 'AirDrop & web stream',
-          gradient: const [Color(0xFF00D2FF), Color(0xFF0099CC)],
+          gradient: const [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
+          badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/airdrop'),
         ),
         _ToolEntry(
@@ -359,34 +364,39 @@ class MySpaceHubScreen extends ConsumerWidget {
           label: 'Theme',
           subtitle: 'Appearance',
           gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
+          badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/theme'),
         ),
         _ToolEntry(
           icon: Icons.history_rounded,
           label: 'History',
           subtitle: 'Recently played',
-          gradient: const [Color(0xFF8C52FF), Color(0xFF00D2FF)],
+          gradient: const [Color(0xFF6366F1), Color(0xFF4338CA)],
+          badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/history'),
         ),
         _ToolEntry(
           icon: Icons.cleaning_services_rounded,
           label: 'Cleaner',
           subtitle: 'Free up space',
-          gradient: const [Color(0xFFFF4D6A), Color(0xFFCC2244)],
+          gradient: const [Color(0xFFEC4899), Color(0xFFBE185D)],
+          badge: null,
           onTapBuilder: (ctx) => () => _showStorageCleanerSheet(ctx),
         ),
         _ToolEntry(
           icon: Icons.bar_chart_rounded,
           label: 'Stats',
           subtitle: 'Your activity',
-          gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
+          gradient: const [Color(0xFF14B8A6), Color(0xFF0D9488)],
+          badge: 'NEW',
           onTapBuilder: (ctx) => () => ctx.push('/stats'),
         ),
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
           label: 'Equalizer',
           subtitle: 'Audio tuner',
-          gradient: const [Color(0xFF00D2FF), Color(0xFF8C52FF)],
+          gradient: const [Color(0xFF9CA3AF), Color(0xFF6B7280)],
+          badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
         ),
       ];
@@ -396,10 +406,6 @@ class MySpaceHubScreen extends ConsumerWidget {
     final isGoogle    = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
-    final libraryAsync = ref.watch(mediaLibraryProvider);
-    final total = libraryAsync.valueOrNull?.length ?? 0;
-    final songs = libraryAsync.valueOrNull?.where((e) => !e.isVideo).length ?? 0;
-    final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).length ?? 0;
 
     final tools = _buildToolEntries(context, ref);
 
@@ -529,53 +535,6 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-            // ── Stats Row ────────────────────────────────────────────
-            if (total > 0)
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      _StatCard(
-                        icon: Icons.library_music_rounded,
-                        value: '$songs',
-                        label: 'Songs',
-                        color: AppColors.accentViolet,
-                      ),
-                      const SizedBox(width: 10),
-                      _StatCard(
-                        icon: Icons.video_library_rounded,
-                        value: '$videos',
-                        label: 'Videos',
-                        color: AppColors.accent,
-                      ),
-                      const SizedBox(width: 10),
-                      _StatCard(
-                        icon: Icons.folder_rounded,
-                        value: '$total',
-                        label: 'Total',
-                        color: AppColors.accentGreen,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            if (total > 0) const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-            // ── Usage Stats Dashboard ────────────────────────────────
-            const SliverToBoxAdapter(child: UsageStatsDashboard()),
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-
-            // ── Tools Section Label ──────────────────────────────────
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _SectionLabel(label: 'Tools'),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 12)),
-
             // ── Tools Grid (3×3) ─────────────────────────────────────
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -584,16 +543,19 @@ class MySpaceHubScreen extends ConsumerWidget {
                   crossAxisCount: 3,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 0.95,
+                  childAspectRatio: 1.25,
                 ),
                 delegate: SliverChildListDelegate(
                   tools
-                      .map((t) => _ToolMiniCard(
-                            icon: t.icon,
-                            label: t.label,
-                            subtitle: t.subtitle,
-                            gradient: t.gradient,
-                            onTap: t.onTapBuilder(context),
+                      .map((t) => _BadgeOverlay(
+                            badge: t.badge,
+                            child: _ToolMiniCard(
+                              icon: t.icon,
+                              label: t.label,
+                              subtitle: t.subtitle,
+                              gradient: t.gradient,
+                              onTap: t.onTapBuilder(context),
+                            ),
                           ))
                       .toList(),
                 ),
@@ -602,17 +564,15 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
 
-            // ── Quick Links ──────────────────────────────────────────
+            // ── Quick Links (consolidated card) ──────────────────────
             SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: _SectionLabel(label: 'Quick Links'),
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 10)),
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.surface,
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: AppColors.borderOf(context)),
+                ),
                 child: Column(
                   children: [
                     _QuickLink(
@@ -622,7 +582,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                       color: AppColors.accent,
                       onTap: () => context.push('/settings'),
                     ),
-                    const SizedBox(height: 8),
+                    Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(
                       icon: Icons.queue_music_rounded,
                       label: 'Playlists',
@@ -630,13 +590,13 @@ class MySpaceHubScreen extends ConsumerWidget {
                       color: AppColors.accentGreen,
                       onTap: () => context.push('/playlists'),
                     ),
-                    const SizedBox(height: 8),
+                    Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(
-                      icon: Icons.bar_chart_rounded,
-                      label: 'Your Stats',
-                      subtitle: 'Listening time, tracks played & more',
-                      color: AppColors.accentGreen,
-                      onTap: () => context.push('/stats'),
+                      icon: Icons.help_outline_rounded,
+                      label: 'Help & Feedback',
+                      subtitle: 'Report issues or send feedback',
+                      color: AppColors.accentViolet,
+                      onTap: () => context.push('/about'),
                     ),
                   ],
                 ),
@@ -1053,6 +1013,45 @@ class _SectionLabel extends StatelessWidget {
   }
 }
 
+// ── Badge Overlay ─────────────────────────────────────────────────────────────
+
+class _BadgeOverlay extends StatelessWidget {
+  final Widget child;
+  final String? badge; // e.g. 'NEW', 'HOT', or null
+  const _BadgeOverlay({required this.child, this.badge});
+
+  @override
+  Widget build(BuildContext context) {
+    if (badge == null) return child;
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        child,
+        Positioned(
+          top: -4,
+          right: -4,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+            decoration: BoxDecoration(
+              color: Colors.red,
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              badge!,
+              style: const TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 // ── Tool Mini Card ────────────────────────────────────────────────────────────
 
 class _ToolMiniCard extends StatelessWidget {
@@ -1163,13 +1162,8 @@ class _QuickLink extends StatelessWidget {
         HapticFeedback.selectionClick();
         onTap();
       },
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderOf(context)),
-        ),
         child: Row(
           children: [
             Container(

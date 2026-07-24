@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
@@ -401,20 +402,26 @@ class _VideoGrid extends ConsumerWidget {
               ? ListView.builder(
                   padding: EdgeInsets.fromLTRB(16, 0, 16,
                       MediaQuery.of(context).padding.bottom + 90),
+                  physics: const NeverScrollableScrollPhysics(),
+                  shrinkWrap: true,
                   cacheExtent: 600,
+                  itemExtent: 92,
                   itemCount: items.length,
                   itemBuilder: (context, i) {
                     final item = items[i];
                     return RepaintBoundary(
-                      child: _VideoListItem(
-                        item: item,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          ref
-                              .read(queueProvider.notifier)
-                              .setQueue(items, startIndex: i);
-                          context.push('/player/video', extra: item);
-                        },
+                      child: SizedBox(
+                        height: 92,
+                        child: _VideoListItem(
+                          item: item,
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            ref
+                                .read(queueProvider.notifier)
+                                .setQueue(items, startIndex: i);
+                            context.push('/player/video', extra: item);
+                          },
+                        ),
                       ),
                     );
                   },
@@ -502,6 +509,19 @@ class _VideoListItemState extends State<_VideoListItem> {
       }
       return;
     }
+    // Check disk cache first
+    try {
+      final tmpDir = await getTemporaryDirectory();
+      final diskPath = '${tmpDir.path}/otya_thumbs/$key.jpg';
+      final diskFile = File(diskPath);
+      if (await diskFile.exists()) {
+        _VideoCardState._thumbCacheSet(key, diskPath);
+        if (!_disposed && mounted) {
+          setState(() => _thumbPath = diskPath);
+        }
+        return;
+      }
+    } catch (_) {}
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
@@ -510,6 +530,14 @@ class _VideoListItemState extends State<_VideoListItem> {
       _VideoCardState._thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
         setState(() => _thumbPath = path);
+        // Persist to disk cache for future fast loads
+        try {
+          final tmpDir = await getTemporaryDirectory();
+          final diskDir = Directory('${tmpDir.path}/otya_thumbs');
+          if (!await diskDir.exists()) await diskDir.create(recursive: true);
+          final diskPath = '${diskDir.path}/$key.jpg';
+          await File(path).copy(diskPath);
+        } catch (_) {}
       }
     } catch (_) {
       _VideoCardState._thumbCacheSet(key, null);
@@ -590,6 +618,7 @@ class _VideoListItemState extends State<_VideoListItem> {
                         ? Image.file(
                             File(_thumbPath!),
                             fit: BoxFit.cover,
+                            cacheWidth: 200,
                             errorBuilder: (_, __, ___) =>
                                 _thumbnailPlaceholder(),
                           )
@@ -603,7 +632,7 @@ class _VideoListItemState extends State<_VideoListItem> {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 5, vertical: 2),
                         decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.72),
+                          color: Colors.black54,
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
@@ -636,8 +665,8 @@ class _VideoListItemState extends State<_VideoListItem> {
                         ? widget.item.fileName
                         : widget.item.title,
                     style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.onSurface,
                       fontFamily: 'Inter',
                     ),
@@ -650,12 +679,13 @@ class _VideoListItemState extends State<_VideoListItem> {
                     children: [
                       Container(
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 1),
+                            horizontal: 4, vertical: 1),
                         decoration: BoxDecoration(
                           color: AppColors.accent.withValues(alpha: 0.12),
                           borderRadius: BorderRadius.circular(4),
                           border: Border.all(
-                              color: AppColors.accent.withValues(alpha: 0.3)),
+                              color: AppColors.accent.withValues(alpha: 0.5),
+                              width: 0.8),
                         ),
                         child: Text(
                           _resolutionBadge(),
@@ -672,7 +702,7 @@ class _VideoListItemState extends State<_VideoListItem> {
                         child: Text(
                           '| ${widget.item.formattedSize}',
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             color: AppColors.textSecondary,
                             fontFamily: 'Inter',
                           ),
@@ -692,7 +722,7 @@ class _VideoListItemState extends State<_VideoListItem> {
                         child: Text(
                           _folderName(),
                           style: const TextStyle(
-                            fontSize: 12,
+                            fontSize: 10,
                             color: AppColors.textSecondary,
                             fontFamily: 'Inter',
                           ),
@@ -785,6 +815,19 @@ class _VideoCardState extends State<_VideoCard> {
       }
       return;
     }
+    // Check disk cache first
+    try {
+      final tmpDir = await getTemporaryDirectory();
+      final diskPath = '${tmpDir.path}/otya_thumbs/$key.jpg';
+      final diskFile = File(diskPath);
+      if (await diskFile.exists()) {
+        _thumbCacheSet(key, diskPath);
+        if (!_disposed && mounted) {
+          setState(() => _thumbPath = diskPath);
+        }
+        return;
+      }
+    } catch (_) {}
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
@@ -793,6 +836,14 @@ class _VideoCardState extends State<_VideoCard> {
       _thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
         setState(() => _thumbPath = path);
+        // Persist to disk cache for future fast loads
+        try {
+          final tmpDir = await getTemporaryDirectory();
+          final diskDir = Directory('${tmpDir.path}/otya_thumbs');
+          if (!await diskDir.exists()) await diskDir.create(recursive: true);
+          final diskPath = '${diskDir.path}/$key.jpg';
+          await File(path).copy(diskPath);
+        } catch (_) {}
       }
     } catch (_) {
       _thumbCacheSet(key, null);
@@ -862,6 +913,7 @@ class _VideoCardState extends State<_VideoCard> {
                         ? Image.file(
                             File(_thumbPath!),
                             fit: BoxFit.cover,
+                            cacheWidth: 200,
                             errorBuilder: (_, __, ___) => _gradientBg(),
                           )
                         : _gradientBg(),
