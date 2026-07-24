@@ -81,7 +81,11 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   // miniPlayerItemProvider and read queueProvider without a BuildContext.
   ProviderContainer? _container;
 
-  AudioPlayerNotifier() : super(const AudioPlayerState()) {
+  // _attachStreams() is called by the provider factory AFTER _container is
+  // assigned, so _onTrackComplete() can safely read queueProvider.
+  AudioPlayerNotifier() : super(const AudioPlayerState());
+
+  void init() {
     _attachStreams();
   }
 
@@ -230,11 +234,17 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void _updateNotification() {
     final item = _container?.read(miniPlayerItemProvider);
     if (item == null) return;
+    // albumArtPath may be an 'albumid:NNNN' URI — not a real file path.
+    // MediaNotificationService calls File(path).existsSync() which always
+    // returns false for albumid: strings. Only pass real file paths.
+    final artPath = item.albumArtPath;
+    final safeArtPath =
+        (artPath != null && !artPath.startsWith('albumid:')) ? artPath : null;
     MediaNotificationService.instance.show(
       title: item.title,
       artist: item.artist ?? 'Unknown Artist',
       isPlaying: state.isPlaying,
-      albumArtPath: item.albumArtPath,
+      albumArtPath: safeArtPath,
     );
   }
 
@@ -332,6 +342,9 @@ final audioPlayerProvider =
   (ref) {
     final notifier = AudioPlayerNotifier();
     notifier._container = ref.container;
+    // init() must be called AFTER _container is set so that stream callbacks
+    // that call _container?.read(...) do not NPE on first track completion.
+    notifier.init();
     return notifier;
   },
 );

@@ -11,6 +11,7 @@ import 'core/services/cloudflare_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/media_notification_service.dart';
 import 'core/services/push_notification_service.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
@@ -162,6 +163,14 @@ Future<void> _initBackground() async {
 }
 
 Future<void> _initNotifications() async {
+  try {
+    // Firebase must be initialised before any FirebaseMessaging call.
+    // Without this, FcmService.init() throws:
+    //   'No Firebase App has been created — call Firebase.initializeApp()'
+    await Firebase.initializeApp();
+  } catch (e) {
+    debugPrint('[Firebase] initializeApp error (non-fatal): $e');
+  }
   try {
     await NotificationService.instance.init();
     await UpdateNotificationService.instance.init();

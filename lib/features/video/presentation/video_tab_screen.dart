@@ -497,34 +497,7 @@ class _VideoGrid extends ConsumerWidget {
   }
 }
 
-// ── DEAD CODE REMOVED — old SliverFillRemaining block replaced above ──
-class _DeadCodePlaceholder {
-  // ignore: unused_field
-  final _item = null;
-  void _onTap() {
-    // placeholder so the closing braces below compile
-    return;
-  }
-  // The original code continued with:
-  //   item: item,
-  void _original(dynamic item, dynamic context) {
-    // item: item,
-                        onTap: () {
-                          HapticFeedback.lightImpact();
-                          ref
-                              .read(queueProvider.notifier)
-                              .setQueue(items, startIndex: i);
-                          context.push('/player/video', extra: item);
-                        },
-                      ),
-                    );
-                  },
-                ),
-        ),
-      ],
-    );
-  }
-}
+// Dead code placeholder removed — list and grid views are above.
 
 // ── Video List Item ───────────────────────────────────────────────────────
 

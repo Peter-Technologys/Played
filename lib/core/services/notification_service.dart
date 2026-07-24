@@ -13,9 +13,8 @@ class NotificationService {
 
   Future<void> init() async {
     const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings =
-        InitializationSettings(android: androidSettings);
+        AndroidInitializationSettings('@drawable/ic_notification');
+    const settings = InitializationSettings(android: androidSettings);
     await _plugin.initialize(
       settings,
       onDidReceiveNotificationResponse: _onNotificationResponse,
@@ -94,7 +93,7 @@ class NotificationService {
       channelDescription: 'Audio extraction and video trim completion alerts',
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/ic_notification',
     );
     await _plugin.show(
       id,
