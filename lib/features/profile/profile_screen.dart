@@ -6,8 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/cloudflare_service.dart';
 import '../../core/services/update_service.dart';
@@ -136,14 +136,14 @@ class ProfileScreen extends ConsumerWidget {
             icon: Icons.cloud_upload_rounded,
             label: 'Back Up to Cloud',
             subtitle: isGoogle ? 'Save playlists & history to your account' : 'Sign in with Google first',
-            onTap: () => isGoogle ? _runBackup(context) : _showSignInRequired(context),
+            onTap: () => isGoogle ? _runBackup(context, ref) : _showSignInRequired(context),
           ),
           const SizedBox(height: 6),
           _TappableTile(
             icon: Icons.cloud_download_rounded,
             label: 'Restore from Cloud',
             subtitle: isGoogle ? 'Restore playlists from your last backup' : 'Sign in with Google first',
-            onTap: () => isGoogle ? _runRestore(context) : _showSignInRequired(context),
+            onTap: () => isGoogle ? _runRestore(context, ref) : _showSignInRequired(context),
           ),
 
           const SizedBox(height: 20),
@@ -204,7 +204,7 @@ class ProfileScreen extends ConsumerWidget {
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  Future<void> _runBackup(BuildContext context) async {
+  Future<void> _runBackup(BuildContext context, [WidgetRef? ref]) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(
       content: Row(
@@ -220,8 +220,7 @@ class ProfileScreen extends ConsumerWidget {
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('appwrite_user_id') ?? '';
+    final userId = ref != null ? (ref.read(authNotifierProvider).userId ?? '') : '';
     final ok = await CloudflareService.instance.backupAll(userId);
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
@@ -233,7 +232,7 @@ class ProfileScreen extends ConsumerWidget {
     ));
   }
 
-  Future<void> _runRestore(BuildContext context) async {
+  Future<void> _runRestore(BuildContext context, [WidgetRef? ref]) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
@@ -284,8 +283,7 @@ class ProfileScreen extends ConsumerWidget {
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('appwrite_user_id') ?? '';
+    final userId = ref != null ? (ref.read(authNotifierProvider).userId ?? '') : '';
     final count = await CloudflareService.instance.restorePlaylists(userId);
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
@@ -298,17 +296,37 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
-    // Google Sign-In is handled natively; this is a placeholder.
-    // The userId is stored in SharedPreferences under 'appwrite_user_id'
-    // by the native Google Sign-In flow.
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Google sign-in is handled via the native flow.'),
-          backgroundColor: AppColors.surface,
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign In', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: const InputDecoration(
+            hintText: 'Your name',
+            hintStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.accent)),
+          ),
+          onSubmitted: (v) => Navigator.pop(context, v),
         ),
-      );
-    }
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+            child: const Text('Sign In', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.trim().isEmpty) return;
+    await ref.read(authNotifierProvider.notifier).signIn(userId: const Uuid().v4(), displayName: name.trim());
   }
 
   void _confirmSignOut(BuildContext context, WidgetRef ref) {
@@ -336,12 +354,7 @@ class ProfileScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              // Clear stored auth state
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('appwrite_user_id');
-              await prefs.remove('auth_display_name');
-              await prefs.remove('auth_email');
-              await prefs.remove('auth_photo_url');
+              await ref.read(authNotifierProvider.notifier).signOut();
             },
             child: const Text('Sign out',
                 style: TextStyle(color: AppColors.error)),

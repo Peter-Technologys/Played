@@ -15,6 +15,7 @@ import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../features/player/presentation/widgets/video_gesture_layer.dart';
 import '../../../features/settings/settings_provider.dart';
+import 'queue_screen.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
@@ -456,12 +457,17 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           color: Colors.white70, size: 20),
                       onPressed: () {
                         HapticFeedback.selectionClick();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text(
-                                'Audio track switching coming soon'),
-                            backgroundColor: AppColors.surface,
-                          ),
+                        if (_player == null) return;
+                        final audioTracks = _player!.state.tracks.audio;
+                        if (audioTracks.length <= 1) {
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No alternate audio tracks in this file'), backgroundColor: AppColors.surface));
+                          return;
+                        }
+                        showModalBottomSheet(
+                          context: context,
+                          backgroundColor: AppColors.surface,
+                          shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                          builder: (_) => _AudioTrackSheet(tracks: audioTracks, activeTrack: _player!.state.track.audio, onSelect: (t) => _player!.setAudioTrack(t)),
                         );
                       },
                     ),
@@ -546,8 +552,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                   HapticFeedback.selectionClick();
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('Screenshot saved'),
+                      content: Text('Use your device\'s power + volume-down buttons to screenshot'),
                       backgroundColor: AppColors.surface,
+                      duration: Duration(seconds: 3),
                     ),
                   );
                 },
@@ -655,7 +662,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
-                            // no-op for now, queue integration pending
+                            ref.read(queueProvider.notifier).previous();
+                            final prev = ref.read(queueProvider).current;
+                            if (prev != null && context.mounted) {
+                              Navigator.of(context).pop();
+                              context.push('/player/video', extra: prev);
+                            }
                           },
                           child: const Icon(Icons.skip_previous_rounded,
                               color: Colors.white, size: 28),
@@ -686,6 +698,12 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
+                            ref.read(queueProvider.notifier).next();
+                            final next = ref.read(queueProvider).current;
+                            if (next != null && context.mounted) {
+                              Navigator.of(context).pop();
+                              context.push('/player/video', extra: next);
+                            }
                           },
                           child: const Icon(Icons.skip_next_rounded,
                               color: Colors.white, size: 28),
@@ -1069,6 +1087,42 @@ class _InfoRow extends StatelessWidget {
               ),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Audio Track Sheet ─────────────────────────────────────────────────────
+
+class _AudioTrackSheet extends StatelessWidget {
+  final List<AudioTrack> tracks;
+  final AudioTrack activeTrack;
+  final void Function(AudioTrack) onSelect;
+  const _AudioTrackSheet({required this.tracks, required this.activeTrack, required this.onSelect});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: AppColors.border, borderRadius: BorderRadius.circular(2)))),
+          const SizedBox(height: 16),
+          const Text('Audio Track', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.textPrimary, fontFamily: 'Inter')),
+          const SizedBox(height: 12),
+          ...tracks.map((t) {
+            final isActive = t.id == activeTrack.id;
+            final label = (t.language?.isNotEmpty == true) ? t.language! : (t.title?.isNotEmpty == true) ? t.title! : 'Track ${tracks.indexOf(t) + 1}';
+            return ListTile(
+              contentPadding: EdgeInsets.zero,
+              leading: Icon(isActive ? Icons.radio_button_checked_rounded : Icons.radio_button_off_rounded, color: isActive ? AppColors.accent : AppColors.textSecondary, size: 20),
+              title: Text(label, style: TextStyle(fontSize: 14, fontWeight: isActive ? FontWeight.w700 : FontWeight.normal, color: isActive ? AppColors.accent : AppColors.textPrimary, fontFamily: 'Inter')),
+              onTap: () { Navigator.pop(context); onSelect(t); },
+            );
+          }),
         ],
       ),
     );

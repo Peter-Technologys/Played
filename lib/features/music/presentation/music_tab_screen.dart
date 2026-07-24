@@ -576,17 +576,16 @@ class _SongRow extends ConsumerWidget {
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _SongOptionsSheet(item: item, ref: ref),
+      builder: (_) => _SongOptionsSheet(item: item),
     );
   }
 }
 
 // ── Song options bottom sheet ─────────────────────────────────────────────
 
-class _SongOptionsSheet extends StatelessWidget {
+class _SongOptionsSheet extends ConsumerWidget {
   final MediaItem item;
-  final WidgetRef ref;
-  const _SongOptionsSheet({required this.item, required this.ref});
+  const _SongOptionsSheet({required this.item});
 
   void _showPlaylistPicker(BuildContext context, WidgetRef ref, MediaItem item) {
     final playlists = ref.read(playlistsProvider);
@@ -675,7 +674,7 @@ class _SongOptionsSheet extends StatelessWidget {
   }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
       child: Column(
