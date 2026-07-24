@@ -383,19 +383,22 @@ class OtyaRemoteTheme {
     required this.buttonRadius,
   });
 
-  /// Parses a Worker JSON map. Any missing / malformed field falls back to
-  /// the corresponding AppColors constant so the app always has valid colours.
+  /// Parses a Worker JSON map. Supports both the V2 schema (nested `colors`
+  /// object with snake_case keys) and the legacy flat schema for backwards
+  /// compatibility. Any missing / malformed field falls back to the
+  /// corresponding AppColors constant so the app always has valid colours.
   factory OtyaRemoteTheme.fromJson(Map<String, dynamic> json) {
+    final colors = (json['colors'] as Map<String, dynamic>?) ?? {};
     return OtyaRemoteTheme(
-      label:           (json['label']           as String?) ?? 'Remote Theme',
-      accent:          _parseColor(json['accent'],          AppColors.accent),
-      accentSecondary: _parseColor(json['accentSecondary'], AppColors.accentViolet),
-      background:      _parseColor(json['background'],      AppColors.background),
-      surface:         _parseColor(json['surface'],         AppColors.surface),
-      textPrimary:     _parseColor(json['textPrimary'],     AppColors.textPrimary),
-      textSecondary:   _parseColor(json['textSecondary'],   AppColors.textSecondary),
-      cardRadius:      (json['cardRadius']   as num?)?.toDouble() ?? 24.0,
-      buttonRadius:    (json['buttonRadius'] as num?)?.toDouble() ?? 14.0,
+      label:           (json['theme_identity'] as String?) ?? (json['label'] as String?) ?? 'Remote Theme',
+      accent:          _parseColor(colors['primary'] ?? json['accent'], AppColors.accent),
+      accentSecondary: _parseColor(colors['secondary'] ?? json['accentSecondary'], AppColors.accentViolet),
+      background:      _parseColor(colors['scaffold_background'] ?? json['background'], AppColors.background),
+      surface:         _parseColor(colors['surface'] ?? json['surface'], AppColors.surface),
+      textPrimary:     _parseColor(colors['text_primary'] ?? json['textPrimary'], AppColors.textPrimary),
+      textSecondary:   _parseColor(colors['text_secondary'] ?? json['textSecondary'], AppColors.textSecondary),
+      cardRadius:      (json['card_border_radius'] as num?)?.toDouble() ?? (json['cardRadius'] as num?)?.toDouble() ?? 24.0,
+      buttonRadius:    (json['button_padding'] as num?)?.toDouble() ?? (json['buttonRadius'] as num?)?.toDouble() ?? 14.0,
     );
   }
 
