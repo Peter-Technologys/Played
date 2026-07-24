@@ -5,10 +5,11 @@ import '../config/environment.dart';
 import '../database/played_database.dart';
 import '../models/playlist.dart';
 import '../utils/connectivity_utils.dart';
+import 'api_signer.dart';
 
 /// CloudflareService — handles playlists, history, and pro status via
 /// the Cloudflare Worker + D1 backend at petersmartlink.com.
-/// Auth (Google OAuth) is handled natively; userId is stored in SharedPreferences.
+/// Every request is HMAC-signed via ApiSigner.
 /// Every method is fire-and-forget safe: errors are logged, never thrown.
 class CloudflareService {
   CloudflareService._();
@@ -16,38 +17,40 @@ class CloudflareService {
 
   static const Duration _timeout = Duration(seconds: 12);
 
-  // PERFORMANCE 1: Single reusable HTTP client — avoids TCP setup overhead
-  // on every backup call. Dispose is documented but not called automatically
-  // because the singleton lives for the app lifetime.
+  // Single reusable HTTP client — avoids TCP setup overhead on every call.
   static final http.Client _client = http.Client();
 
   /// Disposes the shared HTTP client. Call only on app shutdown.
   static void dispose() => _client.close();
 
-  // Connectivity check — returns false quickly when offline so we
-  // avoid 12-second timeout hangs on every backup method.
-  // Delegates to the shared isOnline() utility in connectivity_utils.dart.
+  // ── Signed header helpers ─────────────────────────────────────────────────
+
+  Map<String, String> _getHeaders(String path) =>
+      ApiSigner.signedHeaders(method: 'GET', path: path);
+
+  Map<String, String> _postHeaders(String path) => {
+    ...ApiSigner.signedHeaders(method: 'POST', path: path),
+    'Content-Type': 'application/json',
+  };
 
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<void> backupPlaylists(String userId) async {
-    // BUG 2: Skip immediately when offline — prevents 12-second timeout hangs.
     if (!await isOnline()) {
       debugPrint('[Cloudflare] backupPlaylists: offline, skipping.');
       return;
     }
     final playlists = PlayedDatabase.instance.getAllPlaylists();
     int synced = 0;
-    // BUG 1: Use Future.wait batches of 5 (same pattern as backupHistory)
-    // instead of sequential for-loop — prevents timeouts on large libraries.
     const batchSize = 5;
+    const path = '/api/playlists';
     for (var i = 0; i < playlists.length; i += batchSize) {
       final batch = playlists.skip(i).take(batchSize);
       final results = await Future.wait(batch.map((pl) async {
         try {
           final res = await _client.post(
             Uri.parse(Environment.apiPlaylistsUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: _postHeaders(path),
             body: jsonEncode({
               'id':        '${userId}_${pl.id}',
               'user_id':   userId,
@@ -68,15 +71,19 @@ class CloudflareService {
 
   Future<int> restorePlaylists(String userId) async {
     try {
+      const path = '/api/playlists';
       final res = await _client
-          .get(Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'))
+          .get(
+            Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'),
+            headers: _getHeaders(path),
+          )
           .timeout(_timeout);
       if (res.statusCode != 200) return -1;
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final list = (data['playlists'] as List<dynamic>?) ?? [];
       int restored = 0;
       for (final item in list) {
-        final map = item as Map<String, dynamic>;
+        final map   = item as Map<String, dynamic>;
         final rawId = (map['id'] as String).replaceFirst('${userId}_', '');
         final playlist = Playlist(
           id:        rawId,
@@ -101,7 +108,6 @@ class CloudflareService {
   // ── Play history ──────────────────────────────────────────────────────────
 
   Future<void> backupHistory(String userId) async {
-    // BUG 2: Skip immediately when offline.
     if (!await isOnline()) {
       debugPrint('[Cloudflare] backupHistory: offline, skipping.');
       return;
@@ -109,13 +115,14 @@ class CloudflareService {
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200);
     int synced = 0;
     const batchSize = 10;
+    const path = '/api/history';
     for (var i = 0; i < history.length; i += batchSize) {
       final batch = history.skip(i).take(batchSize);
       final results = await Future.wait(batch.map((item) async {
         try {
           final res = await _client.post(
             Uri.parse(Environment.apiHistoryUrl),
-            headers: {'Content-Type': 'application/json'},
+            headers: _postHeaders(path),
             body: jsonEncode({
               'id':             '${userId}_${item.id}',
               'user_id':        userId,
@@ -139,15 +146,15 @@ class CloudflareService {
   // ── Pro status ────────────────────────────────────────────────────────────
 
   Future<void> saveProExpiry(String userId, int expiryMs) async {
-    // BUG 2: Skip immediately when offline.
     if (!await isOnline()) {
       debugPrint('[Cloudflare] saveProExpiry: offline, skipping.');
       return;
     }
     try {
+      const path = '/api/pro';
       await _client.post(
         Uri.parse(Environment.apiProUrl),
-        headers: {'Content-Type': 'application/json'},
+        headers: _postHeaders(path),
         body: jsonEncode({'user_id': userId, 'expiry_ms': expiryMs}),
       ).timeout(_timeout);
     } catch (e) {
@@ -156,14 +163,17 @@ class CloudflareService {
   }
 
   Future<int> fetchProExpiry(String userId) async {
-    // BUG 2: Skip immediately when offline.
     if (!await isOnline()) {
       debugPrint('[Cloudflare] fetchProExpiry: offline, skipping.');
       return 0;
     }
     try {
+      const path = '/api/pro';
       final res = await _client
-          .get(Uri.parse('${Environment.apiProUrl}?user_id=$userId'))
+          .get(
+            Uri.parse('${Environment.apiProUrl}?user_id=$userId'),
+            headers: _getHeaders(path),
+          )
           .timeout(_timeout);
       if (res.statusCode != 200) return 0;
       final data = jsonDecode(res.body) as Map<String, dynamic>;

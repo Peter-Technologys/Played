@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dart:ffi';
-import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -8,15 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../config/environment.dart';
 import '../config/flavor_config.dart';
+import 'api_signer.dart';
 import 'update_notification_service.dart';
 
 /// Checks if a newer version of OTYA Player is available.
-///
-/// Compares server versionCode (integer) against BuildConfig.VERSION_CODE
-/// via package_info_plus — no hardcoded version strings.
-///
-/// WorkManager scheduling is handled by UpdateCheckWorker (Kotlin side).
-/// This service is called both from WorkManager and on app foreground.
+/// Compares server versionCode against installed build number via package_info_plus.
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
@@ -25,19 +20,11 @@ class UpdateService {
   static const String _prefSkippedCode = 'update_skipped_code';
   static const String _prefDeviceId    = 'update_device_id';
 
-  // Guard against concurrent SharedPreferences access
-  bool _checkInProgress      = false;
-  bool _registerInProgress   = false;
+  bool _checkInProgress    = false;
+  bool _registerInProgress = false;
 
   String get downloadUrl => Environment.downloadUrl;
 
-  /// Returns [UpdateInfo] if a newer version is available, null otherwise.
-  /// Checks at most once per 24 hours unless [force] is true.
-  /// Guards against concurrent calls.
-  ///
-  /// Returns null immediately when [FlavorConfig.selfUpdateEnabled] is false
-  /// (i.e. the Google Play / standard flavor) — updates are handled by the
-  /// Play Store in that case.
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
     if (!FlavorConfig.selfUpdateEnabled) return null;
     if (_checkInProgress) return null;
@@ -53,7 +40,6 @@ class UpdateService {
     try {
       final prefs = await SharedPreferences.getInstance();
 
-      // Throttle: only check once per day unless forced
       if (!force) {
         final lastCheck = prefs.getInt(_prefLastCheck) ?? 0;
         final now = DateTime.now().millisecondsSinceEpoch;
@@ -63,7 +49,7 @@ class UpdateService {
         }
       }
 
-      // Try /latest first, fall back to /version if it fails
+      // /latest and /version are public (no HMAC) — used by website too
       http.Response? response;
       try {
         response = await http
@@ -94,22 +80,18 @@ class UpdateService {
 
       if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
 
-      // Save the time we last checked
       await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
 
-      // Get installed versionCode from the OS (not a hardcoded string)
-      final packageInfo = await PackageInfo.fromPlatform();
+      final packageInfo   = await PackageInfo.fromPlatform();
       final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       debugPrint('[UpdateService] Installed: $installedCode  Server: $serverVersionCode');
 
       if (serverVersionCode <= installedCode) return null;
 
-      // Check if user already dismissed this exact version
       final skippedCode = prefs.getInt(_prefSkippedCode) ?? 0;
       if (skippedCode >= serverVersionCode) return null;
 
-      // Use ABI-specific URL from Worker response
       final abi       = _detectAbi();
       final directUrl = abi == 'arm64'
           ? (downloads['arm64'] as String? ?? Environment.arm64DownloadUrl)
@@ -130,7 +112,6 @@ class UpdateService {
     }
   }
 
-  /// Called by WorkManager worker — checks and shows notification if update found.
   Future<void> checkAndNotify() async {
     final info = await checkForUpdate();
     if (info != null) {
@@ -138,13 +119,11 @@ class UpdateService {
     }
   }
 
-  /// User tapped "Later" — skip this version code until next app open.
   Future<void> remindLater(int versionCode) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_prefSkippedCode, versionCode);
   }
 
-  /// Register this device on first launch. Guards against concurrent calls.
   Future<void> registerDevice() async {
     if (_registerInProgress) return;
     _registerInProgress = true;
@@ -160,82 +139,58 @@ class UpdateService {
       final prefs = await SharedPreferences.getInstance();
       String? deviceId = prefs.getString(_prefDeviceId);
       if (deviceId == null) {
-        deviceId = _generateDeviceId();
+        deviceId = const Uuid().v4();
         await prefs.setString(_prefDeviceId, deviceId);
       }
 
-      final packageInfo = await PackageInfo.fromPlatform();
+      final packageInfo   = await PackageInfo.fromPlatform();
       final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
-      final abi = _detectAbi();
-      final now = DateTime.now().toUtc().toIso8601String();
+      final abi           = _detectAbi();
 
-      // POST to Appwrite REST — no SDK needed, avoids auth requirement
-      final url = '${Environment.appwriteEndpoint}/databases/${Environment.databaseId}'
-          '/collections/${Environment.devicesCollection}/documents';
+      // POST to Worker /api/device (HMAC-authenticated)
+      const path = '/api/device';
+      final headers = {
+        ...ApiSigner.signedHeaders(
+          method: 'POST',
+          path: path,
+          deviceId: deviceId,
+        ),
+        'Content-Type': 'application/json',
+      };
 
-      final body = jsonEncode({
-        'documentId': deviceId,
-        'data': {
-          'deviceId':      deviceId,
-          'appVersion':    packageInfo.version,
-          'versionCode':   installedCode,
-          'abi':           abi,
-          'platform':      'android',
-          'registeredAt':  now,
-          'lastSeenAt':    now,
-        },
-      });
-
-      // Try update first, then create
-      final updateRes = await http.patch(
-        Uri.parse('$url/$deviceId'),
-        headers: {
-          'Content-Type': 'application/json',
-          'X-Appwrite-Project': Environment.appwriteProjectId,
-        },
-        body: jsonEncode({'data': {
-          'appVersion':  packageInfo.version,
-          'versionCode': installedCode,
-          'lastSeenAt':  now,
-        }}),
+      final res = await http.post(
+        Uri.parse(Environment.apiDeviceUrl),
+        headers: headers,
+        body: jsonEncode({
+          'device_id':       deviceId,
+          'app_version':     packageInfo.version,
+          'app_build':       installedCode,
+          'arch':            abi,
+          'platform':        'android',
+          'android_version': '',
+          'model':           '',
+          'locale':          '',
+        }),
       ).timeout(const Duration(seconds: 8));
 
-      if (updateRes.statusCode == 404) {
-        // Device not registered yet — create it
-        await http.post(
-          Uri.parse(url),
-          headers: {
-            'Content-Type': 'application/json',
-            'X-Appwrite-Project': Environment.appwriteProjectId,
-          },
-          body: body,
-        ).timeout(const Duration(seconds: 8));
+      if (res.statusCode == 200) {
+        debugPrint('[UpdateService] Device registered: $deviceId');
+      } else {
+        debugPrint('[UpdateService] registerDevice returned ${res.statusCode}');
       }
-
-      debugPrint('[UpdateService] Device registered: $deviceId');
     } catch (e) {
       debugPrint('[UpdateService] registerDevice failed (non-fatal): $e');
     }
   }
 
   String _detectAbi() {
-    // Fix #5: use dart:ffi Abi.current() — instant, accurate, no file I/O.
-    // Platform.environment['SUPPORTED_ABIS'] is NOT set by the Android runtime
-    // in Dart isolates. The /proc/cpuinfo fallback works but is a synchronous
-    // file read on the main isolate. Abi.current() is a single native call.
     try {
       final abi = Abi.current();
       if (abi == Abi.androidArm64) return 'arm64';
       if (abi == Abi.androidArm)   return 'arm32';
-      if (abi == Abi.androidX64)   return 'arm64'; // x86_64 emulator — use arm64 APK
+      if (abi == Abi.androidX64)   return 'arm64';
     } catch (_) {}
-    return 'arm64'; // safe default — covers 99%+ of modern devices
-  }
-
-  String _generateDeviceId() {
-    // Use UUID v4 for a cryptographically random, globally unique device ID.
-    // The uuid package is already declared in pubspec.yaml.
-    return const Uuid().v4();
+    return 'arm64';
   }
 }
 

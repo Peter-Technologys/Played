@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart' show Color, WidgetsBinding;
+import 'package:flutter/material.dart' show WidgetsBinding;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../theme/app_colors.dart';
 import 'update_service.dart';
 
 /// Builds and shows high-priority update notifications.
@@ -57,7 +58,7 @@ class UpdateNotificationService {
       importance: Importance.high,
       priority: Priority.high,
       icon: '@mipmap/ic_launcher',
-      color: const Color(0xFF8A2BE2),
+      color: AppColors.accentViolet,
       styleInformation: BigTextStyleInformation(
         changelog,
         contentTitle: 'OTYA Player ${info.version} is available',
@@ -100,8 +101,6 @@ class UpdateNotificationService {
     final url    = response.payload ?? '';
 
     if (action == 'download' || (action == null && url.isNotEmpty)) {
-      // Notification callbacks may arrive on a background isolate.
-      // Schedule on the main thread to safely call platform channels.
       WidgetsBinding.instance.addPostFrameCallback((_) => _openUrl(url));
     }
     // 'later' just dismisses — WorkManager will re-check in 24h
