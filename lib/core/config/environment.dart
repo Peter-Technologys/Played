@@ -11,6 +11,8 @@ abstract class Environment {
   static const String apiPlaylistsUrl   = '$workerUrl/api/playlists';
   static const String apiHistoryUrl     = '$workerUrl/api/history';
   static const String apiProUrl         = '$workerUrl/api/pro';
+  static const String apiFeedbackUrl    = '$workerUrl/api/feedback';
+  static const String apiRatingsUrl     = '$workerUrl/api/ratings';
 
   // ── Public version endpoints (no auth — used by update checker) ───────────
   static const String latestUrl         = '$workerUrl/latest';

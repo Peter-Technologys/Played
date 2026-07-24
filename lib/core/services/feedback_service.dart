@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -6,9 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../config/environment.dart';
+import 'api_signer.dart';
 
 /// Handles Rate Us and Report a Problem.
-/// Appwrite calls are fire-and-forget — if they fail the email still goes through.
+/// Data is posted to the Cloudflare Worker (D1) and the email client is also
+/// opened as a fallback — both are fire-and-forget.
 class FeedbackService {
   FeedbackService._();
   static final FeedbackService instance = FeedbackService._();
@@ -59,6 +62,32 @@ class FeedbackService {
     }
   }
 
+  Future<void> _postToWorker(
+      String path, Map<String, dynamic> data, String deviceId) async {
+    try {
+      final headers = {
+        ...ApiSigner.signedHeaders(
+          method: 'POST',
+          path: path,
+          deviceId: deviceId,
+        ),
+        'Content-Type': 'application/json',
+      };
+      final res = await http
+          .post(
+            Uri.parse('${Environment.workerUrl}$path'),
+            headers: headers,
+            body: jsonEncode(data),
+          )
+          .timeout(const Duration(seconds: 8));
+      if (res.statusCode >= 400) {
+        debugPrint('[FeedbackService] Worker $path HTTP ${res.statusCode}: ${res.body}');
+      }
+    } catch (e) {
+      debugPrint('[FeedbackService] Worker post failed (non-fatal): $e');
+    }
+  }
+
   Future<void> _openEmail(String subject, String body) async {
     final uri = Uri(
       scheme: 'mailto',
@@ -91,12 +120,20 @@ class FeedbackService {
     await prefs.setString(_prefRatePromptKey, pkg.version);
   }
 
-  /// Submit a star rating + comment to Appwrite AND open a pre-filled email.
+  /// Submit a star rating + comment to Cloudflare D1 AND open a pre-filled email.
   Future<void> submitRating({
     required int stars,
     required String comment,
   }) async {
     final info = await _deviceInfo();
+
+    _postToWorker('/api/ratings', {
+      'device_id':    info['deviceId'],
+      'app_version':  info['version'],
+      'version_code': int.tryParse(info['buildNumber']!) ?? 0,
+      'stars':        stars,
+      'comment':      comment,
+    }, info['deviceId']!).ignore();
 
     final starEmoji = List.filled(stars, '⭐').join();
     final subject   = 'OTYA Player Rating — $stars stars';
@@ -111,13 +148,22 @@ class FeedbackService {
 
   // ── Report a Problem ──────────────────────────────────────────────────────
 
-  /// Submit a bug/problem report to Appwrite AND open a pre-filled email.
+  /// Submit a bug/problem report to Cloudflare D1 AND open a pre-filled email.
   Future<void> submitReport({
     required String description,
     required String category,
     String? userEmail,
   }) async {
     final info = await _deviceInfo();
+
+    _postToWorker('/api/feedback', {
+      'device_id':    info['deviceId'],
+      'app_version':  info['version'],
+      'version_code': int.tryParse(info['buildNumber']!) ?? 0,
+      'category':     category,
+      'description':  description,
+      if (userEmail != null && userEmail.isNotEmpty) 'user_email': userEmail,
+    }, info['deviceId']!).ignore();
 
     final categoryLabel = category[0].toUpperCase() + category.substring(1);
     final subject = 'OTYA Player Problem Report — $categoryLabel';
