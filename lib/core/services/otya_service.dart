@@ -6,11 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../config/environment.dart';
 import 'api_signer.dart';
+import 'apk_downloader.dart';
+import 'push_notification_service.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OtyaService
@@ -508,8 +509,11 @@ class OtyaRemoteTheme {
 // Branded update modal that matches AppTheme.dark exactly.
 // force_update = true  → no dismiss gesture, no "Later" button.
 // force_update = false → barrierDismissible + "Later" button.
+//
+// The Download button triggers ApkDownloader.downloadAndInstall() and shows
+// progress via PushNotificationService rather than opening a browser.
 // ─────────────────────────────────────────────────────────────────────────────
-class _UpdateDialog extends StatelessWidget {
+class _UpdateDialog extends StatefulWidget {
   const _UpdateDialog({
     required this.releaseNotes,
     required this.downloadUrl,
@@ -523,10 +527,17 @@ class _UpdateDialog extends StatelessWidget {
   final int    remoteBuild;
 
   @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  bool _downloading = false;
+
+  @override
   Widget build(BuildContext context) {
     return PopScope(
       // Prevent back-button dismissal when force update is required.
-      canPop: !forceUpdate,
+      canPop: !widget.forceUpdate,
       child: AlertDialog(
         // Shape and background come from AppTheme.dark's dialogTheme.
         title: Row(
@@ -562,7 +573,7 @@ class _UpdateDialog extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            if (forceUpdate) ..._forceUpdateBanner(),
+            if (widget.forceUpdate) ..._forceUpdateBanner(),
             const SizedBox(height: 12),
             const Text(
               "What's new",
@@ -576,7 +587,7 @@ class _UpdateDialog extends StatelessWidget {
             ),
             const SizedBox(height: 6),
             Text(
-              releaseNotes,
+              widget.releaseNotes,
               style: const TextStyle(
                 fontSize: 14,
                 color: AppColors.textPrimary,
@@ -584,11 +595,24 @@ class _UpdateDialog extends StatelessWidget {
                 height: 1.5,
               ),
             ),
+            if (_downloading) ...[
+              const SizedBox(height: 16),
+              const LinearProgressIndicator(),
+              const SizedBox(height: 6),
+              const Text(
+                'Downloading… check the notification bar for progress.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ],
           ],
         ),
         actions: [
-          // "Later" is hidden for force updates.
-          if (!forceUpdate)
+          // "Later" is hidden for force updates or while downloading.
+          if (!widget.forceUpdate && !_downloading)
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: const Text(
@@ -600,9 +624,18 @@ class _UpdateDialog extends StatelessWidget {
               ),
             ),
           ElevatedButton.icon(
-            onPressed: () => _launchDownload(context),
-            icon: const Icon(Icons.download_rounded, size: 18),
-            label: const Text('Download'),
+            onPressed: _downloading ? null : () => _launchDownload(context),
+            icon: _downloading
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: Colors.black,
+                    ),
+                  )
+                : const Icon(Icons.download_rounded, size: 18),
+            label: Text(_downloading ? 'Downloading…' : 'Download'),
           ),
         ],
       ),
@@ -641,22 +674,49 @@ class _UpdateDialog extends StatelessWidget {
   }
 
   Future<void> _launchDownload(BuildContext context) async {
-    final uri = Uri.tryParse(downloadUrl);
-    if (uri == null) {
-      debugPrint('[OtyaService] Invalid download URL: $downloadUrl');
+    if (widget.downloadUrl.isEmpty) {
+      debugPrint('[OtyaService] Download URL is empty — cannot start download.');
       return;
     }
-    try {
-      final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-      if (!launched) {
-        debugPrint('[OtyaService] url_launcher could not open: $downloadUrl');
+
+    setState(() => _downloading = true);
+
+    // Show an immediate progress notification so the user sees feedback even
+    // if they dismiss the dialog.
+    await PushNotificationService.instance.showDownloadProgress(percent: 0);
+
+    final version = widget.remoteBuild.toString();
+
+    await ApkDownloader.instance.downloadAndInstall(
+      url:     widget.downloadUrl,
+      version: version,
+      onProgress: (progress) {
+        PushNotificationService.instance
+            .showDownloadProgress(percent: (progress * 100).round())
+            .ignore();
+      },
+      onError: (err) {
+        debugPrint('[OtyaService] Download error: $err');
+        PushNotificationService.instance.dismissDownload().ignore();
+        if (mounted) {
+          setState(() => _downloading = false);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Download failed: $err')),
+          );
+        }
+      },
+    );
+
+    // downloadAndInstall completes after the installer is launched (or on
+    // error). Show the "complete" notification and close the dialog.
+    await PushNotificationService.instance.showDownloadComplete();
+
+    if (mounted) {
+      setState(() => _downloading = false);
+      // Only pop if not a force update — user must complete the install.
+      if (!widget.forceUpdate) {
+        Navigator.of(context).pop();
       }
-    } catch (e) {
-      debugPrint('[OtyaService] launchUrl error: $e');
-    }
-    // Only pop if not a force update — user must complete the download.
-    if (!forceUpdate && context.mounted) {
-      Navigator.of(context).pop();
     }
   }
 }
