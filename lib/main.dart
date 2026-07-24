@@ -9,6 +9,7 @@ import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/cloudflare_service.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/media_notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/otya_service.dart';
@@ -182,6 +183,7 @@ Future<void> _initNotifications() async {
   try {
     await NotificationService.instance.init();
     await UpdateNotificationService.instance.init();
+    await MediaNotificationService.instance.init();
   } catch (e) {
     debugPrint('[Notifications] Init error: $e');
   }

@@ -576,19 +576,19 @@ class MySpaceHubScreen extends ConsumerWidget {
                 child: Column(
                   children: [
                     _QuickLink(
-                      icon: Icons.settings_rounded,
-                      label: 'Profile & Settings',
-                      subtitle: 'Account, appearance, playback & more',
+                      icon: Icons.person_rounded,
+                      label: 'Account & Profile',
+                      subtitle: 'Sign in, backup, about & updates',
                       color: AppColors.accent,
-                      onTap: () => context.push('/settings'),
+                      onTap: () => context.push('/profile'),
                     ),
                     Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(
-                      icon: Icons.queue_music_rounded,
-                      label: 'Playlists',
-                      subtitle: 'Manage your playlists',
+                      icon: Icons.settings_rounded,
+                      label: 'App Settings',
+                      subtitle: 'Playback, storage, display & more',
                       color: AppColors.accentGreen,
-                      onTap: () => context.push('/playlists'),
+                      onTap: () => context.push('/settings'),
                     ),
                     Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(

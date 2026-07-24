@@ -238,11 +238,24 @@ class AppRouter {
       ),
       GoRoute(
         path: '/player/audio',
-        pageBuilder: (c, s) => _slideUpPage(
-          context: c,
-          state: s,
-          child: AudioPlayerScreen(mediaItem: s.extra as MediaItem),
-        ),
+        pageBuilder: (c, s) {
+          final extra = s.extra;
+          if (extra is Map<String, dynamic>) {
+            return _slideUpPage(
+              context: c,
+              state: s,
+              child: AudioPlayerScreen(
+                mediaItem: extra['item'] as MediaItem,
+                resumeOnly: extra['resumeOnly'] as bool? ?? false,
+              ),
+            );
+          }
+          return _slideUpPage(
+            context: c,
+            state: s,
+            child: AudioPlayerScreen(mediaItem: extra as MediaItem),
+          );
+        },
       ),
       GoRoute(
         path: '/player/car-mode',
