@@ -5,6 +5,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/update_service.dart';
+import '../../../core/widgets/update_dialog.dart';
 
 /// Standalone About screen — reached via /about route.
 /// Shows app logo, version, description, and support links.
@@ -153,17 +155,41 @@ class _AboutScreenState extends State<AboutScreen> {
   Future<void> _checkForUpdates(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(
-      content: Text('Checking for updates...'),
+      content: Row(
+        children: [
+          SizedBox(
+            width: 16,
+            height: 16,
+            child: CircularProgressIndicator(
+                strokeWidth: 2, color: AppColors.accent),
+          ),
+          SizedBox(width: 12),
+          Text('Checking for updates…'),
+        ],
+      ),
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
-    await Future.delayed(const Duration(seconds: 1));
-    messenger.hideCurrentSnackBar();
-    if (!context.mounted) return;
-    messenger.showSnackBar(const SnackBar(
-      content: Text('You have the latest version \u2705'),
-      backgroundColor: AppColors.surface,
-    ));
+    try {
+      final info = await UpdateService.instance.checkForUpdate(force: true);
+      messenger.hideCurrentSnackBar();
+      if (!context.mounted) return;
+      if (info == null) {
+        messenger.showSnackBar(const SnackBar(
+          content: Text('You have the latest version ✅'),
+          backgroundColor: AppColors.surface,
+        ));
+      } else {
+        await UpdateDialog.checkAndShow(context);
+      }
+    } catch (_) {
+      messenger.hideCurrentSnackBar();
+      if (!context.mounted) return;
+      messenger.showSnackBar(const SnackBar(
+        content: Text('Could not check. Make sure you have internet.'),
+        backgroundColor: AppColors.error,
+      ));
+    }
   }
 
   Future<void> _launchEmail(BuildContext context) async {

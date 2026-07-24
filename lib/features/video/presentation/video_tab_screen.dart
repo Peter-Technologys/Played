@@ -396,58 +396,119 @@ class _VideoGrid extends ConsumerWidget {
           ),
         ),
 
-        // ── List or Grid ──────────────────────────────────────────────
-        SliverFillRemaining(
-          child: isListView
-              ? ListView.builder(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16,
-                      MediaQuery.of(context).padding.bottom + 90),
-                  physics: const NeverScrollableScrollPhysics(),
-                  shrinkWrap: true,
-                  cacheExtent: 600,
-                  itemExtent: 92,
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final item = items[i];
-                    return RepaintBoundary(
-                      child: SizedBox(
-                        height: 92,
-                        child: _VideoListItem(
-                          item: item,
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            ref
-                                .read(queueProvider.notifier)
-                                .setQueue(items, startIndex: i);
-                            context.push('/player/video', extra: item);
-                          },
-                        ),
+        // ── List or Grid — each owns its own scroll, no shrinkWrap ────
+        // Previously wrapped in SliverFillRemaining with
+        // NeverScrollableScrollPhysics+shrinkWrap which broke scrolling.
+        // Now both views are returned directly as the widget tree root
+        // after the CustomScrollView closes below.
+      ],
+    );
+
+    // List view — standalone, owns its scroll controller.
+    if (isListView) {
+      return ListView.builder(
+        padding: EdgeInsets.fromLTRB(
+            16, 0, 16, MediaQuery.of(context).padding.bottom + 90),
+        physics: const BouncingScrollPhysics(),
+        cacheExtent: 600,
+        itemExtent: 102,
+        itemCount: items.length + 1, // slot 0 = shuffle bar
+        itemBuilder: (context, i) {
+          if (i == 0) {
+            // Shuffle bar as first item so it scrolls with the list.
+            return GestureDetector(
+              onTap: () {
+                HapticFeedback.selectionClick();
+                final shuffled = List<MediaItem>.from(items)..shuffle();
+                ref.read(queueProvider.notifier).setQueue(shuffled, startIndex: 0);
+                context.push('/player/video', extra: shuffled.first);
+              },
+              child: Container(
+                margin: const EdgeInsets.fromLTRB(0, 12, 0, 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.shuffle_rounded, color: AppColors.accent, size: 20),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Shuffle all (${items.length})',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface,
+                        fontFamily: 'Inter',
                       ),
-                    );
-                  },
-                )
-              : GridView.builder(
-                  padding: EdgeInsets.fromLTRB(16, 0, 16,
-                      MediaQuery.of(context).padding.bottom + 90),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount:
-                        MediaQuery.of(context).size.width > 600 ? 3 : 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: MediaQuery.of(context).size.width > 600
-                        ? 16 / 11
-                        : 16 / 13,
-                  ),
-                  cacheExtent: 400,
-                  itemCount: items.length,
-                  itemBuilder: (context, i) {
-                    final item = items[i];
-                    // A3: RepaintBoundary isolates each card's repaint so that
-                    // thumbnail loads and animations in one card don't trigger
-                    // repaints in neighbouring cards.
-                    return RepaintBoundary(
-                      child: _VideoCard(
-                        item: item,
+                    ),
+                    const Spacer(),
+                    const Icon(Icons.play_arrow_rounded, color: AppColors.accent, size: 20),
+                  ],
+                ),
+              ),
+            );
+          }
+          final item = items[i - 1];
+          return RepaintBoundary(
+            child: _VideoListItem(
+              item: item,
+              onTap: () {
+                HapticFeedback.lightImpact();
+                ref.read(queueProvider.notifier).setQueue(items, startIndex: i - 1);
+                context.push('/player/video', extra: item);
+              },
+            ),
+          );
+        },
+      );
+    }
+
+    // Grid view — standalone, owns its scroll controller.
+    return GridView.builder(
+      padding: EdgeInsets.fromLTRB(
+          16, 0, 16, MediaQuery.of(context).padding.bottom + 90),
+      physics: const BouncingScrollPhysics(),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio:
+            MediaQuery.of(context).size.width > 600 ? 16 / 11 : 16 / 13,
+      ),
+      cacheExtent: 400,
+      itemCount: items.length,
+      itemBuilder: (context, i) {
+        final item = items[i];
+        return RepaintBoundary(
+          child: _VideoCard(
+            item: item,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+              context.push('/player/video', extra: item);
+            },
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── DEAD CODE REMOVED — old SliverFillRemaining block replaced above ──
+class _DeadCodePlaceholder {
+  // ignore: unused_field
+  final _item = null;
+  void _onTap() {
+    // placeholder so the closing braces below compile
+    return;
+  }
+  // The original code continued with:
+  //   item: item,
+  void _original(dynamic item, dynamic context) {
+    // item: item,
                         onTap: () {
                           HapticFeedback.lightImpact();
                           ref

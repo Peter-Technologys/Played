@@ -5,8 +5,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/cloudflare_service.dart';
@@ -155,45 +153,9 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 6. ABOUT ──────────────────────────────────────────────────
-          const _SectionHeader(label: 'About'),
-          const SizedBox(height: 12),
-          const _AboutCard(),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.email_outlined,
-            label: 'Contact Support',
-            subtitle: 'support@petersmartlink.com',
-            onTap: () => _launchEmail(context),
-          ),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.new_releases_outlined,
-            label: "What's New",
-            subtitle: 'See what changed in this version',
-            onTap: () => context.push('/whats-new'),
-          ),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.share_rounded,
-            label: 'Share App',
-            subtitle: 'Send OTYA Player to a friend',
-            onTap: () => _shareApp(context),
-          ),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.privacy_tip_outlined,
-            label: 'Privacy Policy',
-            onTap: () => context.push('/privacy'),
-          ),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.star_outline_rounded,
-            label: 'Rate OTYA Player',
-            subtitle: 'Enjoying the app? Leave a review!',
-            onTap: () => _launchUrl(context,
-                'https://play.google.com/store/apps/details?id=com.otyaplayer.app'),
-          ),
+          // About, Contact, What's New, Share, Privacy & Rate are in
+          // the dedicated About screen — tap Help & Feedback in My Space
+          // or navigate to /about.
           const SizedBox(height: 32),
           const Center(child: PlayedFooter()),
           const SizedBox(height: 24),
@@ -373,62 +335,6 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _launchEmail(BuildContext context) async {
-    final uri = Uri(
-      scheme: 'mailto',
-      path: 'support@petersmartlink.com',
-      queryParameters: {'subject': 'OTYA Player Support'},
-    );
-    if (!await launchUrl(uri)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Could not open email app.'),
-              backgroundColor: AppColors.error),
-        );
-      }
-    }
-  }
-
-  Future<void> _shareApp(BuildContext context) async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      await Share.share(
-        'Download OTYA Player v${info.version} — free offline media player for Android:\n'
-        'https://petersmartlink.com/download/otya-player',
-        subject: 'OTYA Player',
-      );
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not share: $e'),
-              backgroundColor: AppColors.error),
-        );
-      }
-    }
-  }
-
-  Future<void> _launchUrl(BuildContext context, String url) async {
-    final uri = Uri.parse(url);
-    // Try in-app browser first, fall back to external app
-    final launched = await launchUrl(
-      uri,
-      mode: LaunchMode.inAppBrowserView,
-    );
-    if (!launched) {
-      final fallback = await launchUrl(
-        uri,
-        mode: LaunchMode.externalApplication,
-      );
-      if (!fallback && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-              content: Text('Could not open link.'),
-              backgroundColor: AppColors.error),
-        );
-      }
-    }
-  }
 }
 
 // ── Update Checker Tile ────────────────────────────────────────────────────
