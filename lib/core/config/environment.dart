@@ -22,12 +22,13 @@ abstract class Environment {
   static const String arm64DownloadUrl    = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl    = '$workerUrl/apk/arm32';
 
-  // ── Cloudflare Worker API (D1-backed) ─────────────────────────────────────
-  // These replace the Appwrite database calls for playlists, history, pro status.
-  // Auth (Google OAuth) still goes through Appwrite.
+  // ── Cloudflare Worker API (D1-backed, HMAC-authenticated) ───────────────
   static const String checkUpdateUrl      = '$workerUrl/check-update';
   static const String registerDeviceUrl   = '$workerUrl/register-device';
-  static const String configsThemeUrl     = '$workerUrl/configs/theme';
+  static const String configsThemeUrl     = '$workerUrl/api/theme';
+  static const String apiThemeUrl         = '$workerUrl/api/theme';
+  static const String apiVersionUrl       = '$workerUrl/api/version';
+  static const String apiDeviceUrl        = '$workerUrl/api/device';
   static const String apiPlaylistsUrl     = '$workerUrl/api/playlists';
   static const String apiHistoryUrl       = '$workerUrl/api/history';
   static const String apiProUrl           = '$workerUrl/api/pro';
