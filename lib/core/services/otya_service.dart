@@ -36,7 +36,7 @@ class OtyaService {
   static const String _keyLastUpdate = 'otya_update_last_check';
 
   // ── Worker endpoints ──────────────────────────────────────────────────────
-  static String get _themeUrl        => '${Environment.workerUrl}/configs/theme';
+  static String get _themeUrl        => '${Environment.workerUrl}/api/theme';
   static String get _checkUpdateUrl  => '${Environment.workerUrl}/check-update';
   static String get _registerUrl     => '${Environment.workerUrl}/register-device';
 
@@ -93,7 +93,7 @@ class OtyaService {
     final cached  = prefs.getString(_keyThemeJson);
 
     final url = Uri.parse(_themeUrl);
-    final signedPath = url.path;
+    final signedPath = '/api/theme';
     final headers = <String, String>{
       ...ApiSigner.signedHeaders(method: 'GET', path: signedPath),
       if (etag != null) 'If-None-Match': etag,

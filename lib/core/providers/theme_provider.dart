@@ -125,10 +125,10 @@ class ThemeProvider extends ChangeNotifier {
     final prefs     = await SharedPreferences.getInstance();
     final savedEtag = prefs.getString(_kEtag);
 
-    final themeUri = Uri.parse(Environment.configsThemeUrl);
+    final themeUri = Uri.parse('${Environment.workerUrl}/api/theme');
     final signedHeaders = ApiSigner.signedHeaders(
       method: 'GET',
-      path: '/configs/theme',
+      path: '/api/theme',
     );
     final response = await http.get(
       themeUri,
