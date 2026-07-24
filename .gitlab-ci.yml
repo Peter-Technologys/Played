@@ -11,7 +11,8 @@
 # Required CI/CD Variables:
 #   GOOGLE_SERVICES_JSON, KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
 #   R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY
-#   APPWRITE_ENDPOINT, APPWRITE_PROJECT_ID, APPWRITE_API_KEY (optional)
+#   OTYA_SECRET (HMAC secret — injected at build time via --dart-define)
+#   CF_ACCOUNT_ID, CF_API_TOKEN, KV_NAMESPACE_ID (Cloudflare KV for version manifest)
 
 image: ghcr.io/cirruslabs/flutter:stable
 
@@ -173,7 +174,13 @@ build_release:
       fi
     - echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
     - export KEYSTORE_PATH="$(pwd)/android/app/keystore.jks"
-    - flutter build apk --release --split-per-abi --no-pub --target-platform android-arm,android-arm64 --split-debug-info=build/debug-info
+    - |
+      flutter build apk --release --split-per-abi --no-pub \
+        --target-platform android-arm,android-arm64 \
+        --split-debug-info=build/debug-info \
+        --dart-define=OTYA_SECRET="$OTYA_SECRET" \
+        --dart-define=APP_ARCH=split \
+        --dart-define=SELF_UPDATE=true
     # Verify APKs were produced before marking job successful
     - |
       for APK in \
@@ -225,6 +232,3 @@ publish_to_r2:
     CF_ACCOUNT_ID: $CF_ACCOUNT_ID
     CF_API_TOKEN: $CF_API_TOKEN
     KV_NAMESPACE_ID: $KV_NAMESPACE_ID
-    APPWRITE_ENDPOINT: $APPWRITE_ENDPOINT
-    APPWRITE_PROJECT_ID: $APPWRITE_PROJECT_ID
-    APPWRITE_API_KEY: $APPWRITE_API_KEY
