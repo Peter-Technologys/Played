@@ -16,7 +16,6 @@ import '../features/player/presentation/mini_player.dart';
 import '../features/profile/profile_screen.dart' show ProfileScreen, WhatsNewScreen;
 import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
-import '../features/tools/tools_screen.dart';
 import '../features/playlists/playlist_screen.dart' show PlaylistsScreen, PlaylistDetailScreenById;
 import '../features/settings/presentation/settings_detail_screen.dart';
 import '../features/settings/presentation/about_screen.dart';
@@ -89,13 +88,7 @@ class AppRouter {
             pageBuilder: (context, state) => _fadePage(
               context: context, state: state, child: const MusicTabScreen()),
           ),
-          // Tab 2 — Tools
-          GoRoute(
-            path: '/tools',
-            pageBuilder: (context, state) => _fadePage(
-              context: context, state: state, child: const ToolsScreen()),
-          ),
-          // Tab 3 — My Space hub (account + quick tools + settings)
+          // Tab 2 — My Space hub (account + tools + quick links + settings)
           GoRoute(
             path: '/myspace',
             pageBuilder: (context, state) => _fadePage(
@@ -550,7 +543,7 @@ class _MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<_MainShell> {
   int _currentIndex = 0;
 
-  static const _routes = ['/', '/music', '/tools', '/myspace'];
+  static const _routes = ['/', '/music', '/myspace'];
 
   // TASK 1: Removed IndexedStack + _pages list.
   // Tab state is preserved by AutomaticKeepAliveClientMixin on each tab screen.
@@ -637,16 +630,10 @@ class _MainShellState extends ConsumerState<_MainShell> {
                       onTap: () => _onTap(1),
                     ),
                     _NavItem(
-                      icon: Icons.build_rounded,
-                      label: 'TOOLS',
-                      isActive: _currentIndex == 2,
-                      onTap: () => _onTap(2),
-                    ),
-                    _NavItem(
                       icon: Icons.person_rounded,
                       label: 'MY SPACE',
-                      isActive: _currentIndex == 3,
-                      onTap: () => _onTap(3),
+                      isActive: _currentIndex == 2,
+                      onTap: () => _onTap(2),
                     ),
                   ],
                 ),
