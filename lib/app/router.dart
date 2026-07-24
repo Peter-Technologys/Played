@@ -274,6 +274,34 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/music/album',
+        pageBuilder: (c, s) {
+          final args = s.extra as Map<String, dynamic>;
+          return _fadePage(
+            context: c,
+            state: s,
+            child: MusicAlbumDetailPage(
+              name: args['name'] as String,
+              items: args['items'] as List<MediaItem>,
+            ),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/music/artist',
+        pageBuilder: (c, s) {
+          final args = s.extra as Map<String, dynamic>;
+          return _fadePage(
+            context: c,
+            state: s,
+            child: MusicArtistDetailPage(
+              name: args['name'] as String,
+              items: args['items'] as List<MediaItem>,
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: '/tools/whatsapp',
         pageBuilder: (c, s) => _fadePage(
           context: c,
