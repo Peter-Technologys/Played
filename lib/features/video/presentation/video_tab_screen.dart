@@ -547,11 +547,12 @@ class _VideoListItemState extends State<_VideoListItem> {
   /// Infer a resolution badge from the file path (same logic as _VideoCardState).
   String _resolutionBadge() {
     final p = widget.item.filePath.toLowerCase();
+    if (p.contains('2160') || p.contains('4k')) return '4K';
     if (p.contains('1080')) return '1080p';
-    if (p.contains('720')) return '720p';
-    if (p.contains('480')) return '480p';
-    if (p.contains('4k') || p.contains('2160')) return '4K';
-    return '720p';
+    if (p.contains('720'))  return '720p';
+    if (p.contains('480'))  return '480p';
+    if (p.contains('360'))  return '360p';
+    return 'SD';
   }
 
   /// Extract the immediate parent folder name from the file path.
@@ -853,11 +854,12 @@ class _VideoCardState extends State<_VideoCard> {
   /// Infer a resolution badge from the file path.
   String _resolutionBadge() {
     final p = widget.item.filePath.toLowerCase();
+    if (p.contains('2160') || p.contains('4k')) return '4K';
     if (p.contains('1080')) return '1080p';
-    if (p.contains('720')) return '720p';
-    if (p.contains('480')) return '480p';
-    if (p.contains('4k') || p.contains('2160')) return '4K';
-    return '720p'; // sensible default
+    if (p.contains('720'))  return '720p';
+    if (p.contains('480'))  return '480p';
+    if (p.contains('360'))  return '360p';
+    return 'SD';
   }
 
   /// Extract the immediate parent folder name from the file path.

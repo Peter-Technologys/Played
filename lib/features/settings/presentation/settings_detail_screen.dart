@@ -445,8 +445,8 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
                   _sheetHeader('Audio'),
 
                   _SheetSwitch(
-                    label: 'Resume on Headset',
-                    subtitle: 'Auto-play when headphones connect',
+                    label: 'Auto-Resume',
+                    subtitle: 'Resume playback automatically (headset connect, app return)',
                     value: s.autoResume,
                     onChanged: (v) {
                       HapticFeedback.selectionClick();

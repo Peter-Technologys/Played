@@ -1,8 +1,10 @@
+import 'dart:io';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
@@ -1328,6 +1330,11 @@ class _StorageCleanerSheetState extends ConsumerState<_StorageCleanerSheet> {
                   : () async {
                       setState(() => _clearing = true);
                       await PlayedDatabase.instance.clearAllSeekPositions();
+                      try {
+                        final tmpDir = await getTemporaryDirectory();
+                        final thumbDir = Directory('${tmpDir.path}/otya_thumbs');
+                        if (await thumbDir.exists()) await thumbDir.delete(recursive: true);
+                      } catch (_) {}
                       if (mounted) {
                         setState(() {
                           _clearing = false;

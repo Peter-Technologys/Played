@@ -570,7 +570,12 @@ class _VaultCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    item.originalPath.split('/').last,
+                    () {
+                      final rawName = item.originalPath.split('/').last;
+                      return rawName.contains('.')
+                          ? rawName.substring(0, rawName.lastIndexOf('.'))
+                          : rawName;
+                    }(),
                     style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
                         color: Theme.of(context).colorScheme.onSurface),
                     maxLines: 2, overflow: TextOverflow.ellipsis,
