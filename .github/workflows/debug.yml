@@ -94,7 +94,13 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-        run: flutter build apk --release --no-pub --split-per-abi --target-platform android-arm,android-arm64
+          OTYA_SECRET: ${{ secrets.OTYA_SECRET }}
+        run: |
+          flutter build apk --release --no-pub --split-per-abi \
+            --target-platform android-arm,android-arm64 \
+            --dart-define=OTYA_SECRET=$OTYA_SECRET \
+            --dart-define=APP_ARCH=arm64 \
+            --dart-define=SELF_UPDATE=true
 
       - name: Remove keystore
         if: always()
