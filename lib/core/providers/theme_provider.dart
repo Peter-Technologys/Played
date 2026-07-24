@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../extensions/color_ext.dart';
 import '../config/environment.dart';
+import '../services/api_signer.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // ThemeProvider
@@ -124,10 +125,15 @@ class ThemeProvider extends ChangeNotifier {
     final prefs     = await SharedPreferences.getInstance();
     final savedEtag = prefs.getString(_kEtag);
 
+    final themeUri = Uri.parse(Environment.configsThemeUrl);
+    final signedHeaders = ApiSigner.signedHeaders(
+      method: 'GET',
+      path: '/configs/theme',
+    );
     final response = await http.get(
-      Uri.parse(Environment.configsThemeUrl),
+      themeUri,
       headers: {
-        'Accept': 'application/json',
+        ...signedHeaders,
         if (savedEtag != null) 'If-None-Match': savedEtag,
       },
     ).timeout(const Duration(seconds: 8));
