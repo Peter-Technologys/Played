@@ -8,8 +8,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
-import '../../../core/services/update_service.dart';
-import '../../../core/widgets/update_dialog.dart';
 import '../settings_provider.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 
@@ -24,38 +22,6 @@ class SettingsDetailScreen extends ConsumerStatefulWidget {
 }
 
 class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
-  bool _checkingUpdate = false;
-
-  Future<void> _checkForUpdate() async {
-    if (_checkingUpdate) return;
-    setState(() => _checkingUpdate = true);
-    try {
-      final update = await UpdateService.instance.checkForUpdate(force: true);
-      if (!mounted) return;
-      if (update != null) {
-        await showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => UpdateDialog(info: update),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('You have the latest version ✅')),
-        );
-      }
-    } catch (_) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Could not check for updates. Check your connection.'),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) setState(() => _checkingUpdate = false);
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     final s  = ref.watch(settingsProvider);
@@ -73,7 +39,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Settings',
+          'App Settings',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -164,30 +130,6 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
               subtitle: 'App lock, biometrics, hide vault',
               color: AppColors.accentViolet,
               onTap: () => _showPrivacySheet(context, ref),
-            ),
-          ]),
-
-          const SizedBox(height: 24),
-
-          // ── GROUP 3: UPDATES & ABOUT ──────────────────────────────
-          _SectionHeader(label: 'Updates & About'),
-          const SizedBox(height: 10),
-
-          _GroupCard(children: [
-            _NavTile(
-              icon: Icons.info_outline_rounded,
-              label: 'About & Support',
-              subtitle: 'Version, links & what\'s new',
-              color: AppColors.accent,
-              onTap: () => context.push('/about'),
-            ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.system_update_outlined,
-              label: 'Check for Updates',
-              subtitle: _checkingUpdate ? 'Checking…' : 'Tap to check for a new version',
-              color: AppColors.accent,
-              onTap: _checkingUpdate ? () {} : _checkForUpdate,
             ),
           ]),
 

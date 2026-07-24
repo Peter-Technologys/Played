@@ -12,6 +12,8 @@ import '../../../core/database/played_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
+import '../../../core/services/playback_coordinator.dart';
+import '../../../core/services/media_notification_service.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -88,6 +90,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
       state = state.copyWith(isPlaying: playing);
+      _updateNotification();
     });
 
     // buffering stream — only show spinner during initial load (no duration yet).
@@ -192,6 +195,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       }
       if (_loadGeneration != myGeneration) return;
 
+      await PlaybackCoordinator.instance.register(_player, 'audio');
       await _player.play();
     } catch (e) {
       debugPrint('[AudioPlayer] _loadCurrent error: $e');
@@ -207,6 +211,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
+    _updateNotification();
 
     final saved      = PlayedDatabase.instance.getSeekPosition(item.id);
     final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
@@ -220,6 +225,17 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       debugPrint('[AudioPlayer] load error: $e');
       if (mounted) state = state.copyWith(isLoading: false);
     }
+  }
+
+  void _updateNotification() {
+    final item = _container?.read(miniPlayerItemProvider);
+    if (item == null) return;
+    MediaNotificationService.instance.show(
+      title: item.title,
+      artist: item.artist ?? 'Unknown Artist',
+      isPlaying: state.isPlaying,
+      albumArtPath: item.albumArtPath,
+    );
   }
 
   bool _loadFavorite(String id) =>
@@ -304,6 +320,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _completedSub?.cancel();
+    PlaybackCoordinator.instance.unregister(_player);
+    MediaNotificationService.instance.dismiss();
     _player.dispose();
     super.dispose();
   }
@@ -322,7 +340,10 @@ final audioPlayerProvider =
 
 class AudioPlayerScreen extends ConsumerStatefulWidget {
   final MediaItem mediaItem;
-  const AudioPlayerScreen({super.key, required this.mediaItem});
+  /// If true, do NOT call load() — just show the UI for the already-playing track.
+  /// Used when the mini player taps open the full-screen player without restarting.
+  final bool resumeOnly;
+  const AudioPlayerScreen({super.key, required this.mediaItem, this.resumeOnly = false});
 
   @override
   ConsumerState<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
@@ -359,9 +380,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      // load() already calls PlayedDatabase.instance.recordPlay() internally
-      // — do not call it again here to avoid double-counting play history.
-      _startLoad();
+      if (!widget.resumeOnly) {
+        // load() already calls PlayedDatabase.instance.recordPlay() internally
+        // — do not call it again here to avoid double-counting play history.
+        _startLoad();
+      }
+      // If resumeOnly, the player is already playing — just show the UI.
     });
   }
 

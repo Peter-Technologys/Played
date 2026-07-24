@@ -118,7 +118,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
         },
         onTap: () {
           HapticFeedback.selectionClick();
-          context.push('/player/audio', extra: displayItem);
+          // Pass resumeOnly: true so AudioPlayerScreen does NOT restart the track
+          context.push('/player/audio', extra: {'item': displayItem, 'resumeOnly': true});
         },
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 80),
@@ -207,7 +208,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                         GestureDetector(
                           onTap: () {
                             HapticFeedback.selectionClick();
-                            context.push('/player/audio', extra: displayItem);
+                            // Pass resumeOnly: true so AudioPlayerScreen does NOT restart the track
+                            context.push('/player/audio', extra: {'item': displayItem, 'resumeOnly': true});
                           },
                           child: const Padding(
                             padding: EdgeInsets.only(right: 4),

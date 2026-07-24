@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../app/theme/app_colors.dart';
+import 'playback_coordinator.dart';
 
 
 // ── Track models ─────────────────────────────────────────────────────────────────────
@@ -147,7 +148,10 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
       }
       if (!mounted) return;
 
-      if (widget.autoPlay) await _player!.play();
+      if (widget.autoPlay) {
+        await PlaybackCoordinator.instance.register(_player!, 'video');
+        await _player!.play();
+      }
     } catch (e) {
       if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
     }
@@ -221,6 +225,9 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     _errorSub?.cancel();
     _trackSub = null;
     _errorSub = null;
+    // Unregister from coordinator before disposing so the coordinator does not
+    // hold a dangling reference to a torn-down player.
+    if (_player != null) PlaybackCoordinator.instance.unregister(_player!);
     // Dispose releases all native MPV/MediaCodec resources.
     // Must be called to prevent memory leaks on track navigation.
     _player?.dispose();
