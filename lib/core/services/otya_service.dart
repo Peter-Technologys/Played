@@ -10,6 +10,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../config/environment.dart';
+import 'api_signer.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // OtyaService
@@ -91,15 +92,17 @@ class OtyaService {
     final etag    = prefs.getString(_keyThemeEtag);
     final cached  = prefs.getString(_keyThemeJson);
 
+    final url = Uri.parse(_themeUrl);
+    final signedPath = url.path;
     final headers = <String, String>{
-      'Accept': 'application/json',
+      ...ApiSigner.signedHeaders(method: 'GET', path: signedPath),
       if (etag != null) 'If-None-Match': etag,
     };
 
     http.Response? response;
     try {
       response = await http
-          .get(Uri.parse(_themeUrl), headers: headers)
+          .get(url, headers: headers)
           .timeout(const Duration(seconds: 8));
     } catch (e) {
       debugPrint('[OtyaService] Theme network error: $e — using cached/fallback.');
@@ -209,10 +212,15 @@ class OtyaService {
       }
     }
 
+    final checkUpdateUri = Uri.parse(_checkUpdateUrl);
+    final checkUpdateHeaders = ApiSigner.signedHeaders(
+      method: 'GET',
+      path: checkUpdateUri.path,
+    );
     http.Response? response;
     try {
       response = await http
-          .get(Uri.parse(_checkUpdateUrl))
+          .get(checkUpdateUri, headers: checkUpdateHeaders)
           .timeout(const Duration(seconds: 10));
     } catch (e) {
       debugPrint('[OtyaService] Update check network error: $e');
@@ -297,10 +305,19 @@ class OtyaService {
     required String fcmToken,
   }) async {
     try {
+      final registerUri = Uri.parse(_registerUrl);
+      final registerHeaders = {
+        ...ApiSigner.signedHeaders(
+          method: 'POST',
+          path: registerUri.path,
+          deviceId: deviceId,
+        ),
+        'Content-Type': 'application/json',
+      };
       final response = await http
           .post(
-            Uri.parse(_registerUrl),
-            headers: {'Content-Type': 'application/json'},
+            registerUri,
+            headers: registerHeaders,
             body: jsonEncode({
               'deviceId': deviceId,
               'fcmToken': fcmToken,
