@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -8,9 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
-import 'core/services/audio_handler.dart';
 import 'core/services/cloudflare_service.dart';
-import 'core/services/pip_service.dart';
 import 'core/services/notification_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'core/services/storage_folder_service.dart';
@@ -64,20 +61,6 @@ void main() async {
   await runZonedGuarded(() async {
     await _initDatabase();
     final savedSettings = await AppSettings.load();
-
-    // AudioService.init() MUST be called before runApp() on Android.
-    // audio_service v0.18.x registers the foreground service connection
-    // during init; if called after runApp() the Android service binding
-    // races with the first Activity lifecycle event and the handler is
-    // never assigned, causing silent audio failures.
-    await _initAudioService();
-
-    // Wire up native pause/resume signals from MainActivity.kt (onPause/onResume).
-    // Must be called after _initAudioService() so globalAudioHandler is set.
-    PipService.listenForNativePause(
-      () => globalAudioHandler?.pause(),
-      () => globalAudioHandler?.play(),
-    );
 
     runApp(
       ProviderScope(
@@ -164,9 +147,6 @@ Future<void> _initDatabase() async {
 }
 
 Future<void> _initBackground() async {
-  // Note: _initAudioService() is intentionally NOT listed here.
-  // It is called before runApp() to guarantee the AudioService handler
-  // is registered before the first Activity lifecycle event on Android.
   await Future.wait([
     _initNotifications(),
     _initWorkManager(),
@@ -195,25 +175,6 @@ Future<void> _registerPushToken() async {
     }
   } catch (e) {
     debugPrint('[main] _registerPushToken failed (non-fatal): $e');
-  }
-}
-
-Future<void> _initAudioService() async {
-  try {
-    globalAudioHandler ??= await AudioService.init(
-      builder: () => PlayedAudioHandler(),
-      config: const AudioServiceConfig(
-        androidNotificationChannelId: 'com.otyaplayer.app.audio',
-        androidNotificationChannelName: 'OTYA Player Media',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: true,
-        androidNotificationIcon: 'mipmap/ic_launcher',
-        notificationColor: Color(0xFF8A2BE2),
-      ),
-    );
-    debugPrint('[AudioService] Ready.');
-  } catch (e) {
-    debugPrint('[AudioService] Init error: $e');
   }
 }
 

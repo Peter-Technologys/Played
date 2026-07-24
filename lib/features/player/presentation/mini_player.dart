@@ -12,14 +12,6 @@ import 'audio_player_screen.dart';
 
 final miniPlayerItemProvider = StateProvider<MediaItem?>((_) => null);
 
-// ── TASK 3: Audio output route provider ────────────────────────────
-// Previously used audio_session to detect the current output device.
-// audio_session has been removed (just_audio migration to media_kit).
-// Returns null so the label is hidden; can be re-implemented via
-// platform channels if needed in the future.
-
-final _audioOutputLabelProvider = FutureProvider<String?>((_) async => null);
-
 // ── TASK 2: Granular selectors — each rebuilds only its own subtree ─
 
 /// Watches only [isPlaying] — rebuilds on play/pause toggle only.
@@ -207,9 +199,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
-                              // TASK 3: Dynamic audio output label.
-                              // Hidden when detection fails.
-                              const _AudioOutputLabel(),
                             ],
                           ),
                         ),
@@ -251,43 +240,6 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
           ),
         ),
       ),
-    );
-  }
-}
-
-// ── TASK 3: Audio output label widget ──────────────────────────────
-
-class _AudioOutputLabel extends ConsumerWidget {
-  const _AudioOutputLabel();
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final labelAsync = ref.watch(_audioOutputLabelProvider);
-    return labelAsync.when(
-      data: (label) {
-        if (label == null) return const SizedBox.shrink();
-        return Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.volume_up_rounded,
-                size: 10, color: AppColors.textSecondary),
-            const SizedBox(width: 3),
-            Flexible(
-              child: Text(
-                label,
-                style: const TextStyle(
-                    fontSize: 9,
-                    color: AppColors.textSecondary,
-                    fontFamily: 'Inter'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-          ],
-        );
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
     );
   }
 }

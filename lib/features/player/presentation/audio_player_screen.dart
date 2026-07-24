@@ -9,7 +9,6 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
-import '../../../core/services/audio_handler.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
@@ -62,57 +61,38 @@ class AudioPlayerState {
 }
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
-  // Route all playback through the audio_service handler.
-  // Guard against null — AudioService.init() runs in background after app start.
-  PlayedAudioHandler? get _handler => globalAudioHandler;
-  Player? get _player => _handler?.player;
-  String? _currentItemId;
-  // Track which player instance the streams are attached to.
-  // Reset to false whenever a new item is loaded so we re-attach
-  // to the (potentially new) player instance.
-  bool _streamsAttached = false;
-  Player? _attachedPlayer;
+  // media_kit Player owned directly — single engine, no audio_service wrapper.
+  final Player _player = Player();
 
-  // Held subscriptions — cancelled before re-attaching to prevent stacking.
+  String? _currentItemId;
+  bool    _loading        = false;
+  int     _loadGeneration = 0;
+
+  // Held subscriptions — cancelled on dispose.
   StreamSubscription? _playingSub;
   StreamSubscription? _bufferingSub;
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
   StreamSubscription? _completedSub;
 
-  AudioPlayerNotifier() : super(const AudioPlayerState());
+  // Keep a reference to the ProviderContainer so load() can update
+  // miniPlayerItemProvider and read queueProvider without a BuildContext.
+  ProviderContainer? _container;
 
-  /// Attach stream listeners once the handler is ready (called from load()).
-  /// Always cancels existing subscriptions and re-attaches so that loading a
-  /// second track never leaves stale listeners from the previous player instance.
+  AudioPlayerNotifier() : super(const AudioPlayerState()) {
+    _attachStreams();
+  }
+
   void _attachStreams() {
-    final player = _player;
-    if (player == null) return;
-    // Always cancel existing subscriptions before re-attaching.
-    // The old guard `if (_streamsAttached && identical(_attachedPlayer, player)) return;`
-    // was causing stale stream listeners when the user loads a second track,
-    // because the flag prevented re-attachment even when the player instance changed.
-    _playingSub?.cancel();
-    _bufferingSub?.cancel();
-    _positionSub?.cancel();
-    _durationSub?.cancel();
-    _completedSub?.cancel();
-    _streamsAttached = true;
-    _attachedPlayer = player;
-
     // playing stream — reflects actual play/pause state
-    _playingSub = player.stream.playing.listen((playing) {
+    _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
       state = state.copyWith(isPlaying: playing);
     });
 
-    // buffering stream — true while media is loading/buffering.
-    // Only update isLoading during the initial load phase (before duration
-    // is known). Mid-playback buffering should not re-show the spinner.
-    _bufferingSub = player.stream.buffering.listen((buffering) {
+    // buffering stream — only show spinner during initial load (no duration yet).
+    _bufferingSub = _player.stream.buffering.listen((buffering) {
       if (!mounted) return;
-      // Only show loading spinner if we don't have a duration yet
-      // (i.e. still in initial load). Mid-playback rebuffering is silent.
       if (buffering && state.duration == Duration.zero) {
         state = state.copyWith(isLoading: true);
       } else if (!buffering) {
@@ -120,11 +100,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       }
     });
 
-    // Debounce position saves: write to DB at most once every 5 seconds
-    // using a timestamp comparison instead of the modulo trick, which
-    // could fire multiple times per second if the stream emits faster than 1 Hz.
+    // Debounce position saves: write to DB at most once every 5 seconds.
     DateTime lastSave = DateTime.fromMillisecondsSinceEpoch(0);
-    _positionSub = player.stream.position.listen((p) {
+    _positionSub = _player.stream.position.listen((p) {
       if (!mounted) return;
       state = state.copyWith(position: p);
       if (_currentItemId != null && p.inSeconds > 0) {
@@ -136,25 +114,19 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       }
     });
 
-    _durationSub = player.stream.duration.listen((d) {
+    _durationSub = _player.stream.duration.listen((d) {
       if (!mounted) return;
       state = state.copyWith(duration: d);
     });
 
-    // completed stream — fires true when the track finishes.
-    // AudioPlayerHandler.onSkipNext already handles queue advancement
-    // via the handler's _completedSub. This subscription is kept only
-    // for repeat-one logic which must bypass the handler's skip.
-    _completedSub = player.stream.completed.listen((completed) {
-      if (completed && state.repeat == RepeatState.one) {
-        // Repeat-one: reload current track directly without going through
-        // the handler's onSkipNext (which would advance the queue).
-        final queue = _container?.read(queueProvider);
-        final current = queue?.current;
+    // completed stream — repeat-one reloads current; all other modes call
+    // _onTrackComplete() which advances the queue.
+    _completedSub = _player.stream.completed.listen((completed) {
+      if (!completed) return;
+      if (state.repeat == RepeatState.one) {
+        final current = _container?.read(queueProvider).current;
         if (current != null) load(current);
-      } else if (completed) {
-        // For all other repeat modes, the handler's onSkipNext callback
-        // already fired — just update repeat-all / repeat-off state.
+      } else {
         _onTrackComplete();
       }
     });
@@ -166,7 +138,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final notifier = _container!.read(queueProvider.notifier);
     switch (state.repeat) {
       case RepeatState.one:
-        // Handled directly in _completedSub to avoid double-load.
+        // Handled directly in _completedSub.
         break;
       case RepeatState.all:
         notifier.next();
@@ -184,115 +156,93 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     }
   }
 
-  // Keep a reference to the ProviderContainer so load() can update
-  // miniPlayerItemProvider without needing a BuildContext.
-  ProviderContainer? _container;
+  Future<void> _loadCurrent(
+    MediaItem item, {
+    required double speed,
+    Duration? savedPosition,
+  }) async {
+    _loadGeneration++;
+    final myGeneration = _loadGeneration;
 
-  void attachContainer(ProviderContainer container) {
-    _container = container;
-    // Best-effort wire at creation time. If the handler is not yet ready
-    // (AudioService.init() is async), load() will re-wire on every call.
-    _handler?.onSkipNext     = skipNext;
-    _handler?.onSkipPrevious = skipPrevious;
+    // Reset stale _loading flag instead of returning early (avoids deadlock).
+    if (_loading) {
+      debugPrint('[AudioPlayer] _loadCurrent: resetting stale _loading flag.');
+      _loading = false;
+    }
+    _loading = true;
+
+    try {
+      if (_player.state.playing) await _player.pause();
+      if (_loadGeneration != myGeneration) return;
+
+      try {
+        await _player.open(Media(item.filePath), play: false);
+      } catch (srcErr) {
+        debugPrint('[AudioPlayer] player.open failed: $srcErr\nPath: ${item.filePath}');
+        if (mounted) state = state.copyWith(isLoading: false);
+        return;
+      }
+
+      if (_loadGeneration != myGeneration) return;
+      await _player.setRate(speed);
+      if (_loadGeneration != myGeneration) return;
+
+      if (savedPosition != null && savedPosition.inSeconds > 0) {
+        await _player.seek(savedPosition);
+      }
+      if (_loadGeneration != myGeneration) return;
+
+      await _player.play();
+    } catch (e) {
+      debugPrint('[AudioPlayer] _loadCurrent error: $e');
+      if (mounted) state = state.copyWith(isLoading: false);
+    } finally {
+      _loading = false;
+    }
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
-    // ── Wait for AudioService ──────────────────────────────────────────────
-    // AudioService.init() runs in the background after runApp().
-    // Exponential back-off: total wait up to ~7 s before giving up.
-    if (_handler == null) {
-      debugPrint('[AudioPlayer] Waiting for AudioService...');
-      const delays = [100, 200, 300, 500, 500, 1000, 1000, 1500, 2000];
-      for (final ms in delays) {
-        await Future.delayed(Duration(milliseconds: ms));
-        if (_handler != null) break;
-      }
-    }
-    if (_handler == null) {
-      debugPrint('[AudioPlayer] AudioService not ready after retries — giving up.');
-      // Fix A: Surface a user-visible error state instead of silently failing.
-      // isLoading: false stops the spinner; the UI can show a retry affordance.
-      if (mounted) {
-        state = state.copyWith(isLoading: false);
-        // Notify the UI layer via a post-frame callback so any mounted
-        // ScaffoldMessenger can display the snackbar.
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (_container != null) {
-            // We don't have a BuildContext here, but the error state
-            // (isLoading: false with duration == zero) is enough for the
-            // AudioPlayerScreen build() to show a retry button.
-            debugPrint('[AudioPlayer] Error state emitted — UI should show retry.');
-          }
-        });
-      }
-      return;
-    }
-
-    // FIX 3: Re-wire callbacks on EVERY load() call.
-    // attachContainer() runs at provider creation when globalAudioHandler is
-    // still null, so the ?. operator silently skips the assignment and the
-    // callbacks are never set. Re-wiring here guarantees they are always live.
-    _handler!.onSkipNext     = skipNext;
-    _handler!.onSkipPrevious = skipPrevious;
-
     _currentItemId = item.id;
     if (mounted) {
       state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     }
-    // Fix D: Warn in logs if _container is null (means attachContainer() was
-    // never called, which would prevent miniPlayer and queue updates).
-    if (_container == null) {
-      debugPrint('[AudioPlayer] WARNING: _container is null — miniPlayerItemProvider will not be updated. '
-          'Ensure attachContainer() is called before load().');
-    }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
 
-    final saved       = PlayedDatabase.instance.getSeekPosition(item.id);
-    final savedSpeed  = await SpeedMemoryService.instance.getSpeed(item.id);
-    final speed       = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
+    final saved      = PlayedDatabase.instance.getSeekPosition(item.id);
+    final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
+    final speed      = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
 
     try {
-      await _handler!.loadAndPlay(
-        item,
-        speed: speed,
-        savedPosition: saved,
-      );
-      // Attach streams AFTER loadAndPlay() completes so we always subscribe
-      // to the live player instance, never a stale one from a previous track.
-      _attachStreams();
-      state = state.copyWith(speed: speed, isLoading: false);
-      // Fire-and-forget — don't block the UI on a DB write
+      await _loadCurrent(item, speed: speed, savedPosition: saved);
+      if (mounted) state = state.copyWith(speed: speed, isLoading: false);
       PlayedDatabase.instance.recordPlay(item).ignore();
     } catch (e) {
       debugPrint('[AudioPlayer] load error: $e');
-      state = state.copyWith(isLoading: false);
+      if (mounted) state = state.copyWith(isLoading: false);
     }
   }
 
-  bool _loadFavorite(String id) {
-    // Favorites persisted in Hive seekPositions box reused as flags box
-    // We use a dedicated key prefix to avoid collision
-    final data = PlayedDatabase.instance.getFavoriteFlag(id);
-    return data;
-  }
+  bool _loadFavorite(String id) =>
+      PlayedDatabase.instance.getFavoriteFlag(id);
 
   void togglePlay() {
-    // Optimistic update so the button reflects the new state immediately,
-    // even if the stream subscription is momentarily stale.
     final willPlay = !state.isPlaying;
     state = state.copyWith(isPlaying: willPlay);
-    if (willPlay) { _handler?.play(); } else { _handler?.pause(); }
+    if (willPlay) { _player.play(); } else { _player.pause(); }
   }
-  void pause()      => _handler?.pause();
-  Future<void> seek(Duration p) async => _handler?.seek(p);
-  Future<void> skipForward() async =>
-      _handler?.seek(state.position + const Duration(seconds: 10));
-  Future<void> skipBack() async =>
-      _handler?.seek(state.position - const Duration(seconds: 10));
+
+  void pause() => _player.pause();
+
+  Future<void> seek(Duration p) => _player.seek(p);
+
+  Future<void> skipForward() =>
+      _player.seek(state.position + const Duration(seconds: 10));
+
+  Future<void> skipBack() =>
+      _player.seek(state.position - const Duration(seconds: 10));
 
   void skipNext() {
     if (_container == null) return;
-    // Save position of current track before skipping
     if (_currentItemId != null) {
       PlayedDatabase.instance.saveSeekPosition(_currentItemId!, state.position);
     }
@@ -303,7 +253,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   void skipPrevious() {
     if (state.position.inSeconds > 3) {
-      _handler?.seek(Duration.zero);
+      _player.seek(Duration.zero);
       return;
     }
     if (_container == null) return;
@@ -316,9 +266,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void setSpeed(double s) {
-    _handler?.setSpeed(s);
+    _player.setRate(s);
     state = state.copyWith(speed: s);
-    // Persist per-track speed memory
     if (_currentItemId != null) {
       SpeedMemoryService.instance.saveSpeed(_currentItemId!, s);
     }
@@ -333,19 +282,16 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void toggleShuffle() {
-    // Delegate shuffle state entirely to QueueNotifier — single source of truth.
     _container?.read(queueProvider.notifier).toggleShuffle();
   }
 
   void cycleRepeat() {
+    // Repeat is handled entirely by _completedSub logic.
+    // Do NOT call _player.setPlaylistMode() — media_kit's internal playlist
+    // mode conflicts with manual queue management.
     final next = RepeatState.values[
         (state.repeat.index + 1) % RepeatState.values.length];
     state = state.copyWith(repeat: next);
-    switch (next) {
-      case RepeatState.off: _player?.setPlaylistMode(PlaylistMode.none);
-      case RepeatState.one: _player?.setPlaylistMode(PlaylistMode.single);
-      case RepeatState.all: _player?.setPlaylistMode(PlaylistMode.loop);
-    }
   }
 
   void savePosition(String id) =>
@@ -353,13 +299,12 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   @override
   void dispose() {
-    // Cancel stream subscriptions to prevent callbacks firing after disposal.
     _playingSub?.cancel();
     _bufferingSub?.cancel();
     _positionSub?.cancel();
     _durationSub?.cancel();
     _completedSub?.cancel();
-    // Do NOT stop the handler — it lives for the app lifetime
+    _player.dispose();
     super.dispose();
   }
 }
@@ -368,9 +313,7 @@ final audioPlayerProvider =
     StateNotifierProvider<AudioPlayerNotifier, AudioPlayerState>(
   (ref) {
     final notifier = AudioPlayerNotifier();
-    // Give the notifier access to the provider container so it can
-    // update miniPlayerItemProvider when a track loads.
-    notifier.attachContainer(ref.container);
+    notifier._container = ref.container;
     return notifier;
   },
 );

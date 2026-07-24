@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -783,14 +784,63 @@ class _SongOptionsSheet extends StatelessWidget {
             icon: Icons.delete_outline_rounded,
             label: 'Delete',
             color: AppColors.error,
-            onTap: () {
+            onTap: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Delete not implemented'),
+              final confirmed = await showDialog<bool>(
+                context: context,
+                builder: (ctx) => AlertDialog(
                   backgroundColor: AppColors.surface,
+                  title: const Text(
+                    'Delete Song',
+                    style: TextStyle(
+                      color: AppColors.textPrimary,
+                      fontFamily: 'Inter',
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  content: Text(
+                    'Are you sure you want to permanently delete "${item.title}"? This cannot be undone.',
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, false),
+                      child: const Text('Cancel',
+                          style: TextStyle(color: AppColors.textSecondary)),
+                    ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(ctx, true),
+                      child: const Text('Delete',
+                          style: TextStyle(color: AppColors.error)),
+                    ),
+                  ],
                 ),
               );
+              if (confirmed != true) return;
+              try {
+                await File(item.filePath).delete();
+                ref.read(mediaLibraryProvider.notifier).refresh();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${item.title}" deleted'),
+                      backgroundColor: AppColors.surface,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('Failed to delete: $e'),
+                      backgroundColor: AppColors.surface,
+                    ),
+                  );
+                }
+              }
             },
           ),
         ],
@@ -1102,9 +1152,73 @@ class _AlbumsView extends StatelessWidget {
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
+            onTap: () => context.push(
+              '/music/album',
+              extra: {'name': album, 'items': tracks},
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+// Public so it can be referenced from router.dart via GoRoute.
+class MusicAlbumDetailPage extends ConsumerWidget {
+  final String name;
+  final List<MediaItem> items;
+  const MusicAlbumDetailPage({super.key, required this.name, required this.items});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded,
+              color: Theme.of(context).colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          name,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 16,
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                '${items.length} track${items.length == 1 ? '' : 's'}',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return _SongRow(
+            item: item,
+            index: i,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+              context.push('/player/audio', extra: item);
+            },
+          );
+        },
+      ),
     );
   }
 }
@@ -1183,9 +1297,73 @@ class _ArtistsView extends StatelessWidget {
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
+            onTap: () => context.push(
+              '/music/artist',
+              extra: {'name': artist, 'items': tracks},
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+// Public so it can be referenced from router.dart via GoRoute.
+class MusicArtistDetailPage extends ConsumerWidget {
+  final String name;
+  final List<MediaItem> items;
+  const MusicArtistDetailPage({super.key, required this.name, required this.items});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_rounded,
+              color: Theme.of(context).colorScheme.onSurface),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          name,
+          style: TextStyle(
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurface,
+            fontSize: 16,
+          ),
+        ),
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: Center(
+              child: Text(
+                '${items.length} song${items.length == 1 ? '' : 's'}',
+                style: const TextStyle(
+                    fontSize: 12, color: AppColors.textSecondary),
+              ),
+            ),
+          ),
+        ],
+      ),
+      body: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(0, 8, 0, 100),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return _SongRow(
+            item: item,
+            index: i,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+              context.push('/player/audio', extra: item);
+            },
+          );
+        },
+      ),
     );
   }
 }
