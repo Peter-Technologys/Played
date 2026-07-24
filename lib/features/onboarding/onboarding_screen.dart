@@ -29,7 +29,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
   // Glow animation for slide 3
   late final AnimationController _glowCtrl;
 
-  static const _ctaLabels = ['NEXT', 'GOT IT', 'GET STARTED'];
+  static const _ctaLabels = ['NEXT', 'NEXT', 'GET STARTED'];
 
   @override
   void initState() {

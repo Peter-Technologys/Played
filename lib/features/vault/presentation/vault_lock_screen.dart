@@ -114,13 +114,20 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
   Widget build(BuildContext context) {
     if (ref.watch(vaultUnlockedProvider)) return const VaultGalleryScreen();
 
-    return Scaffold(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) ref.read(vaultUnlockedProvider.notifier).state = false;
+      },
+      child: Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            ref.read(vaultUnlockedProvider.notifier).state = false;
+            Navigator.of(context).pop();
+          },
         ),
         elevation: 0,
       ),
@@ -208,7 +215,8 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
           ),
         ),
       ),
-    );
+    ), // end Scaffold
+    ); // end PopScope
   }
 }
 
@@ -430,14 +438,21 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) ref.read(vaultUnlockedProvider.notifier).state = false;
+      },
+      child: Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () => Navigator.of(context).pop(),
+          onPressed: () {
+            ref.read(vaultUnlockedProvider.notifier).state = false;
+            Navigator.of(context).pop();
+          },
         ),
         title: Text('Private Vault',
             style: TextStyle(fontWeight: FontWeight.w700,
@@ -503,7 +518,8 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
                     onRemove: () => _removeItem(_items[i]),
                   ),
                 ),
-    );
+    ), // end Scaffold
+    ); // end PopScope
   }
 }
 

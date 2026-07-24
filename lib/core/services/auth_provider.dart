@@ -1,74 +1,54 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// Auth state based on SharedPreferences (userId stored by Google Sign-In).
-/// Appwrite has been removed — auth is now handled by Google Sign-In only,
-/// with the userId persisted under 'appwrite_user_id' for Cloudflare calls.
-
 class _AuthState {
   final String? userId;
   final String? displayName;
   final String? email;
   final String? photoUrl;
 
-  const _AuthState({
-    this.userId,
-    this.displayName,
-    this.email,
-    this.photoUrl,
-  });
+  const _AuthState({this.userId, this.displayName, this.email, this.photoUrl});
 
   bool get isSignedIn => userId != null && userId!.isNotEmpty;
 }
 
-Future<_AuthState> _loadAuthState() async {
-  final prefs = await SharedPreferences.getInstance();
-  final userId = prefs.getString('appwrite_user_id');
-  final displayName = prefs.getString('auth_display_name');
-  final email = prefs.getString('auth_email');
-  final photoUrl = prefs.getString('auth_photo_url');
-  return _AuthState(
-    userId: userId,
-    displayName: displayName,
-    email: email,
-    photoUrl: photoUrl,
-  );
+class AuthNotifier extends StateNotifier<_AuthState> {
+  AuthNotifier() : super(const _AuthState()) { _load(); }
+
+  Future<void> _load() async {
+    final prefs = await SharedPreferences.getInstance();
+    state = _AuthState(
+      userId:      prefs.getString('appwrite_user_id'),
+      displayName: prefs.getString('auth_display_name'),
+      email:       prefs.getString('auth_email'),
+      photoUrl:    prefs.getString('auth_photo_url'),
+    );
+  }
+
+  Future<void> signIn({required String userId, required String displayName, String? email, String? photoUrl}) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('appwrite_user_id', userId);
+    await prefs.setString('auth_display_name', displayName);
+    if (email != null) await prefs.setString('auth_email', email);
+    if (photoUrl != null) await prefs.setString('auth_photo_url', photoUrl);
+    state = _AuthState(userId: userId, displayName: displayName, email: email, photoUrl: photoUrl);
+  }
+
+  Future<void> signOut() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('appwrite_user_id');
+    await prefs.remove('auth_display_name');
+    await prefs.remove('auth_email');
+    await prefs.remove('auth_photo_url');
+    state = const _AuthState();
+  }
 }
 
-/// Provides the current auth state loaded from SharedPreferences.
-final authStateProvider = FutureProvider<_AuthState>((_) => _loadAuthState());
+final authNotifierProvider = StateNotifierProvider<AuthNotifier, _AuthState>((_) => AuthNotifier());
 
-/// True when a user is signed in (userId is non-empty in SharedPreferences).
-final isSignedInProvider = Provider<bool>((ref) {
-  return ref.watch(authStateProvider).maybeWhen(
-    data: (state) => state.isSignedIn,
-    orElse: () => false,
-  );
-});
-
-/// The signed-in user's display name, or null.
-final displayNameProvider = Provider<String?>((ref) {
-  return ref.watch(authStateProvider).maybeWhen(
-    data: (state) =>
-        state.displayName?.isNotEmpty == true ? state.displayName : null,
-    orElse: () => null,
-  );
-});
-
-/// The signed-in user's email, or null.
-final userEmailProvider = Provider<String?>((ref) {
-  return ref.watch(authStateProvider).maybeWhen(
-    data: (state) => state.email?.isNotEmpty == true ? state.email : null,
-    orElse: () => null,
-  );
-});
-
-/// Google profile photo URL, or null.
-final photoUrlProvider = Provider<String?>((ref) {
-  return ref.watch(authStateProvider).maybeWhen(
-    data: (state) => state.photoUrl?.isNotEmpty == true ? state.photoUrl : null,
-    orElse: () => null,
-  );
-});
+final isSignedInProvider   = Provider<bool>((ref) => ref.watch(authNotifierProvider).isSignedIn);
+final displayNameProvider  = Provider<String?>((ref) { final n = ref.watch(authNotifierProvider).displayName; return (n?.isNotEmpty == true) ? n : null; });
+final userEmailProvider    = Provider<String?>((ref) { final e = ref.watch(authNotifierProvider).email; return (e?.isNotEmpty == true) ? e : null; });
+final photoUrlProvider     = Provider<String?>((ref) { final u = ref.watch(authNotifierProvider).photoUrl; return (u?.isNotEmpty == true) ? u : null; });
 
 

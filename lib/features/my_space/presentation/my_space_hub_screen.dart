@@ -6,9 +6,9 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:uuid/uuid.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/played_database.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
 import 'providers/my_space_provider.dart';
@@ -526,11 +526,11 @@ class MySpaceHubScreen extends ConsumerWidget {
                     ? _SignedInCard(
                         displayName: displayName,
                         photoUrl: photoUrl,
-                        onSignOut: () => _confirmSignOut(context),
-                        onBackup: () => _runBackup(context),
+                        onSignOut: () => _confirmSignOut(context, ref),
+                        onBackup: () => _runBackup(context, ref),
                       ).animate().fadeIn(duration: 300.ms)
                     : _SignInCard(
-                        onTap: () => _signIn(context),
+                        onTap: () => _signIn(context, ref),
                       ).animate().fadeIn(duration: 300.ms),
               ),
             ),
@@ -616,19 +616,41 @@ class MySpaceHubScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _signIn(BuildContext context) async {
-    // Google Sign-In is handled natively; userId is stored in SharedPreferences.
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Google sign-in is handled via the native flow.'),
-          backgroundColor: AppColors.surface,
+  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
+    final controller = TextEditingController();
+    final name = await showDialog<String>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign In', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          style: const TextStyle(color: AppColors.textPrimary),
+          decoration: const InputDecoration(
+            hintText: 'Your name',
+            hintStyle: TextStyle(color: AppColors.textSecondary),
+            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
+            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.accent)),
+          ),
+          onSubmitted: (v) => Navigator.pop(context, v),
         ),
-      );
-    }
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, controller.text),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
+            child: const Text('Sign In', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (name == null || name.trim().isEmpty) return;
+    await ref.read(authNotifierProvider.notifier).signIn(userId: const Uuid().v4(), displayName: name.trim());
   }
 
-  void _confirmSignOut(BuildContext context) {
+  void _confirmSignOut(BuildContext context, WidgetRef ref) {
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -654,11 +676,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              final prefs = await SharedPreferences.getInstance();
-              await prefs.remove('appwrite_user_id');
-              await prefs.remove('auth_display_name');
-              await prefs.remove('auth_email');
-              await prefs.remove('auth_photo_url');
+              await ref.read(authNotifierProvider.notifier).signOut();
             },
             child: const Text('Sign out',
                 style: TextStyle(color: AppColors.error)),
@@ -668,9 +686,8 @@ class MySpaceHubScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _runBackup(BuildContext context) async {
-    final prefs = await SharedPreferences.getInstance();
-    final userId = prefs.getString('appwrite_user_id') ?? '';
+  Future<void> _runBackup(BuildContext context, WidgetRef ref) async {
+    final userId = ref.read(authNotifierProvider).userId ?? '';
     if (userId.isEmpty) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(

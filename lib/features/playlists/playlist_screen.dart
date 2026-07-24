@@ -9,6 +9,7 @@ import '../../core/database/played_database.dart';
 import '../../core/models/media_item.dart';
 import '../../core/models/playlist.dart';
 import '../../features/my_space/data/media_repository.dart';
+import '../../features/my_space/presentation/providers/my_space_provider.dart';
 import '../../features/player/presentation/audio_player_screen.dart';
 import '../../features/player/presentation/mini_player.dart';
 import '../../features/player/presentation/queue_screen.dart';
@@ -429,16 +430,13 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // Resolve MediaItems from IDs using the in-memory cache
-    final allMedia = MediaRepository.instance.cachedItems ?? [];
+    // Resolve MediaItems from IDs — watch the live provider so cold-start
+    // and post-scan updates are reflected immediately.
+    final libraryItems = ref.watch(mediaLibraryProvider).valueOrNull
+        ?? MediaRepository.instance.cachedItems
+        ?? [];
     final tracks = widget.playlist.mediaIds
-        .map((id) {
-          try {
-            return allMedia.firstWhere((m) => m.id == id);
-          } catch (_) {
-            return null;
-          }
-        })
+        .map((id) { try { return libraryItems.firstWhere((m) => m.id == id); } catch (_) { return null; } })
         .whereType<MediaItem>()
         .toList();
 
@@ -470,7 +468,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 final shuffled = List.of(tracks)..shuffle();
                 ref.read(queueProvider.notifier).setQueue(shuffled);
                 ref.read(miniPlayerItemProvider.notifier).state = shuffled.first;
-                ref.read(audioPlayerProvider.notifier).load(shuffled.first);
                 context.push('/player/audio', extra: shuffled.first);
               },
             ),
@@ -482,7 +479,6 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                 HapticFeedback.mediumImpact();
                 ref.read(queueProvider.notifier).setQueue(tracks);
                 ref.read(miniPlayerItemProvider.notifier).state = tracks.first;
-                ref.read(audioPlayerProvider.notifier).load(tracks.first);
                 context.push('/player/audio', extra: tracks.first);
               },
             ),
@@ -595,10 +591,8 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   ),
                   onTap: () {
                     HapticFeedback.selectionClick();
-                    ref
-                        .read(queueProvider.notifier)
-                        .setQueue(tracks, startIndex: i);
-                    ref.read(audioPlayerProvider.notifier).load(item);
+                    ref.read(queueProvider.notifier).setQueue(tracks, startIndex: i);
+                    ref.read(miniPlayerItemProvider.notifier).state = item;
                     context.push('/player/audio', extra: item);
                   },
                 );
