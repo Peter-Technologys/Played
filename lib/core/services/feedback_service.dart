@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -60,30 +59,6 @@ class FeedbackService {
     }
   }
 
-  Future<void> _postToAppwrite(
-      String collection, Map<String, dynamic> data) async {
-    try {
-      final res = await http
-          .post(
-            Uri.parse(
-              '${Environment.appwriteEndpoint}/databases/${Environment.databaseId}'
-              '/collections/$collection/documents',
-            ),
-            headers: {
-              'Content-Type': 'application/json',
-              'X-Appwrite-Project': Environment.appwriteProjectId,
-            },
-            body: jsonEncode({'documentId': 'unique()', 'data': data}),
-          )
-          .timeout(const Duration(seconds: 8));
-      if (res.statusCode >= 400) {
-        debugPrint('[FeedbackService] Appwrite $collection HTTP ${res.statusCode}: ${res.body}');
-      }
-    } catch (e) {
-      debugPrint('[FeedbackService] Appwrite post failed (non-fatal): $e');
-    }
-  }
-
   Future<void> _openEmail(String subject, String body) async {
     final uri = Uri(
       scheme: 'mailto',
@@ -122,16 +97,6 @@ class FeedbackService {
     required String comment,
   }) async {
     final info = await _deviceInfo();
-    final now  = DateTime.now().toUtc().toIso8601String();
-
-    _postToAppwrite('ratings', {
-      'deviceId':    info['deviceId'],
-      'appVersion':  info['version'],
-      'versionCode': int.tryParse(info['buildNumber']!) ?? 0,
-      'stars':       stars,
-      'comment':     comment,
-      'createdAt':   now,
-    }).ignore();
 
     final starEmoji = List.filled(stars, '⭐').join();
     final subject   = 'OTYA Player Rating — $stars stars';
@@ -153,17 +118,6 @@ class FeedbackService {
     String? userEmail,
   }) async {
     final info = await _deviceInfo();
-    final now  = DateTime.now().toUtc().toIso8601String();
-
-    _postToAppwrite('feedback', {
-      'deviceId':    info['deviceId'],
-      'appVersion':  info['version'],
-      'versionCode': int.tryParse(info['buildNumber']!) ?? 0,
-      'category':    category,
-      'description': description,
-      'createdAt':   now,
-      if (userEmail != null && userEmail.isNotEmpty) 'email': userEmail,
-    }).ignore();
 
     final categoryLabel = category[0].toUpperCase() + category.substring(1);
     final subject = 'OTYA Player Problem Report — $categoryLabel';

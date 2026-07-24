@@ -16,11 +16,6 @@ abstract class Environment {
   static const String latestUrl         = '$workerUrl/latest';
   static const String versionUrl        = '$workerUrl/api/version';
 
-  // ── Appwrite (feedback & ratings — fire-and-forget) ───────────────────────
-  static const String appwriteEndpoint  = 'https://cloud.appwrite.io/v1';
-  static const String appwriteProjectId = '';
-  static const String databaseId        = '';
-
   // ── APK download ──────────────────────────────────────────────────────────
   static const String arm64DownloadUrl = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl = '$workerUrl/apk/arm32';
