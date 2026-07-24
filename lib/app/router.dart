@@ -554,8 +554,6 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  int _currentIndex = 0;
-
   static const _routes = ['/', '/music', '/myspace'];
 
   // TASK 1: Removed IndexedStack + _pages list.
@@ -564,8 +562,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
-    if (index == _currentIndex) return;
-    setState(() => _currentIndex = index);
     GoRouter.of(context).go(_routes[index]);
   }
 
@@ -575,6 +571,15 @@ class _MainShellState extends ConsumerState<_MainShell> {
     final hasMini  = miniItem != null;
     final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
 
+    // Derive the active tab index from the current route location so that
+    // deep links and programmatic navigation keep the nav bar in sync.
+    final location = GoRouterState.of(context).matchedLocation;
+    final currentIndex = location.startsWith('/music')
+        ? 1
+        : location.startsWith('/myspace')
+            ? 2
+            : 0;
+
     return Scaffold(
       appBar: AppBar(
         // Transparent / blends with the page content behind it
@@ -583,7 +588,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
         scrolledUnderElevation: 0,
         // Search icon only shown on Video (0) and Music (1) tabs.
         // My Space (2) has its own internal search for tools.
-        actions: _currentIndex == 2
+        actions: currentIndex == 2
             ? const []
             : [
                 IconButton(
@@ -636,19 +641,19 @@ class _MainShellState extends ConsumerState<_MainShell> {
                     _NavItem(
                       icon: Icons.play_circle_rounded,
                       label: 'VIDEO',
-                      isActive: _currentIndex == 0,
+                      isActive: currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
                     _NavItem(
                       icon: Icons.music_note_rounded,
                       label: 'MUSIC',
-                      isActive: _currentIndex == 1,
+                      isActive: currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
                     _NavItem(
                       icon: Icons.person_rounded,
                       label: 'MY SPACE',
-                      isActive: _currentIndex == 2,
+                      isActive: currentIndex == 2,
                       onTap: () => _onTap(2),
                     ),
                   ],

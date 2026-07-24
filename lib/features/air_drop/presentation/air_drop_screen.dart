@@ -352,14 +352,14 @@ class _SendView extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           // File list
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 8),
-            child: Text('PICK A FILE TO SEND',
-                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
+          Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: Text('PICK A FILE TO SEND (${library.length})',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.w700,
                     color: AppColors.textSecondary,
                     letterSpacing: 1.2, fontFamily: 'Inter')),
           ),
-          ...library.take(50).map((item) => _FileTile(
+          ...library.map((item) => _FileTile(
             item: item,
             isSelected: state.selectedItem?.id == item.id,
             onTap: () => n.startServing(item),
