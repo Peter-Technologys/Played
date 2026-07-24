@@ -3,12 +3,8 @@
 // Signs every outgoing request with HMAC-SHA256 so the Worker can verify
 // the request came from the real Otya Player app.
 //
-// The shared secret (OTYA_STORE_ADMIN_TOKEN) must NEVER be shipped in
-// plaintext. Store it using --dart-define at build time:
-//
-//   flutter build apk --dart-define=OTYA_SECRET=your_token_here
-//
-// Then read it here with:  const String.fromEnvironment('OTYA_SECRET')
+// The shared secret must NEVER be shipped in plaintext.
+// Build with: flutter build apk --dart-define=OTYA_SECRET=your_token_here
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
@@ -27,19 +23,25 @@ class ApiSigner {
     required String path,
     String? deviceId,
   }) {
+    assert(
+      _secret.isNotEmpty,
+      'OTYA_SECRET is empty — build with --dart-define=OTYA_SECRET=your_token',
+    );
+
     final timestamp =
         (DateTime.now().millisecondsSinceEpoch ~/ 1000).toString();
     final signingString = '$method:$path:$timestamp';
 
-    final key     = utf8.encode(_secret);
-    final message = utf8.encode(signingString);
-    final hmac    = Hmac(sha256, key);
-    final signature = hmac.convert(message).toString();
+    final key       = utf8.encode(_secret);
+    final message   = utf8.encode(signingString);
+    final hmac      = Hmac(sha256, key);
+    final signature = hmac.convert(message).toString(); // lowercase hex
 
     return {
       'X-Otya-Timestamp': timestamp,
       'X-Otya-Signature': signature,
-      if (deviceId != null) 'X-Otya-Device-Id': deviceId,
+      if (deviceId != null && deviceId.isNotEmpty)
+        'X-Otya-Device-Id': deviceId,
       'Accept': 'application/json',
       'Accept-Encoding': 'gzip, deflate',
     };

@@ -26,7 +26,9 @@ class DeviceService {
   DeviceService._();
   static final DeviceService instance = DeviceService._();
 
-  final _http = AppHttpClient.instance;
+  final _http       = AppHttpClient.instance;
+  // Singleton — DeviceInfoPlugin is heavy; instantiate once, not per call.
+  final _deviceInfo = DeviceInfoPlugin();
   String? _cachedDeviceId;
 
   /// Returns the stable device ID (generated once, stored in SharedPreferences).
@@ -54,12 +56,11 @@ class DeviceService {
       if (prefs.getString(_kRegisteredBuild) == currentBuild) return;
 
       final deviceId   = await getDeviceId();
-      final deviceInfo = DeviceInfoPlugin();
       String model          = 'unknown';
       String androidVersion = 'unknown';
 
       if (Platform.isAndroid) {
-        final android = await deviceInfo.androidInfo;
+        final android = await _deviceInfo.androidInfo;
         model          = '${android.manufacturer} ${android.model}';
         androidVersion = android.version.release;
       }
