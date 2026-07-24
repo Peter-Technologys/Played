@@ -144,16 +144,5 @@ jobs:
             ${{ steps.apk.outputs.arm64 }}
             ${{ steps.apk.outputs.arm32 }}
 
-      - uses: actions/upload-artifact@v4
-        with:
-          name: release-apks-${{ github.ref_name }}
-          path: |
-            ${{ steps.apk.outputs.arm64 }}
-            ${{ steps.apk.outputs.arm32 }}
-          retention-days: 30
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: debug-info-${{ github.ref_name }}
-          path: build/debug-info/
-          retention-days: 30
+      # APKs are already published to Cloudflare R2 and attached to the
+      # GitHub Release above — no need to store them as Actions artifacts.
