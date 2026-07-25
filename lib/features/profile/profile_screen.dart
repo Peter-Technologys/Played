@@ -4,8 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:uuid/uuid.dart';
+
 import '../../app/theme/app_colors.dart';
 import '../../core/services/cloudflare_service.dart';
 import '../../core/services/update_service.dart';
@@ -13,7 +12,6 @@ import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 
 import '../../shared/widgets/played_logo.dart';
-import '../settings/settings_provider.dart';
 import '../../core/config/changelog.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -26,8 +24,6 @@ class ProfileScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final s           = ref.watch(settingsProvider);
-    final sn          = ref.read(settingsProvider.notifier);
     final isGoogle    = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
@@ -42,7 +38,7 @@ class ProfileScreen extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Profile & Settings',
+        title: Text('Account & Profile',
             style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.w700,
               color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
@@ -63,7 +59,14 @@ class ProfileScreen extends ConsumerWidget {
             ).animate().fadeIn(duration: 300.ms),
           ] else ...[  
             _GoogleSignInButton(
-              onTap: () => _signInWithGoogle(context, ref),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Google Sign-In coming soon'),
+                    backgroundColor: AppColors.surface,
+                  ),
+                );
+              },
             ).animate().fadeIn(duration: 300.ms),
             const SizedBox(height: 8),
             const Text(
@@ -75,35 +78,7 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 2. PRIVACY & SECURITY ─────────────────────────────────────
-          const _SectionHeader(label: 'Privacy & Security'),
-          const SizedBox(height: 12),
-          _SwitchTile(
-            icon: Icons.lock_rounded,
-            label: 'App Lock',
-            subtitle: 'Require biometrics to open OTYA Player',
-            value: s.appLockEnabled,
-            onChanged: sn.setAppLock,
-          ),
-          const SizedBox(height: 8),
-          _SwitchTile(
-            icon: Icons.visibility_off_rounded,
-            label: 'Hide Vault from Recents',
-            subtitle: 'Blur screenshot when switching apps',
-            value: s.hideVaultFromRecents,
-            onChanged: sn.setHideVaultFromRecents,
-          ),
-          const SizedBox(height: 8),
-          _TappableTile(
-            icon: Icons.security_rounded,
-            label: 'Manage App Permissions',
-            subtitle: 'Storage, Bluetooth, Notifications',
-            onTap: openAppSettings,
-          ),
-
-          const SizedBox(height: 20),
-
-          // ── 3. BACKUP & SYNC ──────────────────────────────────────────
+          // ── 2. BACKUP & SYNC ──────────────────────────────────────────
           const _SectionHeader(label: 'Backup & Sync'),
           const SizedBox(height: 8),
           if (!isGoogle)
@@ -143,13 +118,6 @@ class ProfileScreen extends ConsumerWidget {
             subtitle: isGoogle ? 'Restore playlists from your last backup' : 'Sign in with Google first',
             onTap: () => isGoogle ? _runRestore(context, ref) : _showSignInRequired(context),
           ),
-
-          const SizedBox(height: 20),
-
-          // ── 4. APP UPDATES ────────────────────────────────────────────
-          const _SectionHeader(label: 'App Updates'),
-          const SizedBox(height: 12),
-          const _UpdateCheckerTile(),
 
           const SizedBox(height: 20),
 
@@ -255,40 +223,6 @@ class ProfileScreen extends ConsumerWidget {
           : '❌ Restore failed. Check your connection.'),
       backgroundColor: count >= 0 ? AppColors.surface : AppColors.error,
     ));
-  }
-
-  Future<void> _signInWithGoogle(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Sign In', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimary),
-          decoration: const InputDecoration(
-            hintText: 'Your name',
-            hintStyle: TextStyle(color: AppColors.textSecondary),
-            enabledBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.border)),
-            focusedBorder: UnderlineInputBorder(borderSide: BorderSide(color: AppColors.accent)),
-          ),
-          onSubmitted: (v) => Navigator.pop(context, v),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-            child: const Text('Sign In', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-    if (name == null || name.trim().isEmpty) return;
-    await ref.read(authNotifierProvider.notifier).signIn(userId: const Uuid().v4(), displayName: name.trim());
   }
 
   void _confirmSignOut(BuildContext context, WidgetRef ref) {
@@ -759,28 +693,41 @@ class _GoogleSignInButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: onTap,
-      child: Container(
-        height: 52,
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.borderOf(context)),
-        ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text('G',
-                style: TextStyle(
-                  fontSize: 20, fontWeight: FontWeight.w700,
-                  color: Color(0xFF4285F4),
-                )),
-            const SizedBox(width: 12),
-            Text('Sign in with Google',
-                style: TextStyle(
-                  fontSize: 15, fontWeight: FontWeight.w600,
-                  color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-                )),
-          ],
+      child: Opacity(
+        opacity: 0.6,
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: AppColors.borderOf(context)),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text('G',
+                  style: TextStyle(
+                    fontSize: 20, fontWeight: FontWeight.w700,
+                    color: Color(0xFF4285F4),
+                  )),
+              const SizedBox(width: 12),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Sign in with Google',
+                      style: TextStyle(
+                        fontSize: 15, fontWeight: FontWeight.w600,
+                        color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
+                      )),
+                  const Text('Coming soon',
+                      style: TextStyle(
+                        fontSize: 11, color: AppColors.textSecondary, fontFamily: 'Inter',
+                      )),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );

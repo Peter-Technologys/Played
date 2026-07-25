@@ -587,7 +587,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                     Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(
                       icon: Icons.settings_rounded,
-                      label: 'App Settings',
+                      label: 'Settings',
                       subtitle: 'Playback, storage, display & more',
                       color: AppColors.accentGreen,
                       onTap: () => context.push('/settings'),
