@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../core/services/phone_state_service.dart';
 
 enum AppThemeMode { dark, amoled, light }
 
@@ -188,7 +189,10 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   void setLanguage(String v)              => _update(state.copyWith(language: v));
   void setPlaybackSpeed(double v)         => _update(state.copyWith(playbackSpeed: v));
   void setAutoPip(bool v)                 => _update(state.copyWith(autoPip: v));
-  void setPauseDuringCalls(bool v)        => _update(state.copyWith(pauseDuringCalls: v));
+  void setPauseDuringCalls(bool v) {
+    _update(state.copyWith(pauseDuringCalls: v));
+    PhoneStateService.instance.setPauseDuringCalls(v);
+  }
   void setAutoLoadSubtitles(bool v)       => _update(state.copyWith(autoLoadSubtitles: v));
   void setSearchHistory(bool v)           => _update(state.copyWith(searchHistory: v));
   void setOrientationLocked(bool v)       => _update(state.copyWith(orientationLocked: v));

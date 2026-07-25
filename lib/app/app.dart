@@ -11,6 +11,7 @@ import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/widgets/update_dialog.dart';
 import '../core/services/custom_theme_manager.dart';
+import '../core/services/fcm_service.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/widgets/announcement_dialog.dart';
 
@@ -31,6 +32,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     _checkOnboarding();
     CustomThemeManager.instance.load();
     _applyOverlayStyle(isDark: true);
+    // Wire the GoRouter's navigator key into FcmService so that foreground
+    // FCM messages can show in-app SnackBars via navigatorKey.currentContext.
+    FcmService.instance.navigatorKey = AppRouter.navigatorKey;
     // Init remote theme — loads cache instantly, fetches update in background
     ThemeProvider.instance.initTheme();
     SchedulerBinding.instance.addPostFrameCallback((_) {

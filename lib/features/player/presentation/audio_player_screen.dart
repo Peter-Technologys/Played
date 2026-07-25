@@ -14,6 +14,7 @@ import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';
+import '../../../core/services/album_art_service.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -758,43 +759,77 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
 // ── Album Art ──────────────────────────────────────────────────
 
-class _AlbumArt extends StatelessWidget {
+/// Displays album art for the currently playing audio track.
+///
+/// Handles `albumid:NNNN` paths by resolving them to real file-system paths
+/// via [AlbumArtService] (which calls the `getAlbumArt` method on the
+/// `com.otyaplayer.app/media_store` MethodChannel). While the resolution is
+/// in progress the placeholder gradient is shown; once resolved the image is
+/// displayed (or the placeholder if resolution failed).
+class _AlbumArt extends StatefulWidget {
   final String? albumArtPath;
   final bool isPlaying;
   const _AlbumArt({this.albumArtPath, required this.isPlaying});
 
   @override
+  State<_AlbumArt> createState() => _AlbumArtState();
+}
+
+class _AlbumArtState extends State<_AlbumArt> {
+  String? _resolvedPath;
+  bool _loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_AlbumArt old) {
+    super.didUpdateWidget(old);
+    if (old.albumArtPath != widget.albumArtPath) _resolve();
+  }
+
+  Future<void> _resolve() async {
+    // Mark as loading so we show the placeholder while resolving.
+    if (mounted) setState(() => _loading = true);
+    final path = await AlbumArtService.instance.resolve(widget.albumArtPath);
+    if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final showArt = !_loading && _resolvedPath != null;
+
     return AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
       transform: Matrix4.diagonal3Values(
-          isPlaying ? 1.0 : 0.88,
-          isPlaying ? 1.0 : 0.88,
+          widget.isPlaying ? 1.0 : 0.88,
+          widget.isPlaying ? 1.0 : 0.88,
           1.0),
       transformAlignment: Alignment.center,
-      // AnimatedScale delegates the transform to the compositor so the
-      // easing curve is applied correctly without a Dart-side rebuild per frame.
-      // Wrapping AnimatedContainer so shadow also animates.
+      // AnimatedContainer so the glow shadow also animates with play state.
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
         boxShadow: [
           BoxShadow(
-            color: AppColors.accent.withValues(alpha: isPlaying ? 0.35 : 0.1),
-            blurRadius: isPlaying ? 48 : 16,
-            spreadRadius: isPlaying ? 6 : 0,
+            color: AppColors.accent.withValues(alpha: widget.isPlaying ? 0.35 : 0.1),
+            blurRadius: widget.isPlaying ? 48 : 16,
+            spreadRadius: widget.isPlaying ? 6 : 0,
           ),
           BoxShadow(
-            color: AppColors.accentViolet.withValues(alpha: isPlaying ? 0.20 : 0.05),
-            blurRadius: isPlaying ? 64 : 20,
-            spreadRadius: isPlaying ? 8 : 0,
+            color: AppColors.accentViolet.withValues(alpha: widget.isPlaying ? 0.20 : 0.05),
+            blurRadius: widget.isPlaying ? 64 : 20,
+            spreadRadius: widget.isPlaying ? 8 : 0,
           ),
         ],
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: albumArtPath != null && !albumArtPath!.startsWith('albumid:')
-            ? Image.file(File(albumArtPath!),
+        child: showArt
+            ? Image.file(File(_resolvedPath!),
                 fit: BoxFit.cover, width: double.infinity)
             : Container(
                 decoration: BoxDecoration(
@@ -811,7 +846,7 @@ class _AlbumArt extends StatelessWidget {
                   child: Icon(
                     Icons.music_note_rounded,
                     color: AppColors.accent.withValues(
-                        alpha: isPlaying ? 0.9 : 0.5),
+                        alpha: widget.isPlaying ? 0.9 : 0.5),
                     size: 80,
                   ),
                 ),

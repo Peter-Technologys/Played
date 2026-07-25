@@ -42,7 +42,14 @@ class _VideoGestureLayerState extends State<VideoGestureLayer> {
   Future<void> _readInitialValues() async {
     try {
       final b = await _brightnessChannel.invokeMethod<double>('getBrightness');
-      if (b != null) _brightnessNotifier.value = b.clamp(0.0, 1.0);
+      if (b != null) {
+        // window.attributes.screenBrightness returns -1.0 when the system
+        // default brightness is in use (i.e. the app has not yet set a custom
+        // value). Clamping -1.0 to [0, 1] would yield 0.0, making the
+        // brightness indicator show 0% even though the screen is at full
+        // brightness. Treat any negative value as 0.5 (system default proxy).
+        _brightnessNotifier.value = b < 0 ? 0.5 : b.clamp(0.0, 1.0);
+      }
     } catch (_) {}
     try {
       final v = await _volumeChannel.invokeMethod<double>('getVolume');

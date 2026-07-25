@@ -66,7 +66,13 @@ CustomTransitionPage<void> _slideUpPage({
     );
 
 class AppRouter {
+  /// Shared navigator key — exposed so [FcmService] can obtain a [BuildContext]
+  /// for showing in-app SnackBars from foreground FCM messages.
+  static final GlobalKey<NavigatorState> navigatorKey =
+      GlobalKey<NavigatorState>();
+
   static final GoRouter router = GoRouter(
+    navigatorKey: navigatorKey,
     initialLocation: '/',
     routes: [
       ShellRoute(

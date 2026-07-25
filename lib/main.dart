@@ -8,8 +8,12 @@ import 'package:workmanager/workmanager.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/cloudflare_service.dart';
+import 'core/services/device_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/media_notification_service.dart';
+import 'core/services/phone_state_service.dart';
+import 'core/services/pip_service.dart';
+import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/storage_folder_service.dart';
@@ -73,7 +77,7 @@ void main() async {
       ),
     );
 
-    unawaited(_initBackground());
+    unawaited(_initBackground(savedSettings));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
     if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
@@ -147,15 +151,35 @@ Future<void> _initDatabase() async {
   }
 }
 
-Future<void> _initBackground() async {
+Future<void> _initBackground(AppSettings savedSettings) async {
   await Future.wait([
     _initNotifications(),
     _initWorkManager(),
     StorageFolderService.instance.ensureCreated(),
   ]);
 
-  unawaited(UpdateService.instance.registerDevice());
+  // BUG 10: Replace UpdateService.registerDevice() (which sends incomplete
+  // device info and causes double-registration) with DeviceService, which
+  // includes model, Android version, locale, and only re-registers when the
+  // build number changes.
+  unawaited(DeviceService.instance.registerIfNeeded());
   unawaited(UpdateService.instance.checkAndNotify());
+
+  // BUG 1: Register the PiP channel handler so MainActivity.kt's
+  // onPause()/onResume() calls to invokeMethod('playerPause') and
+  // invokeMethod('playerResume') are forwarded to the active media_kit Player.
+  PipService.listenForNativePause(
+    () => PlaybackCoordinator.instance.activePlayer?.pause(),
+    () => PlaybackCoordinator.instance.activePlayer?.play(),
+  );
+
+  // BUG 2: Apply the persisted pauseDuringCalls setting on startup so Kotlin
+  // registers (or skips) the TelephonyManager listener immediately, rather
+  // than waiting for the user to open Settings and toggle the switch.
+  unawaited(
+    PhoneStateService.instance.setPauseDuringCalls(savedSettings.pauseDuringCalls),
+  );
+
   // FcmService handles FCM token retrieval, persistence, and backend
   // registration — replaces the old manual _registerPushToken() call.
   unawaited(FcmService.instance.init());
