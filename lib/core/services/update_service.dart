@@ -4,7 +4,6 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:uuid/uuid.dart';
 import '../config/environment.dart';
 import '../config/flavor_config.dart';
 import 'api_signer.dart';
@@ -18,10 +17,8 @@ class UpdateService {
 
   static const String _prefLastCheck   = 'update_last_check';
   static const String _prefSkippedCode = 'update_skipped_code';
-  static const String _prefDeviceId    = 'update_device_id';
 
-  bool _checkInProgress    = false;
-  bool _registerInProgress = false;
+  bool _checkInProgress = false;
 
   String get downloadUrl => Environment.downloadUrl;
 
@@ -124,64 +121,9 @@ class UpdateService {
     await prefs.setInt(_prefSkippedCode, versionCode);
   }
 
-  Future<void> registerDevice() async {
-    if (_registerInProgress) return;
-    _registerInProgress = true;
-    try {
-      await _doRegisterDevice();
-    } finally {
-      _registerInProgress = false;
-    }
-  }
-
-  Future<void> _doRegisterDevice() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      String? deviceId = prefs.getString(_prefDeviceId);
-      if (deviceId == null) {
-        deviceId = const Uuid().v4();
-        await prefs.setString(_prefDeviceId, deviceId);
-      }
-
-      final packageInfo   = await PackageInfo.fromPlatform();
-      final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
-      final abi           = _detectAbi();
-
-      // POST to Worker /api/device (HMAC-authenticated)
-      const path = '/api/device';
-      final headers = {
-        ...ApiSigner.signedHeaders(
-          method: 'POST',
-          path: path,
-          deviceId: deviceId,
-        ),
-        'Content-Type': 'application/json',
-      };
-
-      final res = await http.post(
-        Uri.parse(Environment.apiDeviceUrl),
-        headers: headers,
-        body: jsonEncode({
-          'device_id':       deviceId,
-          'app_version':     packageInfo.version,
-          'app_build':       installedCode,
-          'arch':            abi,
-          'platform':        'android',
-          'android_version': '',
-          'model':           '',
-          'locale':          '',
-        }),
-      ).timeout(const Duration(seconds: 8));
-
-      if (res.statusCode == 200) {
-        debugPrint('[UpdateService] Device registered: $deviceId');
-      } else {
-        debugPrint('[UpdateService] registerDevice returned ${res.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('[UpdateService] registerDevice failed (non-fatal): $e');
-    }
-  }
+  // registerDevice() was removed — use DeviceService.instance.registerIfNeeded()
+  // which sends the full device payload (model, android_version, locale) using
+  // device_info_plus. UpdateService no longer handles device registration.
 
   String _detectAbi() {
     try {

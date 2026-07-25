@@ -298,7 +298,10 @@ class OtyaService {
   // ───────────────────────────────────────────────────────────────────────────
   // 3. registerDevicePushToken
   //
-  // POSTs { deviceId, fcmToken } to /register-device.
+  // POSTs { device_id, fcm_token } to /api/device (snake_case, same as
+  // DeviceService) so the FCM token is always stored on the canonical row.
+  // The legacy /register-device endpoint used camelCase keys which silently
+  // missed the ON CONFLICT update when field names didn't match.
   // Non-blocking — failures are logged but never surfaced to the user.
   // ───────────────────────────────────────────────────────────────────────────
   Future<void> registerDevicePushToken({
@@ -306,22 +309,23 @@ class OtyaService {
     required String fcmToken,
   }) async {
     try {
-      final registerUri = Uri.parse(_registerUrl);
+      const path = '/api/device';
+      final deviceUri = Uri.parse('${Environment.workerUrl}$path');
       final registerHeaders = {
         ...ApiSigner.signedHeaders(
           method: 'POST',
-          path: registerUri.path,
+          path: path,
           deviceId: deviceId,
         ),
         'Content-Type': 'application/json',
       };
       final response = await http
           .post(
-            registerUri,
+            deviceUri,
             headers: registerHeaders,
             body: jsonEncode({
-              'deviceId': deviceId,
-              'fcmToken': fcmToken,
+              'device_id': deviceId,
+              'fcm_token': fcmToken,
             }),
           )
           .timeout(const Duration(seconds: 10));
