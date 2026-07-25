@@ -2,8 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:shimmer/shimmer.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/providers/remote_themes_provider.dart';
+import '../../../core/providers/theme_provider.dart';
 import '../../../core/services/custom_theme_manager.dart';
 import '../settings_provider.dart';
 
@@ -68,7 +71,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          // ── THEME CARDS (2-column, aspect ratio ~0.72) ───────────
+          // ── LOCAL THEME CARDS (2-column, aspect ratio ~0.72) ─────
           _SectionHeader(label: 'Colour Theme'),
           const SizedBox(height: 12),
           GridView.count(
@@ -123,58 +126,17 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
                   sn.setThemeMode(AppThemeMode.amoled);
                 },
               ),
-
-              // VIP Festive — Ramadan
-              _VipPresetCard(
-                name: 'Ramadan 2025',
-                gradientColors: const [Color(0xFF1A0A2E), Color(0xFF4A1A6E)],
-                icon: Icons.nightlight_round,
-                iconColor: const Color(0xFFFFD700),
-                onTap: () => _showVipSnackBar(context),
-              ),
-
-              // VIP Festive — Diwali
-              _VipPresetCard(
-                name: 'Happy Diwali',
-                gradientColors: const [Color(0xFF2D1B00), Color(0xFF8B4500)],
-                icon: Icons.local_fire_department_rounded,
-                iconColor: const Color(0xFFFF6B00),
-                onTap: () => _showVipSnackBar(context),
-              ),
-
-              // VIP Festive — Christmas
-              _VipPresetCard(
-                name: 'Christmas',
-                gradientColors: const [Color(0xFF0A2A0A), Color(0xFF1A5C1A)],
-                icon: Icons.ac_unit_rounded,
-                iconColor: Colors.white,
-                onTap: () => _showVipSnackBar(context),
-              ),
-
-              // VIP Festive — New Year
-              _VipPresetCard(
-                name: 'New Year',
-                gradientColors: const [Color(0xFF0A0A2A), Color(0xFF1A1A6E)],
-                icon: Icons.celebration_rounded,
-                iconColor: AppColors.accent,
-                onTap: () => _showVipSnackBar(context),
-              ),
             ],
           ),
-        ],
-      ),
-    );
-  }
 
-  void _showVipSnackBar(BuildContext context) {
-    HapticFeedback.selectionClick();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'VIP themes coming soon',
-          style: TextStyle(fontFamily: 'Inter'),
-        ),
-        behavior: SnackBarBehavior.floating,
+          // ── SERVER THEMES ─────────────────────────────────────────
+          const SizedBox(height: 24),
+          _SectionHeader(label: 'Server Themes'),
+          const SizedBox(height: 12),
+          _ServerThemesSection(
+            onThemeApplied: () => setState(() {}),
+          ),
+        ],
       ),
     );
   }
@@ -421,31 +383,251 @@ class _CustomizeWallpaperCard extends StatelessWidget {
   }
 }
 
-// ── VIP Preset Card ───────────────────────────────────────────────────
+// ── Server Themes Section ─────────────────────────────────────────────
 
-class _VipPresetCard extends StatelessWidget {
-  final String name;
-  final List<Color> gradientColors;
-  final IconData icon;
-  final Color iconColor;
-  final VoidCallback onTap;
+/// Watches [remoteThemesProvider] and renders loading / error / data states.
+class _ServerThemesSection extends ConsumerWidget {
+  /// Called after a theme is applied so the parent can call setState.
+  final VoidCallback onThemeApplied;
 
-  const _VipPresetCard({
-    required this.name,
-    required this.gradientColors,
-    required this.icon,
-    required this.iconColor,
-    required this.onTap,
-  });
+  const _ServerThemesSection({required this.onThemeApplied});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final themesAsync = ref.watch(remoteThemesProvider);
+
+    return themesAsync.when(
+      loading: () => _ShimmerGrid(),
+      error: (_, __) => _ErrorTile(
+        onRetry: () => ref.read(remoteThemesProvider.notifier).refresh(),
+      ),
+      data: (themes) {
+        if (themes.isEmpty) {
+          return const Padding(
+            padding: EdgeInsets.symmetric(vertical: 16),
+            child: Center(
+              child: Text(
+                'No server themes available',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          );
+        }
+        return GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            childAspectRatio: 0.72,
+          ),
+          itemCount: themes.length,
+          itemBuilder: (context, i) => _RemoteThemeCard(
+            theme: themes[i],
+            onApplied: onThemeApplied,
+          ),
+        );
+      },
+    );
+  }
+}
+
+// ── Shimmer placeholder grid ──────────────────────────────────────────
+
+class _ShimmerGrid extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Shimmer.fromColors(
+      baseColor: AppColors.surface,
+      highlightColor: const Color(0xFF2A2F45),
+      child: GridView.count(
+        crossAxisCount: 2,
+        crossAxisSpacing: 12,
+        mainAxisSpacing: 12,
+        childAspectRatio: 0.72,
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        children: List.generate(
+          2,
+          (_) => Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Error tile ────────────────────────────────────────────────────────
+
+class _ErrorTile extends StatelessWidget {
+  final VoidCallback onRetry;
+  const _ErrorTile({required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_rounded,
+              color: AppColors.textSecondary, size: 20),
+          const SizedBox(width: 10),
+          const Expanded(
+            child: Text(
+              'Could not load server themes',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppColors.textSecondary,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+          GestureDetector(
+            onTap: onRetry,
+            child: Container(
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                    color: AppColors.accent.withValues(alpha: 0.4)),
+              ),
+              child: const Text(
+                'Retry',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.accent,
+                  fontFamily: 'Inter',
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+// ── Remote Theme Card ─────────────────────────────────────────────────
+
+class _RemoteThemeCard extends StatelessWidget {
+  final RemoteTheme theme;
+  final VoidCallback onApplied;
+
+  const _RemoteThemeCard({required this.theme, required this.onApplied});
+
+  /// Converts a snake_case theme id to Title Case display name.
+  /// e.g. `new_year` → `New Year`, `uganda_independence` → `Uganda Independence`
+  static String _formatName(String id) {
+    return id
+        .split('_')
+        .map((w) => w.isEmpty
+            ? w
+            : '${w[0].toUpperCase()}${w.substring(1).toLowerCase()}')
+        .join(' ');
+  }
+
+  /// Returns gradient colors based on the theme id.
+  static List<Color> _gradientFor(String id) {
+    final lower = id.toLowerCase();
+    if (lower == 'space' || lower == 'default') {
+      return const [Color(0xFF0D0D2B), Color(0xFF1A1A4E)];
+    }
+    if (lower.contains('new_year') || lower == 'newyear') {
+      return const [Color(0xFF0A0A2A), Color(0xFF1A1A6E)];
+    }
+    if (lower.contains('christmas') || lower.contains('xmas')) {
+      return const [Color(0xFF0A2A0A), Color(0xFF1A5C1A)];
+    }
+    if (lower.contains('uganda') || lower.contains('independence')) {
+      return const [Color(0xFF1A2A00), Color(0xFF3A5A00)];
+    }
+    return const [Color(0xFF1B232A), Color(0xFF0F111A)];
+  }
+
+  /// Returns the icon for the theme id.
+  static IconData _iconFor(String id) {
+    final lower = id.toLowerCase();
+    if (lower == 'space' || lower == 'default') return Icons.star_rounded;
+    if (lower.contains('new_year') || lower == 'newyear') {
+      return Icons.celebration_rounded;
+    }
+    if (lower.contains('christmas') || lower.contains('xmas')) {
+      return Icons.ac_unit_rounded;
+    }
+    if (lower.contains('uganda') || lower.contains('independence')) {
+      return Icons.flag_rounded;
+    }
+    return Icons.palette_rounded;
+  }
+
+  /// Returns the icon color for the theme id.
+  static Color _iconColorFor(String id) {
+    final lower = id.toLowerCase();
+    if (lower.contains('uganda') || lower.contains('independence')) {
+      return const Color(0xFFFCDC04);
+    }
+    return Colors.white;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isSelected =
+        ThemeProvider.instance.selectedThemeId == theme.id;
+    final displayName = _formatName(theme.id);
+    final gradientColors = _gradientFor(theme.id);
+    final icon = _iconFor(theme.id);
+    final iconColor = _iconColorFor(theme.id);
+
     return GestureDetector(
-      onTap: onTap,
-      child: Container(
+      onTap: () async {
+        HapticFeedback.selectionClick();
+        await ThemeProvider.instance.applyRemoteTheme(theme.id);
+        onApplied();
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                '$displayName theme applied',
+                style: const TextStyle(fontFamily: 'Inter'),
+              ),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
+      },
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.border, width: 1),
+          border: isSelected
+              ? Border.all(color: const Color(0xFF00D2FF), width: 2)
+              : Border.all(color: AppColors.border, width: 1),
+          boxShadow: isSelected
+              ? [
+                  BoxShadow(
+                    color: const Color(0xFF00D2FF).withValues(alpha: 0.35),
+                    blurRadius: 16,
+                    spreadRadius: 1,
+                  ),
+                ]
+              : null,
         ),
         child: ClipRRect(
           borderRadius: BorderRadius.circular(15),
@@ -472,7 +654,7 @@ class _VipPresetCard extends StatelessWidget {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 8),
                     child: Text(
-                      name,
+                      displayName,
                       textAlign: TextAlign.center,
                       style: const TextStyle(
                         fontSize: 11,
@@ -485,21 +667,21 @@ class _VipPresetCard extends StatelessWidget {
                 ],
               ),
 
-              // VIP badge — top-left
+              // SERVER badge — top-left
               Positioned(
                 top: 8,
                 left: 8,
                 child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 6, vertical: 2),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFD700),
+                    color: AppColors.accent,
                     borderRadius: BorderRadius.circular(4),
                   ),
                   child: const Text(
-                    'VIP',
+                    'SERVER',
                     style: TextStyle(
-                      fontSize: 9,
+                      fontSize: 8,
                       fontWeight: FontWeight.w800,
                       color: Colors.black,
                       fontFamily: 'Inter',
@@ -507,6 +689,26 @@ class _VipPresetCard extends StatelessWidget {
                   ),
                 ),
               ),
+
+              // Selected checkmark badge — bottom-right
+              if (isSelected)
+                Positioned(
+                  bottom: 6,
+                  right: 6,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      color: Color(0xFF00D2FF),
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Icon(
+                      Icons.check_rounded,
+                      color: Colors.black,
+                      size: 13,
+                    ),
+                  ),
+                ),
             ],
           ),
         ),

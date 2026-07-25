@@ -24,9 +24,10 @@ import '../services/api_signer.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 class ThemeProvider extends ChangeNotifier {
   // ── SharedPreferences keys ────────────────────────────────────────────────
-  static const String _kThemeCache = 'otya_cached_theme_v2';
-  static const String _kEtag       = 'otya_theme_etag_v2';
+  static const String _kThemeCache        = 'otya_cached_theme_v2';
+  static const String _kEtag              = 'otya_theme_etag_v2';
   static const String _kSeenAnnouncements = 'otya_seen_announcements';
+  static const String _kSelectedThemeId   = 'otya_selected_theme_id';
 
   // ── Singleton ─────────────────────────────────────────────────────────────
   ThemeProvider._();
@@ -35,12 +36,17 @@ class ThemeProvider extends ChangeNotifier {
   // ── State ─────────────────────────────────────────────────────────────────
   Map<String, dynamic>? _themeData;
   bool _fetchInProgress = false;
+  String? _selectedThemeId;
 
   /// Raw theme map — useful for reading custom fields not exposed as getters.
   Map<String, dynamic>? get rawTheme => _themeData;
 
   /// True when a remote theme has been loaded (cached or fresh).
   bool get hasTheme => _themeData != null;
+
+  /// The ID of the currently selected remote server theme, or null if a local
+  /// theme (Dark / Light / AMOLED / Custom Wallpaper) is active.
+  String? get selectedThemeId => _selectedThemeId;
 
   // ── Announcement ──────────────────────────────────────────────────────────
 
@@ -86,6 +92,11 @@ class ThemeProvider extends ChangeNotifier {
   /// Loads cache instantly, then fetches remote update in the background.
   Future<void> initTheme() async {
     await _loadFromCache();
+    // Restore the previously selected remote theme ID (if any).
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      _selectedThemeId = prefs.getString(_kSelectedThemeId);
+    } catch (_) {}
     // Fire-and-forget — never blocks startup
     fetchRemoteTheme().ignore();
   }
@@ -168,6 +179,49 @@ class ThemeProvider extends ChangeNotifier {
     }
 
     debugPrint('[ThemeProvider] Unexpected status ${response.statusCode}.');
+  }
+
+  // ── Apply a specific remote theme by ID ───────────────────────────────────
+
+  /// Fetches `GET /api/theme?id=<themeId>`, applies it, and persists it.
+  /// Also stores the selected theme ID so the selection indicator survives
+  /// app restarts.
+  Future<void> applyRemoteTheme(String themeId) async {
+    try {
+      final uri = Uri.parse('${Environment.workerUrl}/api/theme?id=$themeId');
+      final headers = ApiSigner.signedHeaders(
+        method: 'GET',
+        path: '/api/theme',
+      );
+      final response = await http
+          .get(uri, headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        Map<String, dynamic> parsed;
+        try {
+          parsed = jsonDecode(response.body) as Map<String, dynamic>;
+        } catch (_) {
+          debugPrint('[ThemeProvider] applyRemoteTheme: invalid JSON');
+          return;
+        }
+
+        _themeData = parsed;
+        _selectedThemeId = themeId;
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString(_kThemeCache, response.body);
+        await prefs.setString(_kSelectedThemeId, themeId);
+
+        notifyListeners();
+        debugPrint('[ThemeProvider] Remote theme applied: $themeId');
+      } else {
+        debugPrint(
+            '[ThemeProvider] applyRemoteTheme: status ${response.statusCode}');
+      }
+    } catch (e) {
+      debugPrint('[ThemeProvider] applyRemoteTheme error: $e');
+    }
   }
 
   // ── ThemeData builder ─────────────────────────────────────────────────────
