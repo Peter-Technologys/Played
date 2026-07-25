@@ -35,8 +35,8 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters)
         private const val CHANNEL_ID       = "com.otyaplayer.app.updates"
         private const val CHANNEL_NAME     = "Updates"
         private const val NOTIFICATION_ID  = 9001
-        private const val VERSION_URL      = "https://getotya.petersmartlink.com/version"
-        private const val DOWNLOAD_URL     = "https://getotya.petersmartlink.com/download"
+        private const val VERSION_URL      = "https://petersmartlink.com/check-update"
+        private const val DOWNLOAD_URL     = "https://petersmartlink.com/download/otya-player"
         private const val PREF_NAME        = "otya_update_prefs"
         private const val PREF_SKIPPED     = "skipped_version_code"
 
