@@ -1,6 +1,8 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
 import '../database/played_database.dart';
 import '../models/playlist.dart';
@@ -20,6 +22,37 @@ class CloudflareService {
   // Single reusable HTTP client — avoids TCP setup overhead on every call.
   static final http.Client _client = http.Client();
 
+  // SharedPreferences key: stores the userId of a backup that was skipped
+  // because the device was offline. Flushed on the next successful online sync.
+  static const String _kPendingBackupUserId = 'otya_pending_backup_user_id';
+
+  /// Stores userId so the next online sync picks up what was missed offline.
+  Future<void> _queuePendingBackup(String userId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kPendingBackupUserId, userId);
+      debugPrint('[Cloudflare] Queued pending backup for $userId.');
+    } catch (e) {
+      debugPrint('[Cloudflare] _queuePendingBackup failed: $e');
+    }
+  }
+
+  /// If a backup was queued while offline, run it now (device is online).
+  Future<void> _flushPendingBackup() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final userId = prefs.getString(_kPendingBackupUserId);
+      if (userId == null) return;
+      await prefs.remove(_kPendingBackupUserId);
+      debugPrint('[Cloudflare] Flushing pending backup for $userId.');
+      // Key already removed above, so recursive calls to _flushPendingBackup
+      // from backupAll → backupPlaylists/backupHistory will be no-ops.
+      await backupAll(userId);
+    } catch (e) {
+      debugPrint('[Cloudflare] _flushPendingBackup failed: $e');
+    }
+  }
+
   /// Disposes the shared HTTP client. Call only on app shutdown.
   static void dispose() => _client.close();
 
@@ -37,9 +70,12 @@ class CloudflareService {
 
   Future<void> backupPlaylists(String userId) async {
     if (!await isOnline()) {
-      debugPrint('[Cloudflare] backupPlaylists: offline, skipping.');
+      debugPrint('[Cloudflare] backupPlaylists: offline — queuing for later.');
+      await _queuePendingBackup(userId);
       return;
     }
+    // Flush any backup that was missed while the device was last offline.
+    unawaited(_flushPendingBackup());
     final playlists = PlayedDatabase.instance.getAllPlaylists();
     int synced = 0;
     const batchSize = 5;
@@ -109,9 +145,11 @@ class CloudflareService {
 
   Future<void> backupHistory(String userId) async {
     if (!await isOnline()) {
-      debugPrint('[Cloudflare] backupHistory: offline, skipping.');
+      debugPrint('[Cloudflare] backupHistory: offline — queuing for later.');
+      await _queuePendingBackup(userId);
       return;
     }
+    unawaited(_flushPendingBackup());
     final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200);
     int synced = 0;
     const batchSize = 10;

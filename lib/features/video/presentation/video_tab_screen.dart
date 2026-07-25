@@ -510,7 +510,28 @@ class _VideoListItemState extends State<_VideoListItem> {
         setState(() => _thumbPath = path);
       }
     } catch (_) {
-      _VideoCardState._thumbCacheSet(key, null);
+      // Same retry logic as _VideoCardState: one deferred retry before giving up.
+      if (!_VideoCardState._retryKeys.contains(key)) {
+        _VideoCardState._retryKeys.add(key);
+        await Future.delayed(const Duration(seconds: 4));
+        if (!_disposed && mounted) {
+          try {
+            final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
+              'path': widget.item.filePath,
+              'id': widget.item.id,
+            });
+            _VideoCardState._thumbCacheSet(key, path);
+            if (!_disposed && mounted && path != null) {
+              setState(() => _thumbPath = path);
+            }
+          } catch (_) {
+            _VideoCardState._thumbCacheSet(key, null);
+          }
+        }
+        _VideoCardState._retryKeys.remove(key);
+      } else {
+        _VideoCardState._thumbCacheSet(key, null);
+      }
     }
   }
 
@@ -757,6 +778,10 @@ class _VideoCardState extends State<_VideoCard> {
   static final Map<String, String?> _thumbCache = {};
   static const _maxThumbCache = 200;
 
+  // Keys whose first thumbnail generation attempt failed.
+  // Used by _loadThumb to schedule one retry instead of caching null forever.
+  static final Set<String> _retryKeys = {};
+
   static void _thumbCacheSet(String key, String? value) {
     if (_thumbCache.length >= _maxThumbCache) {
       // LinkedHashMap preserves insertion order — evict the oldest entry.
@@ -796,7 +821,32 @@ class _VideoCardState extends State<_VideoCard> {
         setState(() => _thumbPath = path);
       }
     } catch (_) {
-      _thumbCacheSet(key, null);
+      // First failure: schedule one retry after 4 s instead of caching null
+      // permanently. Transient MediaStore / IO errors resolve on their own.
+      if (!_retryKeys.contains(key)) {
+        _retryKeys.add(key);
+        await Future.delayed(const Duration(seconds: 4));
+        if (!_disposed && mounted) await _retryThumb(key);
+        _retryKeys.remove(key);
+      } else {
+        // Retry also failed — give up and cache null so we stop retrying.
+        _thumbCacheSet(key, null);
+      }
+    }
+  }
+
+  Future<void> _retryThumb(String key) async {
+    try {
+      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
+        'path': widget.item.filePath,
+        'id': widget.item.id,
+      });
+      _thumbCacheSet(key, path);
+      if (!_disposed && mounted && path != null) {
+        setState(() => _thumbPath = path);
+      }
+    } catch (_) {
+      _thumbCacheSet(key, null); // Give up after one retry.
     }
   }
 

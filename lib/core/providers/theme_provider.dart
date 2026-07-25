@@ -186,42 +186,58 @@ class ThemeProvider extends ChangeNotifier {
   /// Fetches `GET /api/theme?id=<themeId>`, applies it, and persists it.
   /// Also stores the selected theme ID so the selection indicator survives
   /// app restarts.
+  /// Fetches and applies a specific remote theme by ID.
+  /// Retries up to 3 times with exponential back-off so a single timeout
+  /// (e.g. poor connectivity) does not permanently block the theme switch.
   Future<void> applyRemoteTheme(String themeId) async {
-    try {
-      final uri = Uri.parse('${Environment.workerUrl}/api/theme?id=$themeId');
-      final headers = ApiSigner.signedHeaders(
-        method: 'GET',
-        path: '/api/theme',
-      );
-      final response = await http
-          .get(uri, headers: headers)
-          .timeout(const Duration(seconds: 10));
+    const maxAttempts = 3;
+    for (int attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        final uri = Uri.parse('${Environment.workerUrl}/api/theme?id=$themeId');
+        final headers = ApiSigner.signedHeaders(
+          method: 'GET',
+          path: '/api/theme',
+        );
+        final response = await http
+            .get(uri, headers: headers)
+            .timeout(const Duration(seconds: 10));
 
-      if (response.statusCode == 200) {
-        Map<String, dynamic> parsed;
-        try {
-          parsed = jsonDecode(response.body) as Map<String, dynamic>;
-        } catch (_) {
-          debugPrint('[ThemeProvider] applyRemoteTheme: invalid JSON');
+        if (response.statusCode == 200) {
+          Map<String, dynamic> parsed;
+          try {
+            parsed = jsonDecode(response.body) as Map<String, dynamic>;
+          } catch (_) {
+            debugPrint('[ThemeProvider] applyRemoteTheme: invalid JSON');
+            return;
+          }
+
+          _themeData = parsed;
+          _selectedThemeId = themeId;
+
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_kThemeCache, response.body);
+          await prefs.setString(_kSelectedThemeId, themeId);
+
+          notifyListeners();
+          debugPrint('[ThemeProvider] Remote theme applied: $themeId');
           return;
         }
 
-        _themeData = parsed;
-        _selectedThemeId = themeId;
-
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setString(_kThemeCache, response.body);
-        await prefs.setString(_kSelectedThemeId, themeId);
-
-        notifyListeners();
-        debugPrint('[ThemeProvider] Remote theme applied: $themeId');
-      } else {
+        // Non-2xx is a server error — not worth retrying.
         debugPrint(
             '[ThemeProvider] applyRemoteTheme: status ${response.statusCode}');
+        return;
+      } catch (e) {
+        debugPrint(
+            '[ThemeProvider] applyRemoteTheme attempt $attempt/$maxAttempts failed: $e');
+        if (attempt < maxAttempts) {
+          // Exponential back-off: 2 s, 4 s.
+          await Future.delayed(Duration(seconds: attempt * 2));
+        }
       }
-    } catch (e) {
-      debugPrint('[ThemeProvider] applyRemoteTheme error: $e');
     }
+    debugPrint(
+        '[ThemeProvider] applyRemoteTheme: all $maxAttempts attempts exhausted for $themeId');
   }
 
   // ── ThemeData builder ─────────────────────────────────────────────────────

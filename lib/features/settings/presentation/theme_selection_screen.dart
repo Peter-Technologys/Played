@@ -126,6 +126,19 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
                   sn.setThemeMode(AppThemeMode.amoled);
                 },
               ),
+
+              // System / Auto — follows the Android device theme setting
+              _ThemeCard(
+                name: 'System Auto',
+                gradientColors: const [Color(0xFF2A2A3A), Color(0xFFE8EAF0)],
+                isSelected: settings.themeMode == AppThemeMode.system &&
+                    _wallpaperPath == null,
+                labelColor: Colors.white,
+                onTap: () {
+                  HapticFeedback.selectionClick();
+                  sn.setThemeMode(AppThemeMode.system);
+                },
+              ),
             ],
           ),
 

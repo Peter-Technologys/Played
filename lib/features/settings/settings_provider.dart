@@ -3,7 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../core/services/phone_state_service.dart';
 
-enum AppThemeMode { dark, amoled, light }
+/// Follow the OS setting automatically with [system].
+enum AppThemeMode { dark, amoled, light, system }
 
 class AppSettings {
   final AppThemeMode themeMode;

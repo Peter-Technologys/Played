@@ -78,7 +78,13 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final locale = ref.watch(localeProvider);
-    final isDark = settings.themeMode != AppThemeMode.light;
+    // For System mode, follow the actual platform brightness.
+    final platformBrightness =
+        SchedulerBinding.instance.platformDispatcher.platformBrightness;
+    final isDark = settings.themeMode == AppThemeMode.dark ||
+        settings.themeMode == AppThemeMode.amoled ||
+        (settings.themeMode == AppThemeMode.system &&
+            platformBrightness == Brightness.dark);
 
     // Update status-bar icon brightness whenever theme changes.
     ref.listen<AppSettings>(settingsProvider, (prev, next) {
@@ -165,6 +171,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             AppThemeMode.dark   => ThemeMode.dark,
             AppThemeMode.amoled => ThemeMode.dark,
             AppThemeMode.light  => ThemeMode.light,
+            AppThemeMode.system => ThemeMode.system,
           },
           locale: locale,
           supportedLocales: const [
