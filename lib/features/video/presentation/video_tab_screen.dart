@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
@@ -501,19 +500,6 @@ class _VideoListItemState extends State<_VideoListItem> {
       }
       return;
     }
-    // Check disk cache first
-    try {
-      final tmpDir = await getTemporaryDirectory();
-      final diskPath = '${tmpDir.path}/otya_thumbs/$key.jpg';
-      final diskFile = File(diskPath);
-      if (await diskFile.exists()) {
-        _VideoCardState._thumbCacheSet(key, diskPath);
-        if (!_disposed && mounted) {
-          setState(() => _thumbPath = diskPath);
-        }
-        return;
-      }
-    } catch (_) {}
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
@@ -522,14 +508,6 @@ class _VideoListItemState extends State<_VideoListItem> {
       _VideoCardState._thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
         setState(() => _thumbPath = path);
-        // Persist to disk cache for future fast loads
-        try {
-          final tmpDir = await getTemporaryDirectory();
-          final diskDir = Directory('${tmpDir.path}/otya_thumbs');
-          if (!await diskDir.exists()) await diskDir.create(recursive: true);
-          final diskPath = '${diskDir.path}/$key.jpg';
-          await File(path).copy(diskPath);
-        } catch (_) {}
       }
     } catch (_) {
       _VideoCardState._thumbCacheSet(key, null);
@@ -808,19 +786,6 @@ class _VideoCardState extends State<_VideoCard> {
       }
       return;
     }
-    // Check disk cache first
-    try {
-      final tmpDir = await getTemporaryDirectory();
-      final diskPath = '${tmpDir.path}/otya_thumbs/$key.jpg';
-      final diskFile = File(diskPath);
-      if (await diskFile.exists()) {
-        _thumbCacheSet(key, diskPath);
-        if (!_disposed && mounted) {
-          setState(() => _thumbPath = diskPath);
-        }
-        return;
-      }
-    } catch (_) {}
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
@@ -829,14 +794,6 @@ class _VideoCardState extends State<_VideoCard> {
       _thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
         setState(() => _thumbPath = path);
-        // Persist to disk cache for future fast loads
-        try {
-          final tmpDir = await getTemporaryDirectory();
-          final diskDir = Directory('${tmpDir.path}/otya_thumbs');
-          if (!await diskDir.exists()) await diskDir.create(recursive: true);
-          final diskPath = '${diskDir.path}/$key.jpg';
-          await File(path).copy(diskPath);
-        } catch (_) {}
       }
     } catch (_) {
       _thumbCacheSet(key, null);

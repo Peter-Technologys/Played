@@ -13,6 +13,7 @@ abstract class Environment {
   static const String apiProUrl         = '$workerUrl/api/pro';
   static const String apiFeedbackUrl    = '$workerUrl/api/feedback';
   static const String apiRatingsUrl     = '$workerUrl/api/ratings';
+  static const String apiThemesUrl      = '$workerUrl/api/themes';
 
   // ── Public version endpoints (no auth — used by update checker) ───────────
   static const String latestUrl         = '$workerUrl/latest';
