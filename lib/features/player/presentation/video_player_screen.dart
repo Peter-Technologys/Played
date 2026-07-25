@@ -66,6 +66,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _savedPosition =
         PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
         Duration.zero;
+    // Initialise _position from _savedPosition so the seek bar shows the
+    // correct position immediately, before the first stream event arrives.
+    _position = _savedPosition;
     WidgetsBinding.instance.addObserver(this);
     _initOrientationFromVideo();
     _initPip();
