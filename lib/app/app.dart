@@ -156,17 +156,31 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         ThemeProvider.instance,
       ]),
       builder: (context, _) {
-        // Use remote theme when available and user is in dark mode,
-        // otherwise fall back to the static AppTheme.
-        final remoteTheme = ThemeProvider.instance.hasTheme
+        // Use remote theme when available.
+        // If the remote theme declares is_dark_mode: false it goes into the
+        // light slot; otherwise it replaces the dark slot.
+        // This ensures the remote theme is actually applied regardless of
+        // whether the user has dark or light mode selected.
+        final remoteThemeData = ThemeProvider.instance.hasTheme
             ? ThemeProvider.instance.currentThemeData
             : null;
+        final remoteIsDark =
+            (ThemeProvider.instance.rawTheme?['is_dark_mode'] as bool?) ?? true;
+
+        final effectiveLightTheme =
+            (remoteThemeData != null && !remoteIsDark)
+                ? remoteThemeData
+                : AppTheme.light;
+        final effectiveDarkTheme =
+            (remoteThemeData != null && remoteIsDark)
+                ? remoteThemeData
+                : AppTheme.dark;
 
         return MaterialApp.router(
           title: 'OTYA Player',
           debugShowCheckedModeBanner: false,
-          theme:     AppTheme.light,
-          darkTheme: remoteTheme ?? AppTheme.dark,
+          theme:     effectiveLightTheme,
+          darkTheme: effectiveDarkTheme,
           themeMode: switch (settings.themeMode) {
             AppThemeMode.dark   => ThemeMode.dark,
             AppThemeMode.amoled => ThemeMode.dark,
