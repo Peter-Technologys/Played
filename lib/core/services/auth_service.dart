@@ -165,7 +165,17 @@ class AuthService {
 
   // ── Public getters ────────────────────────────────────────────────────────
 
+  /// Synchronous login check. May return false on cold start if
+  /// [_ensureLoaded] has not yet completed — use [checkIsLoggedIn] instead
+  /// when you cannot guarantee that loading has already happened.
   bool get isLoggedIn => _accessToken != null && _userId != null;
+
+  /// Async login check that awaits [_ensureLoaded] before reading state.
+  /// Prefer this over [isLoggedIn] on first access after a cold start.
+  Future<bool> checkIsLoggedIn() async {
+    await _ensureLoaded();
+    return _accessToken != null && _userId != null;
+  }
 
   String? get userId    => _userId;
   String? get userEmail => _userEmail;
