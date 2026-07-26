@@ -51,8 +51,8 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new_rounded,
-              color: AppColors.textPrimary, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () {
             HapticFeedback.selectionClick();
             Navigator.of(context).pop();

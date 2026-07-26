@@ -194,8 +194,9 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                               const SizedBox(height: 2),
                               Text(
                                 displayItem.artist ?? 'Unknown Artist',
-                                style: const TextStyle(
-                                    fontSize: 11, color: AppColors.textSecondary),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
@@ -211,10 +212,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                             // Pass resumeOnly: true so AudioPlayerScreen does NOT restart the track
                             context.push('/player/audio', extra: {'item': displayItem, 'resumeOnly': true});
                           },
-                          child: const Padding(
-                            padding: EdgeInsets.only(right: 4),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 4),
                             child: Icon(Icons.queue_music_rounded,
-                                color: AppColors.textSecondary, size: 18),
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), size: 18),
                           ),
                         ),
 
@@ -224,10 +225,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
                         // Close
                         GestureDetector(
                           onTap: _dismiss,
-                          child: const Padding(
-                            padding: EdgeInsets.only(right: 12),
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 12),
                             child: Icon(Icons.close_rounded,
-                                color: AppColors.textSecondary, size: 18),
+                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), size: 18),
                           ),
                         ),
                       ],
@@ -272,7 +273,7 @@ class _PlayPauseRing extends ConsumerWidget {
             CircularProgressIndicator(
               value: progress,
               strokeWidth: 2.5,
-              backgroundColor: AppColors.border,
+              backgroundColor: AppColors.borderOf(context),
               valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
             ),
             GestureDetector(
@@ -361,7 +362,7 @@ class _MiniSeekBarState extends ConsumerState<_MiniSeekBar> {
           height: _isDragging ? 4.0 : 2.5,
           child: LinearProgressIndicator(
             value: progress,
-            backgroundColor: AppColors.border,
+            backgroundColor: AppColors.borderOf(context),
             valueColor:
                 const AlwaysStoppedAnimation<Color>(AppColors.accent),
           ),
