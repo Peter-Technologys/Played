@@ -190,7 +190,16 @@ class AppRouter {
       GoRoute(
         path: '/video/folder',
         pageBuilder: (c, s) {
-          final args = s.extra as Map<String, dynamic>;
+          final args = s.extra as Map<String, dynamic>?;
+          if (args == null || args['name'] == null || args['items'] == null) {
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const Scaffold(
+                body: Center(child: Text('Navigation error: missing data')),
+              ),
+            );
+          }
           return _fadePage(
             context: c,
             state: s,
@@ -294,7 +303,16 @@ class AppRouter {
       GoRoute(
         path: '/music/folder',
         pageBuilder: (c, s) {
-          final args = (s.extra as Map<String, dynamic>?) ?? {};
+          final args = s.extra as Map<String, dynamic>?;
+          if (args == null || args['name'] == null || args['items'] == null) {
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const Scaffold(
+                body: Center(child: Text('Navigation error: missing data')),
+              ),
+            );
+          }
           return _fadePage(
             context: c,
             state: s,
@@ -308,7 +326,16 @@ class AppRouter {
       GoRoute(
         path: '/music/album',
         pageBuilder: (c, s) {
-          final args = (s.extra as Map<String, dynamic>?) ?? {};
+          final args = s.extra as Map<String, dynamic>?;
+          if (args == null || args['name'] == null || args['items'] == null) {
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const Scaffold(
+                body: Center(child: Text('Navigation error: missing data')),
+              ),
+            );
+          }
           return _fadePage(
             context: c,
             state: s,
@@ -322,7 +349,16 @@ class AppRouter {
       GoRoute(
         path: '/music/artist',
         pageBuilder: (c, s) {
-          final args = (s.extra as Map<String, dynamic>?) ?? {};
+          final args = s.extra as Map<String, dynamic>?;
+          if (args == null || args['name'] == null || args['items'] == null) {
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const Scaffold(
+                body: Center(child: Text('Navigation error: missing data')),
+              ),
+            );
+          }
           return _fadePage(
             context: c,
             state: s,

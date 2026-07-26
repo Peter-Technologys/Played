@@ -17,6 +17,7 @@ class AuthNotifier extends StateNotifier<_AuthState> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    // Use the same keys as AuthService so both systems stay in sync.
     state = _AuthState(
       userId:      prefs.getString('otya_user_id'),
       displayName: prefs.getString('otya_user_name'),
