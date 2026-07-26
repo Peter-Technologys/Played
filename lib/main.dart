@@ -17,6 +17,7 @@ import 'core/services/phone_state_service.dart';
 import 'core/services/pip_service.dart';
 import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
+import 'core/services/crash_reporter.dart';
 import 'core/services/fcm_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
@@ -199,6 +200,10 @@ Future<void> _initBackground(AppSettings savedSettings) async {
   // FcmService handles FCM token retrieval, persistence, and backend
   // registration — replaces the old manual _registerPushToken() call.
   unawaited(FcmService.instance.init());
+
+  // CrashReporter installs Flutter/platform error handlers and uploads any
+  // crashes that were stored while the device was offline.
+  unawaited(CrashReporter.instance.init());
 }
 
 Future<void> _initNotifications() async {

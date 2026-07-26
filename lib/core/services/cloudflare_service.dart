@@ -7,6 +7,7 @@ import '../config/environment.dart';
 import '../database/played_database.dart';
 import '../models/playlist.dart';
 import '../utils/connectivity_utils.dart';
+import 'ai_sync_service.dart';
 import 'api_signer.dart';
 
 /// CloudflareService — handles playlists, history, and pro status via
@@ -235,6 +236,8 @@ class CloudflareService {
         backupPlaylists(userId),
         backupHistory(userId),
       ]);
+      // Trigger AI sync now that we know the device is online (backup succeeded).
+      unawaited(AiSyncService.instance.syncOnlineIfNeeded(null));
       return true;
     } catch (e) {
       debugPrint('[Cloudflare] backupAll failed: $e');
