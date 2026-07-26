@@ -77,9 +77,11 @@ class FcmService {
 
   Future<void> init() async {
     if (_initialized) return;
-    _initialized = true;
 
-    if (!Platform.isAndroid) return;
+    if (!Platform.isAndroid) {
+      _initialized = true;
+      return;
+    }
 
     try {
       // 1. Request permission (Android 13+ / iOS).
@@ -97,9 +99,13 @@ class FcmService {
       // 5. Foreground message handler.
       FirebaseMessaging.onMessage.listen(_onForegroundMessage);
 
+      // Only mark initialized after everything succeeds so init() can be
+      // retried if a transient error occurs during setup.
+      _initialized = true;
       debugPrint('[FcmService] Initialized.');
     } catch (e) {
       debugPrint('[FcmService] init error (non-fatal): $e');
+      // Don't set _initialized = true on failure so init() can be retried.
     }
   }
 
