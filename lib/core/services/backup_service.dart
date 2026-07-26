@@ -6,8 +6,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'auth_service.dart';
-import '../database/played_database.dart';
-import '../models/playlist.dart';
+import 'http_client.dart';
 
 const _kAuthBase = 'https://petersmartlink.com/auth';
 
@@ -15,8 +14,10 @@ class BackupService {
   BackupService._();
   static final BackupService instance = BackupService._();
 
-  static final http.Client _client = http.Client();
-  static const Duration _timeout   = Duration(seconds: 30);
+  // Delegate to the app-wide singleton HTTP client — avoids duplicate
+  // persistent connections and lets AppHttpClient manage the lifecycle.
+  http.Client get _client => AppHttpClient.instance.client;
+  static const Duration _timeout = Duration(seconds: 30);
 
   Future<void> backup(Map<String, dynamic> data, String driveAccessToken) async {
     final token = await AuthService.instance.getValidToken();

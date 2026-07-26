@@ -98,11 +98,12 @@ class NotificationService {
     String? payload,
   }) async {
     const androidDetails = AndroidNotificationDetails(
-      'com.otyaplayer.app.tools.complete',
-      'OTYA Player Tools \u2014 Complete',
-      channelDescription: 'Audio extraction and video trim completion alerts',
+      'com.otyaplayer.app.tools.error',
+      'OTYA Player Tools \u2014 Error',
+      channelDescription: 'Audio extraction and video trim error alerts',
       importance: Importance.high,
       priority: Priority.high,
+      icon: '@drawable/ic_notification',
     );
     await sharedNotificationsPlugin.show(
       id,

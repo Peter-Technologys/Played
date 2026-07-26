@@ -82,22 +82,6 @@ class MediaScannerService {
   // Fix: channel name MUST match MainActivity.kt registration
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
 
-  static const List<String> _videoExtensions = [
-    'mp4', 'mkv', 'avi', 'mov', 'flv', 'ts', 'webm', 'wmv', '3gp', 'm4v',
-    'f4v', 'rm', 'rmvb', 'vob', 'divx', 'xvid',
-  ];
-
-  static const List<String> _audioExtensions = [
-    'mp3', 'aac', 'flac', 'wav', 'ogg', 'm4a', 'opus', 'wma', 'aiff',
-    'amr', 'mid', 'midi', 'ape', 'ac3', 'dts', 'mka',
-  ];
-
-  static const Set<String> _skipDirs = {
-    'Android', '.thumbnails', '.cache', 'cache', 'obb',
-    '.trash', 'lost+found', '.nomedia', 'tmp', 'temp',
-    'proc', 'sys', 'dev', // Linux virtual FS — skip on rooted devices
-  };
-
   static const List<String> _receiveDirs = [
     '/storage/emulated/0/Download',
     '/storage/emulated/0/Downloads',
@@ -211,8 +195,8 @@ class MediaScannerService {
         final path = entity.path;
         if (alreadySeen.contains(path)) continue;
         final ext = path.split('.').last.toLowerCase();
-        final isVideo = _videoExtensions.contains(ext);
-        final isAudio = _audioExtensions.contains(ext);
+        final isVideo = _kVideoExtensions.contains(ext);
+        final isAudio = _kAudioExtensions.contains(ext);
         if (!isVideo && !isAudio) continue;
         try {
           final stat = await entity.stat();
@@ -317,8 +301,8 @@ class MediaScannerService {
       await for (final entity in dir.list(followLinks: false)) {
         if (entity is! File) continue;
         final ext     = entity.path.split('.').last.toLowerCase();
-        final isVideo = _videoExtensions.contains(ext);
-        final isAudio = _audioExtensions.contains(ext);
+        final isVideo = _kVideoExtensions.contains(ext);
+        final isAudio = _kAudioExtensions.contains(ext);
         if (!isVideo && !isAudio) continue;
         try {
           final stat = await entity.stat();
