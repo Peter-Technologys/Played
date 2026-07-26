@@ -74,6 +74,11 @@ class AiSyncService {
   // ── Internal implementation ────────────────────────────────────────────────
 
   Future<void> _doSync(BuildContext? context, {bool force = false}) async {
+    // Capture messenger before any await — context may be invalid after async gaps.
+    final messenger = context != null && context.mounted
+        ? ScaffoldMessenger.of(context)
+        : null;
+
     final prefs = await SharedPreferences.getInstance();
 
     // Cooldown guard (also checked in syncOnlineIfNeeded, but syncOnline can
@@ -172,27 +177,27 @@ class AiSyncService {
 
     // ── Handle response actions ──────────────────────────────────────────────
 
-    if (!upToDate && context != null && context.mounted) {
+    if (!upToDate && messenger != null) {
       debugPrint('[AiSync] Update available — showing snackbar.');
       final label = latestVersion.isNotEmpty
           ? 'Update available: v$latestVersion'
           : 'Update available';
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         SnackBar(
           content: Text(label),
           duration: const Duration(seconds: 10),
           action: SnackBarAction(
             label: 'Update',
             onPressed: () =>
-                OtyaService.instance.checkAppUpdate(context, force: true),
+                OtyaService.instance.checkAppUpdate(context!, force: true),
           ),
         ),
       );
     }
 
-    if (welcomeBack == true && context != null && context.mounted) {
+    if (welcomeBack == true && messenger != null) {
       debugPrint('[AiSync] Welcome back — showing snackbar.');
-      ScaffoldMessenger.of(context).showSnackBar(
+      messenger.showSnackBar(
         const SnackBar(
           content: Text("Welcome back! Here's what's new."),
           duration: Duration(seconds: 4),

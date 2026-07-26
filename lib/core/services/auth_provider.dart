@@ -28,7 +28,6 @@ class AuthNotifier extends StateNotifier<_AuthState> {
 
   Future<void> signIn({required String userId, required String displayName, String? email, String? photoUrl}) async {
     final prefs = await SharedPreferences.getInstance();
-    // Use the same keys as AuthService so both systems stay in sync.
     await prefs.setString('otya_user_id', userId);
     await prefs.setString('otya_user_name', displayName);
     if (email != null) await prefs.setString('otya_user_email', email);
@@ -38,7 +37,6 @@ class AuthNotifier extends StateNotifier<_AuthState> {
 
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
-    // Use the same keys as AuthService so both systems stay in sync.
     await prefs.remove('otya_user_id');
     await prefs.remove('otya_user_name');
     await prefs.remove('otya_user_email');

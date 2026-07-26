@@ -19,7 +19,7 @@ class ProService {
 
   static const _kProExpiry = 'pro_expiry_ms';
   // userId stored by Google Sign-In flow; Cloudflare ignores empty string gracefully.
-  static const _kUserId = 'appwrite_user_id';
+  static const _kUserId = 'otya_user_id';
 
   int? _cachedExpiryMs;
   DateTime? _cacheTime;

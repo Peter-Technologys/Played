@@ -165,14 +165,11 @@ class AppSettings {
 
 // ── Notifier ──────────────────────────────────────────────────────────
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  SettingsNotifier(AppSettings initial) : super(initial) {
-    // Eagerly load from disk on construction so the provider always
-    // reflects persisted settings, even if loadSettingsForStartup() was
-    // not called before runApp().
-    AppSettings.load().then((s) {
-      if (mounted) state = s;
-    }).catchError((_) {});
-  }
+  // The `initial` value is already the fully-loaded AppSettings from
+  // loadSettingsForStartup() called in main() before runApp(). A second
+  // AppSettings.load() call here would redundantly hit SharedPreferences
+  // again on every cold start and could briefly overwrite in-flight state.
+  SettingsNotifier(AppSettings initial) : super(initial);
 
   Future<void> _update(AppSettings s) async {
     state = s;
