@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:ffi';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -126,13 +125,11 @@ class UpdateService {
   // device_info_plus. UpdateService no longer handles device registration.
 
   String _detectAbi() {
-    try {
-      final abi = Abi.current();
-      if (abi == Abi.androidArm64) return 'arm64';
-      if (abi == Abi.androidArm)   return 'arm32';
-      if (abi == Abi.androidX64)   return 'arm64';
-    } catch (_) {}
-    return 'arm64';
+    // Use the build-time dart-define (same approach as DeviceService) —
+    // more reliable than Abi.current() which can mis-detect on x86_64 emulators.
+    // Build with: flutter build apk --dart-define=APP_ARCH=arm64
+    const arch = String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
+    return arch;
   }
 }
 
