@@ -3,6 +3,7 @@ import 'package:flutter/material.dart' show WidgetsBinding;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../app/theme/app_colors.dart';
+import 'shared_notification_plugin.dart';
 import 'update_service.dart';
 
 /// Builds and shows high-priority update notifications.
@@ -22,20 +23,12 @@ class UpdateNotificationService {
   static const String _channelName     = 'Updates';
   static const String _channelDesc     = 'OTYA Player app update notifications';
 
-  final FlutterLocalNotificationsPlugin _plugin =
-      FlutterLocalNotificationsPlugin();
-
   bool _initialized = false;
   bool _showing     = false;
 
   Future<void> init() async {
     if (_initialized) return;
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
-    const settings = InitializationSettings(android: androidSettings);
-    await _plugin.initialize(
-      settings,
-      onDidReceiveNotificationResponse: _onNotificationTap,
-    );
+    await initSharedNotificationsPlugin();
     _initialized = true;
     debugPrint('[UpdateNotification] Initialized.');
   }
@@ -57,7 +50,7 @@ class UpdateNotificationService {
       channelDescription: _channelDesc,
       importance: Importance.high,
       priority: Priority.high,
-      icon: '@mipmap/ic_launcher',
+      icon: '@drawable/ic_notification',
       color: AppColors.accentViolet,
       styleInformation: BigTextStyleInformation(
         changelog,
@@ -82,7 +75,7 @@ class UpdateNotificationService {
       ticker: 'OTYA Player update available',
     );
 
-    await _plugin.show(
+    await sharedNotificationsPlugin.show(
       _notificationId,
       'OTYA Player Update Available',
       'Version ${info.version} — $changelog',
@@ -94,7 +87,7 @@ class UpdateNotificationService {
     debugPrint('[UpdateNotification] Shown for v${info.version}.');
   }
 
-  Future<void> dismiss() async => _plugin.cancel(_notificationId);
+  Future<void> dismiss() async => sharedNotificationsPlugin.cancel(_notificationId);
 
   /// Public entry-point called by [sharedNotificationRouter].
   void handleTap(NotificationResponse response) => _onNotificationTap(response);
