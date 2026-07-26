@@ -142,9 +142,9 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
             ],
           ),
 
-          // ── SERVER THEMES ─────────────────────────────────────────
+          // ── MORE THEMES ───────────────────────────────────────────
           const SizedBox(height: 24),
-          _SectionHeader(label: 'Server Themes'),
+          _SectionHeader(label: 'More Themes'),
           const SizedBox(height: 12),
           _ServerThemesSection(
             onThemeApplied: () => setState(() {}),
@@ -420,7 +420,7 @@ class _ServerThemesSection extends ConsumerWidget {
             padding: EdgeInsets.symmetric(vertical: 16),
             child: Center(
               child: Text(
-                'No server themes available',
+                'No themes available yet — check back soon.',
                 style: TextStyle(
                   color: AppColors.textSecondary,
                   fontSize: 13,
@@ -501,7 +501,7 @@ class _ErrorTile extends StatelessWidget {
           const SizedBox(width: 10),
           const Expanded(
             child: Text(
-              'Could not load server themes',
+              'Could not load themes — tap to retry',
               style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -678,29 +678,6 @@ class _RemoteThemeCard extends StatelessWidget {
                     ),
                   ),
                 ],
-              ),
-
-              // SERVER badge — top-left
-              Positioned(
-                top: 8,
-                left: 8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    'SERVER',
-                    style: TextStyle(
-                      fontSize: 8,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.black,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                ),
               ),
 
               // Selected checkmark badge — bottom-right

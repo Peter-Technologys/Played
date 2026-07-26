@@ -43,11 +43,16 @@ class CloudflareService {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString(_kPendingBackupUserId);
       if (userId == null) return;
-      await prefs.remove(_kPendingBackupUserId);
       debugPrint('[Cloudflare] Flushing pending backup for $userId.');
-      // Key already removed above, so recursive calls to _flushPendingBackup
-      // from backupAll → backupPlaylists/backupHistory will be no-ops.
-      await backupAll(userId);
+      // Remove the key ONLY after a successful backup so that a network
+      // failure during backupAll keeps the queue entry for the next retry.
+      final success = await backupAll(userId);
+      if (success) {
+        await prefs.remove(_kPendingBackupUserId);
+        debugPrint('[Cloudflare] Pending backup flushed successfully.');
+      } else {
+        debugPrint('[Cloudflare] backupAll returned false — retaining queued backup.');
+      }
     } catch (e) {
       debugPrint('[Cloudflare] _flushPendingBackup failed: $e');
     }

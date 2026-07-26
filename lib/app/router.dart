@@ -131,7 +131,7 @@ class AppRouter {
       GoRoute(
         path: '/tools/folder-detail',
         pageBuilder: (c, s) {
-          final args = s.extra as Map<String, dynamic>;
+          final args = (s.extra as Map<String, dynamic>?) ?? {};
           return _fadePage(
             context: c,
             state: s,
@@ -236,11 +236,15 @@ class AppRouter {
       // TASK 4: slide-up transition for full-screen player routes
       GoRoute(
         path: '/player/video',
-        pageBuilder: (c, s) => _slideUpPage(
-          context: c,
-          state: s,
-          child: VideoPlayerScreen(mediaItem: s.extra as MediaItem),
-        ),
+        pageBuilder: (c, s) {
+          final item = s.extra;
+          if (item is! MediaItem) {
+            return _fadePage(context: c, state: s, child: const SizedBox.shrink());
+          }
+          return _slideUpPage(context: c, state: s,
+            child: VideoPlayerScreen(mediaItem: item),
+          );
+        },
       ),
       GoRoute(
         path: '/player/audio',
@@ -274,7 +278,7 @@ class AppRouter {
       GoRoute(
         path: '/music/folder',
         pageBuilder: (c, s) {
-          final args = s.extra as Map<String, dynamic>;
+          final args = (s.extra as Map<String, dynamic>?) ?? {};
           return _fadePage(
             context: c,
             state: s,
@@ -288,7 +292,7 @@ class AppRouter {
       GoRoute(
         path: '/music/album',
         pageBuilder: (c, s) {
-          final args = s.extra as Map<String, dynamic>;
+          final args = (s.extra as Map<String, dynamic>?) ?? {};
           return _fadePage(
             context: c,
             state: s,
@@ -302,7 +306,7 @@ class AppRouter {
       GoRoute(
         path: '/music/artist',
         pageBuilder: (c, s) {
-          final args = s.extra as Map<String, dynamic>;
+          final args = (s.extra as Map<String, dynamic>?) ?? {};
           return _fadePage(
             context: c,
             state: s,
@@ -315,16 +319,22 @@ class AppRouter {
       ),
       GoRoute(
         path: '/tools/whatsapp',
-        pageBuilder: (c, s) => _fadePage(
-          context: c,
-          state: s,
-          child: ProGate(
-            featureName: 'WhatsApp Trimmer',
-            featureDescription:
-                'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
-            child: WhatsAppTrimmerScreen(mediaItem: s.extra as MediaItem),
-          ),
-        ),
+        pageBuilder: (c, s) {
+          final item = s.extra;
+          if (item is! MediaItem) {
+            return _fadePage(context: c, state: s, child: const SizedBox.shrink());
+          }
+          return _fadePage(
+            context: c,
+            state: s,
+            child: ProGate(
+              featureName: 'WhatsApp Trimmer',
+              featureDescription:
+                  'Trim and compress any video to 30 seconds / 16 MB for WhatsApp.',
+              child: WhatsAppTrimmerScreen(mediaItem: item),
+            ),
+          );
+        },
       ),
     ],
   );

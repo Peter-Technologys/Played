@@ -86,8 +86,9 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     try {
       _player = Player(
         configuration: const PlayerConfiguration(
-          // logLevel: MPVLogLevel.warn, // uncomment for debugging
+          backgroundAudio: true,
           title: 'OTYA Player',
+          logLevel: MPVLogLevel.error,
         ),
       );
       _controller = VideoController(

@@ -65,7 +65,15 @@ class AudioPlayerState {
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   // media_kit Player owned directly — single engine, no audio_service wrapper.
-  final Player _player = Player();
+  // backgroundAudio: true keeps playback alive when the screen locks or the
+  // app is backgrounded (sets WakeLock + AudioFocus on Android).
+  final Player _player = Player(
+    configuration: const PlayerConfiguration(
+      backgroundAudio: true,
+      title: 'OTYA Player',
+      logLevel: MPVLogLevel.error,
+    ),
+  );
 
   String? _currentItemId;
   bool    _loading        = false;
