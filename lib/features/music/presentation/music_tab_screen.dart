@@ -113,7 +113,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
                 },
                 data: (items) => RefreshIndicator(
                   color: AppColors.accent,
-                  backgroundColor: AppColors.surface,
+                  backgroundColor: Theme.of(context).colorScheme.surface,
                   onRefresh: () => ref
                       .read(mediaLibraryProvider.notifier)
                       .backgroundRefresh(),
