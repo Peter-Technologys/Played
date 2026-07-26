@@ -17,29 +17,30 @@ class AuthNotifier extends StateNotifier<_AuthState> {
 
   Future<void> _load() async {
     final prefs = await SharedPreferences.getInstance();
+    // Use the same keys as AuthService so both systems stay in sync.
     state = _AuthState(
-      userId:      prefs.getString('appwrite_user_id'),
-      displayName: prefs.getString('auth_display_name'),
-      email:       prefs.getString('auth_email'),
-      photoUrl:    prefs.getString('auth_photo_url'),
+      userId:      prefs.getString('otya_user_id'),
+      displayName: prefs.getString('otya_user_name'),
+      email:       prefs.getString('otya_user_email'),
+      photoUrl:    prefs.getString('otya_user_avatar'),
     );
   }
 
   Future<void> signIn({required String userId, required String displayName, String? email, String? photoUrl}) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('appwrite_user_id', userId);
-    await prefs.setString('auth_display_name', displayName);
-    if (email != null) await prefs.setString('auth_email', email);
-    if (photoUrl != null) await prefs.setString('auth_photo_url', photoUrl);
+    await prefs.setString('otya_user_id', userId);
+    await prefs.setString('otya_user_name', displayName);
+    if (email != null) await prefs.setString('otya_user_email', email);
+    if (photoUrl != null) await prefs.setString('otya_user_avatar', photoUrl);
     state = _AuthState(userId: userId, displayName: displayName, email: email, photoUrl: photoUrl);
   }
 
   Future<void> signOut() async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.remove('appwrite_user_id');
-    await prefs.remove('auth_display_name');
-    await prefs.remove('auth_email');
-    await prefs.remove('auth_photo_url');
+    await prefs.remove('otya_user_id');
+    await prefs.remove('otya_user_name');
+    await prefs.remove('otya_user_email');
+    await prefs.remove('otya_user_avatar');
     state = const _AuthState();
   }
 }

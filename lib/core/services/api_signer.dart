@@ -8,6 +8,7 @@
 
 import 'dart:convert';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/foundation.dart';
 
 class ApiSigner {
   // Injected at build time — never hardcode the real value here.
@@ -23,6 +24,15 @@ class ApiSigner {
     required String path,
     String? deviceId,
   }) {
+    if (_secret.isEmpty) {
+      debugPrint(
+        '[ApiSigner] WARNING: OTYA_SECRET is not set. '
+        'Build with --dart-define=OTYA_SECRET=your_token. '
+        'All API calls will be rejected by the Worker.',
+      );
+      // Still proceed — Worker will return 401, which is handled gracefully.
+    }
+
     assert(
       _secret.isNotEmpty,
       'OTYA_SECRET is empty — build with --dart-define=OTYA_SECRET=your_token',

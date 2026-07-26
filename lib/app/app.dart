@@ -37,10 +37,15 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     FcmService.instance.navigatorKey = AppRouter.navigatorKey;
     // Init remote theme — loads cache instantly, fetches update in background
     ThemeProvider.instance.initTheme();
+    // Delay dialogs by 2 seconds after the first frame so that DB,
+    // notifications, and background services finish initialising first.
+    // Showing them immediately on the first frame can cause
+    // "setState after dispose" crashes during the startup window.
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      if (mounted) UpdateDialog.checkAndShow(context);
-      // Show announcement dialog after first frame (non-blocking)
-      if (mounted) AnnouncementDialog.showIfPending(context);
+      Future.delayed(const Duration(seconds: 2), () {
+        if (mounted) UpdateDialog.checkAndShow(context);
+        if (mounted) AnnouncementDialog.showIfPending(context);
+      });
     });
   }
 

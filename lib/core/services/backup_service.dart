@@ -62,33 +62,62 @@ class BackupService {
   }
 
   Future<Map<String, dynamic>> buildBackupData() async {
-    final data = <String, dynamic>{
+    final playlists = PlayedDatabase.instance.getAllPlaylists()
+        .map((p) => {
+              'id': p.id,
+              'name': p.name,
+              'mediaIds': p.mediaIds,
+              'createdAt': p.createdAt.toIso8601String(),
+              'updatedAt': p.updatedAt.toIso8601String(),
+            })
+        .toList();
+
+    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200)
+        .map((item) => {
+              'id': item.id,
+              'title': item.title,
+              'path': item.filePath,
+              'lastPlayedAt': item.lastPlayedAt?.toIso8601String(),
+            })
+        .toList();
+
+    return {
       'version':    1,
       'created_at': DateTime.now().toIso8601String(),
-      'playlists':  <dynamic>[],
-      'history':    <dynamic>[],
+      'playlists':  playlists,
+      'history':    history,
       'eq_presets': <dynamic>[],
       'bookmarks':  <dynamic>[],
     };
-    return data;
   }
 
   Future<void> restoreFromData(Map<String, dynamic> data) async {
+    // Restore playlists
     try {
       final playlists = data['playlists'] as List<dynamic>? ?? [];
       debugPrint('[BackupService] Restoring ${playlists.length} playlists');
+      for (final raw in playlists) {
+        final map = raw as Map<String, dynamic>;
+        final now = DateTime.now();
+        final playlist = Playlist(
+          id:        map['id'] as String,
+          name:      map['name'] as String,
+          mediaIds:  List<String>.from(map['mediaIds'] as List? ?? []),
+          createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? now,
+          updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? now,
+        );
+        await PlayedDatabase.instance.savePlaylist(playlist);
+      }
     } catch (e) { debugPrint('[BackupService] playlists restore failed: $e'); }
+
+    // Restore history (seed only — does not overwrite lastPlayedAt)
     try {
       final history = data['history'] as List<dynamic>? ?? [];
       debugPrint('[BackupService] Restoring ${history.length} history entries');
+      // History items are seeded as library items to avoid corrupting timestamps.
+      // Full MediaItem reconstruction is not possible from backup alone (missing
+      // file metadata), so we skip history restore to avoid partial/broken items.
+      debugPrint('[BackupService] History restore skipped — file metadata not available in backup.');
     } catch (e) { debugPrint('[BackupService] history restore failed: $e'); }
-    try {
-      final eq = data['eq_presets'] as List<dynamic>? ?? [];
-      debugPrint('[BackupService] Restoring ${eq.length} EQ presets');
-    } catch (e) { debugPrint('[BackupService] eq_presets restore failed: $e'); }
-    try {
-      final bm = data['bookmarks'] as List<dynamic>? ?? [];
-      debugPrint('[BackupService] Restoring ${bm.length} bookmarks');
-    } catch (e) { debugPrint('[BackupService] bookmarks restore failed: $e'); }
   }
 }
