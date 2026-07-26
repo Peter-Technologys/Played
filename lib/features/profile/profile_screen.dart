@@ -10,6 +10,7 @@ import '../../core/services/cloudflare_service.dart';
 import '../../core/services/update_service.dart';
 import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
+import '../../core/services/auth_service.dart';
 
 import '../../shared/widgets/played_logo.dart';
 import '../../core/config/changelog.dart';
@@ -78,7 +79,14 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
-          // ── 2. BACKUP & SYNC ──────────────────────────────────────────
+          // ── 1b. OTYA ACCOUNT ─────────────────────────────────────────
+          const _SectionHeader(label: 'OTYA Account'),
+          const SizedBox(height: 8),
+          _OtyaAccountSection(),
+
+          const SizedBox(height: 20),
+
+                    // ── 2. BACKUP & SYNC ──────────────────────────────────────────
           const _SectionHeader(label: 'Backup & Sync'),
           const SizedBox(height: 8),
           if (!isGoogle)
@@ -830,9 +838,10 @@ class _TappableTile extends StatelessWidget {
   final String label;
   final String? subtitle;
   final VoidCallback onTap;
+  final Color? iconColor;
   const _TappableTile({
     required this.icon, required this.label,
-    this.subtitle, required this.onTap,
+    this.subtitle, required this.onTap, this.iconColor,
   });
 
   @override
@@ -848,7 +857,7 @@ class _TappableTile extends StatelessWidget {
         ),
         child: Row(
           children: [
-            Icon(icon, color: AppColors.accent, size: 20),
+            Icon(icon, color: iconColor ?? AppColors.accent, size: 20),
             const SizedBox(width: 14),
             Expanded(
               child: Column(
@@ -875,6 +884,303 @@ class _TappableTile extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+// ── OTYA Account Section ──────────────────────────────────────────────────────
+
+class _OtyaAccountSection extends ConsumerStatefulWidget {
+  @override
+  ConsumerState<_OtyaAccountSection> createState() => _OtyaAccountSectionState();
+}
+
+class _OtyaAccountSectionState extends ConsumerState<_OtyaAccountSection> {
+  UserProfile? _profile;
+  bool _loadingProfile = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  Future<void> _loadProfile() async {
+    if (!AuthService.instance.isLoggedIn) return;
+    setState(() => _loadingProfile = true);
+    final p = await AuthService.instance.getProfile();
+    if (mounted) setState(() { _profile = p; _loadingProfile = false; });
+  }
+
+  Future<void> _signOut() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Sign out of OTYA?',
+            style: TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+        content: const Text(
+          'Your local data stays on this device.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sign Out', style: TextStyle(color: AppColors.error)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await AuthService.instance.logout();
+    ref.read(authNotifierProvider.notifier).signOut();
+    if (mounted) setState(() => _profile = null);
+  }
+
+  Future<void> _deleteAccount() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (_) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Delete Account?',
+            style: TextStyle(color: AppColors.error, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+        content: const Text(
+          'This permanently deletes your OTYA account and all cloud data. This cannot be undone.',
+          style: TextStyle(color: AppColors.textSecondary, fontSize: 13, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    await AuthService.instance.deleteAccount();
+    ref.read(authNotifierProvider.notifier).signOut();
+    if (mounted) setState(() => _profile = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isLoggedIn = AuthService.instance.isLoggedIn;
+
+    if (!isLoggedIn) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Column(
+              children: [
+                const Text(
+                  'Sign in to sync your music, playlists, and settings across devices.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 13,
+                    fontFamily: 'Inter',
+                    height: 1.5,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                GestureDetector(
+                  onTap: () => context.push('/auth'),
+                  child: Container(
+                    height: 46,
+                    decoration: BoxDecoration(
+                      gradient: AppColors.accentGradient,
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: const Center(
+                      child: Text(
+                        'Sign In / Register',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 14,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      );
+    }
+
+    if (_loadingProfile) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(16),
+          child: CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2),
+        ),
+      );
+    }
+
+    final profile = _profile;
+    final name    = profile?.name ?? AuthService.instance.userName ?? 'OTYA User';
+    final email   = profile?.email ?? AuthService.instance.userEmail ?? '';
+    final verified = profile?.isVerified ?? AuthService.instance.isVerified;
+
+    return Column(
+      children: [
+        // Profile card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.surface,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.border),
+          ),
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 28,
+                backgroundColor: AppColors.accentViolet.withValues(alpha: 0.2),
+                backgroundImage: profile?.avatarUrl != null
+                    ? NetworkImage(profile!.avatarUrl!)
+                    : null,
+                child: profile?.avatarUrl == null
+                    ? Text(
+                        name.isNotEmpty ? name[0].toUpperCase() : 'O',
+                        style: const TextStyle(
+                          color: AppColors.accentViolet,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 22,
+                          fontFamily: 'Inter',
+                        ),
+                      )
+                    : null,
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 16,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      email,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12,
+                        fontFamily: 'Inter',
+                      ),
+                    ),
+                    if (!verified) ...[
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.warning.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Text(
+                          'Email not verified',
+                          style: TextStyle(
+                            color: AppColors.warning,
+                            fontSize: 11,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        // Verify email button (shown if not verified)
+        if (!verified) ...[
+          _TappableTile(
+            icon: Icons.verified_outlined,
+            label: 'Verify Email',
+            subtitle: 'Enter the code sent to your email',
+            onTap: () => context.push('/auth/verify-email'),
+          ),
+          const SizedBox(height: 6),
+        ],
+        // Backup to Drive
+        _TappableTile(
+          icon: Icons.cloud_upload_rounded,
+          label: 'Backup to Drive',
+          subtitle: 'Save your data to Google Drive',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Connect Google Drive in settings to enable backup'),
+                backgroundColor: AppColors.surface,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        // Restore from Drive
+        _TappableTile(
+          icon: Icons.cloud_download_rounded,
+          label: 'Restore from Drive',
+          subtitle: 'Restore your data from Google Drive',
+          onTap: () {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Connect Google Drive in settings to enable restore'),
+                backgroundColor: AppColors.surface,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+        ),
+        const SizedBox(height: 6),
+        // Sign out
+        _TappableTile(
+          icon: Icons.logout_rounded,
+          label: 'Sign Out',
+          subtitle: 'Sign out of your OTYA account',
+          onTap: _signOut,
+        ),
+        const SizedBox(height: 6),
+        // Delete account
+        _TappableTile(
+          icon: Icons.delete_forever_rounded,
+          label: 'Delete Account',
+          subtitle: 'Permanently delete your account and data',
+          onTap: _deleteAccount,
+          iconColor: AppColors.error,
+        ),
+      ],
     );
   }
 }
