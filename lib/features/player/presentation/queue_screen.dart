@@ -89,14 +89,15 @@ class QueueScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final queue = ref.watch(queueProvider);
+    final cs = Theme.of(context).colorScheme;
 
     return Container(
       height: MediaQuery.of(context).size.width > 600
           ? MediaQuery.of(context).size.height * 0.6
           : MediaQuery.of(context).size.height * 0.8,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       ),
       child: Column(
         children: [
@@ -105,7 +106,7 @@ class QueueScreen extends ConsumerWidget {
             child: Container(
               width: 40, height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: AppColors.borderOf(context),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -115,11 +116,11 @@ class QueueScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: [
-                const Text('Up Next',
+                Text('Up Next',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
+                      color: cs.onSurface,
                       fontFamily: 'Inter',
                     )),
                 const SizedBox(width: 8),
@@ -145,9 +146,7 @@ class QueueScreen extends ConsumerWidget {
                   },
                   child: Icon(
                     Icons.shuffle_rounded,
-                    color: queue.shuffle
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
+                    color: queue.shuffle ? AppColors.accent : cs.onSurface.withValues(alpha: 0.45),
                     size: 22,
                   ),
                 ),
@@ -157,17 +156,17 @@ class QueueScreen extends ConsumerWidget {
                     HapticFeedback.mediumImpact();
                     ref.read(queueProvider.notifier).clear();
                   },
-                  child: const Text('Clear',
+                  child: Text('Clear',
                       style: TextStyle(
                           fontSize: 13,
-                          color: AppColors.textSecondary,
+                          color: cs.onSurface.withValues(alpha: 0.55),
                           fontFamily: 'Inter')),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 12),
-          const Divider(color: AppColors.border, height: 1),
+          const Divider(height: 1),
           Expanded(
             child: queue.items.isEmpty
                 ? Center(
@@ -185,21 +184,21 @@ class QueueScreen extends ConsumerWidget {
                               color: AppColors.accent, size: 36),
                         ),
                         const SizedBox(height: 16),
-                        const Text(
+                        Text(
                           'Queue is empty',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
+                            color: cs.onSurface,
                             fontFamily: 'Inter',
                           ),
                         ),
                         const SizedBox(height: 6),
-                        const Text(
+                        Text(
                           'Play a song or video to start a queue.',
                           style: TextStyle(
                             fontSize: 12,
-                            color: AppColors.textSecondary,
+                            color: cs.onSurface.withValues(alpha: 0.55),
                             fontFamily: 'Inter',
                           ),
                           textAlign: TextAlign.center,
@@ -213,8 +212,6 @@ class QueueScreen extends ConsumerWidget {
                     itemCount: queue.items.length,
                     onReorder: (oldIndex, newIndex) {
                       HapticFeedback.mediumImpact();
-                      // ReorderableListView passes newIndex after removal;
-                      // adjust when moving downward.
                       final adjusted =
                           newIndex > oldIndex ? newIndex - 1 : newIndex;
                       ref
@@ -232,7 +229,7 @@ class QueueScreen extends ConsumerWidget {
                           decoration: BoxDecoration(
                             color: isCurrent
                                 ? AppColors.accent.withValues(alpha: 0.15)
-                                : AppColors.border,
+                                : AppColors.borderOf(context),
                             borderRadius: BorderRadius.circular(10),
                           ),
                           child: Icon(
@@ -243,7 +240,7 @@ class QueueScreen extends ConsumerWidget {
                                     : Icons.music_note_rounded),
                             color: isCurrent
                                 ? AppColors.accent
-                                : AppColors.textSecondary,
+                                : cs.onSurface.withValues(alpha: 0.45),
                             size: 18,
                           ),
                         ),
@@ -253,26 +250,25 @@ class QueueScreen extends ConsumerWidget {
                               fontWeight: isCurrent
                                   ? FontWeight.w700
                                   : FontWeight.w500,
-                              color: isCurrent
-                                  ? AppColors.accent
-                                  : AppColors.textPrimary,
+                              color: isCurrent ? AppColors.accent : cs.onSurface,
                               fontFamily: 'Inter',
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis),
                         subtitle: Text(
                           item.artist ?? item.formattedDuration,
-                          style: const TextStyle(
-                              fontSize: 11, color: AppColors.textSecondary),
+                          style: TextStyle(
+                              fontSize: 11,
+                              color: cs.onSurface.withValues(alpha: 0.55)),
                         ),
                         trailing: GestureDetector(
                           onTap: () {
                             HapticFeedback.lightImpact();
                             ref.read(queueProvider.notifier).removeAt(i);
                           },
-                          child: const Icon(
+                          child: Icon(
                               Icons.remove_circle_outline_rounded,
-                              color: AppColors.textSecondary,
+                              color: cs.onSurface.withValues(alpha: 0.45),
                               size: 20),
                         ),
                       );
