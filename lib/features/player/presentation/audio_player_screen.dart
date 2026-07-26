@@ -434,33 +434,25 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   }
 
   void _showQueue() => showModalBottomSheet(
-    context: context, backgroundColor: AppColors.surface,
+    context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     builder: (_) => const QueueScreen(),
   );
 
   void _showLyrics(Duration pos) => showModalBottomSheet(
-    context: context, backgroundColor: AppColors.surface,
+    context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     builder: (_) => LyricsSheet(item: widget.mediaItem, position: pos),
   );
 
   void _showFileInfo() => showModalBottomSheet(
-    context: context, backgroundColor: AppColors.surface,
+    context: context,
     isScrollControlled: true,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
     builder: (_) => FileInfoSheet(item: widget.mediaItem),
   );
 
   void _showOptions() => showModalBottomSheet(
-    context: context, backgroundColor: AppColors.surface,
-    shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+    context: context,
     builder: (_) => _OptionsSheet(
       mediaItem: widget.mediaItem,
       onFileInfo:        () { Navigator.pop(context); _showFileInfo(); },
