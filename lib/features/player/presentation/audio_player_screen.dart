@@ -69,7 +69,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   // app is backgrounded (sets WakeLock + AudioFocus on Android).
   final Player _player = Player(
     configuration: const PlayerConfiguration(
-      backgroundAudio: true,
       title: 'OTYA Player',
       logLevel: MPVLogLevel.error,
     ),
