@@ -50,7 +50,7 @@ class MediaNotificationService {
     if (albumArtPath != null && File(albumArtPath).existsSync()) {
       artUri = Uri.file(albumArtPath);
     }
-    AudioHandlerSingleton.instance.handler?.updateMediaItem(
+    AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
       title: title,
       artist: artist,
       artUri: artUri,
@@ -67,7 +67,7 @@ class MediaNotificationService {
     if (!_initialized) await init();
     // audio_service does not support raw bytes for artUri directly;
     // pass without art — the title/artist still show on the lock screen.
-    AudioHandlerSingleton.instance.handler?.updateMediaItem(
+    AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
       title: title,
       artist: artist,
     );
