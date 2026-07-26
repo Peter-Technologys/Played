@@ -3,6 +3,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import 'apk_downloader.dart';
+import 'shared_notification_plugin.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // PushNotificationService
@@ -40,7 +41,6 @@ class PushNotificationService {
   static const _prefixDownload = 'download:';
   static const _prefixUrl      = 'url:';
 
-  final _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
   // Cached download metadata so the tap handler can trigger the installer.
@@ -49,17 +49,15 @@ class PushNotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
-    const androidSettings =
-        AndroidInitializationSettings('@drawable/ic_notification');
-    await _plugin.initialize(
-      const InitializationSettings(android: androidSettings),
-      onDidReceiveNotificationResponse: _onTap,
-    );
+    await initSharedNotificationsPlugin();
     _initialized = true;
     debugPrint('[PushNotificationService] Initialized.');
   }
 
   // ── Tap handler ───────────────────────────────────────────────────────────
+
+  /// Public entry-point called by [sharedNotificationRouter].
+  void handleTap(NotificationResponse response) => _onTap(response);
 
   void _onTap(NotificationResponse response) {
     final payload = response.payload ?? '';
@@ -122,9 +120,9 @@ class PushNotificationService {
       ),
     );
 
-    await _plugin.show(
+    await sharedNotificationsPlugin.show(
       idUpdate,
-      'Update Available — v$version',
+      'Update Available \u2014 v$version',
       releaseNotes,
       NotificationDetails(android: androidDetails),
       payload: '$_prefixDownload$downloadUrl|$version',
@@ -154,9 +152,9 @@ class PushNotificationService {
       icon: '@drawable/ic_notification',
     );
 
-    await _plugin.show(
+    await sharedNotificationsPlugin.show(
       idProgress,
-      'Downloading OTYA Player…',
+      'Downloading OTYA Player\u2026',
       '$percent%',
       NotificationDetails(android: androidDetails),
     );
@@ -179,7 +177,7 @@ class PushNotificationService {
       icon: '@drawable/ic_notification',
     );
 
-    await _plugin.show(
+    await sharedNotificationsPlugin.show(
       idDone,
       'Download Complete',
       'Tap to install OTYA Player $version',
@@ -208,7 +206,7 @@ class PushNotificationService {
       styleInformation: BigTextStyleInformation(body),
     );
 
-    await _plugin.show(
+    await sharedNotificationsPlugin.show(
       idAnnounce,
       title,
       body,
@@ -221,6 +219,6 @@ class PushNotificationService {
   /// Cancels the ongoing download-progress notification.
   Future<void> dismissDownload() async {
     if (!_initialized) return;
-    await _plugin.cancel(idProgress);
+    await sharedNotificationsPlugin.cancel(idProgress);
   }
 }
