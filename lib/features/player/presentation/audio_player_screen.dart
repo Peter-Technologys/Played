@@ -12,9 +12,9 @@ import '../../../core/database/played_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
+import '../../../core/services/audio_handler.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';
-import '../../../core/services/album_art_service.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -94,9 +94,11 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   AudioPlayerNotifier() : super(const AudioPlayerState());
 
   void init() {
+    // Attach the Player to the audio_service handler so the foreground
+    // service and system MediaSession are driven by this player's streams.
+    AudioHandlerSingleton.instance.attachPlayer(_player);
     _attachStreams();
     // Wire notification prev/next buttons to this notifier's queue logic.
-    // media_kit has no internal playlist so player.previous()/next() are no-ops.
     MediaNotificationService.instance.onSkipPrevious = skipPrevious;
     MediaNotificationService.instance.onSkipNext     = skipNext;
   }
@@ -348,6 +350,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     MediaNotificationService.instance.onSkipNext     = null;
     PlaybackCoordinator.instance.unregister(_player);
     MediaNotificationService.instance.dismiss();
+    AudioHandlerSingleton.instance.detachPlayer();
     _player.dispose();
     super.dispose();
   }
