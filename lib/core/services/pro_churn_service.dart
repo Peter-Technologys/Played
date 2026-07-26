@@ -23,7 +23,9 @@ class ProChurnService {
   ProChurnService._();
   static final ProChurnService instance = ProChurnService._();
 
-  static const String _kProExpiry = 'pro_expiry_ms';
+  static const String _kProExpiry        = 'pro_expiry_ms';
+  static const String _kLastChurnNotif   = 'otya_churn_notif_last_ms';
+  static const Duration _cooldown        = Duration(hours: 24);
 
   // ── Public API ────────────────────────────────────────────────────────────
 
@@ -42,7 +44,16 @@ class ProChurnService {
   // ── Internal ──────────────────────────────────────────────────────────────
 
   Future<void> _doCheckAndNotify() async {
-    final prefs    = await SharedPreferences.getInstance();
+    final prefs = await SharedPreferences.getInstance();
+
+    // Cooldown: don't show the notification more than once per 24 hours.
+    final lastMs  = prefs.getInt(_kLastChurnNotif) ?? 0;
+    final elapsed = DateTime.now().millisecondsSinceEpoch - lastMs;
+    if (elapsed < _cooldown.inMilliseconds) {
+      debugPrint('[ProChurn] Within cooldown — skipping.');
+      return;
+    }
+
     final expiryMs = prefs.getInt(_kProExpiry) ?? 0;
 
     if (expiryMs <= 0) {
@@ -101,6 +112,12 @@ class ProChurnService {
       const NotificationDetails(android: androidDetails),
       payload: 'https://petersmartlink.com',
     );
+
+    // Record the timestamp so the 24-hour cooldown starts from now.
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_kLastChurnNotif, DateTime.now().millisecondsSinceEpoch);
+    } catch (_) {}
 
     debugPrint('[ProChurn] Notification shown: $title');
   }

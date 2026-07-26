@@ -8,12 +8,19 @@ class SpeedMemoryService {
 
   static const _prefix = 'speed_';
 
+  // Cached instance — avoids a platform-channel round-trip on every read/write.
+  SharedPreferences? _prefs;
+
+  Future<SharedPreferences> _getPrefs() async {
+    _prefs ??= await SharedPreferences.getInstance();
+    return _prefs!;
+  }
+
   Future<double?> getSpeed(String mediaId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       final raw = prefs.getString('$_prefix$mediaId');
-      if (raw == null) return null;
-      return double.tryParse(raw);
+      return raw == null ? null : double.tryParse(raw);
     } catch (_) {
       return null;
     }
@@ -21,7 +28,7 @@ class SpeedMemoryService {
 
   Future<void> saveSpeed(String mediaId, double speed) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
+      final prefs = await _getPrefs();
       await prefs.setString('$_prefix$mediaId', speed.toString());
     } catch (_) {}
   }

@@ -9,6 +9,7 @@ import '../models/playlist.dart';
 import '../utils/connectivity_utils.dart';
 import 'ai_sync_service.dart';
 import 'api_signer.dart';
+import 'http_client.dart';
 
 /// CloudflareService — handles playlists, history, and pro status via
 /// the Cloudflare Worker + D1 backend at petersmartlink.com.
@@ -20,8 +21,9 @@ class CloudflareService {
 
   static const Duration _timeout = Duration(seconds: 12);
 
-  // Single reusable HTTP client — avoids TCP setup overhead on every call.
-  static final http.Client _client = http.Client();
+  // Delegate to the app-wide singleton HTTP client — avoids duplicate
+  // persistent connections and lets AppHttpClient manage the lifecycle.
+  http.Client get _client => AppHttpClient.instance.client;
 
   // SharedPreferences key: stores the userId of a backup that was skipped
   // because the device was offline. Flushed on the next successful online sync.
@@ -58,9 +60,6 @@ class CloudflareService {
       debugPrint('[Cloudflare] _flushPendingBackup failed: $e');
     }
   }
-
-  /// Disposes the shared HTTP client. Call only on app shutdown.
-  static void dispose() => _client.close();
 
   // ── Signed header helpers ─────────────────────────────────────────────────
 

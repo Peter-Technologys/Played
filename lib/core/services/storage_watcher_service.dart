@@ -10,6 +10,10 @@ class StorageWatcherService {
   // Per-path debounce timers so events from different directories
   // don't cancel each other's debounce window.
   final Map<String, Timer> _debounces = {};
+  // Tracks which paths have an active watcher subscription.
+  // Using a dedicated set rather than _debounces (which is cleared after each
+  // timer fires) ensures we never register duplicate subscriptions.
+  final Set<String> _watchedPaths = {};
 
   Stream<FileSystemEvent> get events => _ctrl.stream;
 
@@ -17,7 +21,8 @@ class StorageWatcherService {
     final dir = Directory(dirPath);
     if (!dir.existsSync()) return;
     // Don't register the same path twice.
-    if (_debounces.containsKey(dirPath)) return;
+    if (_watchedPaths.contains(dirPath)) return;
+    _watchedPaths.add(dirPath);
     try {
       final sub = dir.watch(events: FileSystemEvent.all, recursive: true).listen(
         (event) {
@@ -31,7 +36,10 @@ class StorageWatcherService {
         cancelOnError: false,
       );
       _subs.add(sub);
-    } catch (e) { debugPrint('[Watcher] Cannot watch $dirPath: $e'); }
+    } catch (e) {
+      _watchedPaths.remove(dirPath); // remove on failure so watch() can be retried
+      debugPrint('[Watcher] Cannot watch $dirPath: $e');
+    }
   }
 
   void watchAll() {
@@ -51,6 +59,7 @@ class StorageWatcherService {
     _debounces.clear();
     for (final s in _subs) await s.cancel();
     _subs.clear();
+    _watchedPaths.clear();
     if (!_ctrl.isClosed) await _ctrl.close();
   }
 }

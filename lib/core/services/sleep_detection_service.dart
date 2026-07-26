@@ -60,7 +60,7 @@ class SleepDetectionService {
   /// Resets the inactivity countdown.
   void recordInteraction() {
     _lastInteractionAt = DateTime.now();
-    debugPrint('[SleepDetection] Interaction recorded at $_lastInteractionAt');
+    if (kDebugMode) debugPrint('[SleepDetection] Interaction recorded at $_lastInteractionAt');
   }
 
   /// Whether the service is currently running.
@@ -87,7 +87,9 @@ class SleepDetectionService {
     if (!_running) return;
 
     final elapsed = timeSinceLastInteraction;
-    debugPrint('[SleepDetection] Inactivity check — elapsed: ${elapsed.inSeconds}s / timeout: ${_timeout.inSeconds}s');
+    if (kDebugMode) {
+      debugPrint('[SleepDetection] Inactivity check — elapsed: ${elapsed.inSeconds}s / timeout: ${_timeout.inSeconds}s');
+    }
 
     if (elapsed >= _timeout) {
       debugPrint('[SleepDetection] Sleep detected — firing callback.');

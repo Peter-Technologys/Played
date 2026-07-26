@@ -125,13 +125,30 @@ load();
   Future<void> _stream(HttpRequest req) async {
     final enc  = req.uri.queryParameters['path'] ?? '';
     if (enc.isEmpty) { req.response..statusCode = 400..write('Missing path')..close(); return; }
-    // Sanitise path - prevent directory traversal attacks.
+
+    // Sanitise path — prevent directory traversal attacks.
+    // 1. Decode percent-encoding (handles %2e%2e and similar sequences).
     final decoded = Uri.decodeComponent(enc);
-    if (decoded.contains('..') || !decoded.startsWith('/storage/')) {
+    // 2. Normalise the path through Uri to resolve any . or .. segments.
+    final normalised = Uri.file(decoded).toFilePath();
+    // 3. Enforce the /storage/ prefix on the normalised path.
+    if (!normalised.startsWith('/storage/')) {
       req.response..statusCode = 403..write('Forbidden')..close();
       return;
     }
-    final file = File(decoded);
+    // 4. Resolve symlinks to prevent symlink-based traversal out of /storage/.
+    final String resolved;
+    try {
+      resolved = await File(normalised).resolveSymbolicLinks();
+    } catch (_) {
+      req.response..statusCode = 404..write('Not found')..close();
+      return;
+    }
+    if (!resolved.startsWith('/storage/')) {
+      req.response..statusCode = 403..write('Forbidden')..close();
+      return;
+    }
+    final file = File(resolved);
     if (!await file.exists()) { req.response..statusCode = 404..write('Not found')..close(); return; }
     final len  = await file.length();
     final mime = _mime(file.path);
