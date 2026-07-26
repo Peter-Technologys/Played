@@ -50,6 +50,11 @@ class MediaNotificationService {
 
   // ── Action handler ────────────────────────────────────────────────────────
 
+  // Callback set by AudioPlayerNotifier so notification buttons can
+  // trigger queue navigation without media_kit's internal playlist.
+  void Function()? onSkipPrevious;
+  void Function()? onSkipNext;
+
   void _onAction(NotificationResponse response) {
     final actionId = response.actionId;
     debugPrint('[MediaNotif] action: $actionId');
@@ -62,11 +67,11 @@ class MediaNotificationService {
 
     switch (actionId) {
       case 'prev':
-        // Seek to start if position > 3 s, otherwise go to previous track.
-        if (player.state.position.inSeconds > 3) {
+        // Route through AudioPlayerNotifier queue logic, not media_kit playlist.
+        if (onSkipPrevious != null) {
+          onSkipPrevious!();
+        } else if (player.state.position.inSeconds > 3) {
           player.seek(Duration.zero).ignore();
-        } else {
-          player.previous().ignore();
         }
       case 'play_pause':
         if (player.state.playing) {
@@ -75,7 +80,8 @@ class MediaNotificationService {
           player.play().ignore();
         }
       case 'next':
-        player.next().ignore();
+        // Route through AudioPlayerNotifier queue logic, not media_kit playlist.
+        onSkipNext?.call();
     }
   }
 

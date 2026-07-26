@@ -95,6 +95,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   void init() {
     _attachStreams();
+    // Wire notification prev/next buttons to this notifier's queue logic.
+    // media_kit has no internal playlist so player.previous()/next() are no-ops.
+    MediaNotificationService.instance.onSkipPrevious = skipPrevious;
+    MediaNotificationService.instance.onSkipNext     = skipNext;
   }
 
   void _attachStreams() {
@@ -338,6 +342,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _completedSub?.cancel();
+    // Clear notification callbacks so they don't hold a reference to this
+    // disposed notifier after a new AudioPlayerNotifier is created.
+    MediaNotificationService.instance.onSkipPrevious = null;
+    MediaNotificationService.instance.onSkipNext     = null;
     PlaybackCoordinator.instance.unregister(_player);
     MediaNotificationService.instance.dismiss();
     _player.dispose();
