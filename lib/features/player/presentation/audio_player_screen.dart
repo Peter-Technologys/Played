@@ -12,6 +12,7 @@ import '../../../core/database/played_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
+import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';

@@ -113,7 +113,15 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
 
   // ── Called by MediaNotificationService ───────────────────────────────
 
-  void updateMediaItem({
+  /// Satisfies [BaseAudioHandler.updateMediaItem] override contract.
+  @override
+  Future<void> updateMediaItem(MediaItem mediaItem) async {
+    this.mediaItem.add(mediaItem);
+  }
+
+  /// Convenience helper used internally to update the media item from
+  /// individual fields (title, artist, artUri, duration).
+  void updateMediaItemFromParts({
     required String title,
     required String artist,
     Uri? artUri,
