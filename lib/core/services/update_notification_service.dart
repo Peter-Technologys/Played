@@ -96,6 +96,9 @@ class UpdateNotificationService {
 
   Future<void> dismiss() async => _plugin.cancel(_notificationId);
 
+  /// Public entry-point called by [sharedNotificationRouter].
+  void handleTap(NotificationResponse response) => _onNotificationTap(response);
+
   void _onNotificationTap(NotificationResponse response) {
     final action = response.actionId;
     final url    = response.payload ?? '';

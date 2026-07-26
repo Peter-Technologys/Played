@@ -27,6 +27,9 @@ class NotificationService {
     debugPrint('[Notifications] Initialized.');
   }
 
+  /// Public entry-point called by [sharedNotificationRouter].
+  void handleTap(NotificationResponse response) => _onNotificationResponse(response);
+
   void _onNotificationResponse(NotificationResponse response) {
     // Fix #8: route notification taps instead of just logging.
     // The payload carries an optional URL (e.g. output file path or download URL).

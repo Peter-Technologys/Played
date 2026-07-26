@@ -61,6 +61,9 @@ class PushNotificationService {
 
   // ── Tap handler ───────────────────────────────────────────────────────────
 
+  /// Public entry-point called by [sharedNotificationRouter].
+  void handleTap(NotificationResponse response) => _onTap(response);
+
   void _onTap(NotificationResponse response) {
     final payload = response.payload ?? '';
     debugPrint('[PushNotif] tapped id=${response.id} payload=$payload');
