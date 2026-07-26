@@ -68,17 +68,25 @@ void main() async {
 
   // Initialise audio_service before runApp so the foreground service is ready
   // before any Player is created.
-  final audioHandler = await AudioService.init(
-    builder: () => OtyaAudioHandler(),
-    config: const AudioServiceConfig(
-      androidNotificationChannelId: 'com.otyaplayer.app.audio',
-      androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
-      androidNotificationOngoing: true,
-      androidStopForegroundOnPause: true,
-      notificationColor: Color(0xFF00E5FF),
-    ),
-  );
-  AudioHandlerSingleton.instance.handler = audioHandler;
+  // Wrapped in try/catch so a failure here does not kill the app — audio
+  // simply won't be available, but the rest of the app can still launch.
+  try {
+    final audioHandler = await AudioService.init(
+      builder: () => OtyaAudioHandler(),
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.otyaplayer.app.audio',
+        androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        notificationColor: Color(0xFF00E5FF),
+      ),
+    );
+    AudioHandlerSingleton.instance.handler = audioHandler;
+  } catch (e, st) {
+    debugPrint('[AudioService] init failed: $e\n$st');
+    if (kDebugMode) _showCrashOverlay('AudioService Init Failed', '$e\n\n$st');
+    // Continue without audio service — app can still launch
+  }
 
   await runZonedGuarded(() async {
     await _initDatabase();
@@ -164,7 +172,10 @@ Future<void> _initDatabase() async {
     debugPrint('[PlayedDB] Init error: $e\n$st');
     try {
       await PlayedDatabase.instance.deleteAndReinit();
-    } catch (_) {}
+    } catch (e2, st2) {
+      debugPrint('[PlayedDB] deleteAndReinit also failed: $e2\n$st2');
+      // App continues with DB unavailable — all DB calls are individually guarded
+    }
   }
 }
 
