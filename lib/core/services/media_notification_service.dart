@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import 'playback_coordinator.dart';
+import 'shared_notification_plugin.dart';
 
 /// Manages the persistent media playback notification with MediaStyle
 /// (Android media controls on lock screen and notification shade).
@@ -24,7 +25,6 @@ class MediaNotificationService {
   static const _channelName = 'OTYA Player \u2014 Now Playing';
   static const _notifId     = 1000;
 
-  final _plugin = FlutterLocalNotificationsPlugin();
   bool _initialized = false;
 
   // Cached state so updatePlayState() can rebuild without a full show() call.
@@ -36,17 +36,13 @@ class MediaNotificationService {
 
   Future<void> init() async {
     if (_initialized) return;
-    // Use the monochrome notification icon — @mipmap/ic_launcher renders as a
-    // coloured square in the status bar which violates Android design guidelines.
-    const androidSettings =
-        AndroidInitializationSettings('@drawable/ic_notification');
-    await _plugin.initialize(
-      const InitializationSettings(android: androidSettings),
-      onDidReceiveNotificationResponse: _onAction,
-    );
+    await initSharedNotificationsPlugin();
     _initialized = true;
     debugPrint('[MediaNotificationService] Initialized.');
   }
+
+  // Called by sharedNotificationRouter for notification ID 1000.
+  void handleAction(NotificationResponse response) => _onAction(response);
 
   // ── Action handler ────────────────────────────────────────────────────────
 
@@ -58,29 +54,19 @@ class MediaNotificationService {
   void _onAction(NotificationResponse response) {
     final actionId = response.actionId;
     debugPrint('[MediaNotif] action: $actionId');
-
     final player = PlaybackCoordinator.instance.activePlayer;
-    if (player == null) {
-      debugPrint('[MediaNotif] No active player — ignoring action $actionId');
-      return;
-    }
-
+    if (player == null) return;
     switch (actionId) {
       case 'prev':
-        // Route through AudioPlayerNotifier queue logic, not media_kit playlist.
         if (onSkipPrevious != null) {
           onSkipPrevious!();
         } else if (player.state.position.inSeconds > 3) {
           player.seek(Duration.zero).ignore();
         }
       case 'play_pause':
-        if (player.state.playing) {
-          player.pause().ignore();
-        } else {
-          player.play().ignore();
-        }
+        if (player.state.playing) { player.pause().ignore(); }
+        else { player.play().ignore(); }
       case 'next':
-        // Route through AudioPlayerNotifier queue logic, not media_kit playlist.
         onSkipNext?.call();
     }
   }
@@ -162,7 +148,7 @@ class MediaNotificationService {
 
   Future<void> dismiss() async {
     if (!_initialized) return;
-    await _plugin.cancel(_notifId);
+    await sharedNotificationsPlugin.cancel(_notifId);
     _lastTitle         = null;
     _lastArtist        = null;
     _lastAlbumArtPath  = null;
@@ -220,7 +206,7 @@ class MediaNotificationService {
       largeIcon: largeIcon,
     );
 
-    await _plugin.show(
+    await sharedNotificationsPlugin.show(
       _notifId,
       title,
       artist,
