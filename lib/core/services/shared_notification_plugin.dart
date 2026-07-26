@@ -3,13 +3,15 @@
 // onDidReceiveNotificationResponse callbacks.
 //
 // Notification ID routing:
-//   1000      -> MediaNotificationService  (playback controls)
 //   9001      -> UpdateNotificationService (update download)
 //   2000-2003 -> PushNotificationService   (FCM push)
 //   else      -> NotificationService       (FFmpeg tools)
+//
+// Note: Media playback notifications (previously ID 1000) are now handled
+// natively by audio_service via the system MediaSession. They no longer
+// go through this plugin.
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'media_notification_service.dart';
 import 'notification_service.dart';
 import 'push_notification_service.dart';
 import 'update_notification_service.dart';
@@ -30,9 +32,7 @@ Future<void> initSharedNotificationsPlugin() async {
 
 void sharedNotificationRouter(NotificationResponse response) {
   final id = response.id ?? -1;
-  if (id == 1000) {
-    MediaNotificationService.instance.handleAction(response);
-  } else if (id == 9001) {
+  if (id == 9001) {
     UpdateNotificationService.instance.handleTap(response);
   } else if (id >= 2000 && id <= 2003) {
     PushNotificationService.instance.handleTap(response);

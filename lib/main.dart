@@ -1,10 +1,12 @@
 import 'dart:async';
+import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
+import 'core/services/audio_handler.dart';
 import 'app/app.dart';
 import 'core/database/played_database.dart';
 import 'core/services/cloudflare_service.dart';
@@ -62,6 +64,20 @@ void main() async {
     if (kDebugMode) _showCrashOverlay('Platform Error', '$error\n\n$stack');
     return true;
   };
+
+  // Initialise audio_service before runApp so the foreground service is ready
+  // before any Player is created.
+  final audioHandler = await AudioService.init(
+    builder: () => OtyaAudioHandler(),
+    config: const AudioServiceConfig(
+      androidNotificationChannelId: 'com.otyaplayer.app.audio',
+      androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: false,
+      notificationColor: Color(0xFF00E5FF),
+    ),
+  );
+  AudioHandlerSingleton.instance.handler = audioHandler;
 
   await runZonedGuarded(() async {
     await _initDatabase();

@@ -93,6 +93,11 @@ dependencies:
   # Google Fonts (Fredoka for display/headline text)
   google_fonts: ^6.2.1
 
+  # Background audio — keeps media_kit Player alive when app is backgrounded.
+  # Provides Android foreground service + system MediaSession (lock-screen
+  # controls, Bluetooth headset buttons, notification media controls).
+  audio_service: ^0.18.0
+
 
 dev_dependencies:
   flutter_test:

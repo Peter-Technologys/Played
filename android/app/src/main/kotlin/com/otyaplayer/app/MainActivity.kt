@@ -757,14 +757,13 @@ class MainActivity : FlutterActivity() {
         }
     }
 
-    // Fix #11: pause the player when the app goes to background so the
-    // MediaKit surface is not rendering to a detached surface. Resume on
-    // foreground. We signal Flutter via the existing PiP channel which
-    // MediaKitEngine already listens to for PiP state changes.
+    // Fix #11: pause the VIDEO player when the app goes to background so the
+    // MediaKit surface is not rendering to a detached surface.
+    // Audio must NOT be paused here — audio_service keeps it alive in the
+    // foreground service. Only send playerPause when video is actively playing.
     override fun onPause() {
         super.onPause()
-        // Only pause if NOT entering PiP (PiP keeps the surface alive).
-        if (!isInPictureInPictureMode) {
+        if (!isInPictureInPictureMode && isVideoPlaying) {
             try {
                 flutterEngine?.dartExecutor?.binaryMessenger?.let { messenger ->
                     MethodChannel(messenger, pipChannel).invokeMethod("playerPause", null)

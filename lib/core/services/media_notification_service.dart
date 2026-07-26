@@ -2,37 +2,31 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
-import 'playback_coordinator.dart';
+import 'audio_handler.dart';
 import 'shared_notification_plugin.dart';
 
-/// Manages the persistent media playback notification with MediaStyle
-/// (Android media controls on lock screen and notification shade).
+/// Manages the media playback notification / MediaSession metadata.
 ///
-/// Changes from original:
-///   • Small icon changed from @mipmap/ic_launcher to @drawable/ic_notification
-///     (white monochrome icon required by Android notification tray).
-///   • _onAction now routes prev/play_pause/next to PlaybackCoordinator.
-///   • updatePlayState() rebuilds only the play/pause action to avoid flicker.
-///   • showWithBitmap() accepts raw album-art bytes (e.g. from the network)
-///     via ByteArrayAndroidBitmap.
+/// Previously this posted a MediaStyle notification via
+/// flutter_local_notifications (ID 1000). It now delegates to
+/// [OtyaAudioHandler.updateMediaItem] instead, which updates the system
+/// MediaSession. audio_service renders the notification natively via
+/// MediaSession — no flutter_local_notifications involvement for media.
+///
+/// The shared plugin is still initialised here because other services
+/// (UpdateNotificationService, PushNotificationService, NotificationService)
+/// depend on it.
 class MediaNotificationService {
   MediaNotificationService._();
   static final MediaNotificationService instance = MediaNotificationService._();
 
-  static const _channelId   = 'otya_media_playback';
-  static const _channelName = 'OTYA Player \u2014 Now Playing';
-  static const _notifId     = 1000;
-
   bool _initialized = false;
 
-  // Cached state so updatePlayState() can rebuild without a full show() call.
-  String?    _lastTitle;
-  String?    _lastArtist;
-  bool       _lastIsPlaying = false;
-  String?    _lastAlbumArtPath;
-  Uint8List? _lastAlbumArtBytes;
+  // Callbacks wired by AudioPlayerNotifier so notification skip buttons
+  // can trigger queue navigation.
+  void Function()? onSkipPrevious;
+  void Function()? onSkipNext;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -41,39 +35,10 @@ class MediaNotificationService {
     debugPrint('[MediaNotificationService] Initialized.');
   }
 
-  // Called by sharedNotificationRouter for notification ID 1000.
-  void handleAction(NotificationResponse response) => _onAction(response);
+  // ── Public API ────────────────────────────────────────────────────────
 
-  // ── Action handler ────────────────────────────────────────────────────────
-
-  // Callback set by AudioPlayerNotifier so notification buttons can
-  // trigger queue navigation without media_kit's internal playlist.
-  void Function()? onSkipPrevious;
-  void Function()? onSkipNext;
-
-  void _onAction(NotificationResponse response) {
-    final actionId = response.actionId;
-    debugPrint('[MediaNotif] action: $actionId');
-    final player = PlaybackCoordinator.instance.activePlayer;
-    if (player == null) return;
-    switch (actionId) {
-      case 'prev':
-        if (onSkipPrevious != null) {
-          onSkipPrevious!();
-        } else if (player.state.position.inSeconds > 3) {
-          player.seek(Duration.zero).ignore();
-        }
-      case 'play_pause':
-        if (player.state.playing) { player.pause().ignore(); }
-        else { player.play().ignore(); }
-      case 'next':
-        onSkipNext?.call();
-    }
-  }
-
-  // ── Public API ────────────────────────────────────────────────────────────
-
-  /// Shows (or updates) the Now Playing notification with a file-path album art.
+  /// Updates the system MediaSession with track metadata.
+  /// The audio_service foreground service renders the notification.
   Future<void> show({
     required String title,
     required String artist,
@@ -81,25 +46,18 @@ class MediaNotificationService {
     String? albumArtPath,
   }) async {
     if (!_initialized) await init();
-
-    _lastTitle        = title;
-    _lastArtist       = artist;
-    _lastIsPlaying    = isPlaying;
-    _lastAlbumArtPath = albumArtPath;
-    _lastAlbumArtBytes = null;
-
-    await _post(
-      title:      title,
-      artist:     artist,
-      isPlaying:  isPlaying,
-      largeIcon:  albumArtPath != null && File(albumArtPath).existsSync()
-          ? FilePathAndroidBitmap(albumArtPath)
-          : null,
+    Uri? artUri;
+    if (albumArtPath != null && File(albumArtPath).existsSync()) {
+      artUri = Uri.file(albumArtPath);
+    }
+    AudioHandlerSingleton.instance.handler?.updateMediaItem(
+      title: title,
+      artist: artist,
+      artUri: artUri,
     );
   }
 
-  /// Shows (or updates) the Now Playing notification with in-memory album art
-  /// (e.g. downloaded from the network).
+  /// Updates the system MediaSession with in-memory album art.
   Future<void> showWithBitmap({
     required String title,
     required String artist,
@@ -107,110 +65,20 @@ class MediaNotificationService {
     required Uint8List albumArtBytes,
   }) async {
     if (!_initialized) await init();
-
-    _lastTitle         = title;
-    _lastArtist        = artist;
-    _lastIsPlaying     = isPlaying;
-    _lastAlbumArtPath  = null;
-    _lastAlbumArtBytes = albumArtBytes;
-
-    await _post(
-      title:     title,
-      artist:    artist,
-      isPlaying: isPlaying,
-      largeIcon: ByteArrayAndroidBitmap(albumArtBytes),
+    // audio_service does not support raw bytes for artUri directly;
+    // pass without art — the title/artist still show on the lock screen.
+    AudioHandlerSingleton.instance.handler?.updateMediaItem(
+      title: title,
+      artist: artist,
     );
   }
 
-  /// Efficiently updates only the play/pause action without rebuilding the
-  /// entire notification (avoids album-art flicker on rapid state changes).
-  Future<void> updatePlayState(bool isPlaying) async {
-    if (!_initialized) return;
-    if (_lastTitle == null) return; // Nothing shown yet.
+  /// No-op: playbackState is updated automatically by OtyaAudioHandler
+  /// stream subscriptions whenever the Player emits a playing event.
+  Future<void> updatePlayState(bool isPlaying) async {}
 
-    _lastIsPlaying = isPlaying;
-
-    AndroidBitmap<Object>? largeIcon;
-    if (_lastAlbumArtBytes != null) {
-      largeIcon = ByteArrayAndroidBitmap(_lastAlbumArtBytes!);
-    } else if (_lastAlbumArtPath != null &&
-        File(_lastAlbumArtPath!).existsSync()) {
-      largeIcon = FilePathAndroidBitmap(_lastAlbumArtPath!);
-    }
-
-    await _post(
-      title:     _lastTitle!,
-      artist:    _lastArtist ?? '',
-      isPlaying: isPlaying,
-      largeIcon: largeIcon,
-    );
-  }
-
+  /// Clears the MediaSession metadata.
   Future<void> dismiss() async {
-    if (!_initialized) return;
-    await sharedNotificationsPlugin.cancel(_notifId);
-    _lastTitle         = null;
-    _lastArtist        = null;
-    _lastAlbumArtPath  = null;
-    _lastAlbumArtBytes = null;
-  }
-
-  // ── Internal ──────────────────────────────────────────────────────────────
-
-  Future<void> _post({
-    required String title,
-    required String artist,
-    required bool isPlaying,
-    AndroidBitmap<Object>? largeIcon,
-  }) async {
-    final androidDetails = AndroidNotificationDetails(
-      _channelId,
-      _channelName,
-      channelDescription:
-          'Shows the currently playing track with media controls',
-      importance: Importance.low,
-      priority: Priority.low,
-      ongoing: true,        // Cannot be dismissed by swipe
-      autoCancel: false,
-      showWhen: false,
-      playSound: false,
-      enableVibration: false,
-      // Use the monochrome white icon for the status bar / notification tray.
-      icon: '@drawable/ic_notification',
-      styleInformation: const MediaStyleInformation(),
-      actions: [
-        const AndroidNotificationAction(
-          'prev',
-          'Previous',
-          icon: DrawableResourceAndroidBitmap('@drawable/ic_skip_previous'),
-          showsUserInterface: false,
-          cancelNotification: false,
-        ),
-        AndroidNotificationAction(
-          'play_pause',
-          isPlaying ? 'Pause' : 'Play',
-          icon: DrawableResourceAndroidBitmap(
-            isPlaying ? '@drawable/ic_pause' : '@drawable/ic_play_arrow',
-          ),
-          showsUserInterface: false,
-          cancelNotification: false,
-        ),
-        const AndroidNotificationAction(
-          'next',
-          'Next',
-          icon: DrawableResourceAndroidBitmap('@drawable/ic_skip_next'),
-          showsUserInterface: false,
-          cancelNotification: false,
-        ),
-      ],
-      largeIcon: largeIcon,
-    );
-
-    await sharedNotificationsPlugin.show(
-      _notifId,
-      title,
-      artist,
-      NotificationDetails(android: androidDetails),
-    );
+    AudioHandlerSingleton.instance.handler?.mediaItem.add(null);
   }
 }
