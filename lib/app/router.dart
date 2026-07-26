@@ -27,6 +27,9 @@ import '../features/music/presentation/music_tab_screen.dart';
 import '../core/models/media_item.dart';
 import '../app/theme/app_colors.dart';
 import '../shared/widgets/pro_gate.dart';
+import '../features/auth/auth_screen.dart';
+import '../features/auth/forgot_password_screen.dart';
+import '../features/auth/verify_email_screen.dart';
 
 // ── Shared fade transition (200 ms) used for shell/tab routes ─────────────
 
@@ -101,6 +104,19 @@ class AppRouter {
               context: context, state: state, child: const MySpaceHubScreen()),
           ),
         ],
+      ),
+      // Auth routes
+      GoRoute(
+        path: '/auth',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AuthScreen()),
+      ),
+      GoRoute(
+        path: '/auth/forgot-password',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ForgotPasswordScreen()),
+      ),
+      GoRoute(
+        path: '/auth/verify-email',
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const VerifyEmailScreen()),
       ),
       // AirDrop remains as a push route (not a shell tab)
       GoRoute(
