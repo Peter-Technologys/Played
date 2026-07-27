@@ -420,6 +420,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
   void _showAddSongsSheet() {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: Theme.of(context).colorScheme.surface,
       shape: const RoundedRectangleBorder(

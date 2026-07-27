@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -47,13 +48,25 @@ class MusicTabScreen extends ConsumerStatefulWidget {
 
 class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
+  late final ScrollController _scrollCtrl;
+  bool _isScrolled = false;
+
+  // Approximate height of header + pills + padding — content starts below this.
+  static const double _headerHeight = 122.0;
+
   @override
   bool get wantKeepAlive => true;
 
   @override
   void initState() {
     super.initState();
+    _scrollCtrl = ScrollController()..addListener(_onScroll);
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _onScroll() {
+    final scrolled = _scrollCtrl.offset > 10;
+    if (scrolled != _isScrolled) setState(() => _isScrolled = scrolled);
   }
 
   @override
@@ -68,6 +81,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   @override
   void dispose() {
+    _scrollCtrl.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -81,16 +95,10 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            // ── Header ──────────────────────────────────────────────
-            _MusicHeader(libraryAsync: libraryAsync),
-
-            // ── Filter pills ─────────────────────────────────────────
-            _FilterPills(current: filter),
-
-            // ── Content ──────────────────────────────────────────────
-            Expanded(
+            // ── Scrollable content fills the whole body ───────────────
+            Positioned.fill(
               child: libraryAsync.when(
                 loading: () => libraryAsync.valueOrNull != null
                     ? _buildContent(
@@ -121,6 +129,33 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
                 ),
               ),
             ),
+
+            // ── Floating blur header + filter pills ───────────────────
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: ClipRect(
+                child: BackdropFilter(
+                  filter: _isScrolled
+                      ? ui.ImageFilter.blur(sigmaX: 20, sigmaY: 20)
+                      : ui.ImageFilter.blur(sigmaX: 0, sigmaY: 0),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    color: _isScrolled
+                        ? AppColors.background.withValues(alpha: 0.85)
+                        : Colors.transparent,
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _MusicHeader(libraryAsync: libraryAsync),
+                        const SizedBox(height: 8),
+                        _FilterPills(current: filter),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       ),
@@ -134,15 +169,18 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
     switch (filter) {
       case _MusicFilter.allSongs:
-        return _SongListView(songs: songs);
+        return _SongListView(songs: songs, scrollController: _scrollCtrl);
       case _MusicFilter.playlist:
-        return const PlaylistsView(showCreateButton: false);
+        return Padding(
+          padding: const EdgeInsets.only(top: _headerHeight),
+          child: const PlaylistsView(showCreateButton: false),
+        );
       case _MusicFilter.folder:
-        return _FoldersView(songs: songs);
+        return _FoldersView(songs: songs, scrollController: _scrollCtrl);
       case _MusicFilter.album:
-        return _AlbumsView(songs: songs);
+        return _AlbumsView(songs: songs, scrollController: _scrollCtrl);
       case _MusicFilter.artist:
-        return _ArtistsView(songs: songs);
+        return _ArtistsView(songs: songs, scrollController: _scrollCtrl);
     }
   }
 }
@@ -333,7 +371,8 @@ class _FilterPills extends ConsumerWidget {
 
 class _SongListView extends ConsumerWidget {
   final List<MediaItem> songs;
-  const _SongListView({required this.songs});
+  final ScrollController? scrollController;
+  const _SongListView({required this.songs, this.scrollController});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -343,8 +382,12 @@ class _SongListView extends ConsumerWidget {
     }
 
     return CustomScrollView(
+      controller: scrollController,
       physics: const BouncingScrollPhysics(),
       slivers: [
+        // Top space so content starts below the floating header
+        const SliverToBoxAdapter(child: SizedBox(height: _MusicTabScreenState._headerHeight)),
+
         // Shuffle all action bar
         SliverToBoxAdapter(
           child: _ShuffleBar(songs: songs),
@@ -573,6 +616,7 @@ class _SongRow extends ConsumerWidget {
   void _showSongOptions(BuildContext context, WidgetRef ref, MediaItem item) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -591,6 +635,7 @@ class _SongOptionsSheet extends ConsumerWidget {
     final playlists = ref.read(playlistsProvider);
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -924,7 +969,8 @@ class _MiniWave extends StatelessWidget {
 
 class _FoldersView extends ConsumerWidget {
   final List<MediaItem> songs;
-  const _FoldersView({required this.songs});
+  final ScrollController? scrollController;
+  const _FoldersView({required this.songs, this.scrollController});
 
   Map<String, List<MediaItem>> _buildFolders() {
     final map = <String, List<MediaItem>>{};
@@ -953,7 +999,8 @@ class _FoldersView extends ConsumerWidget {
     final keys = folders.keys.toList()..sort();
 
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 12, 16,
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
@@ -1077,7 +1124,8 @@ class MusicFolderDetailPage extends ConsumerWidget {
 
 class _AlbumsView extends StatelessWidget {
   final List<MediaItem> songs;
-  const _AlbumsView({required this.songs});
+  final ScrollController? scrollController;
+  const _AlbumsView({required this.songs, this.scrollController});
 
   Map<String, List<MediaItem>> _buildAlbums() {
     final map = <String, List<MediaItem>>{};
@@ -1101,7 +1149,8 @@ class _AlbumsView extends StatelessWidget {
     final keys = albums.keys.toList()..sort();
 
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 12, 16,
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
@@ -1226,7 +1275,8 @@ class MusicAlbumDetailPage extends ConsumerWidget {
 
 class _ArtistsView extends StatelessWidget {
   final List<MediaItem> songs;
-  const _ArtistsView({required this.songs});
+  final ScrollController? scrollController;
+  const _ArtistsView({required this.songs, this.scrollController});
 
   Map<String, List<MediaItem>> _buildArtists() {
     final map = <String, List<MediaItem>>{};
@@ -1250,7 +1300,8 @@ class _ArtistsView extends StatelessWidget {
     final keys = artists.keys.toList()..sort();
 
     return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 12, 16,
+      controller: scrollController,
+      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {

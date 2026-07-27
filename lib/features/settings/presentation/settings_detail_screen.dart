@@ -192,6 +192,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
   void _showGeneralSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -344,6 +345,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
   void _showVideoSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -438,6 +440,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
   void _showAudioSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -534,6 +537,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
   void _showDownloadsSheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -578,6 +582,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
   void _showPrivacySheet(BuildContext context, WidgetRef ref) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -666,6 +671,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
     const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),

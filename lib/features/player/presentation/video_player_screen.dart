@@ -164,6 +164,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -304,6 +305,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     const speeds = [0.5, 1.0, 1.25, 1.5, 2.0];
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -468,6 +470,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         }
                         showModalBottomSheet(
                           context: context,
+                          useSafeArea: true,
                           backgroundColor: AppColors.surface,
                           shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
                           builder: (_) => _AudioTrackSheet(tracks: audioTracks, activeTrack: _player!.state.track.audio, onSelect: (t) => _player!.setAudioTrack(t)),

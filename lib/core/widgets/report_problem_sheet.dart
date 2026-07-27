@@ -10,6 +10,7 @@ class ReportProblemSheet extends StatefulWidget {
   static Future<void> show(BuildContext context) {
     return showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       isScrollControlled: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(

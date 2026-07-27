@@ -190,6 +190,7 @@ class CarModeScreen extends ConsumerWidget {
                     icon: Icons.queue_music_rounded, active: false,
                     onTap: () => showModalBottomSheet(
                       context: context,
+                      useSafeArea: true,
                       backgroundColor: AppColors.surface,
                       isScrollControlled: true,
                       shape: const RoundedRectangleBorder(

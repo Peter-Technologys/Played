@@ -439,24 +439,28 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 
   void _showQueue() => showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => const QueueScreen(),
   );
 
   void _showLyrics(Duration pos) => showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => LyricsSheet(item: widget.mediaItem, position: pos),
   );
 
   void _showFileInfo() => showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     isScrollControlled: true,
     builder: (_) => FileInfoSheet(item: widget.mediaItem),
   );
 
   void _showOptions() => showModalBottomSheet(
     context: context,
+    useSafeArea: true,
     builder: (_) => _OptionsSheet(
       mediaItem: widget.mediaItem,
       onFileInfo:        () { Navigator.pop(context); _showFileInfo(); },

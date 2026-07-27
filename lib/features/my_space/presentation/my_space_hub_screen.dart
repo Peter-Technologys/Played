@@ -158,6 +158,7 @@ class MySpaceHubScreen extends ConsumerWidget {
   static void _showMp3InstructionSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
@@ -318,6 +319,7 @@ class MySpaceHubScreen extends ConsumerWidget {
   static void _showStorageCleanerSheet(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(

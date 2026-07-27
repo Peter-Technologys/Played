@@ -564,6 +564,7 @@ class _VideoListItemState extends State<_VideoListItem> {
   void _showContextMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -871,6 +872,7 @@ class _VideoCardState extends State<_VideoCard> {
   void _showContextMenu(BuildContext context) {
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
@@ -1170,6 +1172,7 @@ class _VideoContextMenu extends ConsumerWidget {
     final playlists = ref.read(playlistsProvider);
     showModalBottomSheet(
       context: context,
+      useSafeArea: true,
       backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
