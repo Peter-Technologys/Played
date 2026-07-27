@@ -142,10 +142,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
             ],
           ),
 
-          // ── MORE THEMES ───────────────────────────────────────────
-          const SizedBox(height: 24),
-          _SectionHeader(label: 'More Themes'),
-          const SizedBox(height: 12),
+          // ── MORE THEMES (header only rendered inside section when themes exist) ──
           _ServerThemesSection(
             onThemeApplied: () => setState(() {}),
           ),
@@ -410,40 +407,32 @@ class _ServerThemesSection extends ConsumerWidget {
     final themesAsync = ref.watch(remoteThemesProvider);
 
     return themesAsync.when(
-      loading: () => _ShimmerGrid(),
-      error: (_, __) => _ErrorTile(
-        onRetry: () => ref.read(remoteThemesProvider.notifier).refresh(),
-      ),
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
       data: (themes) {
-        if (themes.isEmpty) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 16),
-            child: Center(
-              child: Text(
-                'No themes available yet — check back soon.',
-                style: TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 13,
-                  fontFamily: 'Inter',
-                ),
+        if (themes.isEmpty) return const SizedBox.shrink();
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 24),
+            _SectionHeader(label: 'More Themes'),
+            const SizedBox(height: 12),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 0.72,
+              ),
+              itemCount: themes.length,
+              itemBuilder: (context, i) => _RemoteThemeCard(
+                theme: themes[i],
+                onApplied: onThemeApplied,
               ),
             ),
-          );
-        }
-        return GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            childAspectRatio: 0.72,
-          ),
-          itemCount: themes.length,
-          itemBuilder: (context, i) => _RemoteThemeCard(
-            theme: themes[i],
-            onApplied: onThemeApplied,
-          ),
+          ],
         );
       },
     );
