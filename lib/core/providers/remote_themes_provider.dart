@@ -51,7 +51,50 @@ class RemoteThemesNotifier extends AsyncNotifier<List<RemoteTheme>> {
 
   @override
   Future<List<RemoteTheme>> build() async {
+    // Offline-first: serve cached themes immediately so the section appears
+    // instantly without a loading flash. Then refresh in the background and
+    // update state if fresh data arrives.
+    final cached = await _loadFromCache();
+    if (cached.isNotEmpty) {
+      // ignore: unawaited_futures
+      Future(_backgroundRefresh); // fire-and-forget
+      return cached;
+    }
+    // No cache at all — full blocking fetch (loading state until resolved).
     return _fetchThemes();
+  }
+
+  /// Fetches fresh themes from the network and updates provider state if
+  /// successful. Runs after cached data has already been returned to the UI.
+  Future<void> _backgroundRefresh() async {
+    try {
+      final headers = ApiSigner.signedHeaders(
+        method: 'GET',
+        path: '/api/themes',
+      );
+      final response = await http
+          .get(Uri.parse(Environment.apiThemesUrl), headers: headers)
+          .timeout(const Duration(seconds: 10));
+
+      if (response.statusCode == 200) {
+        final body = jsonDecode(response.body) as Map<String, dynamic>;
+        final rawList = body['themes'] as List<dynamic>? ?? [];
+        final themes = rawList
+            .whereType<Map<String, dynamic>>()
+            .map(RemoteTheme.fromJson)
+            .toList();
+        try {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(
+            _kCacheKey,
+            jsonEncode(themes.map((t) => t.toJson()).toList()),
+          );
+        } catch (_) {}
+        if (mounted) state = AsyncValue.data(themes);
+      }
+    } catch (e) {
+      debugPrint('[RemoteThemesProvider] Background refresh failed: $e');
+    }
   }
 
   Future<List<RemoteTheme>> _fetchThemes() async {
