@@ -261,13 +261,10 @@ jobs:
           TAG: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
+          TEXT="❌ <b>OTYA Player ${TAG} release FAILED</b>\n\nThe build failed — please check the CI log for details.\n\n🔧 <a href='${RUN_URL}'>View build log</a>"
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
             -d "parse_mode=HTML" \
             -d "disable_web_page_preview=true" \
-            --data-urlencode "text=❌ <b>OTYA Player ${TAG} release FAILED</b>
-
-The build failed. Please check the CI log for details.
-
-🔧 <a href='${RUN_URL}'>View build log</a>" \
+            --data-urlencode "text=${TEXT}" \
             --fail-with-body || true
