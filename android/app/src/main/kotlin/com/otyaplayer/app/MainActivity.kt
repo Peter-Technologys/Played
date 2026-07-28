@@ -1,8 +1,10 @@
 package com.otyaplayer.app
 
+import android.Manifest
 import android.app.PictureInPictureParams
 import android.content.ContentUris
 import android.content.pm.PackageManager
+import androidx.core.content.ContextCompat
 import android.database.ContentObserver
 import android.database.Cursor
 import android.graphics.Bitmap
@@ -10,6 +12,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
+import android.media.MediaScannerConnection
 import android.net.Uri
 import android.os.Build
 import android.os.Handler
@@ -25,7 +28,7 @@ import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.io.File
@@ -45,7 +48,9 @@ class MainActivity : FlutterActivity() {
 
     // Fix #10: coroutine scope for long-running FFmpeg operations.
     // Cancelled in onDestroy() to avoid leaking threads on low-RAM devices.
-    private val ioScope = CoroutineScope(Dispatchers.IO + Job())
+    // SupervisorJob ensures a failure in one child (e.g. trimVideo) does not
+    // cancel the entire scope and break subsequent trim/extract operations.
+    private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     // Tracks whether the video player is actively playing — used by
     // onUserLeaveHint() to decide whether to auto-enter PiP.
@@ -132,13 +137,32 @@ class MainActivity : FlutterActivity() {
                 when (call.method) {
                     "setPauseDuringCalls" -> {
                         val enabled = call.argument<Boolean>("enabled") ?: true
-                        if (enabled) registerPhoneListener() else unregisterPhoneListener()
+                        if (enabled) {
+                            // Only register if the runtime permission has been granted.
+                            // READ_PHONE_STATE is a dangerous permission on API 23+;
+                            // calling listen()/registerTelephonyCallback() without it
+                            // throws a SecurityException and crashes the app.
+                            if (ContextCompat.checkSelfPermission(
+                                    this, Manifest.permission.READ_PHONE_STATE)
+                                == PackageManager.PERMISSION_GRANTED) {
+                                registerPhoneListener()
+                            }
+                        } else {
+                            unregisterPhoneListener()
+                        }
                         result.success(null)
                     }
                     else -> result.notImplemented()
                 }
             }
-        registerPhoneListener()
+        // Only register at startup if the permission is already granted.
+        // If not yet granted, the listener will be registered later when
+        // Flutter calls setPauseDuringCalls after the user grants the permission.
+        if (ContextCompat.checkSelfPermission(
+                this, Manifest.permission.READ_PHONE_STATE)
+            == PackageManager.PERMISSION_GRANTED) {
+            registerPhoneListener()
+        }
 
         // ── Equalizer ────────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, eqChannel)
@@ -304,43 +328,47 @@ class MainActivity : FlutterActivity() {
         mediaObserver = null
     }
 
-    // Force MediaStore to index a newly added file immediately
+    // Force MediaStore to index a newly added file immediately.
+    // MediaScannerConnection.scanFile() works correctly on all Android versions
+    // including API 29+ where ACTION_MEDIA_SCANNER_SCAN_FILE was deprecated and
+    // stopped working. The old contentResolver.insert() approach also had issues
+    // (it inserted a duplicate entry rather than triggering a real scan).
     private fun triggerMediaScan(path: String) {
         try {
-            val values = android.content.ContentValues().apply {
-                put(MediaStore.Files.FileColumns.DATA, path)
-            }
-            contentResolver.insert(MediaStore.Files.getContentUri("external"), values)
-        } catch (_: Exception) {}
-        // Also use the broadcast approach for older Android
-        try {
-            sendBroadcast(android.content.Intent(
-                android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-                Uri.fromFile(File(path))
-            ))
+            MediaScannerConnection.scanFile(this, arrayOf(path), null, null)
         } catch (_: Exception) {}
     }
 
     // ── FFmpeg: Trim video (offline, uses MediaExtractor + MediaMuxer) ────
 
     private fun trimVideo(inputPath: String, startMs: Long, endMs: Long): String? {
-        return try {
-            val outDir = File(getExternalFilesDir(null), "Trimmed")
-            outDir.mkdirs()
-            val outFile = File(outDir, "trimmed_${System.currentTimeMillis()}.mp4")
+        val outDir = File(getExternalFilesDir(null), "Trimmed")
+        outDir.mkdirs()
+        val outFile = File(outDir, "trimmed_${System.currentTimeMillis()}.mp4")
 
-            val extractor = MediaExtractor()
+        val extractor = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        return try {
             extractor.setDataSource(inputPath)
 
-            val muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
-
             val trackMap = mutableMapOf<Int, Int>() // extractor track → muxer track
+            // Initialise muxer only after we know we have tracks to add, so that
+            // release() in the finally block is safe even if addTrack() was never called.
+            muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+
             for (i in 0 until extractor.trackCount) {
                 val fmt  = extractor.getTrackFormat(i)
                 val mime = fmt.getString(MediaFormat.KEY_MIME) ?: continue
                 if (mime.startsWith("audio/") || mime.startsWith("video/")) {
                     trackMap[i] = muxer.addTrack(fmt)
                 }
+            }
+
+            // Guard: MediaMuxer requires at least one track before start().
+            // An empty trackMap means the file is corrupt or has no A/V streams.
+            if (trackMap.isEmpty()) {
+                Log.w("FFmpeg", "trimVideo: no audio/video tracks found in $inputPath")
+                return null
             }
 
             muxer.start()
@@ -376,8 +404,6 @@ class MainActivity : FlutterActivity() {
             }
 
             muxer.stop()
-            muxer.release()
-            extractor.release()
 
             // Notify MediaStore so the file appears in Downloads
             triggerMediaScan(outFile.absolutePath)
@@ -385,6 +411,11 @@ class MainActivity : FlutterActivity() {
         } catch (e: Exception) {
             Log.e("FFmpeg", "trimVideo failed: ${e.message}")
             null
+        } finally {
+            // Always release resources regardless of success or failure to
+            // prevent file-descriptor and memory leaks on any exception path.
+            try { muxer?.release() } catch (_: Exception) {}
+            extractor.release()
         }
     }
 
