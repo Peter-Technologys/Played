@@ -129,7 +129,11 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters)
             val pm = applicationContext.packageManager
             val pi = pm.getPackageInfo(applicationContext.packageName, 0)
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                pi.longVersionCode.toInt()
+                // longVersionCode can exceed Int.MAX_VALUE; a plain toInt() silently
+                // overflows to a negative number, making serverCode > installedCode
+                // always true and spamming update notifications.
+                // coerceAtMost caps the value safely within Int range.
+                pi.longVersionCode.coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             } else {
                 pi.versionCode
             }
