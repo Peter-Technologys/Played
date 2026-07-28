@@ -422,12 +422,13 @@ class MainActivity : FlutterActivity() {
     // ── FFmpeg: Extract audio (offline, uses MediaExtractor + MediaMuxer) ─
 
     private fun extractAudio(inputPath: String): String? {
-        return try {
-            val outDir = File(getExternalFilesDir(null), "Extracted")
-            outDir.mkdirs()
-            val outFile = File(outDir, "audio_${System.currentTimeMillis()}.m4a")
+        val outDir = File(getExternalFilesDir(null), "Extracted")
+        outDir.mkdirs()
+        val outFile = File(outDir, "audio_${System.currentTimeMillis()}.m4a")
 
-            val extractor = MediaExtractor()
+        val extractor = MediaExtractor()
+        var muxer: MediaMuxer? = null
+        return try {
             extractor.setDataSource(inputPath)
 
             var audioTrack = -1
@@ -445,7 +446,7 @@ class MainActivity : FlutterActivity() {
 
             extractor.selectTrack(audioTrack)
 
-            val muxer    = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
+            muxer = MediaMuxer(outFile.absolutePath, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4)
             val muxTrack = muxer.addTrack(audioFormat)
             muxer.start()
 
@@ -464,14 +465,16 @@ class MainActivity : FlutterActivity() {
             }
 
             muxer.stop()
-            muxer.release()
-            extractor.release()
-
             triggerMediaScan(outFile.absolutePath)
             outFile.absolutePath
         } catch (e: Exception) {
             Log.e("FFmpeg", "extractAudio failed: ${e.message}")
             null
+        } finally {
+            // Always release resources regardless of success or failure to
+            // prevent file-descriptor and memory leaks on any exception path.
+            try { muxer?.release() } catch (_: Exception) {}
+            extractor.release()
         }
     }
 
