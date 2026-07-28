@@ -158,7 +158,81 @@ else
   echo "INFO: KV purge skipped (CF vars not set) — new version live within 10 min"
 fi
 
-# Appwrite notification removed -- fully migrated to Cloudflare R2 + KV.
+# ── Notify server: update D1 releases table ──────────────────────────────────
+# POST /api/admin/release so the D1 releases table is immediately up to date.
+# This powers /api/stats, force-update logic, and crash grouping.
+# Non-fatal: a failure here never aborts the publish.
+if [ -n "${WORKER_URL:-}" ] && [ -n "${OTYA_STORE_ADMIN_TOKEN:-}" ]; then
+  echo "Notifying server of new release v$VERSION..."
+  python3 - <<PYEOF
+import json, hmac, hashlib, time, urllib.request, urllib.error, os
+
+worker_url  = os.environ['WORKER_URL'].rstrip('/')
+secret      = os.environ['OTYA_STORE_ADMIN_TOKEN']
+version     = os.environ['VERSION']
+version_code = int(os.environ['VERSION_CODE'])
+tag         = 'v' + version
+
+# Read changelog
+try:
+    with open(os.environ['CHANGELOG_FILE']) as f:
+        changelog = f.read().strip() or 'Bug fixes and improvements'
+except Exception:
+    changelog = 'Bug fixes and improvements'
+
+# Build HMAC signature: METHOD:PATH:TIMESTAMP
+path      = '/api/admin/release'
+timestamp = str(int(time.time()))
+signing   = f'POST:{path}:{timestamp}'
+sig       = hmac.new(secret.encode(), signing.encode(), hashlib.sha256).hexdigest()
+
+payload = json.dumps({
+    'tag':          tag,
+    'version':      version,
+    'version_code': version_code,
+    'changelog':    changelog,
+}).encode()
+
+req = urllib.request.Request(
+    f'{worker_url}{path}',
+    data=payload,
+    method='POST',
+    headers={
+        'Content-Type':       'application/json',
+        'X-Otya-Timestamp':   timestamp,
+        'X-Otya-Signature':   sig,
+    },
+)
+try:
+    with urllib.request.urlopen(req, timeout=15) as resp:
+        body = resp.read().decode()
+        print(f'Server notified OK ({resp.status}): {body[:120]}')
+except urllib.error.HTTPError as e:
+    print(f'WARNING: Server notify failed HTTP {e.code}: {e.read().decode()[:200]}')
+except Exception as e:
+    print(f'WARNING: Server notify failed: {e}')
+PYEOF
+else
+  echo "INFO: WORKER_URL or OTYA_STORE_ADMIN_TOKEN not set — skipping server notify"
+fi
+
+# ── Write LATEST_BUILD_INFO to KV ─────────────────────────────────────────────
+# The /check-update and /api/version endpoints read from KV first.
+# Writing here means the new version is available immediately after publish,
+# without waiting for R2 propagation or the 5-min cache to expire.
+if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_API_TOKEN:-}" ] && [ -n "${KV_NAMESPACE_ID:-}" ]; then
+  echo "Writing LATEST_BUILD_INFO to KV..."
+  KV_VALUE=$(cat version.json)
+  HTTP=$(curl -s -o /dev/null -w "%{http_code}" \
+    -X PUT \
+    "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${KV_NAMESPACE_ID}/values/LATEST_BUILD_INFO" \
+    -H "Authorization: Bearer ${CF_API_TOKEN}" \
+    -H "Content-Type: application/json" \
+    --data-raw "$KV_VALUE")
+  echo "KV write LATEST_BUILD_INFO HTTP: $HTTP"
+else
+  echo "INFO: CF vars not set — skipping KV LATEST_BUILD_INFO write"
+fi
 
 # -- Prune old backups (keep last 5) --
 # head -n -5 exits non-zero on some systems when the list has fewer than 5
