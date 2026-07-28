@@ -80,7 +80,8 @@ class CloudflareService {
       return;
     }
     // Flush any backup that was missed while the device was last offline.
-    unawaited(_flushPendingBackup());
+    // await instead of unawaited to prevent concurrent backupPlaylists race.
+    await _flushPendingBackup();
     final playlists = PlayedDatabase.instance.getAllPlaylists();
     int synced = 0;
     const batchSize = 5;
