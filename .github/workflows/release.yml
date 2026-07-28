@@ -205,7 +205,7 @@ jobs:
           )
           compare_line = ''
           if prev_tag:
-              compare_line = f'\n\u{1F500} <b>Changes since {prev_tag}:</b> {commit_count} commits'
+              compare_line = '\n\U0001F500 <b>Changes since ' + prev_tag + ':</b> ' + commit_count + ' commits'
           msg = (
               f'\U0001F3B5 <b>OTYA Player {tag} is out!</b>\n'
               f'\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'
@@ -259,10 +259,29 @@ jobs:
           TAG: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          TEXT="❌ <b>OTYA Player ${TAG} release FAILED</b>\n\nThe build failed — please check the CI log for details.\n\n🔧 <a href='${RUN_URL}'>View build log</a>"
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d "chat_id=${TELEGRAM_CHAT_ID}" \
-            -d "parse_mode=HTML" \
-            -d "disable_web_page_preview=true" \
-            --data-urlencode "text=${TEXT}" \
-            --fail-with-body || true
+          python3 - <<'PYEOF'
+          import os, urllib.request, urllib.parse, json
+          bot_token = os.environ['TELEGRAM_BOT_TOKEN']
+          chat_id   = os.environ['TELEGRAM_CHAT_ID']
+          tag       = os.environ['TAG']
+          run_url   = os.environ['RUN_URL']
+          msg = (
+              f'\u274c <b>OTYA Player {tag} release FAILED</b>\n\n'
+              f'The build failed \u2014 please check the CI log for details.\n\n'
+              f'\U0001F527 <a href="{run_url}">View build log</a>'
+          )
+          data = urllib.parse.urlencode({
+              'chat_id': chat_id, 'text': msg,
+              'parse_mode': 'HTML', 'disable_web_page_preview': 'true',
+          }).encode()
+          req = urllib.request.Request(
+              f'https://api.telegram.org/bot{bot_token}/sendMessage',
+              data=data, method='POST'
+          )
+          try:
+              with urllib.request.urlopen(req, timeout=15) as resp:
+                  result = json.load(resp)
+                  print('Failure alert sent, id:', result['result']['message_id'])
+          except Exception as e:
+              print(f'WARNING: failed to send failure alert: {e}')
+          PYEOF
