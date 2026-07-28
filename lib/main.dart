@@ -77,7 +77,7 @@ void main() async {
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
         androidNotificationOngoing: true,
-        androidStopForegroundOnPause: false,
+        androidStopForegroundOnPause: true,
         notificationColor: Color(0xFF00E5FF),
       ),
     );

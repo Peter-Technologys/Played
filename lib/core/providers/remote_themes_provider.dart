@@ -90,7 +90,7 @@ class RemoteThemesNotifier extends AsyncNotifier<List<RemoteTheme>> {
             jsonEncode(themes.map((t) => t.toJson()).toList()),
           );
         } catch (_) {}
-        if (mounted) state = AsyncValue.data(themes);
+        try { state = AsyncValue.data(themes); } catch (_) {}
       }
     } catch (e) {
       debugPrint('[RemoteThemesProvider] Background refresh failed: $e');
