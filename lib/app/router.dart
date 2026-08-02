@@ -74,9 +74,47 @@ class AppRouter {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
+  /// Routes that are accessible without authentication.
+  static const _publicRoutes = {'/auth', '/auth/forgot-password', '/auth/verify-email'};
+
+  /// Redirect guard — Bug 8 fix.
+  ///
+  /// Rules:
+  ///   1. If the user is on a public route (/auth/*), never redirect — return null.
+  ///   2. If the user is on a protected route and NOT signed in, redirect to /auth.
+  ///   3. If the user IS signed in and tries to visit /auth, redirect to /.
+  ///   4. Otherwise return null (no redirect needed).
+  ///
+  /// Returning null is critical: returning the current location causes an
+  /// infinite redirect loop in go_router.
+  static String? _redirect(BuildContext context, GoRouterState state) {
+    final location = state.matchedLocation;
+    final isPublic = _publicRoutes.any((r) => location.startsWith(r));
+
+    // Read auth state synchronously from the Riverpod container.
+    // We use SharedPreferences-backed userId (non-sensitive) for the check —
+    // the actual tokens live in secure storage.
+    final container = ProviderScope.containerOf(context, listen: false);
+    final isSignedIn = container.read(isSignedInProvider);
+
+    if (isPublic) {
+      // On a public route — only redirect away if already signed in and
+      // the user is trying to reach /auth (not /auth/verify-email etc.)
+      if (isSignedIn && location == '/auth') return '/';
+      return null; // stay on the public route
+    }
+
+    // Protected route — redirect to /auth if not signed in.
+    if (!isSignedIn) return '/auth';
+
+    // Signed in and on a protected route — no redirect needed.
+    return null;
+  }
+
   static final GoRouter router = GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: '/',
+    redirect: _redirect,
     routes: [
       ShellRoute(
         pageBuilder: (context, state, child) => _fadePage(
