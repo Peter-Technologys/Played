@@ -11,34 +11,54 @@ import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
 
 // ── PIN helpers ────────────────────────────────────────────────────
+//
+// Security fix: PIN hash is stored in flutter_secure_storage (Android
+// Keystore / iOS Secure Enclave) instead of SharedPreferences, which is
+// readable by any app with root access or a backup extraction.
+//
+// Biometric re-auth timeout: after 5 minutes of vault inactivity the
+// vault is automatically locked and re-authentication is required.
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 const _kPinKey = 'vault_pin_hash';
+const _kBiometricTimeout = Duration(minutes: 5);
+
+const _vaultStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+);
 
 Future<bool> _hasPinSet() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.containsKey(_kPinKey);
+  final stored = await _vaultStorage.read(key: _kPinKey);
+  return stored != null;
 }
 
 Future<bool> _verifyPin(String pin) async {
-  final prefs = await SharedPreferences.getInstance();
-  final stored = prefs.getString(_kPinKey);
+  final stored = await _vaultStorage.read(key: _kPinKey);
   final hash = sha256.convert(utf8.encode(pin)).toString();
   return stored == hash;
 }
 
 Future<void> _savePin(String pin) async {
-  final prefs = await SharedPreferences.getInstance();
   final hash = sha256.convert(utf8.encode(pin)).toString();
-  await prefs.setString(_kPinKey, hash);
+  await _vaultStorage.write(key: _kPinKey, value: hash);
 }
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
+
+/// Tracks the last time the vault was successfully unlocked.
+/// Used to enforce the 5-minute biometric re-auth timeout.
+DateTime? _lastUnlockTime;
+
+/// Returns true if the vault session has expired (> 5 minutes since unlock).
+bool _isVaultSessionExpired() {
+  if (_lastUnlockTime == null) return true;
+  return DateTime.now().difference(_lastUnlockTime!) > _kBiometricTimeout;
+}
 
 // ── Lock Screen ────────────────────────────────────────────────────
 
@@ -57,7 +77,15 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // If the vault was previously unlocked but the session has expired,
+      // force re-authentication (Bug 6 fix: biometric re-auth timeout).
+      if (ref.read(vaultUnlockedProvider) && _isVaultSessionExpired()) {
+        ref.read(vaultUnlockedProvider.notifier).state = false;
+        _lastUnlockTime = null;
+      }
+      _authenticate();
+    });
   }
 
   Future<void> _authenticate() async {
@@ -83,6 +111,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
       );
       if (ok) {
         HapticFeedback.mediumImpact();
+        _lastUnlockTime = DateTime.now(); // record unlock time for timeout
         ref.read(vaultUnlockedProvider.notifier).state = true;
       } else {
         setState(() => _errorMessage = 'Authentication failed. Try again.');
@@ -240,6 +269,7 @@ class _PinDialogState extends State<_PinDialog> {
     setState(() => _loading = false);
     if (ok) {
       HapticFeedback.mediumImpact();
+      _lastUnlockTime = DateTime.now(); // record unlock time for timeout
       Navigator.of(context).pop();
       widget.onSuccess();
     } else {
@@ -378,13 +408,34 @@ class VaultGalleryScreen extends ConsumerStatefulWidget {
   @override ConsumerState<VaultGalleryScreen> createState() => _VaultGalleryScreenState();
 }
 
-class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
+class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
+    with WidgetsBindingObserver {
   List<VaultItem> _items = [];
   bool _loading = true;
   int? _vaultSizeBytes;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// When the app resumes from background, check if the vault session has
+  /// expired and lock the vault if so (biometric re-auth timeout).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isVaultSessionExpired()) {
+      ref.read(vaultUnlockedProvider.notifier).state = false;
+      _lastUnlockTime = null;
+    }
+  }
 
   Future<void> _load() async {
     final items = await PlayedDatabase.instance.getAllVaultItems();
