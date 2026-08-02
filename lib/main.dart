@@ -19,6 +19,8 @@ import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/crash_reporter.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/cache_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
@@ -184,7 +186,16 @@ Future<void> _initBackground(AppSettings savedSettings) async {
     _initNotifications(),
     _initWorkManager(),
     StorageFolderService.instance.ensureCreated(),
+    // Bug 10 fix: initialize connectivity monitoring so isOffline is accurate
+    // before any API call is made. ConnectivityService.instance.isOffline is
+    // then checked by CloudflareService / ApiService before network requests.
+    ConnectivityService.instance.init(),
+    // Performance: initialize the Hive TTL cache for API responses.
+    CacheService.instance.init(),
   ]);
+
+  // Evict stale cache entries on startup (housekeeping).
+  unawaited(CacheService.instance.evictExpired());
 
   // BUG 10: Replace UpdateService.registerDevice() (which sends incomplete
   // device info and causes double-registration) with DeviceService, which

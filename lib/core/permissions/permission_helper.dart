@@ -25,12 +25,19 @@ class PermissionHelper {
 
   /// Request storage/media permissions needed for media scanning.
   /// Returns true if granted.
+  ///
+  /// Android 13+ (API 33+): requests READ_MEDIA_AUDIO + READ_MEDIA_VIDEO
+  ///   (Permission.audio + Permission.videos via permission_handler).
+  /// Android 12 and below: requests READ_EXTERNAL_STORAGE (Permission.storage).
+  ///
+  /// The AndroidManifest.xml declares both sets with appropriate maxSdkVersion
+  /// constraints so the correct permission is used on each Android version.
   static Future<bool> requestMediaPermissions() async {
     final sdk = await _getSdkInt();
     if (sdk == 0) return true; // iOS — no runtime permission needed
     final perms = sdk >= 33
-        ? [Permission.audio, Permission.videos]
-        : [Permission.storage];
+        ? [Permission.audio, Permission.videos]  // Android 13+ (Bug 6 fix)
+        : [Permission.storage];                  // Android 12 and below
     final statuses = await perms.request();
     return statuses.values.every(
       (s) => s == PermissionStatus.granted || s == PermissionStatus.limited,
