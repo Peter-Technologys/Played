@@ -157,6 +157,10 @@ class _LoginTabState extends State<_LoginTab> {
   }
 
   Future<void> _login() async {
+    if (_emailCtrl.text.trim().isEmpty || _passwordCtrl.text.isEmpty) {
+      setState(() => _error = 'Please enter your email and password');
+      return;
+    }
     setState(() { _loading = true; _error = null; });
     final result = await AuthService.instance.login(
       _emailCtrl.text.trim(),
