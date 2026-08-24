@@ -67,8 +67,27 @@ class MainActivity : FlutterActivity() {
     private var mediaObserver: ContentObserver? = null
     private var mediaEventSink: EventChannel.EventSink? = null
 
+    private fun createAudioNotificationChannel() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+            val channel = android.app.NotificationChannel(
+                "com.otyaplayer.app.audio",
+                "OTYA Player \u2014 Now Playing",
+                android.app.NotificationManager.IMPORTANCE_LOW
+            ).apply {
+                description = "Media playback controls and lock screen notification"
+                setShowBadge(false)
+                setSound(null, null)
+                enableVibration(false)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+            }
+            val nm = getSystemService(android.app.NotificationManager::class.java)
+            nm.createNotificationChannel(channel)
+        }
+    }
+
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
+        createAudioNotificationChannel()
 
         // ── PiP ──────────────────────────────────────────────────────────
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, pipChannel)

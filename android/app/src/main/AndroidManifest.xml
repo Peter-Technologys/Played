@@ -186,6 +186,10 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <meta-data
+            android:name="com.ryanheise.audioservice.NOTIFICATION_CHANNEL_ID"
+            android:value="com.otyaplayer.app.audio" />
+
         <!-- FCM: default small notification icon (monochrome white drawable) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
