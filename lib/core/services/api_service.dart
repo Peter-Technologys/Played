@@ -5,6 +5,7 @@
 // Falls back to HMAC signing when not logged in (backward compat).
 
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
@@ -17,6 +18,40 @@ class ApiService {
 
   static final http.Client _client = http.Client();
   static const Duration _timeout   = Duration(seconds: 12);
+
+  // ── Retry helper ──────────────────────────────────────────────────────────
+
+  /// Executes [fn] with up to [maxRetries] retries on transient network
+  /// errors (SocketException, TimeoutException). Uses exponential backoff
+  /// starting at [initialDelay]. Non-retryable errors (4xx) are not retried.
+  static Future<T?> _withRetry<T>(
+    Future<T?> Function() fn, {
+    int maxRetries = 2,
+    Duration initialDelay = const Duration(milliseconds: 500),
+  }) async {
+    Duration delay = initialDelay;
+    for (var attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn();
+      } on SocketException catch (e) {
+        if (attempt == maxRetries) {
+          debugPrint('[ApiService] SocketException after $maxRetries retries: $e');
+          return null;
+        }
+      } on TimeoutException catch (e) {
+        if (attempt == maxRetries) {
+          debugPrint('[ApiService] TimeoutException after $maxRetries retries: $e');
+          return null;
+        }
+      } catch (_) {
+        // Non-retryable error (e.g. 4xx decoded as exception) — bail immediately.
+        rethrow;
+      }
+      await Future<void>.delayed(delay);
+      delay *= 2;
+    }
+    return null;
+  }
 
   // ── Header helpers ────────────────────────────────────────────────────────
 
@@ -49,52 +84,58 @@ class ApiService {
   // ── Device sync ───────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>?> syncDevice(Map<String, dynamic> payload) async {
-    try {
-      const path = '/api/sync';
-      final res = await _client.post(
-        Uri.parse(Environment.apiSyncUrl),
-        headers: await _postHeaders(path),
-        body: jsonEncode(payload),
-      ).timeout(_timeout);
-      if (res.statusCode != 200) return null;
-      return jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (e) {
-      debugPrint('[ApiService] syncDevice failed: $e');
-      return null;
-    }
+    return _withRetry(() async {
+      try {
+        const path = '/api/sync';
+        final res = await _client.post(
+          Uri.parse(Environment.apiSyncUrl),
+          headers: await _postHeaders(path),
+          body: jsonEncode(payload),
+        ).timeout(_timeout);
+        if (res.statusCode != 200) return null;
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (e) {
+        debugPrint('[ApiService] syncDevice failed: $e');
+        return null;
+      }
+    });
   }
 
   Future<Map<String, dynamic>?> syncStatus(String deviceId) async {
-    try {
-      const path = '/api/sync';
-      final res = await _client.get(
-        Uri.parse('${Environment.apiSyncUrl}?device_id=$deviceId'),
-        headers: await _getHeaders(path),
-      ).timeout(_timeout);
-      if (res.statusCode != 200) return null;
-      return jsonDecode(res.body) as Map<String, dynamic>;
-    } catch (e) {
-      debugPrint('[ApiService] syncStatus failed: $e');
-      return null;
-    }
+    return _withRetry(() async {
+      try {
+        const path = '/api/sync';
+        final res = await _client.get(
+          Uri.parse('${Environment.apiSyncUrl}?device_id=$deviceId'),
+          headers: await _getHeaders(path),
+        ).timeout(_timeout);
+        if (res.statusCode != 200) return null;
+        return jsonDecode(res.body) as Map<String, dynamic>;
+      } catch (e) {
+        debugPrint('[ApiService] syncStatus failed: $e');
+        return null;
+      }
+    });
   }
 
   // ── History ───────────────────────────────────────────────────────────────
 
   Future<List<dynamic>> getHistory(String userId) async {
-    try {
-      const path = '/api/history';
-      final res = await _client.get(
-        Uri.parse('${Environment.apiHistoryUrl}?user_id=$userId'),
-        headers: await _getHeaders(path),
-      ).timeout(_timeout);
-      if (res.statusCode != 200) return [];
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      return data['history'] as List<dynamic>? ?? [];
-    } catch (e) {
-      debugPrint('[ApiService] getHistory failed: $e');
-      return [];
-    }
+    return await _withRetry(() async {
+      try {
+        const path = '/api/history';
+        final res = await _client.get(
+          Uri.parse('${Environment.apiHistoryUrl}?user_id=$userId'),
+          headers: await _getHeaders(path),
+        ).timeout(_timeout);
+        if (res.statusCode != 200) return <dynamic>[];
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return data['history'] as List<dynamic>? ?? <dynamic>[];
+      } catch (e) {
+        debugPrint('[ApiService] getHistory failed: $e');
+        return <dynamic>[];
+      }
+    }) ?? [];
   }
 
   Future<void> addHistory(Map<String, dynamic> entry) async {
@@ -113,19 +154,21 @@ class ApiService {
   // ── Playlists ─────────────────────────────────────────────────────────────
 
   Future<List<dynamic>> getPlaylists(String userId) async {
-    try {
-      const path = '/api/playlists';
-      final res = await _client.get(
-        Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'),
-        headers: await _getHeaders(path),
-      ).timeout(_timeout);
-      if (res.statusCode != 200) return [];
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      return data['playlists'] as List<dynamic>? ?? [];
-    } catch (e) {
-      debugPrint('[ApiService] getPlaylists failed: $e');
-      return [];
-    }
+    return await _withRetry(() async {
+      try {
+        const path = '/api/playlists';
+        final res = await _client.get(
+          Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'),
+          headers: await _getHeaders(path),
+        ).timeout(_timeout);
+        if (res.statusCode != 200) return <dynamic>[];
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return data['playlists'] as List<dynamic>? ?? <dynamic>[];
+      } catch (e) {
+        debugPrint('[ApiService] getPlaylists failed: $e');
+        return <dynamic>[];
+      }
+    }) ?? [];
   }
 
   Future<void> savePlaylist(Map<String, dynamic> playlist) async {
@@ -156,19 +199,21 @@ class ApiService {
   // ── Pro status ────────────────────────────────────────────────────────────
 
   Future<int> getProStatus(String userId) async {
-    try {
-      const path = '/api/pro';
-      final res = await _client.get(
-        Uri.parse('${Environment.apiProUrl}?user_id=$userId'),
-        headers: await _getHeaders(path),
-      ).timeout(_timeout);
-      if (res.statusCode != 200) return 0;
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      return (data['expiry_ms'] as num?)?.toInt() ?? 0;
-    } catch (e) {
-      debugPrint('[ApiService] getProStatus failed: $e');
-      return 0;
-    }
+    return await _withRetry(() async {
+      try {
+        const path = '/api/pro';
+        final res = await _client.get(
+          Uri.parse('${Environment.apiProUrl}?user_id=$userId'),
+          headers: await _getHeaders(path),
+        ).timeout(_timeout);
+        if (res.statusCode != 200) return 0;
+        final data = jsonDecode(res.body) as Map<String, dynamic>;
+        return (data['expiry_ms'] as num?)?.toInt() ?? 0;
+      } catch (e) {
+        debugPrint('[ApiService] getProStatus failed: $e');
+        return 0;
+      }
+    }) ?? 0;
   }
 
   // ── Feedback ──────────────────────────────────────────────────────────────
@@ -257,6 +302,15 @@ class ApiService {
     } catch (e) {
       debugPrint('[ApiService] deleteBookmark failed: $e');
     }
+  }
+
+  // ── Lifecycle ─────────────────────────────────────────────────────────────
+
+  /// Closes the underlying HTTP client and releases the connection pool.
+  /// Call this from the app's dispose lifecycle (e.g. in main.dart or a
+  /// top-level provider's onDispose callback).
+  void dispose() {
+    _client.close();
   }
 
   // ── EQ presets ────────────────────────────────────────────────────────────

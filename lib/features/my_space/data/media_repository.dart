@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/media_scanner_service.dart';
@@ -13,19 +14,21 @@ class MediaRepository {
   List<MediaItem>? get cachedItems => _cachedItems;
   bool _scanning = false;
 
+  /// Completer that all concurrent callers await while a scan is in progress.
+  /// Replaced with a fresh Completer on each new scan so callers never hold
+  /// a stale reference to a completed Completer.
+  Completer<List<MediaItem>>? _scanCompleter;
+
   Future<List<MediaItem>> getAllMedia({bool forceRefresh = false}) async {
     if (_cachedItems != null && !forceRefresh) return _cachedItems!;
-    // Prevent concurrent scans — if a scan is already in progress, wait
-    // for it to complete rather than launching a second parallel scan
-    // that wastes CPU and causes race conditions on the cache.
+    // Prevent concurrent scans — if a scan is already in progress, all
+    // callers await the same Completer instead of busy-polling.
     if (_scanning) {
-      for (var i = 0; i < 100; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        if (!_scanning && _cachedItems != null) return _cachedItems!;
-      }
-      return _cachedItems ?? [];
+      _scanCompleter ??= Completer<List<MediaItem>>();
+      return _scanCompleter!.future;
     }
     _scanning = true;
+    _scanCompleter = Completer<List<MediaItem>>();
     try {
 
     final scanned = await MediaScannerService.instance.scanAll();
@@ -67,9 +70,14 @@ class MediaRepository {
           .ignore();
     } catch (_) {}
 
+    _scanCompleter?.complete(alive);
     return alive;
+    } catch (e) {
+      _scanCompleter?.completeError(e);
+      rethrow;
     } finally {
       _scanning = false;
+      _scanCompleter = null;
     }
   }
 

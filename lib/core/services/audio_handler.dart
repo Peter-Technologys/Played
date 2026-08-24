@@ -184,14 +184,19 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> onTaskRemoved() async {
     debugPrint('[OtyaAudioHandler] onTaskRemoved — disposing player.');
+    // Fix #7: Capture player in a local variable BEFORE any async gap so
+    // that a concurrent null-assignment to _player cannot cause a NPE on
+    // the dispose() call that follows the await.
     final player = _player;
     _cancelSubscriptions();
     _player = null;
-    try {
-      await player?.stop();
-      player?.dispose();
-    } catch (e) {
-      debugPrint('[OtyaAudioHandler] Player dispose error: $e');
+    if (player != null) {
+      try {
+        await player.stop();
+        player.dispose();
+      } catch (e) {
+        debugPrint('[OtyaAudioHandler] Player dispose error: $e');
+      }
     }
     await super.onTaskRemoved();
   }

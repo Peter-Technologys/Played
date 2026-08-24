@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:hive_flutter/hive_flutter.dart';
@@ -106,23 +107,19 @@ class PlayedDatabase {
   /// Derives a deterministic 32-byte key from the device's ANDROID_ID.
   /// ANDROID_ID is stable across reboots (changes only on factory reset),
   /// so the vault remains readable after app restarts even without secure storage.
+  ///
+  /// Fix #12: Use SHA-256 (via the `crypto` package) instead of the previous
+  /// trivially-reversible XOR scheme. SHA-256 of the combined string produces
+  /// a 32-byte digest that is used directly as the AES-256 key.
   Future<Uint8List> _deriveKeyFromAndroidId() async {
     try {
       final androidId = await _kDeviceIdChannel.invokeMethod<String>('getAndroidId') ?? '';
       if (androidId.isNotEmpty) {
-        // Stretch the ANDROID_ID into 32 bytes using a simple PBKDF-like
-        // approach: repeat + XOR with a fixed salt to fill 32 bytes.
         const salt = 'otya_vault_v1_salt';
         final combined = '$androidId:$salt';
-        final bytes = combined.codeUnits;
-        final key = Uint8List(32);
-        for (var i = 0; i < 32; i++) {
-          // Fix: parenthesise correctly so the 0xFF mask applies to the full
-          // expression, not just the constant 13 (operator precedence bug).
-          key[i] = bytes[i % bytes.length] ^ ((i * 37 + 13) & 0xFF);
-        }
-        debugPrint('[PlayedDB] Vault key derived from ANDROID_ID.');
-        return key;
+        final digest = sha256.convert(utf8.encode(combined));
+        debugPrint('[PlayedDB] Vault key derived from ANDROID_ID via SHA-256.');
+        return Uint8List.fromList(digest.bytes);
       }
     } catch (e) {
       debugPrint('[PlayedDB] ANDROID_ID fallback failed: $e');
@@ -139,12 +136,9 @@ class PlayedDatabase {
         seed = const Uuid().v4();
         await prefs.setString(prefKey, seed);
       }
-      final bytes = seed.codeUnits;
-      final key = Uint8List(32);
-      for (var i = 0; i < 32; i++) {
-        key[i] = bytes[i % bytes.length] ^ ((i * 53 + 7) & 0xFF);
-      }
-      return key;
+      // Fix #12: SHA-256 the seed instead of XOR
+      final digest = sha256.convert(utf8.encode('$seed:otya_vault_v1_salt'));
+      return Uint8List.fromList(digest.bytes);
     } catch (e) {
       debugPrint('[PlayedDB] SharedPreferences fallback failed: $e — using random session key');
       // True last resort: random key (vault data lost on restart, but avoids crash)
