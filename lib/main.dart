@@ -78,9 +78,12 @@ void main() async {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
-        androidNotificationOngoing: true,
+        androidNotificationOngoing: false,
         androidStopForegroundOnPause: true,
+        androidNotificationIcon: 'drawable/ic_notification',
         notificationColor: Color(0xFF00E5FF),
+        androidShowNotificationBadge: false,
+        preloadArtwork: true,
       ),
     );
     AudioHandlerSingleton.instance.handler = audioHandler;

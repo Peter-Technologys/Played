@@ -268,18 +268,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void _updateNotification() {
     final item = _container?.read(miniPlayerItemProvider);
     if (item == null) return;
-    // albumArtPath may be an 'albumid:NNNN' URI — not a real file path.
-    // MediaNotificationService calls File(path).existsSync() which always
-    // returns false for albumid: strings. Only pass real file paths.
-    final artPath = item.albumArtPath;
-    final safeArtPath =
-        (artPath != null && !artPath.startsWith('albumid:')) ? artPath : null;
-    MediaNotificationService.instance.show(
-      title: item.title,
-      artist: item.artist ?? 'Unknown Artist',
-      isPlaying: state.isPlaying,
-      albumArtPath: safeArtPath,
-    );
+    AlbumArtService.instance.resolve(item.albumArtPath).then((resolvedPath) {
+      MediaNotificationService.instance.show(
+        id: item.id,
+        title: item.title,
+        artist: item.artist ?? 'Unknown Artist',
+        isPlaying: state.isPlaying,
+        albumArtPath: resolvedPath,
+      );
+    });
   }
 
   bool _loadFavorite(String id) =>
