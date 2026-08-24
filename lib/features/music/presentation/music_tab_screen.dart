@@ -310,7 +310,7 @@ class _FilterPills extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const pills = [
-      (_MusicFilter.allSongs, 'All Songs'),
+      (_MusicFilter.allSongs, 'Songs'),
       (_MusicFilter.playlist, 'Playlist'),
       (_MusicFilter.folder, 'Folder'),
       (_MusicFilter.album, 'Album'),
@@ -656,7 +656,7 @@ class _SongOptionsSheet extends ConsumerWidget {
             const SizedBox(height: 12),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Add to Playlist',
+              child: Text('Add to List',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -668,7 +668,7 @@ class _SongOptionsSheet extends ConsumerWidget {
             if (playlists.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('No playlists yet. Create one first.',
+                child: Text('No lists yet. Create one first.',
                     style: TextStyle(color: AppColors.textSecondary)),
               )
             else
@@ -781,7 +781,7 @@ class _SongOptionsSheet extends ConsumerWidget {
               ref.read(queueProvider.notifier).addToQueue(item);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Added to play next'),
+                  content: Text('Queued!'),
                   backgroundColor: AppColors.surface,
                 ),
               );
@@ -789,7 +789,7 @@ class _SongOptionsSheet extends ConsumerWidget {
           ),
           _OptionTile(
             icon: Icons.playlist_add_rounded,
-            label: 'Add to Playlist',
+            label: 'Add to List',
             color: AppColors.accentViolet,
             onTap: () {
               Navigator.pop(context);

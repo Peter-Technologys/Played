@@ -92,7 +92,7 @@ class _PlaybackHistoryScreenState
               color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Playback History',
+        title: const Text('History',
             style: TextStyle(
               fontFamily: 'Inter', fontWeight: FontWeight.w700,
               color: AppColors.textPrimary, fontSize: 18,

@@ -174,7 +174,7 @@ class QueueScreen extends ConsumerWidget {
                     HapticFeedback.mediumImpact();
                     ref.read(queueProvider.notifier).clear();
                   },
-                  child: Text('Clear',
+                  child: Text('Clear All',
                       style: TextStyle(
                           fontSize: 13,
                           color: cs.onSurface.withValues(alpha: 0.55),

@@ -199,7 +199,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
         appBar: AppBar(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
-          title: Text('Flash Share',
+          title: Text('Beam',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w800, fontFamily: 'Inter', fontSize: 18)),
           centerTitle: true,
@@ -232,7 +232,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
                 unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700, fontFamily: 'Inter', fontSize: 13),
-                tabs: const [Tab(text: '📤  Send'), Tab(text: '📥  Receive')],
+                tabs: const [Tab(text: '📤  Beam'), Tab(text: '📥  Catch')],
               ),
             ),
             Expanded(
@@ -345,7 +345,7 @@ class _SendView extends ConsumerWidget {
           // Share APK
           _GlassButton(
             icon: Icons.install_mobile_rounded,
-            label: 'Share OTYA Player APK',
+            label: 'Beam OTYA Player APK',
             subtitle: 'Let friends install without internet',
             color: AppColors.accentViolet,
             onTap: () => n.shareApk(),

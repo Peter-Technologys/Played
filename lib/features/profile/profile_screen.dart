@@ -38,7 +38,7 @@ class ProfileScreen extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Account & Profile',
+        title: Text('My Profile',
             style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.w700,
               color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
@@ -151,7 +151,7 @@ class ProfileScreen extends ConsumerWidget {
             child: CircularProgressIndicator(
                 strokeWidth: 2, color: AppColors.accent)),
           SizedBox(width: 14),
-          Text('Backing up to cloud…'),
+          Text('Syncing…'),
         ],
       ),
       duration: Duration(seconds: 30),
@@ -163,8 +163,8 @@ class ProfileScreen extends ConsumerWidget {
     if (!context.mounted) return;
     messenger.showSnackBar(SnackBar(
       content: Text(ok
-          ? '✅ Backup complete — playlists & history saved'
-          : '❌ Backup failed. Check your connection.'),
+          ? '✅ Sync done — playlists & history saved'
+          : '❌ Sync failed. Check your connection.'),
       backgroundColor: ok ? AppColors.surface : AppColors.error,
     ));
   }
@@ -501,7 +501,7 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text("What's New", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
+        title: Text('Updates', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
@@ -579,7 +579,7 @@ class _AccountCard extends StatelessWidget {
                           shape: BoxShape.circle),
                     ),
                     const SizedBox(width: 6),
-                    const Text('Signed in with Google',
+                    const Text('Connected',
                         style: TextStyle(
                             fontSize: 12, color: AppColors.textSecondary)),
                   ],
@@ -589,7 +589,7 @@ class _AccountCard extends StatelessWidget {
           ),
           TextButton(
             onPressed: onSignOut,
-            child: const Text('Sign out',
+            child: const Text('Sign Out',
                 style: TextStyle(color: AppColors.error, fontSize: 13)),
           ),
         ],

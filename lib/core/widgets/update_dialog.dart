@@ -90,7 +90,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   color: Colors.white, size: 32),
             ),
             const SizedBox(height: 16),
-            Text('New version available! 🎉',
+            Text('New Version 🎉',
                 style: theme.textTheme.titleMedium
                     ?.copyWith(fontWeight: FontWeight.w800),
                 textAlign: TextAlign.center),
@@ -191,7 +191,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 label: Text(
                   _downloading
                       ? 'Downloading…'
-                      : _error != null ? 'Retry' : 'Update Now',
+                      : _error != null ? 'Retry' : 'Get Update',
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: purple,
@@ -214,7 +214,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   style: TextButton.styleFrom(
                       foregroundColor: Colors.grey[600],
                       padding: const EdgeInsets.symmetric(vertical: 10)),
-                  child: const Text('Remind me later'),
+                  child: const Text('Not Now'),
                 ),
               ),
 

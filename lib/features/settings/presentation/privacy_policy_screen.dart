@@ -18,7 +18,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Privacy Policy',
+          'Privacy',
           style: TextStyle(
             fontSize: 20, fontWeight: FontWeight.w700,
             color: AppColors.textPrimary, fontFamily: 'Inter',

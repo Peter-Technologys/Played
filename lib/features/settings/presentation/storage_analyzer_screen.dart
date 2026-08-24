@@ -69,7 +69,7 @@ class _State extends State<StorageAnalyzerScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Storage Analyzer',
+        title: const Text('Storage',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary, fontFamily: 'Inter')),
         actions: [IconButton(

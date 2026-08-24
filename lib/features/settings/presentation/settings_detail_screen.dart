@@ -41,7 +41,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Settings',
+          'Preferences',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -58,8 +58,8 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
           _GroupCard(children: [
             _NavTile(
               icon: Icons.palette_rounded,
-              label: 'Theme & Appearance',
-              subtitle: 'Dark, AMOLED, Light & wallpaper',
+              label: 'Look & Feel',
+              subtitle: 'Themes, AMOLED & wallpaper',
               color: AppColors.accentViolet,
               onTap: () => context.push('/theme'),
             ),
@@ -75,7 +75,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.tune_rounded,
               label: 'General',
-              subtitle: 'Language, search history, cache',
+              subtitle: 'Language & cache',
               color: AppColors.accent,
               onTap: () => _showGeneralSheet(context, ref),
             ),
@@ -83,7 +83,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.videocam_rounded,
               label: 'Video',
-              subtitle: 'Pop-up play, orientation, auto-resume',
+              subtitle: 'PiP, rotation & resume',
               color: AppColors.accentViolet,
               onTap: () => _showVideoSheet(context, ref),
             ),
@@ -91,7 +91,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.headphones_rounded,
               label: 'Audio',
-              subtitle: 'Format, equalizer, .nomedia filters',
+              subtitle: 'EQ, format & filters',
               color: AppColors.accentGreen,
               onTap: () => _showAudioSheet(context, ref),
             ),
@@ -121,15 +121,15 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.download_rounded,
               label: 'Downloads',
-              subtitle: 'Download path, max concurrent tasks',
+              subtitle: 'Path & speed',
               color: AppColors.accent,
               onTap: () => _showDownloadsSheet(context, ref),
             ),
             _Divider(),
             _NavTile(
               icon: Icons.security_rounded,
-              label: 'Privacy & Security',
-              subtitle: 'App lock, biometrics, hide vault',
+              label: 'Privacy',
+              subtitle: 'Lock, biometrics & Safe',
               color: AppColors.accentViolet,
               onTap: () => _showPrivacySheet(context, ref),
             ),
@@ -137,7 +137,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.policy_rounded,
               label: 'Privacy Policy',
-              subtitle: 'How we handle your data',
+              subtitle: 'Read our policy',
               color: AppColors.accentGreen,
               onTap: () => context.push('/privacy'),
             ),
@@ -571,7 +571,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cache cleared ✅'),
+        content: Text('Cleared ✅'),
         backgroundColor: AppColors.surface,
       ),
     );
