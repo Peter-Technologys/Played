@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
+import 'album_art_service.dart';
 import 'audio_handler.dart';
 import 'shared_notification_plugin.dart';
 
@@ -40,6 +42,7 @@ class MediaNotificationService {
   /// Updates the system MediaSession with track metadata.
   /// The audio_service foreground service renders the notification.
   Future<void> show({
+    required String id,
     required String title,
     required String artist,
     required bool isPlaying,
@@ -47,10 +50,14 @@ class MediaNotificationService {
   }) async {
     if (!_initialized) await init();
     Uri? artUri;
-    if (albumArtPath != null && File(albumArtPath).existsSync()) {
-      artUri = Uri.file(albumArtPath);
+    if (albumArtPath != null) {
+      final resolved = await AlbumArtService.instance.resolve(albumArtPath);
+      if (resolved != null && File(resolved).existsSync()) {
+        artUri = Uri.file(resolved);
+      }
     }
     AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
+      id: id,
       title: title,
       artist: artist,
       artUri: artUri,
@@ -59,17 +66,27 @@ class MediaNotificationService {
 
   /// Updates the system MediaSession with in-memory album art.
   Future<void> showWithBitmap({
+    required String id,
     required String title,
     required String artist,
     required bool isPlaying,
     required Uint8List albumArtBytes,
   }) async {
     if (!_initialized) await init();
-    // audio_service does not support raw bytes for artUri directly;
-    // pass without art — the title/artist still show on the lock screen.
+    Uri? artUri;
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/otya_art_${id.hashCode}.jpg');
+      await file.writeAsBytes(albumArtBytes);
+      artUri = Uri.file(file.path);
+    } catch (e) {
+      debugPrint('[MediaNotification] showWithBitmap write failed: $e');
+    }
     AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
+      id: id,
       title: title,
       artist: artist,
+      artUri: artUri,
     );
   }
 

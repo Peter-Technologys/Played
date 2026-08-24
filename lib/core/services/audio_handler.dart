@@ -132,15 +132,16 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   /// Convenience helper used internally to update the media item from
-  /// individual fields (title, artist, artUri, duration).
+  /// individual fields (id, title, artist, artUri, duration).
   void updateMediaItemFromParts({
+    required String id,
     required String title,
     required String artist,
     Uri? artUri,
     Duration? duration,
   }) {
     mediaItem.add(MediaItem(
-      id: title,
+      id: id,
       title: title,
       artist: artist,
       artUri: artUri,
