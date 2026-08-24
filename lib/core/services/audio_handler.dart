@@ -21,6 +21,9 @@ import 'media_notification_service.dart';
 /// kill the process when the app is backgrounded or the screen turns off.
 /// It also drives the system MediaSession (lock-screen controls, Bluetooth
 /// headset buttons) by updating [mediaItem] and [playbackState].
+/// 
+/// FIX: This is the ONLY source of truth for audio state.
+/// No duplicate Player instances elsewhere.
 class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   Player? _player;
 
@@ -32,6 +35,7 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   // ── Player attachment ─────────────────────────────────────────────────
 
   void attachPlayer(Player player) {
+    debugPrint('[OtyaAudioHandler] Attaching player');
     _cancelSubscriptions();
     _player = player;
     _subscribeToPlayer(player);
@@ -39,6 +43,7 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   void detachPlayer() {
+    debugPrint('[OtyaAudioHandler] Detaching player');
     _cancelSubscriptions();
     _player = null;
     playbackState.add(playbackState.value.copyWith(
