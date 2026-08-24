@@ -83,7 +83,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   @override
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     // Fix #20: Persist seek position when the app is backgrounded or killed
     // so the user can resume from where they left off after an app restart.

@@ -9,7 +9,6 @@ import 'theme/app_colors.dart';
 import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
-import '../core/widgets/update_dialog.dart';
 import '../core/services/custom_theme_manager.dart';
 import '../core/services/fcm_service.dart';
 import '../core/providers/theme_provider.dart';
@@ -43,7 +42,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     // "setState after dispose" crashes during the startup window.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) UpdateDialog.checkAndShow(context);
         if (mounted) AnnouncementDialog.showIfPending(context);
       });
     });

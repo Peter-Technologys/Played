@@ -50,14 +50,10 @@ Future<void> _savePin(String pin) async {
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
 
-/// Tracks the last time the vault was successfully unlocked.
-/// Used to enforce the 5-minute biometric re-auth timeout.
-DateTime? _lastUnlockTime;
-
 /// Returns true if the vault session has expired (> 5 minutes since unlock).
 bool _isVaultSessionExpired() {
-  if (_lastUnlockTime == null) return true;
-  return DateTime.now().difference(_lastUnlockTime!) > _kBiometricTimeout;
+  if (_VaultLockScreenState._lastUnlockTime == null) return true;
+  return DateTime.now().difference(_VaultLockScreenState._lastUnlockTime!) > _kBiometricTimeout;
 }
 
 // ── Lock Screen ────────────────────────────────────────────────────
@@ -70,6 +66,9 @@ class VaultLockScreen extends ConsumerStatefulWidget {
 }
 
 class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
+  /// Static so it persists across widget rebuilds and is shared with _VaultGalleryScreenState.
+  static DateTime? _lastUnlockTime;
+
   final LocalAuthentication _auth = LocalAuthentication();
   bool _isAuthenticating = false;
   String? _errorMessage;
@@ -82,7 +81,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
       // force re-authentication (Bug 6 fix: biometric re-auth timeout).
       if (ref.read(vaultUnlockedProvider) && _isVaultSessionExpired()) {
         ref.read(vaultUnlockedProvider.notifier).state = false;
-        _lastUnlockTime = null;
+        _VaultLockScreenState._lastUnlockTime = null;
       }
       _authenticate();
     });
@@ -111,7 +110,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
       );
       if (ok) {
         HapticFeedback.mediumImpact();
-        _lastUnlockTime = DateTime.now(); // record unlock time for timeout
+        _VaultLockScreenState._lastUnlockTime = DateTime.now(); // record unlock time for timeout
         ref.read(vaultUnlockedProvider.notifier).state = true;
       } else {
         setState(() => _errorMessage = 'Authentication failed. Try again.');
@@ -269,7 +268,7 @@ class _PinDialogState extends State<_PinDialog> {
     setState(() => _loading = false);
     if (ok) {
       HapticFeedback.mediumImpact();
-      _lastUnlockTime = DateTime.now(); // record unlock time for timeout
+      _VaultLockScreenState._lastUnlockTime = DateTime.now(); // record unlock time for timeout
       Navigator.of(context).pop();
       widget.onSuccess();
     } else {
@@ -433,7 +432,7 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed && _isVaultSessionExpired()) {
       ref.read(vaultUnlockedProvider.notifier).state = false;
-      _lastUnlockTime = null;
+      _VaultLockScreenState._lastUnlockTime = null;
     }
   }
 

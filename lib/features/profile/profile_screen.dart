@@ -12,7 +12,7 @@ import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 
-import '../../shared/widgets/otya_logo.dart';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile & Settings Screen
@@ -132,7 +132,7 @@ class ProfileScreen extends ConsumerWidget {
           // the dedicated About screen — tap Help & Feedback in My Space
           // or navigate to /about.
           const SizedBox(height: 32),
-          const Center(child: OtyaFooter()),
+          const Center(child: Text('OTYA Player — Otya? Play.', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Inter', letterSpacing: 0.5))),
           const SizedBox(height: 24),
         ],
       ),
@@ -466,12 +466,30 @@ class _AboutCardState extends State<_AboutCard> {
 
 // ── What's New Screen ──────────────────────────────────────────────────────
 
-/// Fetches the changelog from the backend /api/version endpoint and displays
-/// it as plain text. The changelog field is a server-side string so it is
-/// always up-to-date without requiring a binary update.
-class WhatsNewScreen extends StatelessWidget {
+class WhatsNewScreen extends StatefulWidget {
   const WhatsNewScreen({super.key});
-
+  @override
+  State<WhatsNewScreen> createState() => _WhatsNewScreenState();
+}
+class _WhatsNewScreenState extends State<WhatsNewScreen> {
+  String? _changelog;
+  bool _loading = true;
+  String? _error;
+  @override
+  void initState() { super.initState(); _fetch(); }
+  Future<void> _fetch() async {
+    try {
+      final info = await UpdateService.instance.checkForUpdate(force: true);
+      if (mounted) setState(() {
+        _changelog = (info?.changelog.isNotEmpty == true)
+            ? info!.changelog
+            : 'You are on the latest version. No changelog available.';
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() { _error = 'Could not load changelog.'; _loading = false; });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -480,56 +498,27 @@ class WhatsNewScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text("What's New",
-            style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-            )),
+        title: Text("What's New", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
       ),
-      body: FutureBuilder<UpdateInfo?>(
-        future: UpdateService.instance.checkForUpdate(force: true),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            );
-          }
-          final changelog = snapshot.data?.changelog.trim() ?? '';
-          if (changelog.isEmpty) {
-            return const Center(
-              child: Padding(
-                padding: EdgeInsets.all(32),
-                child: Text(
-                  'No changelog available.\nCheck your internet connection.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                    fontFamily: 'Inter',
-                    height: 1.6,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+          : _error != null
+              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.borderOf(context)),
+                    ),
+                    child: Text(_changelog ?? '', style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontFamily: 'Inter', height: 1.7)),
                   ),
                 ),
-              ),
-            );
-          }
-          return SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-            child: Text(
-              changelog,
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-                height: 1.7,
-              ),
-            ),
-          );
-        },
-      ),
     );
   }
 }

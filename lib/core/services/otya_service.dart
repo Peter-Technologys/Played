@@ -75,6 +75,10 @@ class OtyaService {
   //
   // Safe to call on app startup — never throws.
   // ───────────────────────────────────────────────────────────────────────────
+  /// DEPRECATED: Use [ThemeProvider.instance.fetchRemoteTheme()] instead.
+  /// ThemeProvider is the single source of truth for remote themes in OTYA Player.
+  /// This method is kept to avoid breaking any compiled references.
+  @Deprecated('Use ThemeProvider.instance.fetchRemoteTheme()')
   Future<void> fetchOtaTheme() async {
     if (_themeFetchInProgress) return;
     _themeFetchInProgress = true;
