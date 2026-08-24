@@ -110,8 +110,8 @@ class MediaScannerService {
     '/storage/emulated/0/MiDrop',
     '/storage/emulated/0/Zapya',
     '/storage/emulated/0/InShare',
-    '/storage/emulated/0/PLAYED',
-    '/storage/emulated/0/Download/PLAYED',
+    '/storage/emulated/0/OTYA',
+    '/storage/emulated/0/Download/OTYA',
   ];
 
   // PRIMARY: query audio + video in parallel

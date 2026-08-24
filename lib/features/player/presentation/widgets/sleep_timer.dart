@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../app/theme/app_colors.dart';
+import '../../../../core/services/sleep_detection_service.dart';
 
 // ── Provider ───────────────────────────────────────────────
 
@@ -20,16 +21,28 @@ class SleepTimerState {
 class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
   SleepTimerNotifier() : super(const SleepTimerState());
 
+  // UI countdown ticker — updates remaining display every second.
   Timer? _ticker;
-  VoidCallback? _onExpire;
   // Fade callback — set by the audio player screen
   Future<void> Function(double volume)? onSetVolume;
 
   void start(Duration duration, VoidCallback onExpire) {
     _ticker?.cancel();
-    _onExpire = onExpire;
+    SleepDetectionService.instance.stop();
+
     state = SleepTimerState(remaining: duration, isActive: true);
     var remaining = duration;
+
+    // Delegate the actual sleep detection to SleepDetectionService.
+    SleepDetectionService.instance.onSleepDetected = () {
+      _ticker?.cancel();
+      state = const SleepTimerState(isActive: false);
+      onSetVolume?.call(1.0); // restore volume
+      onExpire();
+    };
+    SleepDetectionService.instance.start(duration);
+
+    // Keep a UI ticker for the countdown display and volume fade.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!state.isActive) { _ticker?.cancel(); return; }
       remaining -= const Duration(seconds: 1);
@@ -40,18 +53,13 @@ class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
         final fadeProgress = remaining.inSeconds / 30.0;
         onSetVolume?.call(fadeProgress.clamp(0.0, 1.0));
       }
-
-      if (remaining.inSeconds <= 0) {
-        _ticker?.cancel();
-        state = const SleepTimerState(isActive: false);
-        onSetVolume?.call(1.0); // restore volume
-        _onExpire?.call();
-      }
     });
   }
 
   void cancel() {
     _ticker?.cancel();
+    SleepDetectionService.instance.stop();
+    SleepDetectionService.instance.onSleepDetected = null;
     onSetVolume?.call(1.0); // restore volume
     state = const SleepTimerState(isActive: false);
   }
@@ -59,6 +67,7 @@ class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
   @override
   void dispose() {
     _ticker?.cancel();
+    SleepDetectionService.instance.stop();
     super.dispose();
   }
 }

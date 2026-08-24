@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../app/theme/app_colors.dart';
-import '../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../core/models/media_item.dart';
 import '../../core/models/playlist.dart';
 import '../../features/my_space/data/media_repository.dart';
@@ -25,7 +25,7 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
   PlaylistsNotifier() : super([]);
 
   void load() {
-    state = PlayedDatabase.instance.getAllPlaylists();
+    state = OtyaDatabase.instance.getAllPlaylists();
   }
 
   Future<Playlist> create(String name) async {
@@ -37,13 +37,13 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await PlayedDatabase.instance.savePlaylist(playlist);
+    await OtyaDatabase.instance.savePlaylist(playlist);
     state = [...state, playlist];
     return playlist;
   }
 
   Future<void> rename(String id, String newName) async {
-    final playlist = PlayedDatabase.instance.getPlaylist(id);
+    final playlist = OtyaDatabase.instance.getPlaylist(id);
     if (playlist == null) return;
     final updated = Playlist(
       id: playlist.id,
@@ -52,25 +52,25 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
       createdAt: playlist.createdAt,
       updatedAt: DateTime.now(),
     );
-    await PlayedDatabase.instance.savePlaylist(updated);
+    await OtyaDatabase.instance.savePlaylist(updated);
     state = state.map((p) => p.id == id ? updated : p).toList();
   }
 
   Future<void> delete(String id) async {
-    await PlayedDatabase.instance.deletePlaylist(id);
+    await OtyaDatabase.instance.deletePlaylist(id);
     state = state.where((p) => p.id != id).toList();
   }
 
   Future<void> addTrack(String playlistId, MediaItem item) async {
-    await PlayedDatabase.instance.addToPlaylist(playlistId, item);
+    await OtyaDatabase.instance.addToPlaylist(playlistId, item);
     load();
   }
 
   Future<void> removeTrack(String playlistId, String mediaId) async {
-    final playlist = PlayedDatabase.instance.getPlaylist(playlistId);
+    final playlist = OtyaDatabase.instance.getPlaylist(playlistId);
     if (playlist == null) return;
     playlist.mediaIds.remove(mediaId);
-    await PlayedDatabase.instance.savePlaylist(playlist);
+    await OtyaDatabase.instance.savePlaylist(playlist);
     load();
   }
 }
@@ -534,7 +534,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   createdAt: widget.playlist.createdAt,
                   updatedAt: DateTime.now(),
                 );
-                PlayedDatabase.instance.savePlaylist(updated);
+                OtyaDatabase.instance.savePlaylist(updated);
                 ref.read(playlistsProvider.notifier).load();
               },
               itemBuilder: (context, i) {

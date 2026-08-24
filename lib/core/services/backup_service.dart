@@ -5,6 +5,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../database/otya_database.dart';
+import '../models/playlist.dart';
 import 'auth_service.dart';
 import 'http_client.dart';
 
@@ -62,7 +64,7 @@ class BackupService {
   }
 
   Future<Map<String, dynamic>> buildBackupData() async {
-    final playlists = PlayedDatabase.instance.getAllPlaylists()
+    final playlists = OtyaDatabase.instance.getAllPlaylists()
         .map((p) => {
               'id': p.id,
               'name': p.name,
@@ -72,20 +74,10 @@ class BackupService {
             })
         .toList();
 
-    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200)
-        .map((item) => {
-              'id': item.id,
-              'title': item.title,
-              'path': item.filePath,
-              'lastPlayedAt': item.lastPlayedAt?.toIso8601String(),
-            })
-        .toList();
-
     return {
       'version':    1,
       'created_at': DateTime.now().toIso8601String(),
       'playlists':  playlists,
-      'history':    history,
       'eq_presets': <dynamic>[],
       'bookmarks':  <dynamic>[],
     };
@@ -106,18 +98,9 @@ class BackupService {
           createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? now,
           updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? now,
         );
-        await PlayedDatabase.instance.savePlaylist(playlist);
+        await OtyaDatabase.instance.savePlaylist(playlist);
       }
     } catch (e) { debugPrint('[BackupService] playlists restore failed: $e'); }
 
-    // Restore history (seed only — does not overwrite lastPlayedAt)
-    try {
-      final history = data['history'] as List<dynamic>? ?? [];
-      debugPrint('[BackupService] Restoring ${history.length} history entries');
-      // History items are seeded as library items to avoid corrupting timestamps.
-      // Full MediaItem reconstruction is not possible from backup alone (missing
-      // file metadata), so we skip history restore to avoid partial/broken items.
-      debugPrint('[BackupService] History restore skipped — file metadata not available in backup.');
-    } catch (e) { debugPrint('[BackupService] history restore failed: $e'); }
   }
 }

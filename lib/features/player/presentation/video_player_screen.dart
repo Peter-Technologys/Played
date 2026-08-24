@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/media_kit_engine.dart';
@@ -64,7 +64,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   void initState() {
     super.initState();
     _savedPosition =
-        PlayedDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
+        OtyaDatabase.instance.getSeekPosition(widget.mediaItem.id) ??
         Duration.zero;
     // Initialise _position from _savedPosition so the seek bar shows the
     // correct position immediately, before the first stream event arrives.

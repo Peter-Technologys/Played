@@ -7,7 +7,7 @@ import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/update_service.dart';
 import '../../../core/widgets/update_dialog.dart';
 import '../settings_provider.dart';
@@ -557,7 +557,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
 
   Future<void> _clearCache(BuildContext context) async {
     try {
-      await PlayedDatabase.instance.clearAllSeekPositions();
+      await OtyaDatabase.instance.clearAllSeekPositions();
       // Delete temp dirs if they exist
       final tmpDir = await getTemporaryDirectory();
       if (tmpDir.existsSync()) {
