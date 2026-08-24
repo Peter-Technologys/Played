@@ -55,9 +55,12 @@
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
     <!-- SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM removed — not needed -->
 
     <queries>
+        <!-- HTTPS and HTTP VIEW intents (WebView, url_launcher) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -66,10 +69,17 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
         </intent>
+        <!-- Email / SEND intent (share_plus, mailto links) -->
         <intent>
             <action android:name="android.intent.action.SENDTO" />
             <data android:scheme="mailto" />
         </intent>
+        <intent>
+            <action android:name="android.intent.action.SEND" />
+            <data android:mimeType="*/*" />
+        </intent>
+        <!-- WhatsApp package query (for WhatsApp Trimmer feature) -->
+        <package android:name="com.whatsapp" />
     </queries>
 
     <!-- Declare support for all screen sizes so the app is not filtered

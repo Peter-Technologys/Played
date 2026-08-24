@@ -30,6 +30,7 @@ import '../shared/widgets/pro_gate.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/verify_email_screen.dart';
+import '../features/webview/otya_webview_screen.dart';
 
 // ── Shared fade transition (200 ms) used for shell/tab routes ─────────────
 
@@ -349,6 +350,20 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/webview',
+        pageBuilder: (c, s) {
+          final args = s.extra as Map<String, dynamic>? ?? {};
+          return _fadePage(
+            context: c,
+            state: s,
+            child: OtyaWebViewScreen(
+              url: args['url'] as String? ?? 'https://getotya.petersmartlink.com',
+              title: args['title'] as String?,
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: '/tools/whatsapp',
         pageBuilder: (c, s) {
           final item = s.extra;
@@ -614,8 +629,8 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final miniItem = ref.watch(miniPlayerItemProvider);
-    final hasMini  = miniItem != null;
+    // Only watch mediaLibraryProvider here — mini player is wrapped in its
+    // own Consumer below so only it rebuilds on miniPlayerItemProvider changes.
     final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
 
     // Derive the active tab index from the current route location so that
@@ -655,8 +670,16 @@ class _MainShellState extends ConsumerState<_MainShell> {
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini-player — only rendered when a track is loaded
-          if (hasMini) const RepaintBoundary(child: MiniPlayer()),
+          // Mini-player wrapped in Consumer so only it rebuilds when the
+          // current track changes — the rest of the shell is unaffected.
+          Consumer(
+            builder: (context, ref, _) {
+              final hasMini = ref.watch(miniPlayerItemProvider) != null;
+              return hasMini
+                  ? const RepaintBoundary(child: MiniPlayer())
+                  : const SizedBox.shrink();
+            },
+          ),
           // TASK 11: AdBannerSlot already returns SizedBox.shrink() when ads
           // are disabled — no visual gap. No additional guard needed.
           SafeArea(
