@@ -10,6 +10,9 @@
 //   highMid ~2000–6000 Hz
 //   treble  ~6000–16000 Hz
 
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
 /// A 5-band EQ preset with values in dB (-12 to +12).
 class EqPreset {
   final double bass;
@@ -49,6 +52,11 @@ class EqPreset {
 class AutoEqService {
   AutoEqService._();
   static final AutoEqService instance = AutoEqService._();
+
+  // ── EQ channel ────────────────────────────────────────────────────────────
+  // Kept here so the channel is only invoked from one place (testable, not
+  // duplicated inline in AudioPlayerNotifier.load()).
+  static const _eqChannel = MethodChannel('com.otyaplayer.app/equalizer');
 
   // ── Keyword → preset mapping ──────────────────────────────────────────────
   // Each entry is a list of keywords; the first match wins.
@@ -168,6 +176,28 @@ class AutoEqService {
   ];
 
   // ── Public API ────────────────────────────────────────────────────────────
+
+  /// Applies [preset] to the native equalizer via the MethodChannel.
+  ///
+  /// No-op when [preset] is [EqPreset.flat] (all bands at 0 dB).
+  /// Errors are caught and logged — never thrown to the caller.
+  Future<void> applyPreset(EqPreset preset) async {
+    if (preset.name == 'Flat') return;
+    try {
+      await _eqChannel.invokeMethod<void>('setBands', {
+        'gains': [
+          preset.bass,
+          preset.lowMid,
+          preset.mid,
+          preset.highMid,
+          preset.treble,
+        ],
+      });
+    } catch (e) {
+      // EQ channel errors are non-fatal — playback continues without EQ.
+      debugPrint('[AutoEQ] applyPreset failed (non-fatal): $e');
+    }
+  }
 
   /// Detects an [EqPreset] from [filename] by matching genre/mood keywords.
   /// Returns [EqPreset.flat] when no keyword matches.

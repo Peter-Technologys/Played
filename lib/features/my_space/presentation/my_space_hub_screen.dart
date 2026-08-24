@@ -11,6 +11,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import 'providers/my_space_provider.dart';
 
 // ── Tool entry model (used by search delegate and grid) ──────────────────────
@@ -413,8 +414,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
     final tools = _buildToolEntries(context, ref);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
