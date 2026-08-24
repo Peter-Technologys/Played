@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:go_router/go_router.dart';
@@ -186,11 +188,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _loadGeneration++;
     final myGeneration = _loadGeneration;
 
-    // Reset stale _loading flag instead of returning early (avoids deadlock).
-    if (_loading) {
-      debugPrint('[AudioPlayer] _loadCurrent: resetting stale _loading flag.');
-      _loading = false;
-    }
+    // Fix #4: Only set _loading for this generation. If another call has
+    // already incremented _loadGeneration past myGeneration by the time we
+    // reach the finally block, we must NOT clear _loading — that belongs to
+    // the newer call. Guard every _loading mutation with a generation check.
     _loading = true;
 
     try {
@@ -201,7 +202,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         await _player.open(Media(item.filePath), play: false);
       } catch (srcErr) {
         debugPrint('[AudioPlayer] player.open failed: $srcErr\nPath: ${item.filePath}');
-        if (mounted) state = state.copyWith(isLoading: false);
+        if (_loadGeneration == myGeneration && mounted) {
+          state = state.copyWith(isLoading: false);
+        }
         return;
       }
 
@@ -218,9 +221,14 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       await _player.play();
     } catch (e) {
       debugPrint('[AudioPlayer] _loadCurrent error: $e');
-      if (mounted) state = state.copyWith(isLoading: false);
+      if (_loadGeneration == myGeneration && mounted) {
+        state = state.copyWith(isLoading: false);
+      }
     } finally {
-      _loading = false;
+      // Only clear _loading if we are still the active generation.
+      if (_loadGeneration == myGeneration) {
+        _loading = false;
+      }
     }
   }
 
@@ -527,6 +535,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 child: _AlbumArt(
                   albumArtPath: widget.mediaItem.albumArtPath,
                   isPlaying: ps.isPlaying,
+                  title: widget.mediaItem.title,
                 ),
               ),
             ),
@@ -784,7 +793,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 class _AlbumArt extends StatefulWidget {
   final String? albumArtPath;
   final bool isPlaying;
-  const _AlbumArt({this.albumArtPath, required this.isPlaying});
+  final String title;
+  const _AlbumArt({this.albumArtPath, required this.isPlaying, this.title = ''});
 
   @override
   State<_AlbumArt> createState() => _AlbumArtState();
@@ -807,10 +817,23 @@ class _AlbumArtState extends State<_AlbumArt> {
   }
 
   Future<void> _resolve() async {
-    // Mark as loading so we show the placeholder while resolving.
+    final path = widget.albumArtPath;
+
+    // Fix #10: non-albumid: paths are already real file paths — resolve
+    // synchronously without going async to avoid unnecessary overhead.
+    if (path == null) {
+      if (mounted) setState(() { _resolvedPath = null; _loading = false; });
+      return;
+    }
+    if (!path.startsWith('albumid:')) {
+      if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+      return;
+    }
+
+    // albumid: paths need an async MethodChannel call.
     if (mounted) setState(() => _loading = true);
-    final path = await AlbumArtService.instance.resolve(widget.albumArtPath);
-    if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+    final resolved = await AlbumArtService.instance.resolve(path);
+    if (mounted) setState(() { _resolvedPath = resolved; _loading = false; });
   }
 
   @override
@@ -843,31 +866,102 @@ class _AlbumArtState extends State<_AlbumArt> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
+        // Fix #11: limit decoded image size for the player art
         child: showArt
-            ? Image.file(File(_resolvedPath!),
-                fit: BoxFit.cover, width: double.infinity)
-            : Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.accent.withValues(alpha: 0.15),
-                      AppColors.accentViolet.withValues(alpha: 0.25),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+            ? RepaintBoundary(
+                child: Image.file(
+                  File(_resolvedPath!),
+                  fit: BoxFit.cover,
+                  width: double.infinity,
+                  cacheWidth: 600,
                 ),
-                child: Center(
-                  child: Icon(
-                    Icons.music_note_rounded,
-                    color: AppColors.accent.withValues(
-                        alpha: widget.isPlaying ? 0.9 : 0.5),
-                    size: 80,
-                  ),
-                ),
+              )
+            : _DynamicArtPlaceholder(
+                title: widget.title,
+                isPlaying: widget.isPlaying,
               ),
       ),
     );
+  }
+}
+
+/// Fix #17: Dynamic album art placeholder — blurred gradient background,
+/// first letter of the track title, and a subtle vinyl ring animation.
+class _DynamicArtPlaceholder extends StatelessWidget {
+  final String title;
+  final bool isPlaying;
+  const _DynamicArtPlaceholder({required this.title, required this.isPlaying});
+
+  @override
+  Widget build(BuildContext context) {
+    final letter = title.isNotEmpty ? title[0].toUpperCase() : '♪';
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Blurred gradient background
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.accent.withValues(alpha: 0.20),
+                AppColors.accentViolet.withValues(alpha: 0.35),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          child: Container(color: Colors.transparent),
+        ),
+        // Subtle vinyl ring — animated when playing
+        Center(
+          child: _VinylRing(isPlaying: isPlaying),
+        ),
+        // First letter of track title
+        Center(
+          child: Text(
+            letter,
+            style: TextStyle(
+              fontSize: 96,
+              fontWeight: FontWeight.w900,
+              color: AppColors.accent.withValues(
+                  alpha: isPlaying ? 0.95 : 0.60),
+              fontFamily: 'Inter',
+              height: 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Subtle vinyl record ring that rotates when [isPlaying] is true.
+class _VinylRing extends StatelessWidget {
+  final bool isPlaying;
+  const _VinylRing({required this.isPlaying});
+
+  @override
+  Widget build(BuildContext context) {
+    final ring = Container(
+      width: 220,
+      height: 220,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.18),
+          width: 28,
+        ),
+      ),
+    );
+
+    if (!isPlaying) return ring;
+
+    return ring
+        .animate(onPlay: (c) => c.repeat())
+        .rotate(duration: 4000.ms, curve: Curves.linear);
   }
 }
 
