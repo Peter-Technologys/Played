@@ -246,21 +246,6 @@ class ApiService {
     }
   }
 
-  // ── Ratings ───────────────────────────────────────────────────────────────
-
-  Future<void> submitRating(Map<String, dynamic> rating) async {
-    try {
-      const path = '/api/ratings';
-      await _client.post(
-        Uri.parse(Environment.apiRatingsUrl),
-        headers: await _postHeaders(path),
-        body: jsonEncode(rating),
-      ).timeout(_timeout);
-    } catch (e) {
-      debugPrint('[ApiService] submitRating failed: $e');
-    }
-  }
-
   // ── Bookmarks ─────────────────────────────────────────────────────────────
 
   Future<List<dynamic>> getBookmarks(String userId) async {

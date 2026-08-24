@@ -4,7 +4,7 @@
 // OTYA Player connects to petersmartlink.com Cloudflare backend.
 // Same backend serves SmartPOS (business POS) and Otya-Store website.
 // All apps share JWT auth at /auth/*
-// APK downloads served from Cloudflare R2 via getotya.petersmartlink.com
+// APK downloads served from Cloudflare R2 via petersmartlink.com
 //
 // This client provides:
 //   - Automatic JWT token refresh on 401 using refresh_token from

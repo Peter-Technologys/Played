@@ -6,16 +6,12 @@ abstract class Environment {
   static const String apiSyncUrl        = '$workerUrl/api/sync';
   static const String apiCrashUrl       = '$workerUrl/api/crash-report';
   static const String checkUpdateUrl    = '$workerUrl/check-update';
-  static const String registerDeviceUrl = '$workerUrl/register-device';
-  static const String apiThemeUrl       = '$workerUrl/api/theme';
   static const String apiVersionUrl     = '$workerUrl/api/version';
   static const String apiDeviceUrl      = '$workerUrl/api/device';
   static const String apiPlaylistsUrl   = '$workerUrl/api/playlists';
   static const String apiHistoryUrl     = '$workerUrl/api/history';
   static const String apiProUrl         = '$workerUrl/api/pro';
   static const String apiFeedbackUrl    = '$workerUrl/api/feedback';
-  static const String apiRatingsUrl     = '$workerUrl/api/ratings';
-  static const String apiThemesUrl      = '$workerUrl/api/themes';
 
   // ── Public version endpoints (no auth — used by update checker) ───────────
   static const String latestUrl         = '$workerUrl/latest';

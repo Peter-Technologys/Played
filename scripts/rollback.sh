@@ -30,7 +30,7 @@ VERSION=${VERSION#v}
 
 R2_ENDPOINT="${R2_ENDPOINT:-https://6c76d2a9e5f95d5f9b393e97374d9afb.r2.cloudflarestorage.com}"
 R2_BUCKET="${R2_BUCKET:-otya-player-releases}"
-WORKER_URL="https://getotya.petersmartlink.com"
+WORKER_URL="https://petersmartlink.com"
 
 export AWS_ACCESS_KEY_ID="${R2_ACCESS_KEY_ID:?R2_ACCESS_KEY_ID is required}"
 export AWS_SECRET_ACCESS_KEY="${R2_SECRET_ACCESS_KEY:?R2_SECRET_ACCESS_KEY is required}"

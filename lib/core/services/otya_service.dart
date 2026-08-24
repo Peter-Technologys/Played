@@ -39,7 +39,6 @@ class OtyaService {
   // ── Worker endpoints ──────────────────────────────────────────────────────
   static String get _themeUrl        => '${Environment.workerUrl}/api/theme';
   static String get _checkUpdateUrl  => '${Environment.workerUrl}/check-update';
-  static String get _registerUrl     => '${Environment.workerUrl}/register-device';
 
   // ── Concurrency guards ────────────────────────────────────────────────────
   bool _themeFetchInProgress  = false;
@@ -304,8 +303,6 @@ class OtyaService {
   //
   // POSTs { device_id, fcm_token } to /api/device (snake_case, same as
   // DeviceService) so the FCM token is always stored on the canonical row.
-  // The legacy /register-device endpoint used camelCase keys which silently
-  // missed the ON CONFLICT update when field names didn't match.
   // Non-blocking — failures are logged but never surfaced to the user.
   // ───────────────────────────────────────────────────────────────────────────
   Future<void> registerDevicePushToken({
