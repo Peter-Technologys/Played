@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -12,13 +13,13 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/services/auto_eq_service.dart';
-import '../../../core/services/vault_service.dart';
-import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
 import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';
+import '../../../core/services/sleep_detection_service.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -82,6 +83,12 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   bool    _loading        = false;
   int     _loadGeneration = 0;
 
+  // Cache the last resolved album art path per item ID so _updateNotification()
+  // does not re-resolve on every play/pause event (which fires AlbumArtService
+  // on every state change). Only re-resolves when the item ID changes.
+  String? _lastNotificationItemId;
+  String? _lastResolvedArtPath;
+
   // Held subscriptions — cancelled on dispose.
   StreamSubscription? _playingSub;
   StreamSubscription? _bufferingSub;
@@ -105,6 +112,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     // Wire notification prev/next buttons to this notifier's queue logic.
     MediaNotificationService.instance.onSkipPrevious = skipPrevious;
     MediaNotificationService.instance.onSkipNext     = skipNext;
+
+    // Wire SleepDetectionService so inactivity pauses playback.
+    // The service is started when the user sets a sleep timer (via
+    // SleepTimerButton) and stopped when the timer fires or is cancelled.
+    // Here we only set the callback — start/stop is controlled by the UI.
+    SleepDetectionService.instance.onSleepDetected = () {
+      debugPrint('[AudioPlayer] Sleep detected — pausing playback.');
+      pause();
+    };
   }
 
   void _attachStreams() {
@@ -239,14 +255,12 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     }
 
-    // Auto-EQ: detect a genre preset from the filename and apply it.
+    // Auto-EQ: detect a genre preset from the filename and apply it via
+    // AutoEqService.applyPreset() — single, testable call site.
     final eqPreset = AutoEqService.instance.detectPreset(item.fileName);
     if (eqPreset.name != 'Flat') {
       debugPrint('[AudioPlayer] Auto-EQ: ${eqPreset.name} for ${item.fileName}');
-      const _eqChannel = MethodChannel('com.otyaplayer.app/equalizer');
-      _eqChannel.invokeMethod('setBands', {
-        'gains': [eqPreset.bass, eqPreset.lowMid, eqPreset.mid, eqPreset.highMid, eqPreset.treble],
-      }).catchError((_) {});
+      unawaited(AutoEqService.instance.applyPreset(eqPreset));
     }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _updateNotification();
@@ -268,7 +282,24 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void _updateNotification() {
     final item = _container?.read(miniPlayerItemProvider);
     if (item == null) return;
+
+    // Performance: only re-resolve album art when the item ID changes.
+    // On play/pause events the item is the same — reuse the cached path.
+    if (item.id == _lastNotificationItemId) {
+      MediaNotificationService.instance.show(
+        id: item.id,
+        title: item.title,
+        artist: item.artist ?? 'Unknown Artist',
+        isPlaying: state.isPlaying,
+        albumArtPath: _lastResolvedArtPath,
+      );
+      return;
+    }
+
+    // New item — resolve art and cache the result.
+    _lastNotificationItemId = item.id;
     AlbumArtService.instance.resolve(item.albumArtPath).then((resolvedPath) {
+      _lastResolvedArtPath = resolvedPath;
       MediaNotificationService.instance.show(
         id: item.id,
         title: item.title,
@@ -365,6 +396,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     // disposed notifier after a new AudioPlayerNotifier is created.
     MediaNotificationService.instance.onSkipPrevious = null;
     MediaNotificationService.instance.onSkipNext     = null;
+    // Clear sleep detection callback.
+    SleepDetectionService.instance.onSleepDetected = null;
     PlaybackCoordinator.instance.unregister(_player);
     MediaNotificationService.instance.dismiss();
     AudioHandlerSingleton.instance.detachPlayer();
@@ -502,8 +535,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final skipIconSize = isTablet ? 34.0 : isSmall ? 24.0 : 30.0;
     final vSpace = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       body: SafeArea(
         child: Column(
           children: [
@@ -1130,30 +1162,14 @@ class _OptionsSheet extends ConsumerWidget {
           MaterialPageRoute(builder: (_) => const CarModeScreen()),
         );
       }),
-      _Opt(Icons.playlist_add_rounded, 'Add to Playlist', AppColors.accent, () {
+      // Label corrected: this adds to the playback queue, not a saved playlist.
+      _Opt(Icons.playlist_add_rounded, 'Add to Queue', AppColors.accent, () {
         ref.read(queueProvider.notifier).addToQueue(mediaItem);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('Added to queue')));
       }),
-      _Opt(Icons.lock_rounded, 'Move to Vault', AppColors.accentViolet, () async {
-        Navigator.pop(context);
-        await VaultService.instance.lockItem(mediaItem);
-        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Moved to Vault'))); }
-      }),
-      _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop', AppColors.accent, () {
-        Navigator.pop(context);
-        context.go('/airdrop');
-      }),
-      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent, onTrimForWhatsApp),
-      _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
-        Navigator.pop(context);
-        await FfmpegService.instance.extractAudio(
-            videoPath: mediaItem.filePath, onProgress: (_) {});
-        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Audio extracted to Downloads'))); }
-      }),
+      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp', AppColors.accent, onTrimForWhatsApp),
       _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
     ];
 
