@@ -72,20 +72,10 @@ class BackupService {
             })
         .toList();
 
-    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200)
-        .map((item) => {
-              'id': item.id,
-              'title': item.title,
-              'path': item.filePath,
-              'lastPlayedAt': item.lastPlayedAt?.toIso8601String(),
-            })
-        .toList();
-
     return {
       'version':    1,
       'created_at': DateTime.now().toIso8601String(),
       'playlists':  playlists,
-      'history':    history,
       'eq_presets': <dynamic>[],
       'bookmarks':  <dynamic>[],
     };
@@ -110,14 +100,5 @@ class BackupService {
       }
     } catch (e) { debugPrint('[BackupService] playlists restore failed: $e'); }
 
-    // Restore history (seed only — does not overwrite lastPlayedAt)
-    try {
-      final history = data['history'] as List<dynamic>? ?? [];
-      debugPrint('[BackupService] Restoring ${history.length} history entries');
-      // History items are seeded as library items to avoid corrupting timestamps.
-      // Full MediaItem reconstruction is not possible from backup alone (missing
-      // file metadata), so we skip history restore to avoid partial/broken items.
-      debugPrint('[BackupService] History restore skipped — file metadata not available in backup.');
-    } catch (e) { debugPrint('[BackupService] history restore failed: $e'); }
   }
 }

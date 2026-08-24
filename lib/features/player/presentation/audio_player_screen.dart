@@ -9,6 +9,7 @@ import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/played_database.dart';
+import '../../../core/services/auto_eq_service.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
@@ -228,6 +229,16 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _currentItemId = item.id;
     if (mounted) {
       state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
+    }
+
+    // Auto-EQ: detect a genre preset from the filename and apply it.
+    final eqPreset = AutoEqService.instance.detectPreset(item.fileName);
+    if (eqPreset.name != 'Flat') {
+      debugPrint('[AudioPlayer] Auto-EQ: ${eqPreset.name} for ${item.fileName}');
+      const _eqChannel = MethodChannel('com.otyaplayer.app/equalizer');
+      _eqChannel.invokeMethod('setBands', {
+        'gains': [eqPreset.bass, eqPreset.lowMid, eqPreset.mid, eqPreset.highMid, eqPreset.treble],
+      }).catchError((_) {});
     }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _updateNotification();

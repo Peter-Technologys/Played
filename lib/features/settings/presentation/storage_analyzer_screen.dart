@@ -1,7 +1,14 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/duplicate_detector_service.dart';
 import '../../../core/services/storage_analyzer_service.dart';
+
+// Top-level function required by compute() — closures cannot cross isolate
+// boundaries, so the entry point must be a top-level or static function.
+List<List<String>> _findDuplicatesIsolate(List<TrackMeta> tracks) =>
+    DuplicateDetectorService.instance.findDuplicates(tracks);
 
 class StorageAnalyzerScreen extends StatefulWidget {
   const StorageAnalyzerScreen({super.key});
