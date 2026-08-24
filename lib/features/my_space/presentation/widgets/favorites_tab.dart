@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
-import '../../../../core/database/played_database.dart';
+import '../../../../core/database/otya_database.dart';
 import '../../../../core/models/media_item.dart';
 import '../providers/my_space_provider.dart';
 import '../../../player/presentation/queue_screen.dart';
@@ -17,7 +17,7 @@ class FavoritesTab extends ConsumerWidget {
     List<MediaItem> favorites;
     try {
       final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-      favorites = PlayedDatabase.instance.getFavoriteItems(allItems);
+      favorites = OtyaDatabase.instance.getFavoriteItems(allItems);
     } catch (_) {
       favorites = [];
     }
@@ -85,7 +85,7 @@ class FavoritesTab extends ConsumerWidget {
                 onTap: () async {
                   HapticFeedback.lightImpact();
                   try {
-                    await PlayedDatabase.instance.setFavoriteFlag(item.id, false);
+                    await OtyaDatabase.instance.setFavoriteFlag(item.id, false);
                     // Use read (not invalidate) to avoid provider disposal crash
                     ref.read(mediaLibraryProvider.notifier).refresh();
                   } catch (_) {}

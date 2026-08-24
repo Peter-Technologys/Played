@@ -4,7 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/models/vault_item.dart';
 import '../../player/presentation/mini_player.dart';
@@ -438,7 +438,7 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
   }
 
   Future<void> _load() async {
-    final items = await PlayedDatabase.instance.getAllVaultItems();
+    final items = await OtyaDatabase.instance.getAllVaultItems();
     final size  = await VaultService.instance.getVaultSize();
     if (mounted) setState(() { _items = items; _vaultSizeBytes = size; _loading = false; });
   }

@@ -53,7 +53,7 @@ class PermissionDeniedScreen extends StatelessWidget {
 
             // Explanation
             const Text(
-              'Played needs access to your device storage to find and play '
+              'OTYA Player needs access to your device storage to find and play '
               'your music and videos. Please grant storage permission in '
               'Settings to continue.',
               textAlign: TextAlign.center,

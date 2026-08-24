@@ -2,14 +2,14 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
 /// OTYA Player branded logo — icon + gradient OTYA PLAYER text.
-class PlayedLogo extends StatelessWidget {
+class OtyaLogo extends StatelessWidget {
   final double fontSize;
   final double letterSpacing;
   final double borderRadius;
   final EdgeInsets padding;
   final bool iconOnly;
 
-  const PlayedLogo({
+  const OtyaLogo({
     super.key,
     this.fontSize = 36,
     this.letterSpacing = 6,
@@ -94,8 +94,8 @@ class PlayedLogo extends StatelessWidget {
 }
 
 /// "from OTYA" footer.
-class PlayedFooter extends StatelessWidget {
-  const PlayedFooter({super.key});
+class OtyaFooter extends StatelessWidget {
+  const OtyaFooter({super.key});
 
   @override
   Widget build(BuildContext context) {

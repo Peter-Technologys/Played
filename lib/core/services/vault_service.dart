@@ -4,7 +4,7 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
-import '../database/played_database.dart';
+import '../database/otya_database.dart';
 import '../models/vault_item.dart';
 import '../models/media_item.dart';
 
@@ -98,7 +98,7 @@ class VaultService {
       mediaType: item.isVideo ? 'video' : 'audio',
     );
 
-    await PlayedDatabase.instance.addToVault(vaultItem);
+    await OtyaDatabase.instance.addToVault(vaultItem);
 
     // Delete the original file so it no longer appears in the media library.
     try {
@@ -119,7 +119,7 @@ class VaultService {
   /// Restores a vault item back to its original location.
   Future<void> unlockItem(String mediaId) async {
     final vaultItem =
-        await PlayedDatabase.instance.getVaultItem(mediaId);
+        await OtyaDatabase.instance.getVaultItem(mediaId);
     if (vaultItem == null) {
       throw Exception('Vault item not found: $mediaId');
     }
@@ -133,7 +133,7 @@ class VaultService {
       await vaultFile.delete();
     }
 
-    await PlayedDatabase.instance.removeFromVault(mediaId);
+    await OtyaDatabase.instance.removeFromVault(mediaId);
 
     // Re-index the restored file in MediaStore so it appears in the library.
     try {
@@ -146,7 +146,7 @@ class VaultService {
   /// Permanently deletes a vault item without restoring.
   Future<void> deleteFromVault(String mediaId) async {
     final vaultItem =
-        await PlayedDatabase.instance.getVaultItem(mediaId);
+        await OtyaDatabase.instance.getVaultItem(mediaId);
     if (vaultItem == null) return;
 
     final vaultFile = File(vaultItem.encryptedPath);
@@ -157,17 +157,17 @@ class VaultService {
       await vaultFile.delete();
     }
 
-    await PlayedDatabase.instance.removeFromVault(mediaId);
+    await OtyaDatabase.instance.removeFromVault(mediaId);
     debugPrint('[Vault] Deleted: $mediaId');
   }
 
   /// Returns true if [mediaId] is currently in the vault.
   bool isLocked(String mediaId) =>
-      PlayedDatabase.instance.isInVault(mediaId);
+      OtyaDatabase.instance.isInVault(mediaId);
 
   /// Returns all vault items.
   Future<List<VaultItem>> getAllItems() =>
-      PlayedDatabase.instance.getAllVaultItems();
+      OtyaDatabase.instance.getAllVaultItems();
 
   /// Returns the total size of all vault files in bytes.
   Future<int> getVaultSize() async {

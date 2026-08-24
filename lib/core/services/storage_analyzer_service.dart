@@ -116,14 +116,6 @@ class StorageAnalyzerService {
         }
       }
     } catch (_) {}
-    // Fallback: read /proc/mounts to find the block device, then use
-    // File.statSync on a known path to estimate.
-    try {
-      final stat = await FileStat.stat('/storage/emulated/0');
-      if (stat.type != FileSystemEntityType.notFound) {
-        // Cannot get total from FileStat alone; use a generous default.
-      }
-    } catch (_) {}
     return 64 * 1024 * 1024 * 1024; // 64 GB safe fallback
   }
 }

@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
 import 'providers/my_space_provider.dart';
@@ -625,7 +625,7 @@ class MySpaceHubScreen extends ConsumerWidget {
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Sign In', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
+        title: const Text('Set Display Name', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -643,7 +643,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-            child: const Text('Sign In', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+            child: const Text('Save', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -895,18 +895,15 @@ class _SignInCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: AppColors.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppColors.borderOf(context)),
               ),
               child: const Center(
-                child: Text(
-                  'G',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF4285F4),
-                  ),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: AppColors.accent,
+                  size: 26,
                 ),
               ),
             ),
@@ -916,7 +913,7 @@ class _SignInCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Sign in with Google',
+                    'Set your display name',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -924,9 +921,9 @@ class _SignInCard extends StatelessWidget {
                       fontFamily: 'Inter',
                     ),
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Back up playlists & history to your account',
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Personalise your experience',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -1348,7 +1345,7 @@ class _StorageCleanerSheetState extends ConsumerState<_StorageCleanerSheet> {
                   ? null
                   : () async {
                       setState(() => _clearing = true);
-                      await PlayedDatabase.instance.clearAllSeekPositions();
+                      await OtyaDatabase.instance.clearAllSeekPositions();
                       try {
                         final tmpDir = await getTemporaryDirectory();
                         final thumbDir = Directory('${tmpDir.path}/otya_thumbs');

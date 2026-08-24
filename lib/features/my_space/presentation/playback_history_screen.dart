@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
 import '../../player/presentation/queue_screen.dart';
 
@@ -30,7 +30,7 @@ class _PlaybackHistoryScreenState
 
   void _load() {
     try {
-      final items = PlayedDatabase.instance.getPlaybackHistory(limit: 200);
+      final items = OtyaDatabase.instance.getPlaybackHistory(limit: 200);
       if (mounted) setState(() => _history = items);
     } catch (_) {
       if (mounted) setState(() => _history = []);
@@ -66,7 +66,7 @@ class _PlaybackHistoryScreenState
     );
     if (confirmed == true && mounted) {
       try {
-        await PlayedDatabase.instance.clearPlaybackHistory();
+        await OtyaDatabase.instance.clearPlaybackHistory();
       } catch (_) {}
       _load();
       if (mounted) {

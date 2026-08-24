@@ -130,7 +130,7 @@ class PermissionHelper {
             ),
             const SizedBox(height: 10),
             const Text(
-              'PLAYED needs access to your audio and video files to show your library. '
+              'OTYA Player needs access to your audio and video files to show your library. '
               'No files are uploaded or shared.',
               textAlign: TextAlign.center,
               style: TextStyle(
