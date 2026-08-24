@@ -169,7 +169,7 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters)
         val shortChangelog = if (changelog.length > 200) changelog.take(197) + "..." else changelog
 
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle("OTYA Player Update Available")
             .setContentText("Version $version is ready to download")
             .setStyle(NotificationCompat.BigTextStyle()
@@ -200,6 +200,9 @@ class UpdateCheckWorker(context: Context, params: WorkerParameters)
             ).apply {
                 description = "OTYA Player app update notifications"
                 enableVibration(true)
+                vibrationPattern = longArrayOf(0, 250, 250, 250)
+                setShowBadge(true)
+                lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
             }
             val nm = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE)
                     as NotificationManager

@@ -36,6 +36,9 @@ void sharedNotificationRouter(NotificationResponse response) {
     UpdateNotificationService.instance.handleTap(response);
   } else if (id >= 2000 && id <= 2003) {
     PushNotificationService.instance.handleTap(response);
+  } else if (id == 3000) {
+    // ProChurnService notification - open payload URL
+    NotificationService.instance.handleTap(response);
   } else {
     NotificationService.instance.handleTap(response);
   }
