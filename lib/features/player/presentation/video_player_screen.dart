@@ -83,7 +83,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   }
 
   @override
+  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Fix #20: Persist seek position when the app is backgrounded or killed
+    // so the user can resume from where they left off after an app restart.
+    if (state == AppLifecycleState.paused) {
+      if (_position > Duration.zero) {
+        PlayedDatabase.instance
+            .saveSeekPosition(widget.mediaItem.id, _position);
+      }
+    }
     if (!_pipInitialized) return;
     if (state == AppLifecycleState.paused && _pipAutoEnabled && _pipSupported) {
       PipService.instance.enterPip();

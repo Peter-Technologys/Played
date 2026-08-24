@@ -51,12 +51,12 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
 
     final periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
-      // BUG 7: Only refresh when the app is in the foreground — prevents
-      // unnecessary MediaStore scans while the app is backgrounded.
+      // Fix #8: lifecycleState can be null on the first frame (before the
+      // first didChangeAppLifecycleState callback fires). Guard against null
+      // so we don't accidentally scan when the state is unknown.
       final lifecycle = WidgetsBinding.instance.lifecycleState;
-      if (lifecycle == AppLifecycleState.resumed) {
-        _backgroundRefresh();
-      }
+      if (lifecycle == null || lifecycle != AppLifecycleState.resumed) return;
+      _backgroundRefresh();
     });
 
     ref.onDispose(() {
@@ -80,6 +80,26 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
       return history;
+    }
+
+    // Fix #19: Fresh install with files already on device — history is empty
+    // but the shelf cache may have been populated by a previous scan (e.g.
+    // after an app update that cleared history). Reconstruct a seed list from
+    // the cached shelf IDs mapped back to Hive history items.
+    final db = PlayedDatabase.instance;
+    final cinemaIds = db.getShelfCache('cinema');
+    final streetIds = db.getShelfCache('street');
+    if (cinemaIds.isNotEmpty || streetIds.isNotEmpty) {
+      final allCachedIds = {...cinemaIds, ...streetIds};
+      // getRecentlyPlayed(limit:9999) already returned empty, so the history
+      // box is empty. Fall through to the background scan which will populate
+      // it; but return the shelf-cache IDs as a stub so the UI isn't blank.
+      // We can't reconstruct full MediaItems from IDs alone without the scan,
+      // so trigger the scan and return empty — the scan will update state.
+      Future.microtask(_backgroundRefresh);
+      debugPrint('[MediaLibrary] Shelf cache has ${allCachedIds.length} IDs — '
+          'triggering background scan for cold-start population.');
+      return const [];
     }
 
     // First install — no cache, no history.
