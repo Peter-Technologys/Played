@@ -13,7 +13,6 @@ import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 
 import '../../shared/widgets/played_logo.dart';
-import '../../core/config/changelog.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile & Settings Screen
@@ -467,11 +466,11 @@ class _AboutCardState extends State<_AboutCard> {
 
 // ── What's New Screen ──────────────────────────────────────────────────────
 
+/// Fetches the changelog from the backend /api/version endpoint and displays
+/// it as plain text. The changelog field is a server-side string so it is
+/// always up-to-date without requiring a binary update.
 class WhatsNewScreen extends StatelessWidget {
   const WhatsNewScreen({super.key});
-
-  // Changelog data is sourced from lib/core/config/changelog.dart.
-  static const _sections = changelog;
 
   @override
   Widget build(BuildContext context) {
@@ -491,101 +490,46 @@ class WhatsNewScreen extends StatelessWidget {
               color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
             )),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-        children: _sections
-            .asMap()
-            .entries
-            .map((e) => _SectionWidget(section: e.value)
-                .animate()
-                .fadeIn(duration: 400.ms,
-                    delay: Duration(milliseconds: e.key * 120))
-                .slideY(begin: 0.05, end: 0))
-            .toList(),
-      ),
-    );
-  }
-}
-
-class _SectionWidget extends StatelessWidget {
-  final ChangeSection section;
-  const _SectionWidget({required this.section});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Text('v${section.version}',
-                style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-                )),
-            const SizedBox(width: 10),
-            if (section.isLatest)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: AppColors.accent.withValues(alpha: 0.4)),
+      body: FutureBuilder<UpdateInfo?>(
+        future: UpdateService.instance.checkForUpdate(force: true),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(
+              child: CircularProgressIndicator(color: AppColors.accent),
+            );
+          }
+          final changelog = snapshot.data?.changelog.trim() ?? '';
+          if (changelog.isEmpty) {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(32),
+                child: Text(
+                  'No changelog available.\nCheck your internet connection.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Inter',
+                    height: 1.6,
+                  ),
                 ),
-                child: const Text('LATEST',
-                    style: TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w700,
-                      color: AppColors.accent, fontFamily: 'Inter',
-                      letterSpacing: 0.8,
-                    )),
               ),
-            const Spacer(),
-            Text(section.date,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...section.items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 36, height: 36,
-                    decoration: BoxDecoration(
-                      color: item.color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(item.icon, color: item.color, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.title,
-                            style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-                            )),
-                        const SizedBox(height: 2),
-                        Text(item.description,
-                            style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary,
-                              height: 1.5, fontFamily: 'Inter',
-                            )),
-                      ],
-                    ),
-                  ),
-                ],
+            );
+          }
+          return SingleChildScrollView(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+            child: Text(
+              changelog,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textPrimary,
+                fontFamily: 'Inter',
+                height: 1.7,
               ),
-            )),
-        const SizedBox(height: 8),
-        const Divider(color: AppColors.border, height: 1),
-      ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
