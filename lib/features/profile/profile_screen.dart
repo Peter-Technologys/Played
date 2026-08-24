@@ -12,8 +12,7 @@ import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 
-import '../../shared/widgets/played_logo.dart';
-import '../../core/config/changelog.dart';
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile & Settings Screen
@@ -133,7 +132,7 @@ class ProfileScreen extends ConsumerWidget {
           // the dedicated About screen — tap Help & Feedback in My Space
           // or navigate to /about.
           const SizedBox(height: 32),
-          const Center(child: PlayedFooter()),
+          const Center(child: Text('OTYA Player — Otya? Play.', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Inter', letterSpacing: 0.5))),
           const SizedBox(height: 24),
         ],
       ),
@@ -467,12 +466,30 @@ class _AboutCardState extends State<_AboutCard> {
 
 // ── What's New Screen ──────────────────────────────────────────────────────
 
-class WhatsNewScreen extends StatelessWidget {
+class WhatsNewScreen extends StatefulWidget {
   const WhatsNewScreen({super.key});
-
-  // Changelog data is sourced from lib/core/config/changelog.dart.
-  static const _sections = changelog;
-
+  @override
+  State<WhatsNewScreen> createState() => _WhatsNewScreenState();
+}
+class _WhatsNewScreenState extends State<WhatsNewScreen> {
+  String? _changelog;
+  bool _loading = true;
+  String? _error;
+  @override
+  void initState() { super.initState(); _fetch(); }
+  Future<void> _fetch() async {
+    try {
+      final info = await UpdateService.instance.checkForUpdate(force: true);
+      if (mounted) setState(() {
+        _changelog = (info?.changelog.isNotEmpty == true)
+            ? info!.changelog
+            : 'You are on the latest version. No changelog available.';
+        _loading = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() { _error = 'Could not load changelog.'; _loading = false; });
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -481,111 +498,27 @@ class WhatsNewScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text("What's New",
-            style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.w700,
-              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-            )),
+        title: Text("What's New", style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(20, 8, 20, 40),
-        children: _sections
-            .asMap()
-            .entries
-            .map((e) => _SectionWidget(section: e.value)
-                .animate()
-                .fadeIn(duration: 400.ms,
-                    delay: Duration(milliseconds: e.key * 120))
-                .slideY(begin: 0.05, end: 0))
-            .toList(),
-      ),
-    );
-  }
-}
-
-class _SectionWidget extends StatelessWidget {
-  final ChangeSection section;
-  const _SectionWidget({required this.section});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const SizedBox(height: 24),
-        Row(
-          children: [
-            Text('v${section.version}',
-                style: TextStyle(
-                  fontSize: 18, fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-                )),
-            const SizedBox(width: 10),
-            if (section.isLatest)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(6),
-                  border: Border.all(
-                      color: AppColors.accent.withValues(alpha: 0.4)),
-                ),
-                child: const Text('LATEST',
-                    style: TextStyle(
-                      fontSize: 10, fontWeight: FontWeight.w700,
-                      color: AppColors.accent, fontFamily: 'Inter',
-                      letterSpacing: 0.8,
-                    )),
-              ),
-            const Spacer(),
-            Text(section.date,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
-          ],
-        ),
-        const SizedBox(height: 12),
-        ...section.items.map((item) => Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 36, height: 36,
+      body: _loading
+          ? const Center(child: CircularProgressIndicator(color: AppColors.accent))
+          : _error != null
+              ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)))
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: item.color.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(10),
+                      color: Theme.of(context).colorScheme.surface,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: AppColors.borderOf(context)),
                     ),
-                    child: Icon(item.icon, color: item.color, size: 18),
+                    child: Text(_changelog ?? '', style: const TextStyle(fontSize: 14, color: AppColors.textPrimary, fontFamily: 'Inter', height: 1.7)),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.title,
-                            style: TextStyle(
-                              fontSize: 14, fontWeight: FontWeight.w600,
-                              color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter',
-                            )),
-                        const SizedBox(height: 2),
-                        Text(item.description,
-                            style: const TextStyle(
-                              fontSize: 12, color: AppColors.textSecondary,
-                              height: 1.5, fontFamily: 'Inter',
-                            )),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            )),
-        const SizedBox(height: 8),
-        const Divider(color: AppColors.border, height: 1),
-      ],
+                ),
     );
   }
 }
