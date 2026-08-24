@@ -14,9 +14,9 @@ import 'duration_adapter.dart';
 
 /// Central offline database for OTYA Player.
 /// All data lives on-device in Hive boxes — no internet required.
-class PlayedDatabase {
-  PlayedDatabase._();
-  static final PlayedDatabase instance = PlayedDatabase._();
+class OtyaDatabase {
+  OtyaDatabase._();
+  static final OtyaDatabase instance = OtyaDatabase._();
 
   Box<MediaItem>? _historyBox;
   Box<Playlist>?  _playlistBox;
@@ -33,14 +33,14 @@ class PlayedDatabase {
   Box<dynamic>   get _vault      => _vaultBox        ?? _emptyBox();
 
   Box<T> _emptyBox<T>() {
-    throw StateError('[PlayedDB] Database not initialized. Call init() first.');
+    throw StateError('[OtyaDB] Database not initialized. Call init() first.');
   }
 
   Future<void> init() async {
     if (_initialized) return;
     await _openBoxes();
     _initialized = true;
-    debugPrint('[PlayedDB] Initialized successfully.');
+    debugPrint('[OtyaDB] Initialized successfully.');
   }
 
   Future<void> _openBoxes() async {
@@ -64,7 +64,7 @@ class PlayedDatabase {
   }
 
   Future<void> deleteAndReinit() async {
-    debugPrint('[PlayedDB] Corruption detected — deleting and reinitializing.');
+    debugPrint('[OtyaDB] Corruption detected — deleting and reinitializing.');
     try { await Hive.deleteBoxFromDisk(HiveBoxes.history); } catch (_) {}
     try { await Hive.deleteBoxFromDisk(HiveBoxes.playlists); } catch (_) {}
     try { await Hive.deleteBoxFromDisk(HiveBoxes.seekPositions); } catch (_) {}
@@ -98,7 +98,7 @@ class PlayedDatabase {
       // policy, etc.), derive a deterministic key from ANDROID_ID instead of
       // a random session key. A random key is lost on restart, making all
       // vault data permanently unreadable.
-      debugPrint('[PlayedDB] Vault key error: $e — falling back to ANDROID_ID derivation');
+      debugPrint('[OtyaDB] Vault key error: $e — falling back to ANDROID_ID derivation');
       return _deriveKeyFromAndroidId();
     }
   }
@@ -121,16 +121,16 @@ class PlayedDatabase {
           // expression, not just the constant 13 (operator precedence bug).
           key[i] = bytes[i % bytes.length] ^ ((i * 37 + 13) & 0xFF);
         }
-        debugPrint('[PlayedDB] Vault key derived from ANDROID_ID.');
+        debugPrint('[OtyaDB] Vault key derived from ANDROID_ID.');
         return key;
       }
     } catch (e) {
-      debugPrint('[PlayedDB] ANDROID_ID fallback failed: $e');
+      debugPrint('[OtyaDB] ANDROID_ID fallback failed: $e');
     }
     // Absolute last resort: generate a random UUID seed once and persist it
     // in SharedPreferences so the key is unique per device and stable across
     // restarts (unlike a bare fixed constant which is identical for all users).
-    debugPrint('[PlayedDB] Using SharedPreferences-seeded vault key (last resort).');
+    debugPrint('[OtyaDB] Using SharedPreferences-seeded vault key (last resort).');
     try {
       final prefs = await SharedPreferences.getInstance();
       const prefKey = 'otya_vault_fallback_seed';
@@ -146,7 +146,7 @@ class PlayedDatabase {
       }
       return key;
     } catch (e) {
-      debugPrint('[PlayedDB] SharedPreferences fallback failed: $e — using random session key');
+      debugPrint('[OtyaDB] SharedPreferences fallback failed: $e — using random session key');
       // True last resort: random key (vault data lost on restart, but avoids crash)
       final rng = Random.secure();
       return Uint8List.fromList(List<int>.generate(32, (_) => rng.nextInt(256)));
@@ -160,7 +160,7 @@ class PlayedDatabase {
       item.lastPlayedAt = DateTime.now();
       await _history.put(item.id, item);
     } catch (e) {
-      debugPrint('[PlayedDB] recordPlay error: $e');
+      debugPrint('[OtyaDB] recordPlay error: $e');
     }
   }
 
@@ -174,7 +174,7 @@ class PlayedDatabase {
         await _history.put(item.id, item);
       }
     } catch (e) {
-      debugPrint('[PlayedDB] seedLibraryItem error: $e');
+      debugPrint('[OtyaDB] seedLibraryItem error: $e');
     }
   }
 
@@ -188,7 +188,7 @@ class PlayedDatabase {
         });
       return items.take(limit).toList();
     } catch (e) {
-      debugPrint('[PlayedDB] getRecentlyPlayed error: $e');
+      debugPrint('[OtyaDB] getRecentlyPlayed error: $e');
       return [];
     }
   }

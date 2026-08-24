@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
-import '../database/played_database.dart';
+import '../database/otya_database.dart';
 import '../models/playlist.dart';
 import '../utils/connectivity_utils.dart';
 import 'app_sync_service.dart';
@@ -82,7 +82,7 @@ class CloudflareService {
     // Flush any backup that was missed while the device was last offline.
     // await instead of unawaited to prevent concurrent backupPlaylists race.
     await _flushPendingBackup();
-    final playlists = PlayedDatabase.instance.getAllPlaylists();
+    final playlists = OtyaDatabase.instance.getAllPlaylists();
     int synced = 0;
     const batchSize = 5;
     const path = '/api/playlists';
@@ -136,7 +136,7 @@ class CloudflareService {
               DateTime.now(),
           updatedAt: DateTime.now(),
         );
-        await PlayedDatabase.instance.savePlaylist(playlist);
+        await OtyaDatabase.instance.savePlaylist(playlist);
         restored++;
       }
       debugPrint('[Cloudflare] Restored $restored playlists.');
@@ -156,7 +156,7 @@ class CloudflareService {
       return;
     }
     unawaited(_flushPendingBackup());
-    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 200);
+    final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 200);
     int synced = 0;
     const batchSize = 10;
     const path = '/api/history';

@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/smart_shuffle_service.dart';
 
@@ -59,7 +59,7 @@ class QueueNotifier extends StateNotifier<QueueState> {
     final int nextIndex;
     if (state.shuffle) {
       // Build stats from recently played history for weighted shuffle.
-      final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
+      final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 9999);
       final statsMap = <String, TrackStats>{
         for (final item in history)
           item.id: TrackStats(

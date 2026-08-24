@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
 
 // ── Stats Provider ───────────────────────────────────────────────────
@@ -21,7 +21,7 @@ class UsageStats {
 }
 
 final usageStatsProvider = FutureProvider<UsageStats>((ref) async {
-  final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 100);
+  final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 100);
   final total = history.fold<Duration>(
     Duration.zero,
     (sum, item) => sum + (item.duration ?? Duration.zero),

@@ -12,7 +12,7 @@ import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 
-import '../../shared/widgets/played_logo.dart';
+import '../../shared/widgets/otya_logo.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Profile & Settings Screen
@@ -132,7 +132,7 @@ class ProfileScreen extends ConsumerWidget {
           // the dedicated About screen — tap Help & Feedback in My Space
           // or navigate to /about.
           const SizedBox(height: 32),
-          const Center(child: PlayedFooter()),
+          const Center(child: OtyaFooter()),
           const SizedBox(height: 24),
         ],
       ),

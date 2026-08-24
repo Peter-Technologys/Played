@@ -1,7 +1,7 @@
 import 'dart:io';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/media_scanner_service.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/utils/shelf_sorter.dart';
 
 /// Data layer for My Space.
@@ -59,10 +59,10 @@ class MediaRepository {
     // Fire-and-forget shelf cache update
     try {
       final bundle = ShelfSorter.buildAllShelves(alive);
-      PlayedDatabase.instance
+      OtyaDatabase.instance
           .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
           .ignore();
-      PlayedDatabase.instance
+      OtyaDatabase.instance
           .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
           .ignore();
     } catch (_) {}
@@ -77,7 +77,7 @@ class MediaRepository {
     // If cache is ready, filter from it — zero I/O
     if (_cachedItems != null) {
       final cachedPaths = {for (final e in _cachedItems!) e.filePath};
-      final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
+      final history = OtyaDatabase.instance.getRecentlyPlayed(limit: limit * 2);
       return history
           .where((item) => cachedPaths.contains(item.filePath))
           .take(limit)
@@ -87,14 +87,14 @@ class MediaRepository {
     // existsSync() on slow storage can freeze the UI for hundreds of ms;
     // stale entries are harmless — they are filtered on the next full scan.
     try {
-      return PlayedDatabase.instance.getRecentlyPlayed(limit: limit);
+      return OtyaDatabase.instance.getRecentlyPlayed(limit: limit);
     } catch (_) {
       return [];
     }
   }
 
   Future<void> recordPlay(MediaItem item) async {
-    try { await PlayedDatabase.instance.recordPlay(item); } catch (_) {}
+    try { await OtyaDatabase.instance.recordPlay(item); } catch (_) {}
   }
 
   void invalidate() => _cachedItems = null;

@@ -8,7 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:workmanager/workmanager.dart';
 import 'core/services/audio_handler.dart';
 import 'app/app.dart';
-import 'core/database/played_database.dart';
+import 'core/database/otya_database.dart';
 import 'core/services/cloudflare_service.dart';
 import 'core/services/device_service.dart';
 import 'core/services/notification_service.dart';
@@ -169,13 +169,13 @@ void _showCrashOverlay(String title, String details) {
 
 Future<void> _initDatabase() async {
   try {
-    await PlayedDatabase.instance.init();
+    await OtyaDatabase.instance.init();
   } catch (e, st) {
-    debugPrint('[PlayedDB] Init error: $e\n$st');
+    debugPrint('[OtyaDB] Init error: $e\n$st');
     try {
-      await PlayedDatabase.instance.deleteAndReinit();
+      await OtyaDatabase.instance.deleteAndReinit();
     } catch (e2, st2) {
-      debugPrint('[PlayedDB] deleteAndReinit also failed: $e2\n$st2');
+      debugPrint('[OtyaDB] deleteAndReinit also failed: $e2\n$st2');
       // App continues with DB unavailable — all DB calls are individually guarded
     }
   }

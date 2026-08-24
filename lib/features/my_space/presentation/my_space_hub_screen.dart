@@ -8,7 +8,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
 import 'providers/my_space_provider.dart';
@@ -1345,7 +1345,7 @@ class _StorageCleanerSheetState extends ConsumerState<_StorageCleanerSheet> {
                   ? null
                   : () async {
                       setState(() => _clearing = true);
-                      await PlayedDatabase.instance.clearAllSeekPositions();
+                      await OtyaDatabase.instance.clearAllSeekPositions();
                       try {
                         final tmpDir = await getTemporaryDirectory();
                         final thumbDir = Directory('${tmpDir.path}/otya_thumbs');

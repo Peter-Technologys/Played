@@ -8,7 +8,7 @@ import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/auto_eq_service.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
@@ -132,7 +132,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         final now = DateTime.now();
         if (now.difference(lastSave).inSeconds >= 5) {
           lastSave = now;
-          PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
+          OtyaDatabase.instance.saveSeekPosition(_currentItemId!, p);
         }
       }
     });
@@ -243,14 +243,14 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _updateNotification();
 
-    final saved      = PlayedDatabase.instance.getSeekPosition(item.id);
+    final saved      = OtyaDatabase.instance.getSeekPosition(item.id);
     final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
     final speed      = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
 
     try {
       await _loadCurrent(item, speed: speed, savedPosition: saved);
       if (mounted) state = state.copyWith(speed: speed, isLoading: false);
-      PlayedDatabase.instance.recordPlay(item).ignore();
+      OtyaDatabase.instance.recordPlay(item).ignore();
     } catch (e) {
       debugPrint('[AudioPlayer] load error: $e');
       if (mounted) state = state.copyWith(isLoading: false);
@@ -275,7 +275,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   bool _loadFavorite(String id) =>
-      PlayedDatabase.instance.getFavoriteFlag(id);
+      OtyaDatabase.instance.getFavoriteFlag(id);
 
   void togglePlay() {
     final willPlay = !state.isPlaying;
@@ -296,7 +296,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void skipNext() {
     if (_container == null) return;
     if (_currentItemId != null) {
-      PlayedDatabase.instance.saveSeekPosition(_currentItemId!, state.position);
+      OtyaDatabase.instance.saveSeekPosition(_currentItemId!, state.position);
     }
     _container!.read(queueProvider.notifier).next();
     final next = _container!.read(queueProvider).current;
@@ -310,7 +310,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     }
     if (_container == null) return;
     if (_currentItemId != null) {
-      PlayedDatabase.instance.saveSeekPosition(_currentItemId!, Duration.zero);
+      OtyaDatabase.instance.saveSeekPosition(_currentItemId!, Duration.zero);
     }
     _container!.read(queueProvider.notifier).previous();
     final prev = _container!.read(queueProvider).current;
@@ -329,7 +329,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final next = !state.isFavorite;
     state = state.copyWith(isFavorite: next);
     if (_currentItemId != null) {
-      PlayedDatabase.instance.setFavoriteFlag(_currentItemId!, next);
+      OtyaDatabase.instance.setFavoriteFlag(_currentItemId!, next);
     }
   }
 
@@ -347,7 +347,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void savePosition(String id) =>
-      PlayedDatabase.instance.saveSeekPosition(id, state.position);
+      OtyaDatabase.instance.saveSeekPosition(id, state.position);
 
   @override
   void dispose() {
@@ -425,7 +425,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!widget.resumeOnly) {
-        // load() already calls PlayedDatabase.instance.recordPlay() internally
+        // load() already calls OtyaDatabase.instance.recordPlay() internally
         // — do not call it again here to avoid double-counting play history.
         _startLoad();
       }

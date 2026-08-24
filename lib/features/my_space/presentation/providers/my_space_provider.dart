@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
-import '../../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../data/media_repository.dart';
 
 /// Live media change event stream from Android MediaStore.
@@ -76,7 +76,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     // Phase 1b — Hive history seed (< 5 ms).
     // Returns recently played files immediately so the user sees their
     // library at once. Full scan runs silently in the background.
-    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
+    final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
       return history;
@@ -126,7 +126,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   /// getRecentlyPlayed(limit:9999) call on every background refresh.
   Future<void> _writeBackToHive(List<MediaItem> items) async {
     try {
-      final db = PlayedDatabase.instance;
+      final db = OtyaDatabase.instance;
       // Populate the known-IDs set on first call only.
       _knownHiveIds ??= LinkedHashSet<String>.from(
         db.getRecentlyPlayed(limit: 9999).map((e) => e.id),

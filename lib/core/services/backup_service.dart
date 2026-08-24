@@ -5,6 +5,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import '../database/otya_database.dart';
+import '../models/playlist.dart';
 import 'auth_service.dart';
 import 'http_client.dart';
 
@@ -62,7 +64,7 @@ class BackupService {
   }
 
   Future<Map<String, dynamic>> buildBackupData() async {
-    final playlists = PlayedDatabase.instance.getAllPlaylists()
+    final playlists = OtyaDatabase.instance.getAllPlaylists()
         .map((p) => {
               'id': p.id,
               'name': p.name,
@@ -96,7 +98,7 @@ class BackupService {
           createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? now,
           updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? now,
         );
-        await PlayedDatabase.instance.savePlaylist(playlist);
+        await OtyaDatabase.instance.savePlaylist(playlist);
       }
     } catch (e) { debugPrint('[BackupService] playlists restore failed: $e'); }
 
