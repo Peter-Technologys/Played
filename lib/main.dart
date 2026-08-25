@@ -5,7 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:workmanager/workmanager.dart';
 import 'core/services/audio_handler.dart';
 import 'app/app.dart';
 import 'core/database/otya_database.dart';
@@ -25,16 +24,6 @@ import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
-
-@pragma('vm:entry-point')
-void callbackDispatcher() {
-  Workmanager().executeTask((taskName, inputData) async {
-    if (taskName == 'otya_update_check') {
-      await UpdateService.instance.checkAndNotify();
-    }
-    return Future.value(true);
-  });
-}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -190,7 +179,6 @@ Future<void> _initDatabase() async {
 Future<void> _initBackground(AppSettings savedSettings) async {
   await Future.wait([
     _initNotifications(),
-    _initWorkManager(),
     StorageFolderService.instance.ensureCreated(),
     // Bug 10 fix: initialize connectivity monitoring so isOffline is accurate
     // before any API call is made. ConnectivityService.instance.isOffline is
@@ -248,24 +236,3 @@ Future<void> _initNotifications() async {
 // CloudflareService has no init — it is stateless HTTP. Accessed via singleton.
 // ignore: unused_element
 CloudflareService get _cf => CloudflareService.instance;
-
-Future<void> _initWorkManager() async {
-  try {
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: kDebugMode,
-    );
-    await Workmanager().registerPeriodicTask(
-      'otya_update_check',
-      'otya_update_check',
-      frequency: const Duration(hours: 24),
-      constraints: Constraints(
-        networkType: NetworkType.connected,
-      ),
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
-    );
-    debugPrint('[WorkManager] Update check scheduled (24h).');
-  } catch (e) {
-    debugPrint('[WorkManager] Init error: $e');
-  }
-}
