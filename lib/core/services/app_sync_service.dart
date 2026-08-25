@@ -110,7 +110,7 @@ class AppSyncService {
     debugPrint('[AppSync] fcm_token: ${fcmToken != null ? '(present)' : '(absent)'}');
 
     // ABI — injected at build time via --dart-define=APP_ARCH=arm64.
-    const abi = String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
+    const abi = Environment.appArch;
     debugPrint('[AppSync] abi: $abi');
 
     // ── Build request body ───────────────────────────────────────────────────
