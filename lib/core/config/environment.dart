@@ -3,6 +3,7 @@ abstract class Environment {
   static const String workerUrl = 'https://petersmartlink.com';
 
   // ── API endpoints (all HMAC-authenticated) ────────────────────────────────
+  static const String apiSyncUrl      = '$workerUrl/api/sync';
   static const String apiCrashUrl     = '$workerUrl/api/crash-report';
   static const String checkUpdateUrl  = '$workerUrl/check-update';
   static const String apiVersionUrl   = '$workerUrl/api/version';
