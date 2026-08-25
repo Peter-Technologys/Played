@@ -23,8 +23,7 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # Encryption / Vault
-  encrypt: ^5.0.3
+  # Encryption / Vault (encrypt removed — vault uses crypto + flutter_secure_storage directly)
   crypto: ^3.0.5
   local_auth: ^2.3.0
 
@@ -47,6 +46,7 @@ dependencies:
   flutter_animate: ^4.5.2
   cached_network_image: ^3.4.1
   shimmer: ^3.0.0
+  # google_fonts removed — not imported anywhere in the codebase
 
   # Device info — used for ABI detection + update checker
   device_info_plus: ^10.1.0
@@ -55,7 +55,6 @@ dependencies:
   # File System
   path_provider: ^2.1.5
   permission_handler: ^11.3.1
-  file_picker: ^8.1.2
   image_picker: ^1.1.2
 
   # Notifications
@@ -74,9 +73,9 @@ dependencies:
 
   # Utilities
   uuid: ^4.5.1
-  intl: ^0.20.3
   json_annotation: ^4.9.0
   cupertino_icons: ^1.0.8
+  # intl removed — not imported anywhere in the codebase
 
   # Sharing, URL launching, PIN storage
   share_plus: ^10.1.4
@@ -109,12 +108,6 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   flutter_lints: ^5.0.0
 
-# flutter_plugin_android_lifecycle 2.0.19+ requires compileSdk >= 36,
-# which conflicts with file_picker's pre-built AAR (compileSdk 34).
-# Pin to 2.0.18 — the last version that accepts compileSdk 34 — until
-# file_picker ships an AAR built against SDK 36.
-dependency_overrides:
-  flutter_plugin_android_lifecycle: 2.0.18
 
 flutter:
   uses-material-design: true
