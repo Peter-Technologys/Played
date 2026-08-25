@@ -122,46 +122,8 @@ jobs:
             echo "WARNING: KEYSTORE_BASE64 not set - APK will use debug signing."
           fi
 
-      # ── Write local.properties so Gradle knows the Flutter SDK path ────
-      - name: Write local.properties
-        run: |
-          FLUTTER_SDK=$(flutter sdk-path 2>/dev/null || dirname $(dirname $(which flutter)))
-          echo "flutter.sdk=$FLUTTER_SDK" > android/local.properties
-          echo "sdk.dir=$ANDROID_SDK_ROOT" >> android/local.properties
-          cat android/local.properties
-
-      # ── Build Dart kernel (flutter assemble) ─────────────────────────
-      # Run flutter assemble to compile Dart → kernel + AOT snapshot.
-      # This is what flutter build apk does internally before invoking Gradle.
-      # Running it separately avoids the file-watcher crash entirely.
-      - name: Flutter assemble (Dart → AOT snapshot)
-        env:
-          DD_SECRET: ${{ secrets.OTYA_SECRET }}
-          DD_ARCH: arm64
-          DD_UPDATE: "true"
-          DD_WORKER_URL: ${{ secrets.WORKER_URL }}
-        run: |
-          flutter assemble \
-            --output=build/ \
-            -dTargetPlatform=android-arm64 \
-            -dBuildMode=release \
-            -dDartObfuscation=false \
-            -dSplitDebugInfo= \
-            --DartDefines="$(echo -n "OTYA_SECRET=$DD_SECRET,APP_ARCH=$DD_ARCH,SELF_UPDATE=$DD_UPDATE,WORKER_URL=$DD_WORKER_URL" | base64 -w0)" \
-            release_android_application || true
-          flutter assemble \
-            --output=build/ \
-            -dTargetPlatform=android-arm \
-            -dBuildMode=release \
-            -dDartObfuscation=false \
-            -dSplitDebugInfo= \
-            --DartDefines="$(echo -n "OTYA_SECRET=$DD_SECRET,APP_ARCH=$DD_ARCH,SELF_UPDATE=$DD_UPDATE,WORKER_URL=$DD_WORKER_URL" | base64 -w0)" \
-            release_android_application || true
-
-      # ── Build release APK via Gradle directly ──────────────────────
-      # Invoke assembleRelease directly, bypassing flutter build apk and its
-      # file-watcher layer. Dart defines are passed as Gradle project properties.
-      - name: Build release APK (Gradle direct)
+      # ── Build release APK ───────────────────────────────────────
+      - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -172,10 +134,12 @@ jobs:
           DD_UPDATE: "true"
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
-          cd android
-          ./gradlew assembleRelease \
-            -Pdart-defines="$(echo -n "OTYA_SECRET=$DD_SECRET,APP_ARCH=$DD_ARCH,SELF_UPDATE=$DD_UPDATE,WORKER_URL=$DD_WORKER_URL" | base64 -w0)" \
-            --stacktrace
+          flutter build apk --release --no-pub --split-per-abi \
+            --target-platform android-arm,android-arm64 \
+            --dart-define=OTYA_SECRET=$DD_SECRET \
+            --dart-define=APP_ARCH=$DD_ARCH \
+            --dart-define=SELF_UPDATE=$DD_UPDATE \
+            --dart-define=WORKER_URL=$DD_WORKER_URL || true
 
       # Verify APKs were actually produced. Fail here with a clear message
       # if Gradle itself failed (as opposed to just the Flutter watcher crash).
