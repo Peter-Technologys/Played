@@ -47,10 +47,22 @@ android {
 
     signingConfigs {
         release {
-            storeFile = file(System.getenv("KEYSTORE_PATH") ?: "keystore.jks")
-            storePassword = System.getenv("STORE_PASSWORD")
-            keyAlias = System.getenv("KEY_ALIAS")
-            keyPassword = System.getenv("KEY_PASSWORD")
+            def keystorePath = System.getenv("KEYSTORE_PATH") ?: "keystore.jks"
+            def keystoreFile = file(keystorePath)
+            if (keystoreFile.exists()) {
+                storeFile = keystoreFile
+                storePassword = System.getenv("STORE_PASSWORD")
+                keyAlias = System.getenv("KEY_ALIAS")
+                keyPassword = System.getenv("KEY_PASSWORD")
+            } else {
+                // No keystore available (e.g. CI without secrets) — fall back
+                // to the debug signing config so the build still succeeds.
+                println("WARNING: Keystore not found at '$keystorePath' — using debug signing.")
+                storeFile = file("${System.getProperty('user.home')}/.android/debug.keystore")
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
         }
     }
 
