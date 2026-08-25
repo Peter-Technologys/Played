@@ -578,6 +578,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   albumArtPath: widget.mediaItem.albumArtPath,
                   isPlaying: ps.isPlaying,
                   title: widget.mediaItem.title,
+                  onSwipeLeft:  () => ref.read(audioPlayerProvider.notifier).skipNext(),
+                  onSwipeRight: () => ref.read(audioPlayerProvider.notifier).skipPrevious(),
                 ),
               ),
             ),
@@ -836,7 +838,15 @@ class _AlbumArt extends StatefulWidget {
   final String? albumArtPath;
   final bool isPlaying;
   final String title;
-  const _AlbumArt({this.albumArtPath, required this.isPlaying, this.title = ''});
+  final VoidCallback? onSwipeLeft;   // skip next
+  final VoidCallback? onSwipeRight;  // skip previous
+  const _AlbumArt({
+    this.albumArtPath,
+    required this.isPlaying,
+    this.title = '',
+    this.onSwipeLeft,
+    this.onSwipeRight,
+  });
 
   @override
   State<_AlbumArt> createState() => _AlbumArtState();
@@ -845,6 +855,7 @@ class _AlbumArt extends StatefulWidget {
 class _AlbumArtState extends State<_AlbumArt> {
   String? _resolvedPath;
   bool _loading = true;
+  double _dragX = 0;
 
   @override
   void initState() {
@@ -882,7 +893,49 @@ class _AlbumArtState extends State<_AlbumArt> {
   Widget build(BuildContext context) {
     final showArt = !_loading && _resolvedPath != null;
 
-    return AnimatedContainer(
+    return GestureDetector(
+      onHorizontalDragUpdate: (d) {
+        setState(() => _dragX += d.delta.dx);
+      },
+      onHorizontalDragEnd: (d) {
+        final v = d.primaryVelocity ?? 0;
+        if (_dragX < -60 || v < -400) {
+          HapticFeedback.mediumImpact();
+          widget.onSwipeLeft?.call();
+        } else if (_dragX > 60 || v > 400) {
+          HapticFeedback.mediumImpact();
+          widget.onSwipeRight?.call();
+        }
+        setState(() => _dragX = 0);
+      },
+      onHorizontalDragCancel: () => setState(() => _dragX = 0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Swipe hint arrows
+          if (_dragX < -20)
+            Positioned(
+              right: 12,
+              child: AnimatedOpacity(
+                opacity: (_dragX.abs() / 80).clamp(0.0, 1.0),
+                duration: const Duration(milliseconds: 80),
+                child: const Icon(Icons.skip_next_rounded,
+                    color: AppColors.accent, size: 40),
+              ),
+            ),
+          if (_dragX > 20)
+            Positioned(
+              left: 12,
+              child: AnimatedOpacity(
+                opacity: (_dragX.abs() / 80).clamp(0.0, 1.0),
+                duration: const Duration(milliseconds: 80),
+                child: const Icon(Icons.skip_previous_rounded,
+                    color: AppColors.accent, size: 40),
+              ),
+            ),
+          Transform.translate(
+            offset: Offset(_dragX.clamp(-40.0, 40.0), 0),
+            child: AnimatedContainer(
       duration: const Duration(milliseconds: 400),
       curve: Curves.easeInOut,
       transform: Matrix4.diagonal3Values(
@@ -922,6 +975,9 @@ class _AlbumArtState extends State<_AlbumArt> {
                 title: widget.title,
                 isPlaying: widget.isPlaying,
               ),
+      ),
+          ),
+        ],
       ),
     );
   }

@@ -101,7 +101,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     return SlideTransition(
       position: _slideAnim,
       child: GestureDetector(
-        // Swipe down to dismiss
+        // Swipe down to dismiss, left/right to skip
         onVerticalDragUpdate: (d) {
           if (d.delta.dy > 0) {
             setState(() => _dragOffset =
@@ -114,6 +114,18 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
             _dismiss();
           } else {
             setState(() => _dragOffset = 0);
+          }
+        },
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v.abs() < 300) return;
+          HapticFeedback.mediumImpact();
+          if (v < 0) {
+            // Swipe left → skip next
+            ref.read(audioPlayerProvider.notifier).skipNext();
+          } else {
+            // Swipe right → skip previous
+            ref.read(audioPlayerProvider.notifier).skipPrevious();
           }
         },
         onTap: () {
