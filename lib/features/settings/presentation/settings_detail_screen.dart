@@ -1,15 +1,19 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
+import '../../../core/services/custom_theme_manager.dart';
 import '../../../core/services/update_service.dart';
 import '../../../core/widgets/update_dialog.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../settings_provider.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 
@@ -29,8 +33,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
     final s  = ref.watch(settingsProvider);
     final sn = ref.read(settingsProvider.notifier);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
@@ -62,6 +65,22 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
               subtitle: 'Themes, AMOLED & wallpaper',
               color: AppColors.accentViolet,
               onTap: () => context.push('/theme'),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.wallpaper_rounded,
+              label: 'Change Wallpaper',
+              subtitle: 'Set a photo as the app background',
+              color: AppColors.accentAmber,
+              onTap: () => _pickWallpaper(context),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.hide_image_rounded,
+              label: 'Remove Wallpaper',
+              subtitle: 'Restore the default background',
+              color: AppColors.textSecondary,
+              onTap: () => _clearWallpaper(context),
             ),
           ]),
 
@@ -152,6 +171,62 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
         ],
       ),
     );
+  }
+
+  // ── Wallpaper helpers ─────────────────────────────────────────────────
+
+  Future<void> _pickWallpaper(BuildContext context) async {
+    try {
+      // Use image_picker to let the user choose a photo from the gallery.
+      // image_picker is already a dependency (pubspec.yaml).
+      // We import it lazily here to avoid a top-level import that would
+      // require the plugin to be initialised before it is needed.
+      final picked = await _pickImageFromGallery();
+      if (picked == null) return;
+      await CustomThemeManager.instance.setWallpaper(picked);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wallpaper updated'),
+            backgroundColor: AppColors.surface,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not set wallpaper: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearWallpaper(BuildContext context) async {
+    await CustomThemeManager.instance.clearWallpaper();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Wallpaper removed'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
+    }
+  }
+
+  /// Picks an image from the gallery using image_picker.
+  /// Returns the file path, or null if the user cancelled.
+  Future<String?> _pickImageFromGallery() async {
+    try {
+      final picker = ImagePicker();
+      final xFile = await picker.pickImage(source: ImageSource.gallery);
+      return xFile?.path;
+    } catch (e) {
+      debugPrint('[Settings] _pickImageFromGallery error: $e');
+      return null;
+    }
   }
 
   // ── Bottom-sheet helpers ──────────────────────────────────────────────

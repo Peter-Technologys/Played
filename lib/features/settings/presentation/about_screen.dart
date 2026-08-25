@@ -72,6 +72,17 @@ class _AboutScreenState extends State<AboutScreen> {
 
           _GroupCard(children: [
             _NavTile(
+              icon: Icons.language_rounded,
+              label: 'Visit Website',
+              subtitle: 'getotya.petersmartlink.com',
+              color: AppColors.accent,
+              onTap: () => context.push('/webview', extra: {
+                'url': 'https://getotya.petersmartlink.com',
+                'title': 'OTYA Player',
+              }),
+            ),
+            _Divider(),
+            _NavTile(
               icon: Icons.system_update_outlined,
               label: 'Check Updates',
               subtitle: 'Tap to check for a new version',

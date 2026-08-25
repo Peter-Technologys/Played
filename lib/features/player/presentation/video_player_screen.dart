@@ -13,9 +13,13 @@ import '../../../core/models/media_item.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/pip_service.dart';
+import '../../../core/services/playback_coordinator.dart';
+import '../../../core/utils/duration_formatter.dart';
 import '../../../features/player/presentation/widgets/video_gesture_layer.dart';
 import '../../../features/settings/settings_provider.dart';
+import 'file_info_sheet.dart';
 import 'queue_screen.dart';
+import '../../../shared/widgets/speed_picker_sheet.dart';
 
 final batterySaverProvider    = StateProvider<bool>((_) => false);
 final controlsVisibleProvider = StateProvider<bool>((_) => true);
@@ -88,7 +92,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     // so the user can resume from where they left off after an app restart.
     if (state == AppLifecycleState.paused) {
       if (_position > Duration.zero) {
-        PlayedDatabase.instance
+        OtyaDatabase.instance
             .saveSeekPosition(widget.mediaItem.id, _position);
       }
     }
@@ -158,15 +162,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
-  // ── Duration formatter ─────────────────────────────────────────────
-
-  String _formatDuration(Duration d) {
-    final h = d.inHours;
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return h > 0 ? '$h:$m:$s' : '$m:$s';
-  }
-
   // ── More options ───────────────────────────────────────────────
 
   void _showMoreOptions() {
@@ -208,7 +203,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 );
               },
             ),
-            // File Info
+            // File Info — uses the shared FileInfoSheet widget
             ListTile(
               leading: const Icon(Icons.info_outline_rounded,
                   color: AppColors.accent, size: 22),
@@ -219,11 +214,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       fontWeight: FontWeight.w500)),
               onTap: () {
                 Navigator.pop(context);
-                final file = File(widget.mediaItem.filePath);
-                final size = file.existsSync()
-                    ? '${(file.lengthSync() / (1024 * 1024)).toStringAsFixed(1)} MB'
-                    : 'Unknown';
-                showDialog(
+                showModalBottomSheet(
                   context: context,
                   builder: (_) => AlertDialog(
                     backgroundColor: AppColors.surface,
@@ -310,78 +301,13 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   void _showSpeedPicker() {
     HapticFeedback.selectionClick();
-    const speeds = [0.5, 1.0, 1.25, 1.5, 2.0];
-    showModalBottomSheet(
+    showSpeedPickerSheet(
       context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text('Playback Speed',
-                style: TextStyle(
-                  fontSize: 16, fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary, fontFamily: 'Inter',
-                )),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: speeds.map((s) {
-                final isActive = _playbackSpeed == s;
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _playbackSpeed = s);
-                    _player?.setRate(s);
-                    Navigator.of(context).pop();
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 10),
-                    decoration: BoxDecoration(
-                      gradient: isActive
-                          ? const LinearGradient(
-                              colors: [AppColors.accent, AppColors.accentViolet])
-                          : null,
-                      color: isActive ? null : AppColors.surfaceElevated,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: isActive
-                            ? Colors.transparent
-                            : AppColors.border,
-                      ),
-                    ),
-                    child: Text(
-                      '${s}x',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: isActive ? Colors.black : AppColors.textPrimary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
+      currentSpeed: _playbackSpeed,
+      onSpeedSelected: (s) {
+        setState(() => _playbackSpeed = s);
+        _player?.setRate(s);
+      },
     );
   }
 
@@ -611,7 +537,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                     Row(
                       children: [
                         Text(
-                          _formatDuration(_position),
+                          DurationFormatter.format(_position),
                           style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
@@ -646,7 +572,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           ),
                         ),
                         Text(
-                          _formatDuration(_duration),
+                          DurationFormatter.format(_duration),
                           style: const TextStyle(
                               color: Colors.white70,
                               fontSize: 11,
@@ -908,6 +834,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
+    // Unregister from PlaybackCoordinator so it no longer holds a reference
+    // to this disposed player instance.
+    if (_player != null) {
+      PlaybackCoordinator.instance.unregister(_player!);
+    }
     // _restoreOrientation() is async but dispose() cannot be async.
     // Schedule it as a fire-and-forget microtask so SystemChrome calls
     // still execute after the widget tree is torn down.
@@ -1061,48 +992,6 @@ class _AudioWaveAnimation extends StatelessWidget {
               curve: Curves.easeInOut,
             );
       }),
-    );
-  }
-}
-
-// ── File info row ─────────────────────────────────────────────────────────
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 70,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

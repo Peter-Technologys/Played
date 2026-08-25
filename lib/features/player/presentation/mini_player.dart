@@ -127,7 +127,12 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
           child: Opacity(
             opacity: (1 - _dragOffset / (_dismissThreshold * 2)).clamp(0.3, 1.0),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              // Add system bottom padding so the mini player sits above the
+              // navigation bar on gesture-navigation devices.
+              margin: EdgeInsets.fromLTRB(
+                12, 0, 12,
+                4 + MediaQuery.of(context).padding.bottom,
+              ),
               foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
                 border: Border(

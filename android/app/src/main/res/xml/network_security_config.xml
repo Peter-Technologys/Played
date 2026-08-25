@@ -38,4 +38,17 @@
         <!-- 172.16.x.x – 172.31.x.x — less common private range -->
         <domain includeSubdomains="false">172.16.0.1</domain>
     </domain-config>
+
+    <!--
+        Explicit HTTPS-only config for OTYA web properties.
+        Cleartext is blocked; only TLS connections are permitted.
+        Certificate pinning is intentionally omitted to allow CDN rotation.
+    -->
+    <domain-config cleartextTrafficPermitted="false">
+        <domain includeSubdomains="true">getotya.petersmartlink.com</domain>
+        <domain includeSubdomains="true">petersmartlink.com</domain>
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </domain-config>
 </network-security-config>

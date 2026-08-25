@@ -96,6 +96,18 @@
     public static int i(...);
 }
 
+# WebView (webview_flutter + webview_flutter_android)
+# Keep WebView JavaScript interface classes so JS bridge survives R8.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class io.flutter.plugins.webviewflutter.** { *; }
+-dontwarn io.flutter.plugins.webviewflutter.**
+
+# Firebase (firebase_core + firebase_messaging)
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
+
 # General
 -keepattributes *Annotation*
 -keepattributes SourceFile,LineNumberTable
