@@ -7,6 +7,8 @@ import '../features/my_space/presentation/usage_stats_dashboard.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
 import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/my_space/presentation/providers/my_space_provider.dart';
+import '../core/widgets/update_dialog.dart';
+import '../shared/widgets/new_media_banner.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
@@ -622,6 +624,17 @@ class _MainShellState extends ConsumerState<_MainShell> {
   // Tab state is preserved by AutomaticKeepAliveClientMixin on each tab screen.
   // widget.child from ShellRoute is the single source of truth.
 
+  @override
+  void initState() {
+    super.initState();
+    // Show the in-app update dialog once on shell mount (after first frame).
+    // AnnouncementDialog is already wired in app.dart with a 2-second delay;
+    // UpdateDialog runs here so both are available on every app start.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) UpdateDialog.checkAndShow(context);
+    });
+  }
+
   void _onTap(int index) {
     HapticFeedback.selectionClick();
     GoRouter.of(context).go(_routes[index]);
@@ -666,7 +679,12 @@ class _MainShellState extends ConsumerState<_MainShell> {
                 ),
               ],
       ),
-      body: widget.child,
+      body: Stack(
+        children: [
+          widget.child,
+          const NewMediaBanner(),
+        ],
+      ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
