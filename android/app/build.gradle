@@ -50,6 +50,16 @@ android {
         }
     }
 
+    packagingOptions {
+        jniLibs {
+            // media_kit loads libmpv.so at runtime via System.loadLibrary,
+            // so native libs must be extracted from the APK.
+            // AGP 8+ requires this to be set here instead of via
+            // android:extractNativeLibs="true" in AndroidManifest.xml.
+            useLegacyPackaging = true
+        }
+    }
+
     buildTypes {
         release {
             signingConfig = signingConfigs.release
