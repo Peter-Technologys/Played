@@ -141,14 +141,29 @@ jobs:
             --dart-define=SELF_UPDATE=$DD_UPDATE \
             --dart-define=WORKER_URL=$DD_WORKER_URL || true
 
-      # Verify APKs were actually produced. Fail here with a clear message
-      # if Gradle itself failed (as opposed to just the Flutter watcher crash).
-      - name: Verify APKs produced
+      # Find APKs anywhere in the build tree and copy to the expected path.
+      # The Flutter watcher crash can cause outputs to land in a non-standard
+      # location. We search broadly, then verify the two required ABIs exist.
+      - name: Locate and verify APKs
         run: |
+          echo "=== All APKs found in build/ ==="
+          find build/ -name '*.apk' 2>/dev/null || echo "(none found)"
+
+          OUTDIR="build/app/outputs/flutter-apk"
+          mkdir -p "$OUTDIR"
+
+          # Copy any release APKs found elsewhere into the expected output dir
+          find build/ -name '*-release.apk' ! -path "$OUTDIR/*" \
+            -exec cp -v {} "$OUTDIR/" \; 2>/dev/null || true
+
+          echo "=== Contents of $OUTDIR ==="
+          ls -lh "$OUTDIR/" 2>/dev/null || echo "(empty)"
+
+          # Verify the two required ABI APKs exist
           MISSING=0
           for APK in \
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
+            "$OUTDIR/app-arm64-v8a-release.apk" \
+            "$OUTDIR/app-armeabi-v7a-release.apk"; do
             if [ -f "$APK" ]; then
               echo "OK: $APK ($(du -sh "$APK" | cut -f1))"
             else
@@ -156,11 +171,7 @@ jobs:
               MISSING=1
             fi
           done
-          if [ $MISSING -eq 1 ]; then
-            echo "--- All APKs found in build/ ---"
-            find build/ -name '*.apk' 2>/dev/null || echo "(none)"
-            exit 1
-          fi
+          [ $MISSING -eq 0 ] || exit 1
 
       - name: Remove keystore
         if: always()
