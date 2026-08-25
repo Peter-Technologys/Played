@@ -1,38 +1,41 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
 abstract class AppTextStyles {
   static const String _bodyFont = 'Inter';
 
-  // ── Display / Headline / Title — Fredoka ─────────────────────────────────
+  // ── Display / Headline / Title — Inter ───────────────────────────────────
 
-  /// Large display heading — Fredoka, 28sp
-  static TextStyle get heading1 => GoogleFonts.fredoka(
-        fontSize: 28,
-        fontWeight: FontWeight.w700,
+  /// Large display heading — Inter, 26sp
+  static TextStyle get heading1 => const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 26,
+        fontWeight: FontWeight.w800,
         color: AppColors.textPrimary,
         letterSpacing: -0.5,
       );
 
-  /// Section heading — Fredoka, 20sp
-  static TextStyle get heading2 => GoogleFonts.fredoka(
+  /// Section heading — Inter, 18sp
+  static TextStyle get heading2 => const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 18,
+        fontWeight: FontWeight.w700,
+        color: AppColors.textPrimary,
+      );
+
+  /// Sub-heading — Inter, 15sp
+  static TextStyle get heading3 => const TextStyle(
+        fontFamily: 'Inter',
+        fontSize: 15,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimary,
+      );
+
+  /// Screen title (AppBar / tab header) — Inter, 20sp
+  static TextStyle get title => const TextStyle(
+        fontFamily: 'Inter',
         fontSize: 20,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      );
-
-  /// Sub-heading — Fredoka, 16sp
-  static TextStyle get heading3 => GoogleFonts.fredoka(
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
-        color: AppColors.textPrimary,
-      );
-
-  /// Screen title (AppBar / tab header) — Fredoka, 22sp
-  static TextStyle get title => GoogleFonts.fredoka(
-        fontSize: 22,
-        fontWeight: FontWeight.w600,
+        fontWeight: FontWeight.w700,
         color: AppColors.textPrimary,
         letterSpacing: -0.2,
       );

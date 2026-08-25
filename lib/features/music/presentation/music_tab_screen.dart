@@ -288,13 +288,6 @@ class _MusicHeader extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(width: 6),
-          // Refresh
-          _IconBtn(
-            icon: Icons.refresh_rounded,
-            onTap: () =>
-                ref.read(mediaLibraryProvider.notifier).backgroundRefresh(),
-          ),
         ],
       ),
     );
@@ -318,10 +311,10 @@ class _FilterPills extends ConsumerWidget {
     ];
 
     return SizedBox(
-      height: MediaQuery.of(context).size.width > 600 ? 60 : 52,
+      height: MediaQuery.of(context).size.width > 600 ? 60 : 56,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
         itemCount: pills.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -396,7 +389,7 @@ class _SongListView extends ConsumerWidget {
         // Song list
         SliverPadding(
           padding: EdgeInsets.fromLTRB(0, 4, 0,
-              MediaQuery.of(context).padding.bottom + 90),
+              MediaQuery.of(context).padding.bottom + 120),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {
@@ -1001,7 +994,7 @@ class _FoldersView extends ConsumerWidget {
     return ListView.builder(
       controller: scrollController,
       padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
-          MediaQuery.of(context).padding.bottom + 90),
+          MediaQuery.of(context).padding.bottom + 120),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
@@ -1151,7 +1144,7 @@ class _AlbumsView extends StatelessWidget {
     return ListView.builder(
       controller: scrollController,
       padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
-          MediaQuery.of(context).padding.bottom + 90),
+          MediaQuery.of(context).padding.bottom + 120),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final album = keys[i];
@@ -1302,7 +1295,7 @@ class _ArtistsView extends StatelessWidget {
     return ListView.builder(
       controller: scrollController,
       padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
-          MediaQuery.of(context).padding.bottom + 90),
+          MediaQuery.of(context).padding.bottom + 120),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final artist = keys[i];
