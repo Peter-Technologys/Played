@@ -164,7 +164,7 @@ class FcmService {
       // 1. Register via /api/device (device-level registration, HMAC-signed).
       //    Reuse the device ID already stored by UpdateService so we don't
       //    create a second device identity.
-      final deviceId = prefs.getString('update_device_id');
+      final deviceId = prefs.getString('otya_device_id');
       if (deviceId != null && deviceId.isNotEmpty) {
         await OtyaService.instance.registerDevicePushToken(
           deviceId: deviceId,

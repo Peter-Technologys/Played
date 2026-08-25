@@ -37,6 +37,12 @@ import java.nio.ByteBuffer
 
 class MainActivity : FlutterActivity() {
 
+    companion object {
+        // Tracks the last time a one-shot update check was triggered from onResume()
+        // so we don't re-check on every screen rotation (only once per hour).
+        private var lastUpdateCheckMs: Long = 0L
+    }
+
     private val pipChannel      = "com.otyaplayer.app/pip"
     private val mediaChannel    = "com.otyaplayer.app/media_store"
     private val fileChannel     = "com.otyaplayer.app/file_ops"
@@ -317,6 +323,12 @@ class MainActivity : FlutterActivity() {
                     else -> result.notImplemented()
                 }
             }
+
+        // Schedule the background update check (safe to call multiple times —
+        // uses ExistingPeriodicWorkPolicy.KEEP so it only registers once).
+        // Called here so the periodic worker starts on first install without
+        // requiring a device reboot (BootReceiver handles subsequent reboots).
+        UpdateCheckWorker.schedule(this)
     }
 
     // ── MediaStore observer ───────────────────────────────────────────────
@@ -832,6 +844,15 @@ class MainActivity : FlutterActivity() {
                 MethodChannel(messenger, pipChannel).invokeMethod("playerResume", null)
             }
         } catch (_: Exception) {}
+
+        // Run a one-shot update check if it has been more than 1 hour since the last check.
+        // This gives users a faster update prompt when the app comes to the foreground,
+        // without re-checking on every screen rotation.
+        val now = System.currentTimeMillis()
+        if (now - lastUpdateCheckMs > 60 * 60 * 1000L) {
+            lastUpdateCheckMs = now
+            UpdateCheckWorker.runNow(this)
+        }
     }
 
     override fun onDestroy() {
