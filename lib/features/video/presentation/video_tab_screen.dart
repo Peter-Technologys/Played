@@ -243,13 +243,6 @@ class _VideoHeader extends ConsumerWidget {
             icon: Icons.history_rounded,
             onTap: () => context.push('/history'),
           ),
-          const SizedBox(width: 6),
-          // Refresh
-          _IconBtn(
-            icon: Icons.refresh_rounded,
-            onTap: () =>
-                ref.read(mediaLibraryProvider.notifier).backgroundRefresh(),
-          ),
         ],
       ),
     );
