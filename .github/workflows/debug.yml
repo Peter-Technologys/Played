@@ -77,9 +77,12 @@ jobs:
             pub-${{ hashFiles('pubspec.yaml') }}
             pub-
 
-      # Cache Gradle wrapper, caches (including media_kit libmpv JARs), and
-      # the Gradle build cache. media_kit downloads ~200MB of libmpv JARs per
-      # ABI on every cold run — caching them saves 3-4 minutes per build.
+      # Cache Gradle wrapper, caches (including media_kit libmpv JARs), the
+      # Gradle build cache, and the Android SDK CMake install.
+      # media_kit downloads ~200MB of libmpv JARs per ABI on every cold run —
+      # caching them saves 3-4 minutes per build.
+      # CMake (~50MB) is installed mid-build if missing, which can cause native
+      # compilation to fail on constrained runners — caching it prevents that.
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -87,7 +90,8 @@ jobs:
             ~/.gradle/wrapper/
             ~/.gradle/caches/
             ~/.gradle/build-cache/
-          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml') }}
+            /usr/local/lib/android/sdk/cmake/
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml', 'android/app/build.gradle') }}
           restore-keys: |
             gradle-
 
@@ -122,7 +126,15 @@ jobs:
             echo "WARNING: KEYSTORE_BASE64 not set - APK will use debug signing."
           fi
 
+      # ── Pre-build diagnostics ──────────────────────────────────────
+      - name: Pre-build diagnostics
+        run: |
+          df -h
+          ls /usr/local/lib/android/sdk/cmake/ || echo "CMake not cached — will be downloaded"
+
       # ── Build release APK ───────────────────────────────────────
+      # Note: || true has been intentionally removed so a Gradle failure
+      # immediately fails the job with a clear error message.
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
@@ -139,7 +151,18 @@ jobs:
             --dart-define=OTYA_SECRET=$DD_SECRET \
             --dart-define=APP_ARCH=$DD_ARCH \
             --dart-define=SELF_UPDATE=$DD_UPDATE \
-            --dart-define=WORKER_URL=$DD_WORKER_URL || true
+            --dart-define=WORKER_URL=$DD_WORKER_URL
+
+      # ── Post-build diagnostics (always runs) ───────────────────────
+      - name: Post-build diagnostics
+        if: always()
+        run: |
+          echo "=== Disk usage ==="
+          df -h
+          echo "=== APKs found in build/ ==="
+          find build/ -name '*.apk' 2>/dev/null || echo "(none)"
+          echo "=== flutter-apk dir ==="
+          ls -lh build/app/outputs/flutter-apk/ 2>/dev/null || echo "(directory missing)"
 
       # Find APKs anywhere in the build tree and copy to the expected path.
       # The Flutter watcher crash can cause outputs to land in a non-standard
