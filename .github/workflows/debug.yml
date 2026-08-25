@@ -196,18 +196,31 @@ jobs:
           echo "=== APKs found in build/ ==="
           find build/ -name '*.apk' 2>/dev/null || echo "(none)"
 
-      # Copy Gradle output APKs to the path expected by the upload step.
+      # Gradle (invoked directly) writes APKs to android/app/build/outputs/apk/release/.
+      # Copy them to the conventional flutter-apk path so the upload step works unchanged.
       - name: Locate and verify APKs
         run: |
-          echo "=== All APKs found in build/ ==="
-          find build/ -name '*.apk' 2>/dev/null || echo "(none found)"
-
+          GRADLE_OUT="android/app/build/outputs/apk/release"
           OUTDIR="build/app/outputs/flutter-apk"
           mkdir -p "$OUTDIR"
 
-          # Copy any release APKs found elsewhere into the expected output dir
-          find build/ -name '*-release.apk' ! -path "$OUTDIR/*" \
-            -exec cp -v {} "$OUTDIR/" \; 2>/dev/null || true
+          echo "=== Gradle APK output dir ==="
+          ls -lh "$GRADLE_OUT/" 2>/dev/null || echo "(empty or missing)"
+
+          # Copy arm64 and arm32 release APKs to the expected output path
+          for ABI in arm64-v8a armeabi-v7a; do
+            SRC="$GRADLE_OUT/app-${ABI}-release.apk"
+            DST="$OUTDIR/app-${ABI}-release.apk"
+            if [ -f "$SRC" ]; then
+              cp -v "$SRC" "$DST"
+            else
+              echo "WARNING: $SRC not found — searching entire build tree"
+              FOUND=$(find . -name "app-${ABI}-release.apk" 2>/dev/null | head -1)
+              if [ -n "$FOUND" ]; then
+                cp -v "$FOUND" "$DST"
+              fi
+            fi
+          done
 
           echo "=== Contents of $OUTDIR ==="
           ls -lh "$OUTDIR/" 2>/dev/null || echo "(empty)"
