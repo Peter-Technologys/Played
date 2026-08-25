@@ -52,7 +52,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
   bool _isScrolled = false;
 
   // Approximate height of header + pills + padding — content starts below this.
-  static const double _headerHeight = 122.0;
+  static const double _headerHeight = 152.0;
 
   @override
   bool get wantKeepAlive => true;
@@ -201,7 +201,7 @@ class _MusicHeader extends ConsumerWidget {
         libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 0),
       child: Row(
         children: [
           Container(
@@ -289,13 +289,6 @@ class _MusicHeader extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(width: 6),
-          // Refresh
-          _IconBtn(
-            icon: Icons.refresh_rounded,
-            onTap: () =>
-                ref.read(mediaLibraryProvider.notifier).backgroundRefresh(),
-          ),
         ],
       ),
     );
@@ -319,10 +312,10 @@ class _FilterPills extends ConsumerWidget {
     ];
 
     return SizedBox(
-      height: MediaQuery.of(context).size.width > 600 ? 60 : 52,
+      height: MediaQuery.of(context).size.width > 600 ? 60 : 56,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
         itemCount: pills.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -401,7 +394,7 @@ class _SongListView extends ConsumerWidget {
         // Song list
         SliverPadding(
           padding: EdgeInsets.fromLTRB(0, 4, 0,
-              MediaQuery.of(context).padding.bottom + 90),
+              MediaQuery.of(context).padding.bottom + 120),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {

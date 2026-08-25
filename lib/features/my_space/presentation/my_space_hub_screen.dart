@@ -343,7 +343,7 @@ class MySpaceHubScreen extends ConsumerWidget {
         _ToolEntry(
           icon: Icons.audiotrack_rounded,
           label: 'Ripper',
-          subtitle: 'Pull audio out',
+          subtitle: 'Get audio from video',
           gradient: const [Color(0xFF34D399), Color(0xFF059669)],
           badge: null,
           onTapBuilder: (ctx) => () => _showMp3InstructionSheet(ctx),
@@ -398,11 +398,27 @@ class MySpaceHubScreen extends ConsumerWidget {
         ),
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
-          label: 'Tuner',
-          subtitle: 'Shape sound',
+          label: 'Sound',
+          subtitle: 'Tune your sound',
           gradient: const [Color(0xFF9CA3AF), Color(0xFF6B7280)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
+        ),
+        _ToolEntry(
+          icon: Icons.content_cut_rounded,
+          label: 'Trim',
+          subtitle: 'Cut for WhatsApp',
+          gradient: const [Color(0xFF25D366), Color(0xFF128C7E)],
+          badge: null,
+          onTapBuilder: (ctx) => () {
+            // WhatsApp trimmer needs a MediaItem — show a message to open from video player
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text('Open a video in the player, then tap ⋮ → Trim for WhatsApp'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          },
         ),
       ];
 
@@ -422,7 +438,7 @@ class MySpaceHubScreen extends ConsumerWidget {
             // ── Header ──────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 12, 20, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -436,7 +452,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                             child: const Text(
                               'Otya Hub',
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
                                 fontFamily: 'Inter',
@@ -547,7 +563,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   crossAxisCount: 3,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.25,
+                  childAspectRatio: 1.1,
                 ),
                 delegate: SliverChildListDelegate(
                   tools
@@ -609,7 +625,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             SliverToBoxAdapter(
               child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 100,
+                height: MediaQuery.of(context).padding.bottom + 140,
               ),
             ),
           ],
@@ -1111,8 +1127,8 @@ class _ToolMiniCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: gradient,
@@ -1131,7 +1147,7 @@ class _ToolMiniCard extends StatelessWidget {
               ),
               child: Icon(icon, color: Colors.white, size: 20),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(

@@ -243,13 +243,6 @@ class _VideoHeader extends ConsumerWidget {
             icon: Icons.history_rounded,
             onTap: () => context.push('/history'),
           ),
-          const SizedBox(width: 6),
-          // Refresh
-          _IconBtn(
-            icon: Icons.refresh_rounded,
-            onTap: () =>
-                ref.read(mediaLibraryProvider.notifier).backgroundRefresh(),
-          ),
         ],
       ),
     );
@@ -265,68 +258,59 @@ class _FilterPills extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const pills = [
-      (_VideoFilter.videos, 'Videos', Icons.play_circle_rounded),
-      (_VideoFilter.folders, 'Folders', Icons.folder_rounded),
+      (_VideoFilter.videos,    'Videos',    Icons.play_circle_rounded),
+      (_VideoFilter.folders,   'Folders',   Icons.folder_rounded),
       (_VideoFilter.playlists, 'Playlists', Icons.queue_play_next_rounded),
     ];
 
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 14, 16, 0),
-      height: 44,
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: pills.map((pill) {
-          final (filter, label, icon) = pill;
+    return SizedBox(
+      height: 52,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
+        itemCount: pills.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 8),
+        itemBuilder: (context, index) {
+          final (filter, label, icon) = pills[index];
           final isActive = current == filter;
-          return Expanded(
-            child: GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                ref.read(_videoFilterProvider.notifier).state = filter;
-              },
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                margin: const EdgeInsets.all(4),
-                decoration: BoxDecoration(
-                  gradient: isActive
-                      ? const LinearGradient(
-                          colors: [AppColors.accent, AppColors.accentViolet],
-                        )
-                      : null,
-                  borderRadius: BorderRadius.circular(12),
+          return GestureDetector(
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(_videoFilterProvider.notifier).state = filter;
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                gradient: isActive
+                    ? const LinearGradient(
+                        colors: [AppColors.accent, AppColors.accentViolet],
+                      )
+                    : null,
+                color: isActive ? null : AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: isActive ? Colors.transparent : AppColors.border,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      icon,
-                      size: 14,
-                      color: isActive
-                          ? Colors.black
-                          : AppColors.textSecondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      label,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(icon, size: 14,
+                      color: isActive ? Colors.black : AppColors.textSecondary),
+                  const SizedBox(width: 4),
+                  Text(label,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isActive
-                            ? Colors.black
-                            : AppColors.textSecondary,
+                        color: isActive ? Colors.black : AppColors.textSecondary,
                         fontFamily: 'Inter',
-                      ),
-                    ),
-                  ],
-                ),
+                      )),
+                ],
               ),
             ),
           );
-        }).toList(),
+        },
       ),
     );
   }
@@ -387,7 +371,7 @@ class _VideoGrid extends ConsumerWidget {
     if (isListView) {
       return ListView.builder(
         padding: EdgeInsets.fromLTRB(
-            16, 0, 16, MediaQuery.of(context).padding.bottom + 90),
+            16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
         physics: const BouncingScrollPhysics(),
         cacheExtent: 600,
         itemExtent: 102,
@@ -422,7 +406,7 @@ class _VideoGrid extends ConsumerWidget {
         ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
-              16, 0, 16, MediaQuery.of(context).padding.bottom + 90),
+              16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
@@ -1423,7 +1407,7 @@ class _VideoFoldersTab extends StatelessWidget {
 
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(16, 12, 16,
-          MediaQuery.of(context).padding.bottom + 90),
+          MediaQuery.of(context).padding.bottom + 120),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
@@ -1522,7 +1506,7 @@ class VideoFolderDetailPage extends ConsumerWidget {
       ),
       body: GridView.builder(
         padding: EdgeInsets.fromLTRB(16, 12, 16,
-            MediaQuery.of(context).padding.bottom + 90),
+            MediaQuery.of(context).padding.bottom + 120),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 12,

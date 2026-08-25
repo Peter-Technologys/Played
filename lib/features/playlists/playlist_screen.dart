@@ -113,7 +113,8 @@ class PlaylistsScreen extends ConsumerWidget {
           ? _EmptyState(onCreate: () => _showCreateDialog(context, ref))
           : ListView.separated(
               padding: EdgeInsets.fromLTRB(16, 16, 16,
-                  MediaQuery.of(context).padding.bottom + 90),
+                  MediaQuery.of(context).padding.bottom + 120),
+              physics: const BouncingScrollPhysics(),
               itemCount: playlists.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {

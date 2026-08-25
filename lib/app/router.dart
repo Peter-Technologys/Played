@@ -7,6 +7,8 @@ import '../features/my_space/presentation/usage_stats_dashboard.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
 import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/my_space/presentation/providers/my_space_provider.dart';
+import '../core/widgets/update_dialog.dart';
+import '../shared/widgets/new_media_banner.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
@@ -622,6 +624,17 @@ class _MainShellState extends ConsumerState<_MainShell> {
   // Tab state is preserved by AutomaticKeepAliveClientMixin on each tab screen.
   // widget.child from ShellRoute is the single source of truth.
 
+  @override
+  void initState() {
+    super.initState();
+    // Show the in-app update dialog once on shell mount (after first frame).
+    // AnnouncementDialog is already wired in app.dart with a 2-second delay;
+    // UpdateDialog runs here so both are available on every app start.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) UpdateDialog.checkAndShow(context);
+    });
+  }
+
   void _onTap(int index) {
     HapticFeedback.selectionClick();
     GoRouter.of(context).go(_routes[index]);
@@ -643,29 +656,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
             : 0;
 
     return Scaffold(
-      appBar: AppBar(
-        // Transparent / blends with the page content behind it
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        // Search icon only shown on Video (0) and Music (1) tabs.
-        // My Space (2) has its own internal search for tools.
-        actions: currentIndex == 2
-            ? const []
-            : [
-                IconButton(
-                  icon: const Icon(Icons.search_rounded),
-                  tooltip: 'Search',
-                  color: AppColors.textSecondary,
-                  onPressed: () {
-                    showSearch<MediaItem?>(
-                      context: context,
-                      delegate: _GlobalSearchDelegate(allItems),
-                    );
-                  },
-                ),
-              ],
-      ),
       body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
@@ -682,9 +672,8 @@ class _MainShellState extends ConsumerState<_MainShell> {
           ),
           // TASK 11: AdBannerSlot already returns SizedBox.shrink() when ads
           // are disabled — no visual gap. No additional guard needed.
-          SafeArea(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          Container(
+              margin: EdgeInsets.fromLTRB(12, 0, 12, MediaQuery.of(context).padding.bottom + 6),
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? const Color(0xFF1B1E2B)
@@ -729,7 +718,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),

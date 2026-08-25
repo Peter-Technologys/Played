@@ -107,7 +107,8 @@ class _FolderList extends StatelessWidget {
   Widget build(BuildContext context) {
     final keys = folders.keys.toList()..sort();
     return ListView.separated(
-      padding: const EdgeInsets.all(16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
+      physics: const BouncingScrollPhysics(),
       itemCount: keys.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (context, i) {
@@ -228,7 +229,8 @@ class FolderDetailScreen extends StatelessWidget {
         ],
       ),
       body: ListView.separated(
-        padding: const EdgeInsets.all(16),
+        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
+        physics: const BouncingScrollPhysics(),
         itemCount: items.length,
         separatorBuilder: (_, __) => const SizedBox(height: 8),
         itemBuilder: (context, i) {

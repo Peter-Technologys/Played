@@ -230,12 +230,20 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               );
             }
 
-            return Stack(
-              children: [
-                wrappedChild,
-                if (!_onboardingDone)
-                  OnboardingOverlay(onDone: _completeOnboarding),
-              ],
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: MediaQuery.of(context).textScaler.clamp(
+                  minScaleFactor: 0.85,
+                  maxScaleFactor: 1.2,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  wrappedChild,
+                  if (!_onboardingDone)
+                    OnboardingOverlay(onDone: _completeOnboarding),
+                ],
+              ),
             );
           },
         );
