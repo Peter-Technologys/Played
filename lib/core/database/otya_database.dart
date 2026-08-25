@@ -343,6 +343,49 @@ class OtyaDatabase {
     }
   }
 
+  // ── Shelf cache ────────────────────────────────────────────────────────────
+
+  /// Caches a list of media IDs for a named shelf (e.g. 'cinema', 'street').
+  Future<void> cacheShelf(String shelfName, List<String> ids) async {
+    final box = _shelfBox;
+    if (box == null || !box.isOpen) return;
+    try {
+      await box.put('shelf_$shelfName', ids);
+    } catch (e) {
+      debugPrint('[OtyaDB] cacheShelf error: $e');
+    }
+  }
+
+  /// Returns the cached list of media IDs for a named shelf.
+  List<String> getShelfCache(String shelfName) {
+    final box = _shelfBox;
+    if (box == null || !box.isOpen) return [];
+    try {
+      final raw = box.get('shelf_$shelfName');
+      if (raw is List) return raw.cast<String>();
+      return [];
+    } catch (e) {
+      debugPrint('[OtyaDB] getShelfCache error: $e');
+      return [];
+    }
+  }
+
+  /// Seeds a library item into history WITHOUT stamping lastPlayedAt.
+  /// Used by MediaLibraryNotifier to populate history from a fresh scan
+  /// so Phase 1b cold-start seeding works on subsequent launches.
+  Future<void> seedLibraryItem(MediaItem item) async {
+    final box = _historyBox;
+    if (box == null || !box.isOpen) return;
+    try {
+      // Only seed if not already present.
+      if (box.values.any((i) => i.id == item.id)) return;
+      // Use a stable key so the same item is never duplicated.
+      await box.put('seed_${item.id}', item);
+    } catch (e) {
+      debugPrint('[OtyaDB] seedLibraryItem error: $e');
+    }
+  }
+
   // ── Lyrics cache ───────────────────────────────────────────────────────────
 
   Future<void> cacheLyrics(String mediaId, String lyrics) async {

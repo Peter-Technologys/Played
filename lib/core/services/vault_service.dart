@@ -166,7 +166,7 @@ class VaultService {
       OtyaDatabase.instance.isInVault(mediaId);
 
   /// Returns all vault items.
-  Future<List<VaultItem>> getAllItems() =>
+  List<VaultItem> getAllItems() =>
       OtyaDatabase.instance.getAllVaultItems();
 
   /// Returns the total size of all vault files in bytes.

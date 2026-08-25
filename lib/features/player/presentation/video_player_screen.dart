@@ -168,6 +168,15 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   // ── More options ───────────────────────────────────────────────
 
+  // ── File size helper ───────────────────────────────────────────────
+
+  String get size {
+    final bytes = widget.mediaItem.fileSizeBytes;
+    if (bytes == null || bytes == 0) return 'Unknown';
+    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
+
   void _showMoreOptions() {
     showModalBottomSheet(
       context: context,
@@ -1001,6 +1010,50 @@ class _AudioWaveAnimation extends StatelessWidget {
 }
 
 // ── Audio Track Sheet ─────────────────────────────────────────────────────
+
+// ── Info Row ──────────────────────────────────────────────────────────────
+
+class _InfoRow extends StatelessWidget {
+  final String label;
+  final String value;
+  const _InfoRow({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 72,
+            child: Text(
+              '$label:',
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontFamily: 'Inter',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 12,
+                fontFamily: 'Inter',
+              ),
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _AudioTrackSheet extends StatelessWidget {
   final List<AudioTrack> tracks;

@@ -13,6 +13,8 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/services/auto_eq_service.dart';
+import '../../../core/services/vault_service.dart';
+import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
 import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
