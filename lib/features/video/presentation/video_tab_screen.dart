@@ -387,7 +387,7 @@ class _VideoGrid extends ConsumerWidget {
     if (isListView) {
       return ListView.builder(
         padding: EdgeInsets.fromLTRB(
-            16, 0, 16, MediaQuery.of(context).padding.bottom + 90),
+            16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
         physics: const BouncingScrollPhysics(),
         cacheExtent: 600,
         itemExtent: 102,
@@ -422,7 +422,7 @@ class _VideoGrid extends ConsumerWidget {
         ),
         SliverPadding(
           padding: EdgeInsets.fromLTRB(
-              16, 0, 16, MediaQuery.of(context).padding.bottom + 90),
+              16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
           sliver: SliverGrid(
             gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
@@ -1423,7 +1423,7 @@ class _VideoFoldersTab extends StatelessWidget {
 
     return ListView.builder(
       padding: EdgeInsets.fromLTRB(16, 12, 16,
-          MediaQuery.of(context).padding.bottom + 90),
+          MediaQuery.of(context).padding.bottom + 120),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
@@ -1522,7 +1522,7 @@ class VideoFolderDetailPage extends ConsumerWidget {
       ),
       body: GridView.builder(
         padding: EdgeInsets.fromLTRB(16, 12, 16,
-            MediaQuery.of(context).padding.bottom + 90),
+            MediaQuery.of(context).padding.bottom + 120),
         gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 12,
