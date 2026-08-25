@@ -66,7 +66,9 @@ class _MediaCardState extends State<MediaCard>
     // unnecessary setState() call when the result is already in memory.
     final item = widget.item;
     if (item.isVideo) {
-      final key = item.id;
+      // Cache key is filePath — item.id is Uri.encodeComponent(path) which
+      // is NOT the MediaStore integer _ID that getThumbnail() needs.
+      final key = item.filePath;
       if (_thumbCache.containsKey(key)) {
         _thumbPath = _thumbCache[key];
         _loaded = true;
@@ -102,11 +104,14 @@ class _MediaCardState extends State<MediaCard>
   Future<void> _loadArt() async {
     final item = widget.item;
     if (item.isVideo) {
-      final key = item.id;
+      // Use filePath as both cache key and 'id' arg. Kotlin uses 'id' only
+      // as the on-disk cache filename; it uses 'path' with
+      // MediaMetadataRetriever which works with any file path.
+      final key = item.filePath;
       try {
         final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
           'path': item.filePath,
-          'id':   item.id,
+          'id':   item.filePath,
         });
         _cacheInsert(_thumbCache, key, path);
         if (mounted) setState(() { _thumbPath = path; _loaded = true; });

@@ -65,26 +65,30 @@ class PermissionHelper {
   }
 
   /// Check (without requesting) if media permissions are already granted.
+  /// On Android 14+ (API 34+) also accepts PermissionStatus.limited which
+  /// represents READ_MEDIA_VISUAL_USER_SELECTED (partial media access).
   static Future<bool> hasMediaPermissions() async {
     final sdk = await _getSdkInt();
     if (sdk == 0) return true;
-    final perms = sdk >= 33
-        ? [Permission.audio, Permission.videos]
-        : [Permission.storage];
-    for (final p in perms) {
-      final s = await p.status;
-      if (!s.isGranted && !s.isLimited) return false;
+    if (sdk >= 33) {
+      final audioStatus  = await Permission.audio.status;
+      final videosStatus = await Permission.videos.status;
+      final audioOk  = audioStatus.isGranted  || audioStatus.isLimited;
+      final videosOk = videosStatus.isGranted || videosStatus.isLimited;
+      return audioOk && videosOk;
     }
-    return true;
+    final storageStatus = await Permission.storage.status;
+    return storageStatus.isGranted || storageStatus.isLimited;
   }
 
-  /// Request Air-Drop permissions (Bluetooth + Location/NearbyWifi).
+  /// Request Air-Drop permissions (Bluetooth + Location/NearbyWifi + Camera).
   ///
   /// On Android 13+ (API >= 33) we request [Permission.nearbyWifiDevices]
   /// instead of location — the manifest declares NEARBY_WIFI_DEVICES with
   /// `neverForLocation` so no location access is granted.
   /// On Android 12 and below (API <= 32) we keep requesting location because
   /// NEARBY_WIFI_DEVICES is not available and Wi-Fi P2P requires it.
+  /// Camera is always requested for the QR code scanner (mobile_scanner).
   static Future<void> requestAirDropPermissions() async {
     final sdk = await _getSdkInt();
     final perms = <Permission>[
@@ -92,6 +96,7 @@ class PermissionHelper {
       Permission.bluetoothScan,
       Permission.bluetoothAdvertise,
       Permission.bluetoothConnect,
+      Permission.camera, // QR scanner in Air-Drop
     ];
     if (sdk >= 33) {
       perms.add(Permission.nearbyWifiDevices);
