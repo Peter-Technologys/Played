@@ -73,7 +73,7 @@ void main() async {
         // notification persists. Android 12+ destroys the notification
         // immediately when the foreground service stops.
         androidNotificationOngoing: true,
-        androidStopForegroundOnPause: false,
+        androidStopForegroundOnPause: true,
         androidNotificationIcon: 'drawable/ic_notification',
         notificationColor: Color(0xFF00E5FF),
         androidShowNotificationBadge: false,
