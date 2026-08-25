@@ -436,7 +436,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                             child: const Text(
                               'Otya Hub',
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
                                 fontFamily: 'Inter',
@@ -547,7 +547,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   crossAxisCount: 3,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.25,
+                  childAspectRatio: 1.1,
                 ),
                 delegate: SliverChildListDelegate(
                   tools
@@ -1111,8 +1111,8 @@ class _ToolMiniCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: gradient,
@@ -1131,7 +1131,7 @@ class _ToolMiniCard extends StatelessWidget {
               ),
               child: Icon(icon, color: Colors.white, size: 20),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
