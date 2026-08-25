@@ -130,6 +130,18 @@ class CrashReporter {
     await CrashReporter.instance.recordCrash(errorType, description, null);
   }
 
+  /// Convenience wrapper used by main.dart error handlers.
+  ///
+  /// Derives the error type from [error].runtimeType and delegates to
+  /// [recordCrash]. Fire-and-forget safe.
+  void report(Object error, StackTrace stack) {
+    recordCrash(
+      error.runtimeType.toString(),
+      error.toString(),
+      stack,
+    ).ignore();
+  }
+
   // ── Internal helpers ───────────────────────────────────────────────────────
 
   /// Appends [crash] to the pending list in SharedPreferences, capping at

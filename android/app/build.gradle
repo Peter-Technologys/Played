@@ -17,17 +17,17 @@ def flutterVersionName = localProperties.getProperty('flutter.versionName') ?: '
 
 android {
     namespace 'com.otyaplayer.app'
-    compileSdk 36
-    ndkVersion flutter.ndkVersion
+    compileSdk 35
+    ndkVersion '27.0.12077973'
 
     compileOptions {
         coreLibraryDesugaringEnabled true
-        sourceCompatibility JavaVersion.VERSION_11
-        targetCompatibility JavaVersion.VERSION_11
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
 
     kotlinOptions {
-        jvmTarget = '11'
+        jvmTarget = '17'
     }
 
     sourceSets {
@@ -37,7 +37,7 @@ android {
     defaultConfig {
         applicationId 'com.otyaplayer.app'
         minSdk 21
-        targetSdk 36
+        targetSdk 35
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true

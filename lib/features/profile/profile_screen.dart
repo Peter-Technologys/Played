@@ -132,6 +132,20 @@ class ProfileScreen extends ConsumerWidget {
 
           const SizedBox(height: 20),
 
+          // ── 3. WEBSITE ────────────────────────────────────────────────
+          const _SectionHeader(label: 'Website'),
+          const SizedBox(height: 8),
+          _TappableTile(
+            icon: Icons.language_rounded,
+            label: 'Visit OTYA Website',
+            subtitle: 'getotya.petersmartlink.com',
+            iconColor: AppColors.accent,
+            onTap: () => context.push('/webview', extra: {
+              'url': 'https://getotya.petersmartlink.com',
+              'title': 'OTYA Player',
+            }),
+          ),
+
           // About, Contact, What's New, Share, Privacy & Rate are in
           // the dedicated About screen — tap Help & Feedback in My Space
           // or navigate to /about.

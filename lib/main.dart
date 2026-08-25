@@ -60,10 +60,12 @@ void main() async {
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
+    CrashReporter.instance.report(details.exception, details.stack ?? StackTrace.empty);
     if (kDebugMode) _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
+    CrashReporter.instance.report(error, stack);
     if (kDebugMode) _showCrashOverlay('Platform Error', '$error\n\n$stack');
     return true;
   };
@@ -110,6 +112,7 @@ void main() async {
     unawaited(_initBackground(savedSettings));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
+    CrashReporter.instance.report(error, stack);
     if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
   });
 }

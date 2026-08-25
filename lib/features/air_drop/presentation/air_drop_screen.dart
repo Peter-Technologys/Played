@@ -414,9 +414,10 @@ class _ReceiveView extends ConsumerWidget {
             borderRadius: BorderRadius.circular(20),
             child: MobileScanner(
               controller: scanCtrl,
-              onDetect: (capture) {
+              onDetect: (BarcodeCapture capture) {
                 if (scanned) return;
-                final url = capture.barcodes.firstOrNull?.rawValue;
+                final barcode = capture.barcodes.firstOrNull;
+                final url = barcode?.displayValue ?? barcode?.rawValue;
                 if (url != null && url.startsWith('http')) {
                   scanned = true;
                   HapticFeedback.mediumImpact();
