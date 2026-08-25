@@ -55,7 +55,6 @@ dependencies:
   # File System
   path_provider: ^2.1.5
   permission_handler: ^11.3.1
-  file_picker: ^8.1.2
   image_picker: ^1.1.2
 
   # Notifications
@@ -109,12 +108,6 @@ dev_dependencies:
   riverpod_generator: ^2.4.0
   flutter_lints: ^5.0.0
 
-# flutter_plugin_android_lifecycle 2.0.19+ requires compileSdk >= 36,
-# which conflicts with file_picker's pre-built AAR (compileSdk 34).
-# Pin to 2.0.18 — the last version that accepts compileSdk 34 — until
-# file_picker ships an AAR built against SDK 36.
-dependency_overrides:
-  flutter_plugin_android_lifecycle: 2.0.18
 
 flutter:
   uses-material-design: true
