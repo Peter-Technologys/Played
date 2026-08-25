@@ -343,7 +343,7 @@ class MySpaceHubScreen extends ConsumerWidget {
         _ToolEntry(
           icon: Icons.audiotrack_rounded,
           label: 'Ripper',
-          subtitle: 'Pull audio out',
+          subtitle: 'Get audio from video',
           gradient: const [Color(0xFF34D399), Color(0xFF059669)],
           badge: null,
           onTapBuilder: (ctx) => () => _showMp3InstructionSheet(ctx),
@@ -398,11 +398,27 @@ class MySpaceHubScreen extends ConsumerWidget {
         ),
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
-          label: 'Tuner',
-          subtitle: 'Shape sound',
+          label: 'Sound',
+          subtitle: 'Tune your sound',
           gradient: const [Color(0xFF9CA3AF), Color(0xFF6B7280)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
+        ),
+        _ToolEntry(
+          icon: Icons.content_cut_rounded,
+          label: 'Trim',
+          subtitle: 'Cut for WhatsApp',
+          gradient: const [Color(0xFF25D366), Color(0xFF128C7E)],
+          badge: null,
+          onTapBuilder: (ctx) => () {
+            // WhatsApp trimmer needs a MediaItem — show a message to open from video player
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text('Open a video in the player, then tap ⋮ → Trim for WhatsApp'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          },
         ),
       ];
 
