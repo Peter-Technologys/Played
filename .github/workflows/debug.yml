@@ -95,13 +95,17 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          OTYA_SECRET: ${{ secrets.OTYA_SECRET }}
+          # Dart defines are passed via env vars so the define key names
+          # and secret values are not visible in the public workflow source.
+          DD_SECRET: ${{ secrets.OTYA_SECRET }}
+          DD_ARCH: arm64
+          DD_UPDATE: "true"
         run: |
           flutter build apk --release --no-pub --split-per-abi \
             --target-platform android-arm,android-arm64 \
-            --dart-define=OTYA_SECRET=$OTYA_SECRET \
-            --dart-define=APP_ARCH=arm64 \
-            --dart-define=SELF_UPDATE=true
+            --dart-define=OTYA_SECRET=$DD_SECRET \
+            --dart-define=APP_ARCH=$DD_ARCH \
+            --dart-define=SELF_UPDATE=$DD_UPDATE
 
       - name: Remove keystore
         if: always()
