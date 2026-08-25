@@ -16,7 +16,11 @@ class ApiService {
   ApiService._();
   static final ApiService instance = ApiService._();
 
-  static final http.Client _client = http.Client();
+  // Instance-level client so dispose() actually closes this object.
+  // (A static client + instance dispose() was a bug — dispose() would be
+  // called on the instance but close the shared static client, breaking
+  // any concurrent requests.)
+  final http.Client _client = http.Client();
   static const Duration _timeout   = Duration(seconds: 12);
 
   // ── Retry helper ──────────────────────────────────────────────────────────
@@ -24,7 +28,7 @@ class ApiService {
   /// Executes [fn] with up to [maxRetries] retries on transient network
   /// errors (SocketException, TimeoutException). Uses exponential backoff
   /// starting at [initialDelay]. Non-retryable errors (4xx) are not retried.
-  static Future<T?> _withRetry<T>(
+  Future<T?> _withRetry<T>(
     Future<T?> Function() fn, {
     int maxRetries = 2,
     Duration initialDelay = const Duration(milliseconds: 500),

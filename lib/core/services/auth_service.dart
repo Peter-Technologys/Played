@@ -14,10 +14,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/environment.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const _kAuthBase       = 'https://petersmartlink.com/auth';
+// Derived from Environment.workerUrl so the backend domain is never
+// hardcoded here. Environment.workerUrl is injected at build time via
+// --dart-define=WORKER_URL=https://... (see lib/core/config/environment.dart).
+String get _kAuthBase => '${Environment.workerUrl}/auth';
 
 // Secure storage keys (tokens — never in SharedPreferences)
 const _kSecureAccessToken  = 'otya_access_token';

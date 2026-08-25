@@ -1,6 +1,14 @@
 abstract class Environment {
   // ── Website & Worker base ─────────────────────────────────────────────────
-  static const String workerUrl = 'https://petersmartlink.com';
+  //
+  // Injected at build time via --dart-define=WORKER_URL=https://...
+  // NEVER hardcode the production URL here — use the CI/CD variable.
+  // The fallback is intentionally a localhost address so any accidental
+  // non-injected build fails fast rather than silently hitting production.
+  static const String workerUrl = String.fromEnvironment(
+    'WORKER_URL',
+    defaultValue: 'http://localhost:8787',
+  );
 
   // ── API endpoints (all HMAC-authenticated) ────────────────────────────────
   static const String apiSyncUrl      = '$workerUrl/api/sync';
@@ -25,8 +33,10 @@ abstract class Environment {
   static const String appName         = 'OTYA Player';
   static const String appPackageId    = 'com.otyaplayer.app';
   static const String supportEmail    = 'support@petersmartlink.com';
-  static const String websiteUrl      = 'https://petersmartlink.com';
-  static const String downloadPageUrl = 'https://petersmartlink.com/download/otya-player';
+  // websiteUrl and downloadPageUrl are derived from workerUrl so they are
+  // also never hardcoded.
+  static const String websiteUrl      = workerUrl;
+  static const String downloadPageUrl = '$workerUrl/download/otya-player';
 
   // ── Build-time flags ──────────────────────────────────────────────────────
   /// Whether in-app APK download and self-install is enabled.
