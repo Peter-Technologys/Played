@@ -6,14 +6,14 @@ allprojects {
     }
 }
 
-rootProject.buildDir = '../build'
+// Gradle 9: use layout.buildDirectory instead of deprecated buildDir assignment.
 subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
+    layout.buildDirectory = rootProject.layout.buildDirectory.dir(project.name)
 }
 subprojects {
     project.evaluationDependsOn(':app')
 }
 
 tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }
