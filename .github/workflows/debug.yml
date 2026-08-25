@@ -24,7 +24,11 @@ concurrency:
 
 env:
   PUB_ENVIRONMENT: bot.github
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g -Dkotlin.incremental=false"
+  # -Xmx3g: leave headroom for the OS, Flutter SDK, and Android SDK on the
+  # 7GB GitHub Actions runner. -Xmx4g caused OOM mid-build.
+  # -XX:+UseG1GC: better GC pause behaviour for large heap builds.
+  # org.gradle.caching=true: skip recompiling unchanged tasks on warm runs.
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Xmx3g -XX:MaxMetaspaceSize=512m -XX:+UseG1GC -Dkotlin.incremental=false -Dorg.gradle.caching=true"
   TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
   TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
 
@@ -68,14 +72,24 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          # Include pubspec.lock in the cache key so any dependency version
-          # change busts the cache. Keying only on pubspec.yaml caused stale
-          # plugin Android sources to be restored when a package bumped its
-          # version without changing pubspec.yaml constraints.
           key: pub-${{ hashFiles('pubspec.yaml', 'pubspec.lock') }}
           restore-keys: |
             pub-${{ hashFiles('pubspec.yaml') }}
             pub-
+
+      # Cache Gradle wrapper, caches (including media_kit libmpv JARs), and
+      # the Gradle build cache. media_kit downloads ~200MB of libmpv JARs per
+      # ABI on every cold run — caching them saves 3-4 minutes per build.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper/
+            ~/.gradle/caches/
+            ~/.gradle/build-cache/
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml') }}
+          restore-keys: |
+            gradle-
 
       # ── Inject google-services.json ────────────────────────────────────
       # vars can be used in run scripts directly via ${{ vars.X }}
