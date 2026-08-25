@@ -152,7 +152,7 @@ build_apk_debug:
     - *free_disk_space
     - *inject_google_services
     # No --flavor flag: build.gradle has no product flavors defined.
-    - flutter build apk --debug --no-pub
+    - flutter build apk --debug --no-pub --dart-define=WORKER_URL="$WORKER_URL"
   artifacts:
     paths:
       # Output path without a flavor suffix.
@@ -183,7 +183,8 @@ build_release:
         --split-debug-info=build/debug-info \
         --dart-define=$DART_DEFINE_SECRET \
         --dart-define=$DART_DEFINE_ARCH \
-        --dart-define=$DART_DEFINE_UPDATE
+        --dart-define=$DART_DEFINE_UPDATE \
+        --dart-define=WORKER_URL="$WORKER_URL"
     # Verify APKs were produced before marking job successful
     - |
       for APK in \

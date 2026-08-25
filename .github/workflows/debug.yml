@@ -100,12 +100,14 @@ jobs:
           DD_SECRET: ${{ secrets.OTYA_SECRET }}
           DD_ARCH: arm64
           DD_UPDATE: "true"
+          DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
           flutter build apk --release --no-pub --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --dart-define=OTYA_SECRET=$DD_SECRET \
             --dart-define=APP_ARCH=$DD_ARCH \
-            --dart-define=SELF_UPDATE=$DD_UPDATE
+            --dart-define=SELF_UPDATE=$DD_UPDATE \
+            --dart-define=WORKER_URL=$DD_WORKER_URL
 
       - name: Remove keystore
         if: always()
