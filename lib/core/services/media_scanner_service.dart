@@ -345,8 +345,15 @@ class MediaScannerService {
 
     if (merged.isNotEmpty) return merged;
 
-    // Last resort: full filesystem walk (rooted devices, unusual storage layouts)
-    return _filesystemScan();
+    // Last resort: full filesystem walk (rooted devices, unusual storage layouts).
+    // Wrapped in try/catch — if storage permission is revoked mid-scan or the
+    // background isolate fails, return [] rather than crashing the library load.
+    try {
+      return await _filesystemScan();
+    } catch (e) {
+      debugPrint('[Scanner] Filesystem fallback failed: $e');
+      return [];
+    }
   }
 
   /// Scans a single directory (folder browser).

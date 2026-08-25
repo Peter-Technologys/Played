@@ -98,7 +98,12 @@ void main() async {
       ),
     );
 
-    unawaited(_initBackground(savedSettings));
+    unawaited(
+      _initBackground(savedSettings).catchError((Object e, StackTrace st) {
+        debugPrint('[Background init] Error: $e\n$st');
+        CrashReporter.instance.report(e, st);
+      }),
+    );
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
     CrashReporter.instance.report(error, stack);

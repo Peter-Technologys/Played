@@ -134,8 +134,15 @@ class _AirDropNotifier extends StateNotifier<_AirDropState> {
         url: url,
         savePath: '${saveDir.path}/$fileName',
         onProgress: (dl, total) {
+          // Guard with mounted — autoDispose tears down the notifier
+          // mid-download, causing StateError if we update state after dispose.
           if (!mounted) return;
-          state = state.copyWith(progress: total > 0 ? dl / total : 0.0);
+          // Clamp to [0,1] — server content-length can be slightly off,
+          // causing values > 1.0 which crash Slider/LinearProgressIndicator.
+          final progress = total > 0
+              ? (dl / total).clamp(0.0, 1.0)
+              : 0.0;
+          state = state.copyWith(progress: progress);
         },
       );
       MediaRepository.instance.invalidate();
@@ -188,7 +195,15 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
   }
 
   @override
-  void dispose() { _tabCtrl.dispose(); _scanCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _tabCtrl.dispose();
+    // Stop the camera stream before releasing the controller.
+    // Calling dispose() while streaming causes a PlatformException on some
+    // devices (camera already in use / native resource not released).
+    _scanCtrl.stop();
+    _scanCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {

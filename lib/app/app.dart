@@ -43,10 +43,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     // "setState after dispose" crashes during the startup window.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) AnnouncementDialog.showIfPending(context);
+        if (!mounted) return;
+        try { AnnouncementDialog.showIfPending(context); } catch (_) {}
       });
       Future.delayed(const Duration(seconds: 4), () {
-        if (mounted) UpdateDialog.checkAndShow(context);
+        if (!mounted) return;
+        try { UpdateDialog.checkAndShow(context); } catch (_) {}
       });
     });
   }

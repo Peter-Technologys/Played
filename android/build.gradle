@@ -6,48 +6,50 @@ allprojects {
     }
 }
 
-// Redirect plugin subproject build directories to keep the root build/ folder
-// tidy. :app is explicitly excluded so its APK output stays at the standard
-// android/app/build/outputs/flutter-apk/ path that Flutter's tool expects.
-// Redirecting :app breaks APK discovery and causes:
-//   "Gradle build failed to produce an .apk file"
-//   "Caught exception: Already watching path: .../android"
+// Single subprojects block handles both concerns for plugin subprojects.
+// :app is explicitly excluded from BOTH the buildDirectory redirect AND
+// the afterEvaluate compileSdk override because:
+//
+// 1. Redirecting :app's buildDirectory moves APK output away from the path
+//    Flutter's tool expects (android/app/build/outputs/flutter-apk/), causing:
+//      "Gradle build failed to produce an .apk file"
+//      "Caught exception: Already watching path: .../android"
+//
+// 2. Running afterEvaluate on :app can reset internal Gradle state and
+//    re-trigger the file-watcher conflict even when the buildDirectory
+//    redirect is excluded. :app already declares compileSdk = 36 in its
+//    own build.gradle so the override is unnecessary anyway.
+//
+// evaluationDependsOn(':app') has been intentionally removed — it forced
+// :app to be fully evaluated before this block ran, causing Gradle 8+ to
+// throw "Cannot run afterEvaluate when the project is already evaluated".
+// AGP 8+ and Flutter's dev.flutter.flutter-plugin-loader handle ordering.
 subprojects {
+    // Redirect plugin build dirs to keep root build/ tidy (exclude :app).
     if (project.name != 'app') {
         layout.buildDirectory = rootProject.layout.buildDirectory.dir(project.name)
     }
-}
 
-// NOTE: evaluationDependsOn(':app') has been intentionally removed.
-// It forced :app to be fully evaluated before this subprojects{} block ran,
-// which caused Gradle 8+ to throw:
-//   "Cannot run Project.afterEvaluate(Closure) when the project is already evaluated"
-// AGP 8+ and Flutter's dev.flutter.flutter-plugin-loader handle task ordering
-// automatically, so this line is no longer needed.
-
-// Force all Flutter plugin subprojects to compile against SDK 36.
-// Required because flutter_plugin_android_lifecycle mandates compileSdk >= 36
-// and some plugins (e.g. file_picker) still declare compileSdk 34 internally.
-// afterEvaluate is safe here now that evaluationDependsOn(':app') is removed.
-subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            def androidExt = project.extensions.findByName('android')
-            if (androidExt != null) {
-                try {
-                    def current = androidExt.compileSdkVersion
-                    if (current == null || current < 36) {
-                        androidExt.compileSdkVersion 36
-                    }
-                } catch (ignored) {
-                    // compileSdk already set via integer property (AGP 8+ style)
-                    // — try the integer setter instead.
+    // Force plugin subprojects to compile against SDK 36 (exclude :app).
+    // Required because flutter_plugin_android_lifecycle mandates compileSdk >= 36
+    // and some plugins (e.g. file_picker) still declare compileSdk 34 internally.
+    if (project.name != 'app') {
+        afterEvaluate { project ->
+            if (project.hasProperty('android')) {
+                def androidExt = project.extensions.findByName('android')
+                if (androidExt != null) {
                     try {
-                        if (androidExt.compileSdk < 36) {
-                            androidExt.compileSdk = 36
+                        if (androidExt.compileSdkVersion == null || androidExt.compileSdkVersion < 36) {
+                            androidExt.compileSdkVersion 36
                         }
-                    } catch (e2) {
-                        logger.warn("[compileSdk override] Could not set compileSdk on ${project.name}: $e2")
+                    } catch (ignored) {
+                        try {
+                            if (androidExt.compileSdk < 36) {
+                                androidExt.compileSdk = 36
+                            }
+                        } catch (e2) {
+                            logger.warn("[compileSdk override] ${project.name}: $e2")
+                        }
                     }
                 }
             }
