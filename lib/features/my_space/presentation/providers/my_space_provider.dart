@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
+import '../../../../core/providers/duplicates_provider.dart';
+import '../../../../core/services/duplicate_detector_service.dart';
 import '../../../core/database/otya_database.dart';
 import '../../data/media_repository.dart';
 
@@ -86,7 +88,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     // but the shelf cache may have been populated by a previous scan (e.g.
     // after an app update that cleared history). Reconstruct a seed list from
     // the cached shelf IDs mapped back to Hive history items.
-    final db = PlayedDatabase.instance;
+    final db = OtyaDatabase.instance;
     final cinemaIds = db.getShelfCache('cinema');
     final streetIds = db.getShelfCache('street');
     if (cinemaIds.isNotEmpty || streetIds.isNotEmpty) {
@@ -130,10 +132,38 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
         // upsert items that are not already in history to avoid overwriting
         // lastPlayedAt timestamps for recently played tracks.
         _writeBackToHive(fresh).ignore();
+
+        // Run duplicate detection after every successful scan and expose
+        // results via duplicatesProvider so the UI can surface them.
+        _detectDuplicates(fresh);
       }
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
       // Keep previous state — never wipe library on error
+    }
+  }
+
+  /// Runs [DuplicateDetectorService.findDuplicates] on [items] and updates
+  /// [duplicatesProvider] with the result.
+  void _detectDuplicates(List<MediaItem> items) {
+    try {
+      final metas = items.map((item) => TrackMeta(
+        id:            item.id,
+        title:         item.title,
+        durationMs:    item.duration?.inMilliseconds ?? 0,
+        fileSizeBytes: item.fileSizeBytes,
+      )).toList();
+      final groups = DuplicateDetectorService.instance.findDuplicates(metas);
+      try {
+        ref.read(duplicatesProvider.notifier).state = groups;
+      } catch (_) {
+        // ref disposed — ignore
+      }
+      if (groups.isNotEmpty) {
+        debugPrint('[MediaLibrary] Duplicates found: ${groups.length} group(s).');
+      }
+    } catch (e) {
+      debugPrint('[MediaLibrary] Duplicate detection failed (non-fatal): $e');
     }
   }
 

@@ -6,11 +6,13 @@ import 'package:go_router/go_router.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../core/providers/backup_provider.dart';
 import '../../core/services/cloudflare_service.dart';
 import '../../core/services/update_service.dart';
 import '../../core/widgets/update_dialog.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/wallpaper_scaffold.dart';
 
 
 
@@ -28,8 +30,7 @@ class ProfileScreen extends ConsumerWidget {
     final displayName = ref.watch(displayNameProvider);
     final photoUrl    = ref.watch(photoUrlProvider);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
@@ -112,6 +113,9 @@ class ProfileScreen extends ConsumerWidget {
                 ),
               ),
             ),
+          // Backup status indicator — shows the result of the last backup.
+          _BackupStatusIndicator(),
+          const SizedBox(height: 6),
           _TappableTile(
             icon: Icons.cloud_upload_rounded,
             label: 'Back Up to Cloud',
@@ -156,6 +160,9 @@ class ProfileScreen extends ConsumerWidget {
   // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _runBackup(BuildContext context, [WidgetRef? ref]) async {
+    // Update backupStatusProvider so the UI shows a loading indicator.
+    ref?.read(backupStatusProvider.notifier).state = const AsyncLoading();
+
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(
       content: Row(
@@ -173,6 +180,15 @@ class ProfileScreen extends ConsumerWidget {
     ));
     final userId = ref != null ? (ref.read(authNotifierProvider).userId ?? '') : '';
     final ok = await CloudflareService.instance.backupAll(userId);
+
+    // Update backupStatusProvider with the result.
+    if (ok) {
+      ref?.read(backupStatusProvider.notifier).state = const AsyncData(null);
+    } else {
+      ref?.read(backupStatusProvider.notifier).state =
+          AsyncError('Backup failed', StackTrace.current);
+    }
+
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
     messenger.showSnackBar(SnackBar(
@@ -1128,6 +1144,88 @@ class _OtyaAccountSectionState extends ConsumerState<_OtyaAccountSection> {
           iconColor: AppColors.error,
         ),
       ],
+    );
+  }
+}
+
+// ── Backup Status Indicator ────────────────────────────────────────────────
+
+/// Shows a subtle status chip reflecting the last backup operation.
+/// Hidden when no backup has been attempted this session.
+class _BackupStatusIndicator extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final status = ref.watch(backupStatusProvider);
+    if (status == null) return const SizedBox.shrink();
+
+    return status.when(
+      loading: () => _StatusChip(
+        icon: Icons.sync_rounded,
+        label: 'Backup in progress…',
+        color: AppColors.accent,
+        spinning: true,
+      ),
+      data: (_) => _StatusChip(
+        icon: Icons.check_circle_rounded,
+        label: 'Backup complete',
+        color: AppColors.accentGreen,
+      ),
+      error: (e, _) => _StatusChip(
+        icon: Icons.error_outline_rounded,
+        label: 'Backup failed',
+        color: AppColors.error,
+      ),
+    );
+  }
+}
+
+class _StatusChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final bool spinning;
+
+  const _StatusChip({
+    required this.icon,
+    required this.label,
+    required this.color,
+    this.spinning = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          spinning
+              ? SizedBox(
+                  width: 14,
+                  height: 14,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: color,
+                  ),
+                )
+              : Icon(icon, color: color, size: 14),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: color,
+              fontFamily: 'Inter',
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
