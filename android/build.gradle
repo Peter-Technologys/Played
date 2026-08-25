@@ -6,21 +6,9 @@ allprojects {
     }
 }
 
-// Force all Flutter plugin subprojects to compile against SDK 36.
-// Required because flutter_plugin_android_lifecycle mandates compileSdk >= 36
-// and some plugins (e.g. file_picker) still declare compileSdk 34 internally.
-//
-// IMPORTANT: Do NOT add layout.buildDirectory redirects here.
-// Redirecting any subproject's buildDirectory causes Gradle's file watcher
-// to conflict with Flutter's own watcher on the android/ directory, producing:
-//   "Caught exception: Already watching path: .../android"
-//   "Gradle build failed to produce an .apk file"
-//
-// evaluationDependsOn(':app') is intentionally absent — it caused Gradle 8+
-// to throw "Cannot run afterEvaluate when the project is already evaluated".
-// Flutter's dev.flutter.flutter-plugin-loader handles task ordering.
-// No subprojects compileSdk override needed.
-// file_picker 9.x+ already declares compileSdk 36 natively.
+// No subprojects compileSdk override block.
+// file_picker has been removed from pubspec.yaml (it was unused and its
+// pre-built AAR compiled against SDK 34 caused the build to fail).
 // afterEvaluate and plugins.withId() both trigger Flutter 3.47's
 // "Already watching path" watcher crash and must NOT be used here.
 

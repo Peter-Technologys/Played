@@ -86,9 +86,6 @@ dependencies:
   dio: ^5.7.0
   open_filex: ^4.7.0
 
-  # Google Fonts (Fredoka for display/headline text)
-  google_fonts: ^6.2.1
-
   # Background audio — keeps media_kit Player alive when app is backgrounded.
   # Provides Android foreground service + system MediaSession (lock-screen
   # controls, Bluetooth headset buttons, notification media controls).
