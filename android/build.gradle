@@ -19,25 +19,23 @@ allprojects {
 // evaluationDependsOn(':app') is intentionally absent — it caused Gradle 8+
 // to throw "Cannot run afterEvaluate when the project is already evaluated".
 // Flutter's dev.flutter.flutter-plugin-loader handles task ordering.
+// Force all Flutter plugin subprojects to compile against SDK 36.
+// Uses project.plugins.withId() instead of afterEvaluate so the override
+// fires only when the Android plugin is actually applied — this avoids the
+// Gradle 8+ file-watcher race that causes:
+//   "Caught exception: Already watching path: .../android"
+//   "Gradle build failed to produce an .apk file"
 subprojects {
-    afterEvaluate { project ->
-        // Skip :app — it already declares compileSdk = 36 in its own build.gradle.
+    if (project.name == 'app') return
+    project.plugins.withId('com.android.library') {
+        project.android {
+            compileSdk = 36
+        }
+    }
+    project.plugins.withId('com.android.application') {
         if (project.name == 'app') return
-        if (!project.hasProperty('android')) return
-        final androidExt = project.extensions.findByName('android')
-        if (androidExt == null) return
-        try {
-            if (androidExt.compileSdkVersion == null || androidExt.compileSdkVersion < 36) {
-                androidExt.compileSdkVersion 36
-            }
-        } catch (ignored) {
-            try {
-                if (androidExt.compileSdk < 36) {
-                    androidExt.compileSdk = 36
-                }
-            } catch (e2) {
-                logger.warn("[compileSdk override] ${project.name}: $e2")
-            }
+        project.android {
+            compileSdk = 36
         }
     }
 }
