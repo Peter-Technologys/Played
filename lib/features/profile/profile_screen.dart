@@ -780,9 +780,11 @@ class _SwitchTile extends StatelessWidget {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeThumbColor: Colors.black,
+            thumbColor: WidgetStateProperty.resolveWith((states) =>
+                states.contains(WidgetState.selected)
+                    ? Colors.black
+                    : AppColors.textSecondary),
             activeTrackColor: AppColors.accent,
-            inactiveThumbColor: AppColors.textSecondary,
             inactiveTrackColor: AppColors.borderOf(context),
           ),
         ],

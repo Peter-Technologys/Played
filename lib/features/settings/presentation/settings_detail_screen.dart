@@ -360,9 +360,11 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
                         fontFamily: 'Inter',
                       ),
                     ),
-                    activeThumbColor: Colors.black,
+                    thumbColor: WidgetStateProperty.resolveWith((states) =>
+                        states.contains(WidgetState.selected)
+                            ? Colors.black
+                            : AppColors.textSecondary),
                     activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: AppColors.textSecondary,
                     inactiveTrackColor: AppColors.border,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -999,9 +1001,11 @@ class _SwitchRow extends StatelessWidget {
                     HapticFeedback.selectionClick();
                     onChanged!(v);
                   },
-                  activeThumbColor: Colors.black,
+                  thumbColor: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
+                          ? Colors.black
+                          : AppColors.textSecondary),
                   activeTrackColor: AppColors.accent,
-                  inactiveThumbColor: AppColors.textSecondary,
                   inactiveTrackColor: AppColors.border,
                 )
               : null),
@@ -1046,9 +1050,11 @@ class _SheetSwitch extends StatelessWidget {
               ),
             )
           : null,
-      activeThumbColor: Colors.black,
+      thumbColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? Colors.black
+              : AppColors.textSecondary),
       activeTrackColor: AppColors.accent,
-      inactiveThumbColor: AppColors.textSecondary,
       inactiveTrackColor: AppColors.border,
       contentPadding: EdgeInsets.zero,
     );
