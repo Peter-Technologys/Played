@@ -10,27 +10,40 @@ allprojects {
 subprojects {
     layout.buildDirectory = rootProject.layout.buildDirectory.dir(project.name)
 }
-subprojects {
-    project.evaluationDependsOn(':app')
-}
+
+// NOTE: evaluationDependsOn(':app') has been intentionally removed.
+// It forced :app to be fully evaluated before this subprojects{} block ran,
+// which caused Gradle 8+ to throw:
+//   "Cannot run Project.afterEvaluate(Closure) when the project is already evaluated"
+// AGP 8+ and Flutter's dev.flutter.flutter-plugin-loader handle task ordering
+// automatically, so this line is no longer needed.
 
 // Force all Flutter plugin subprojects to compile against SDK 36.
-// Uses configureEach (configuration-time) instead of afterEvaluate
-// (post-evaluation) to avoid the Gradle 8+ error:
-//   "Cannot run Project.afterEvaluate(Closure) when the project is already evaluated"
-// This is triggered because evaluationDependsOn(':app') above causes :app to
-// be fully evaluated before the afterEvaluate callbacks run on subprojects.
+// Required because flutter_plugin_android_lifecycle mandates compileSdk >= 36
+// and some plugins (e.g. file_picker) still declare compileSdk 34 internally.
+// afterEvaluate is safe here now that evaluationDependsOn(':app') is removed.
 subprojects {
-    plugins.withId('com.android.library') {
-        android {
-            compileSdkVersion 36
-        }
-    }
-    plugins.withId('com.android.application') {
-        // :app already sets compileSdk 36 in its own build.gradle.
-        // This block is a no-op for :app but kept for completeness.
-        android {
-            compileSdkVersion 36
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            def androidExt = project.extensions.findByName('android')
+            if (androidExt != null) {
+                try {
+                    def current = androidExt.compileSdkVersion
+                    if (current == null || current < 36) {
+                        androidExt.compileSdkVersion 36
+                    }
+                } catch (ignored) {
+                    // compileSdk already set via integer property (AGP 8+ style)
+                    // — try the integer setter instead.
+                    try {
+                        if (androidExt.compileSdk < 36) {
+                            androidExt.compileSdk = 36
+                        }
+                    } catch (e2) {
+                        logger.warn("[compileSdk override] Could not set compileSdk on ${project.name}: $e2")
+                    }
+                }
+            }
         }
     }
 }
