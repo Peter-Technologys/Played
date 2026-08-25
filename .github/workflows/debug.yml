@@ -127,30 +127,7 @@ jobs:
             --dart-define=OTYA_SECRET=$DD_SECRET \
             --dart-define=APP_ARCH=$DD_ARCH \
             --dart-define=SELF_UPDATE=$DD_UPDATE \
-            --dart-define=WORKER_URL=$DD_WORKER_URL || true
-
-      # AGP 9.x + older Flutter stable triggers an "Already watching path"
-      # file-watcher exception that causes Flutter to exit with code 1 even
-      # though Gradle successfully produced the APKs. Verify the APKs exist
-      # and fail explicitly only if they are missing.
-      - name: Verify APKs exist
-        run: |
-          MISSING=0
-          for APK in \
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
-            if [ -f "$APK" ]; then
-              echo "OK: $APK ($(du -sh "$APK" | cut -f1))"
-            else
-              echo "MISSING: $APK"
-              MISSING=1
-            fi
-          done
-          if [ $MISSING -eq 1 ]; then
-            echo "--- APK search in build/ ---"
-            find build/ -name '*.apk' 2>/dev/null || true
-            exit 1
-          fi
+            --dart-define=WORKER_URL=$DD_WORKER_URL
 
       - name: Remove keystore
         if: always()
