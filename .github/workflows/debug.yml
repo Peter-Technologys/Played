@@ -115,19 +115,41 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          # Dart defines are passed via env vars so the define key names
-          # and secret values are not visible in the public workflow source.
           DD_SECRET: ${{ secrets.OTYA_SECRET }}
           DD_ARCH: arm64
           DD_UPDATE: "true"
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
+          # || true: Flutter exits 1 due to the "Already watching path" file-watcher
+          # bug when running with AGP 8.x on Linux CI. Gradle itself succeeds and
+          # writes the APKs to disk. We verify them explicitly in the next step.
           flutter build apk --release --no-pub --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --dart-define=OTYA_SECRET=$DD_SECRET \
             --dart-define=APP_ARCH=$DD_ARCH \
             --dart-define=SELF_UPDATE=$DD_UPDATE \
-            --dart-define=WORKER_URL=$DD_WORKER_URL
+            --dart-define=WORKER_URL=$DD_WORKER_URL || true
+
+      # Verify APKs were actually produced. Fail here with a clear message
+      # if Gradle itself failed (as opposed to just the Flutter watcher crash).
+      - name: Verify APKs produced
+        run: |
+          MISSING=0
+          for APK in \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
+            if [ -f "$APK" ]; then
+              echo "OK: $APK ($(du -sh "$APK" | cut -f1))"
+            else
+              echo "MISSING: $APK"
+              MISSING=1
+            fi
+          done
+          if [ $MISSING -eq 1 ]; then
+            echo "--- All APKs found in build/ ---"
+            find build/ -name '*.apk' 2>/dev/null || echo "(none)"
+            exit 1
+          fi
 
       - name: Remove keystore
         if: always()
