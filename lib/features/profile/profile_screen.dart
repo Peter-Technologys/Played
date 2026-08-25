@@ -61,12 +61,7 @@ class ProfileScreen extends ConsumerWidget {
           ] else ...[  
             _GoogleSignInButton(
               onTap: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Google Sign-In coming soon'),
-                    backgroundColor: AppColors.surface,
-                  ),
-                );
+                context.push('/auth');
               },
             ).animate().fadeIn(duration: 300.ms),
             const SizedBox(height: 8),

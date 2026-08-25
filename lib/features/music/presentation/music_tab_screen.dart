@@ -172,7 +172,8 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
         return _SongListView(songs: songs, scrollController: _scrollCtrl);
       case _MusicFilter.playlist:
         return Padding(
-          padding: const EdgeInsets.only(top: _headerHeight),
+          padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 128),
           child: const PlaylistsView(showCreateButton: false),
         );
       case _MusicFilter.folder:
@@ -385,8 +386,12 @@ class _SongListView extends ConsumerWidget {
       controller: scrollController,
       physics: const BouncingScrollPhysics(),
       slivers: [
-        // Top space so content starts below the floating header
-        const SliverToBoxAdapter(child: SizedBox(height: _MusicTabScreenState._headerHeight)),
+        // Top space so content starts below the floating header.
+        // Use dynamic status-bar height so notch/tall-bar devices are handled
+        // correctly (128 = header content ~60dp + filter pills ~56dp + gaps ~12dp).
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.of(context).padding.top + 128),
+        ),
 
         // Shuffle all action bar
         SliverToBoxAdapter(
@@ -1000,7 +1005,7 @@ class _FoldersView extends ConsumerWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
@@ -1150,7 +1155,7 @@ class _AlbumsView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
@@ -1301,7 +1306,7 @@ class _ArtistsView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
