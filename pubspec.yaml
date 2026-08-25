@@ -106,7 +106,6 @@ dependencies:
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  analyzer: ^6.8.0  # pinned below 6.9.0 to avoid _macros SDK dependency
   hive_generator: ^2.0.1
   build_runner: ^2.4.13
   json_serializable: ^6.8.0
