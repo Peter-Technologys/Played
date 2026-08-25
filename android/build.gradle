@@ -19,39 +19,10 @@ allprojects {
 // evaluationDependsOn(':app') is intentionally absent — it caused Gradle 8+
 // to throw "Cannot run afterEvaluate when the project is already evaluated".
 // Flutter's dev.flutter.flutter-plugin-loader handles task ordering.
-// Force all Flutter plugin subprojects to compile against SDK 36.
-// Required because flutter_plugin_android_lifecycle mandates compileSdk >= 36
-// and plugins like file_picker still declare compileSdk 34 internally.
-//
-// WHY afterEvaluate and not plugins.withId():
-//   plugins.withId() fires AFTER the AAR metadata check task is registered,
-//   so the compileSdk override arrives too late and the build fails with:
-//     ':file_picker is currently compiled against android-34'
-//   afterEvaluate fires after the subproject is configured but before tasks
-//   run, which is exactly the right moment to override compileSdk.
-//
-// WHY this does NOT cause the "Already watching path" watcher conflict:
-//   The watcher conflict was caused by layout.buildDirectory redirects
-//   (now permanently removed). afterEvaluate itself is safe.
-//
-// :app is excluded — it already declares compileSdk = 36 in its own
-// build.gradle and must not be touched here.
-subprojects {
-    afterEvaluate {
-        if (project.name == 'app') return
-        if (!project.hasProperty('android')) return
-        def ext = project.extensions.findByName('android')
-        if (ext == null) return
-        try {
-            ext.compileSdk = 36
-        } catch (ignored) {
-            // Some plugin DSLs use compileSdkVersion (deprecated form)
-            try { ext.compileSdkVersion 36 } catch (e2) {
-                logger.warn("[compileSdk] ${project.name}: ${e2.message}")
-            }
-        }
-    }
-}
+// No subprojects compileSdk override needed.
+// file_picker 9.x+ already declares compileSdk 36 natively.
+// afterEvaluate and plugins.withId() both trigger Flutter 3.47's
+// "Already watching path" watcher crash and must NOT be used here.
 
 tasks.register("clean", Delete) {
     delete rootProject.layout.buildDirectory
