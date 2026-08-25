@@ -53,8 +53,8 @@ android {
     buildTypes {
         release {
             signingConfig = signingConfigs.release
-            isMinifyEnabled = true
-            isShrinkResources = true
+            minifyEnabled = true
+            shrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
@@ -63,7 +63,7 @@ android {
             // applicationId (com.otyaplayer.app). If the debug build uses a
             // different package (com.otyaplayer.app.debug), Android cannot
             // find the service declaration and playback silently fails.
-            isDebuggable = true
+            debuggable = true
         }
     }
 }
