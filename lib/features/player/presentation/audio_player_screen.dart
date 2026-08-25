@@ -912,7 +912,7 @@ class _AlbumArtState extends State<_AlbumArt> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Swipe hint arrows
+          // Swipe hint: next (right arrow, shown when dragging left)
           if (_dragX < -20)
             Positioned(
               right: 12,
@@ -923,6 +923,7 @@ class _AlbumArtState extends State<_AlbumArt> {
                     color: AppColors.accent, size: 40),
               ),
             ),
+          // Swipe hint: previous (left arrow, shown when dragging right)
           if (_dragX > 20)
             Positioned(
               left: 12,
@@ -933,49 +934,51 @@ class _AlbumArtState extends State<_AlbumArt> {
                     color: AppColors.accent, size: 40),
               ),
             ),
+          // Album art — translates slightly in the drag direction
           Transform.translate(
             offset: Offset(_dragX.clamp(-40.0, 40.0), 0),
             child: AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      transform: Matrix4.diagonal3Values(
-          widget.isPlaying ? 1.0 : 0.88,
-          widget.isPlaying ? 1.0 : 0.88,
-          1.0),
-      transformAlignment: Alignment.center,
-      // AnimatedContainer so the glow shadow also animates with play state.
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: widget.isPlaying ? 0.35 : 0.1),
-            blurRadius: widget.isPlaying ? 48 : 16,
-            spreadRadius: widget.isPlaying ? 6 : 0,
-          ),
-          BoxShadow(
-            color: AppColors.accentViolet.withValues(alpha: widget.isPlaying ? 0.20 : 0.05),
-            blurRadius: widget.isPlaying ? 64 : 20,
-            spreadRadius: widget.isPlaying ? 8 : 0,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        // Fix #11: limit decoded image size for the player art
-        child: showArt
-            ? RepaintBoundary(
-                child: Image.file(
-                  File(_resolvedPath!),
-                  fit: BoxFit.cover,
-                  width: double.infinity,
-                  cacheWidth: 600,
-                ),
-              )
-            : _DynamicArtPlaceholder(
-                title: widget.title,
-                isPlaying: widget.isPlaying,
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              transform: Matrix4.diagonal3Values(
+                  widget.isPlaying ? 1.0 : 0.88,
+                  widget.isPlaying ? 1.0 : 0.88,
+                  1.0),
+              transformAlignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(
+                        alpha: widget.isPlaying ? 0.35 : 0.1),
+                    blurRadius: widget.isPlaying ? 48 : 16,
+                    spreadRadius: widget.isPlaying ? 6 : 0,
+                  ),
+                  BoxShadow(
+                    color: AppColors.accentViolet.withValues(
+                        alpha: widget.isPlaying ? 0.20 : 0.05),
+                    blurRadius: widget.isPlaying ? 64 : 20,
+                    spreadRadius: widget.isPlaying ? 8 : 0,
+                  ),
+                ],
               ),
-      ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: showArt
+                    ? RepaintBoundary(
+                        child: Image.file(
+                          File(_resolvedPath!),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          cacheWidth: 600,
+                        ),
+                      )
+                    : _DynamicArtPlaceholder(
+                        title: widget.title,
+                        isPlaying: widget.isPlaying,
+                      ),
+              ),
+            ),
           ),
         ],
       ),
