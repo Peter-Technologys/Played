@@ -34,10 +34,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── Free disk space ────────────────────────────────────────────────
+      # ── Free disk space (keep NDK — it is cached separately below) ────
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/local/lib/android/sdk/ndk || true
           sudo rm -rf /usr/share/dotnet || true
           sudo rm -rf /usr/local/share/powershell || true
           sudo rm -rf /usr/share/swift || true
@@ -50,6 +49,16 @@ jobs:
         with:
           channel: stable
           cache: true
+
+      # ── Cache Android NDK ──────────────────────────────────────────────
+      # The NDK (~1.5 GB) was previously deleted by the free-disk-space step
+      # and re-downloaded every run (3-4 min). Cache it keyed on the version
+      # declared in android/app/build.gradle so a bump auto-busts the cache.
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk
+          key: ndk-28.2.13676358
 
       - uses: actions/cache@v4
         with:

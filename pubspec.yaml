@@ -31,7 +31,8 @@ dependencies:
   # Flash Share (pure Dart HTTP — replaces nearby_connections which required
   # CMake native compilation and caused CI runner timeouts)
   qr_flutter: ^4.1.0
-  mobile_scanner: ^6.0.0
+  # ^6.0.4+ includes KGP fix patch
+  mobile_scanner: ^6.0.4
 
   # HTTP
   http: ^1.2.2
@@ -49,8 +50,10 @@ dependencies:
   shimmer: ^3.0.0
 
   # Device info — used for ABI detection + update checker
-  device_info_plus: ^10.1.0
-  package_info_plus: ^8.1.0
+  # ^11.1.0+ uses Flutter built-in Kotlin (no KGP warning)
+  device_info_plus: ^11.1.0
+  # ^8.3.0+ uses Flutter built-in Kotlin (no KGP warning)
+  package_info_plus: ^8.3.0
 
   # File System
   path_provider: ^2.1.5
@@ -70,7 +73,8 @@ dependencies:
 
   # Connectivity
   connectivity_plus: ^6.1.4
-  network_info_plus: ^6.1.0
+  # ^6.2.0+ uses Flutter built-in Kotlin (no KGP warning)
+  network_info_plus: ^6.2.0
 
   # Utilities
   uuid: ^4.5.1
@@ -79,7 +83,8 @@ dependencies:
   cupertino_icons: ^1.0.8
 
   # Sharing, URL launching, PIN storage
-  share_plus: ^10.1.4
+  # ^10.4.0+ uses Flutter built-in Kotlin (no KGP warning)
+  share_plus: ^10.4.0
   url_launcher: ^6.3.1
   shared_preferences: ^2.3.5
 

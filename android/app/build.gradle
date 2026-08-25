@@ -1,6 +1,10 @@
 plugins {
     id "com.android.application"
-    id "org.jetbrains.kotlin.android"
+    // org.jetbrains.kotlin.android is intentionally NOT applied here.
+    // Flutter's dev.flutter.flutter-gradle-plugin provides built-in Kotlin
+    // support since Flutter 3.19. Applying KGP manually causes:
+    //   WARNING: Your Android app project applies the Kotlin Gradle Plugin,
+    //   which will cause build failures in future versions of Flutter.
     id "dev.flutter.flutter-gradle-plugin"
 }
 
