@@ -15,16 +15,22 @@ subprojects {
 }
 
 // Force all Flutter plugin subprojects to compile against SDK 36.
-// Required because flutter_plugin_android_lifecycle mandates compileSdk >= 36
-// and some plugins (e.g. file_picker) still declare compileSdk 34 internally.
+// Uses configureEach (configuration-time) instead of afterEvaluate
+// (post-evaluation) to avoid the Gradle 8+ error:
+//   "Cannot run Project.afterEvaluate(Closure) when the project is already evaluated"
+// This is triggered because evaluationDependsOn(':app') above causes :app to
+// be fully evaluated before the afterEvaluate callbacks run on subprojects.
 subprojects {
-    afterEvaluate { project ->
-        if (project.hasProperty('android')) {
-            project.android {
-                if (compileSdkVersion < 36) {
-                    compileSdkVersion 36
-                }
-            }
+    plugins.withId('com.android.library') {
+        android {
+            compileSdkVersion 36
+        }
+    }
+    plugins.withId('com.android.application') {
+        // :app already sets compileSdk 36 in its own build.gradle.
+        // This block is a no-op for :app but kept for completeness.
+        android {
+            compileSdkVersion 36
         }
     }
 }
