@@ -394,7 +394,7 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
   final List<MediaItem> _allItems;
 
   _GlobalSearchDelegate(this._allItems)
-      : super(searchFieldLabel: 'Search videos & music…');
+      : super(searchFieldLabel: 'Search everything…');
 
   // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -456,7 +456,7 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
                 color: AppColors.textSecondary.withValues(alpha: 0.5)),
             const SizedBox(height: 12),
             Text(
-              query.isEmpty ? 'Start typing to search…' : 'No results for "$query"',
+              query.isEmpty ? 'Type to search…' : 'Nothing found for "$query"',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],
@@ -710,19 +710,19 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   children: [
                     _NavItem(
                       icon: Icons.play_circle_rounded,
-                      label: 'VIDEO',
+                      label: 'Watch',
                       isActive: currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
                     _NavItem(
                       icon: Icons.music_note_rounded,
-                      label: 'MUSIC',
+                      label: 'Listen',
                       isActive: currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
                     _NavItem(
                       icon: Icons.person_rounded,
-                      label: 'MY SPACE',
+                      label: 'Hub',
                       isActive: currentIndex == 2,
                       onTap: () => _onTap(2),
                     ),
@@ -822,7 +822,7 @@ class _StatsScreen extends StatelessWidget {
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Your Stats', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
+        title: Text('My Stats', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
       ),
       body: const SingleChildScrollView(
         padding: EdgeInsets.symmetric(vertical: 16),

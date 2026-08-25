@@ -786,12 +786,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     ),
                     _SecondaryBtn(
                       icon: Icons.graphic_eq_rounded,
-                      label: 'EQ',
+                      label: 'Tuner',
                       onTap: () => context.push('/player/equalizer'),
                     ),
                     _SecondaryBtn(
                       icon: Icons.queue_music_rounded,
-                      label: 'Queue',
+                      label: 'Up Next',
                       onTap: _showQueue,
                     ),
                     _SecondaryBtn(
@@ -1156,21 +1156,37 @@ class _OptionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final options = [
-      _Opt(Icons.directions_car_rounded, 'Car Mode', AppColors.accent, () {
+      _Opt(Icons.directions_car_rounded, 'Drive Mode', AppColors.accent, () {
         Navigator.pop(context);
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CarModeScreen()),
         );
       }),
-      // Label corrected: this adds to the playback queue, not a saved playlist.
-      _Opt(Icons.playlist_add_rounded, 'Add to Queue', AppColors.accent, () {
+      _Opt(Icons.playlist_add_rounded, 'Queue It', AppColors.accent, () {
         ref.read(queueProvider.notifier).addToQueue(mediaItem);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Added to queue')));
+            const SnackBar(content: Text('Queued!')));
       }),
-      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp', AppColors.accent, onTrimForWhatsApp),
-      _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
+      _Opt(Icons.lock_rounded, 'Hide in Safe', AppColors.accentViolet, () async {
+        Navigator.pop(context);
+        await VaultService.instance.lockItem(mediaItem);
+        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Moved to Safe'))); }
+      }),
+      _Opt(Icons.wifi_tethering_rounded, 'Beam It', AppColors.accent, () {
+        Navigator.pop(context);
+        context.go('/airdrop');
+      }),
+      _Opt(Icons.phone_android_rounded, 'Trim',   AppColors.accent, onTrimForWhatsApp),
+      _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
+        Navigator.pop(context);
+        await FfmpegService.instance.extractAudio(
+            videoPath: mediaItem.filePath, onProgress: (_) {});
+        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Audio saved to Downloads'))); }
+      }),
+      _Opt(Icons.info_outline_rounded, 'Details', AppColors.textSecondary, onFileInfo),
     ];
 
     return Padding(

@@ -59,7 +59,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
           },
         ),
         title: const Text(
-          'Theme & Appearance',
+          'Look & Feel',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -90,7 +90,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
 
               // Dark Colour
               _ThemeCard(
-                name: 'Dark Colour',
+                name: 'Dark',
                 gradientColors: const [Color(0xFF1B232A), Color(0xFF0F111A)],
                 isSelected: settings.themeMode == AppThemeMode.dark &&
                     _wallpaperPath == null,
@@ -103,7 +103,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
 
               // Light Colour
               _ThemeCard(
-                name: 'Light Colour',
+                name: 'Light',
                 gradientColors: const [Color(0xFFEBEFF5), Color(0xFFC3CFE2)],
                 isSelected: settings.themeMode == AppThemeMode.light &&
                     _wallpaperPath == null,
@@ -129,7 +129,7 @@ class _ThemeSelectionScreenState extends ConsumerState<ThemeSelectionScreen> {
 
               // System / Auto — follows the Android device theme setting
               _ThemeCard(
-                name: 'System Auto',
+                name: 'Auto',
                 gradientColors: const [Color(0xFF2A2A3A), Color(0xFFE8EAF0)],
                 isSelected: settings.themeMode == AppThemeMode.system &&
                     _wallpaperPath == null,

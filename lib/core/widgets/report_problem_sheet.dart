@@ -183,7 +183,7 @@ class _ReportProblemSheetState extends State<ReportProblemSheet>
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text('Report a Problem',
+        const Text('Report Bug',
             style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.w800,
               color: AppColors.textPrimary, fontFamily: 'Inter',

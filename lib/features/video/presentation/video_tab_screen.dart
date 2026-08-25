@@ -1094,7 +1094,7 @@ class _VideoContextMenu extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('"${item.title}" moved to Vault'),
+            content: Text('"${item.title}" moved to Safe'),
             backgroundColor: AppColors.surface,
           ),
         );
@@ -1103,7 +1103,7 @@ class _VideoContextMenu extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add to Vault: $e'),
+            content: Text('Failed to add to Safe: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1193,7 +1193,7 @@ class _VideoContextMenu extends ConsumerWidget {
             const SizedBox(height: 12),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Add to Playlist',
+              child: Text('Add to List',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -1205,7 +1205,7 @@ class _VideoContextMenu extends ConsumerWidget {
             if (playlists.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('No playlists yet. Create one first.',
+                child: Text('No lists yet. Create one first.',
                     style: TextStyle(color: AppColors.textSecondary)),
               )
             else
@@ -1324,7 +1324,7 @@ class _VideoContextMenu extends ConsumerWidget {
           ),
           _ContextOption(
             icon: Icons.playlist_add_rounded,
-            label: 'Add to Playlist',
+            label: 'Add to List',
             color: AppColors.accentViolet,
             onTap: () {
               Navigator.pop(context);
@@ -1345,7 +1345,7 @@ class _VideoContextMenu extends ConsumerWidget {
           ),
           _ContextOption(
             icon: Icons.lock_rounded,
-            label: 'Move to Vault',
+            label: 'Move to Safe',
             color: AppColors.accentViolet,
             onTap: () => _addToVault(context),
           ),

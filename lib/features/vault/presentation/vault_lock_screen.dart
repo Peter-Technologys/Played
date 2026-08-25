@@ -181,7 +181,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                     begin: const Offset(0.8, 0.8), end: const Offset(1, 1),
                     duration: 500.ms, curve: Curves.elasticOut),
               const SizedBox(height: 28),
-              Text('Private Vault',
+              Text('Safe',
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.onSurface))
                   .animate().fadeIn(delay: 200.ms),
@@ -347,11 +347,11 @@ class _SetPinDialogState extends State<_SetPinDialog> {
     return AlertDialog(
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Create Vault PIN', style: TextStyle(color: AppColors.textPrimary)),
+      title: const Text('Create Safe PIN', style: TextStyle(color: AppColors.textPrimary)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Set a PIN to protect your Private Vault.',
+          const Text('Set a PIN to protect your Safe.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           _PinField(controller: _pin1, hint: 'New PIN (4–6 digits)'),
@@ -504,7 +504,7 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
             Navigator.of(context).pop();
           },
         ),
-        title: Text('Private Vault',
+        title: Text('Safe',
             style: TextStyle(fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface, fontSize: 18)),
         actions: [
@@ -543,12 +543,12 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
                             color: AppColors.textSecondary, size: 36),
                       ),
                       const SizedBox(height: 20),
-                      Text('Vault is empty',
+                      Text('Safe is empty',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
                               color: Theme.of(context).colorScheme.onSurface)),
                       const SizedBox(height: 8),
                       const Text(
-                        'Long-press any file and tap\n"Move to Vault" to protect it.',
+                        'Long-press any file and tap\n"Move to Safe" to protect it.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
                       ),

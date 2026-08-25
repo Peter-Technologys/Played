@@ -232,7 +232,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Equalizer',
+        title: const Text('Sound Tuner',
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,

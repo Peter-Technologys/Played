@@ -207,7 +207,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(Icons.info_outline_rounded,
                   color: AppColors.accent, size: 22),
-              title: const Text('File Info',
+              title: const Text('Details',
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontFamily: 'Inter',
@@ -216,9 +216,33 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 Navigator.pop(context);
                 showModalBottomSheet(
                   context: context,
-                  useSafeArea: true,
-                  isScrollControlled: true,
-                  builder: (_) => FileInfoSheet(item: widget.mediaItem),
+                  builder: (_) => AlertDialog(
+                    backgroundColor: AppColors.surface,
+                    title: const Text('Details',
+                        style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontFamily: 'Inter',
+                            fontWeight: FontWeight.w700)),
+                    content: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _InfoRow(label: 'Title', value: widget.mediaItem.title),
+                        _InfoRow(label: 'Path', value: widget.mediaItem.filePath),
+                        _InfoRow(label: 'Size', value: size),
+                        _InfoRow(
+                            label: 'Duration',
+                            value: widget.mediaItem.formattedDuration),
+                      ],
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('Close',
+                            style: TextStyle(color: AppColors.accent)),
+                      ),
+                    ],
+                  ),
                 );
               },
             ),
@@ -226,7 +250,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(Icons.audiotrack_rounded,
                   color: AppColors.accentViolet, size: 22),
-              title: const Text('Extract Audio',
+              title: const Text('Rip Audio',
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontFamily: 'Inter',
@@ -257,7 +281,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(Icons.content_cut_rounded,
                   color: AppColors.accentAmber, size: 22),
-              title: const Text('Trim for WhatsApp',
+              title: const Text('Trim',
                   style: TextStyle(
                       color: AppColors.textPrimary,
                       fontFamily: 'Inter',
@@ -375,7 +399,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         if (_player == null) return;
                         final audioTracks = _player!.state.tracks.audio;
                         if (audioTracks.length <= 1) {
-                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No alternate audio tracks in this file'), backgroundColor: AppColors.surface));
+                          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('No other audio tracks'), backgroundColor: AppColors.surface));
                           return;
                         }
                         showModalBottomSheet(
@@ -715,7 +739,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text(
-                                      'PiP not supported on this device'),
+                                      'Pop-up not supported'),
                                   backgroundColor: AppColors.surface,
                                 ),
                               );

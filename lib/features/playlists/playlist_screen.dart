@@ -94,7 +94,7 @@ class PlaylistsScreen extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Playlists',
+        title: Text('My Lists',
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
@@ -207,7 +207,7 @@ class PlaylistsScreen extends ConsumerWidget {
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New Playlist',
+        label: const Text('New List',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
     );
@@ -218,7 +218,7 @@ class PlaylistsScreen extends ConsumerWidget {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => _NameDialog(
-          controller: controller, title: 'New Playlist', hint: 'Playlist name'),
+          controller: controller, title: 'New List', hint: 'List name'),
     );
     if (name != null && name.trim().isNotEmpty) {
       await ref.read(playlistsProvider.notifier).create(name.trim());
@@ -231,7 +231,7 @@ class PlaylistsScreen extends ConsumerWidget {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => _NameDialog(
-          controller: controller, title: 'Rename Playlist', hint: pl.name),
+          controller: controller, title: 'Rename', hint: pl.name),
     );
     if (name != null && name.trim().isNotEmpty) {
       await ref.read(playlistsProvider.notifier).rename(pl.id, name.trim());
@@ -396,7 +396,7 @@ class PlaylistDetailScreenById extends ConsumerWidget {
           ),
         ),
         body: const Center(
-          child: Text('Playlist not found',
+          child: Text('List not found',
               style: TextStyle(color: AppColors.textSecondary)),
         ),
       );
@@ -750,7 +750,7 @@ class _AddSongsSheetState extends ConsumerState<_AddSongsSheet> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                    '"${item.title}" added to playlist'),
+                                    '"${item.title}" added to list'),
                                 backgroundColor: AppColors.surface,
                               ),
                             );
@@ -840,14 +840,14 @@ class _EmptyState extends StatelessWidget {
               .scaleXY(begin: 1.0, end: 1.08,
                   duration: 1000.ms, curve: Curves.easeInOut),
           const SizedBox(height: 20),
-          Text('No playlists yet',
+          Text('No lists yet',
               style: TextStyle(
                 fontSize: 18, fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface,
               )).animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 8),
           const Text(
-            'Tap + to create your first playlist.',
+            'Tap + to create your first list.',
             style: TextStyle(
                 fontSize: 13, color: AppColors.textSecondary),
           ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
@@ -863,7 +863,7 @@ class _EmptyState extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Text('Create Playlist',
+              child: const Text('Create List',
                   style: TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w700,
                     color: Colors.black, fontFamily: 'Inter',

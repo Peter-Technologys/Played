@@ -28,7 +28,7 @@ class PlaylistsView extends ConsumerWidget {
         children: [
           _EmptyState(
             icon: Icons.queue_music_rounded,
-            label: 'No playlists yet',
+            label: 'No lists yet',
           ),
           if (showCreateButton) ...[
             const SizedBox(height: 16),
@@ -47,7 +47,7 @@ class PlaylistsView extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
-                  'Create Playlist',
+                  'Create List',
                   style: TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.w700,
