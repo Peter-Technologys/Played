@@ -656,35 +656,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
             : 0;
 
     return Scaffold(
-      appBar: AppBar(
-        // Transparent / blends with the page content behind it
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        // Search icon only shown on Video (0) and Music (1) tabs.
-        // My Space (2) has its own internal search for tools.
-        actions: currentIndex == 2
-            ? const []
-            : [
-                IconButton(
-                  icon: const Icon(Icons.search_rounded),
-                  tooltip: 'Search',
-                  color: AppColors.textSecondary,
-                  onPressed: () {
-                    showSearch<MediaItem?>(
-                      context: context,
-                      delegate: _GlobalSearchDelegate(allItems),
-                    );
-                  },
-                ),
-              ],
-      ),
-      body: Stack(
-        children: [
-          widget.child,
-          const NewMediaBanner(),
-        ],
-      ),
+      body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -700,9 +672,8 @@ class _MainShellState extends ConsumerState<_MainShell> {
           ),
           // TASK 11: AdBannerSlot already returns SizedBox.shrink() when ads
           // are disabled — no visual gap. No additional guard needed.
-          SafeArea(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          Container(
+              margin: EdgeInsets.fromLTRB(12, 0, 12, MediaQuery.of(context).padding.bottom + 6),
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? const Color(0xFF1B1E2B)
@@ -747,7 +718,6 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),

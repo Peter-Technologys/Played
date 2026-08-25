@@ -625,7 +625,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             SliverToBoxAdapter(
               child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 100,
+                height: MediaQuery.of(context).padding.bottom + 140,
               ),
             ),
           ],
