@@ -69,12 +69,18 @@ void main() async {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
-        androidNotificationOngoing: false,
-        androidStopForegroundOnPause: true,
+        // Keep the foreground service alive on pause so the lock screen
+        // notification persists. Android 12+ destroys the notification
+        // immediately when the foreground service stops.
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
         notificationColor: Color(0xFF00E5FF),
         androidShowNotificationBadge: false,
-        preloadArtwork: true,
+        // preloadArtwork uses the artUri directly via MediaSession.
+        // Keep false — we supply artwork as a content:// URI via
+        // FileProvider so the system can read it under scoped storage.
+        preloadArtwork: false,
       ),
     );
     AudioHandlerSingleton.instance.handler = audioHandler;

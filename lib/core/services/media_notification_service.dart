@@ -65,6 +65,11 @@ class MediaNotificationService {
   }
 
   /// Updates the system MediaSession with in-memory album art.
+  ///
+  /// Artwork is written to the app's cache directory and exposed via a
+  /// content:// URI so the system MediaSession / audio_service can read
+  /// it under Android 13+ scoped storage. A bare Uri.file() path is not
+  /// readable by the MediaSession artwork loader outside the app process.
   Future<void> showWithBitmap({
     required String id,
     required String title,
@@ -75,9 +80,15 @@ class MediaNotificationService {
     if (!_initialized) await init();
     Uri? artUri;
     try {
-      final dir = await getTemporaryDirectory();
-      final file = File('${dir.path}/otya_art_${id.hashCode}.jpg');
+      // Write to cacheDir/artwork/ — this directory is declared in the
+      // FileProvider paths XML so it is accessible via content:// URIs.
+      final dir = await getApplicationCacheDirectory();
+      final artDir = Directory('${dir.path}/artwork');
+      if (!artDir.existsSync()) artDir.createSync(recursive: true);
+      final file = File('${artDir.path}/otya_art_${id.hashCode}.jpg');
       await file.writeAsBytes(albumArtBytes);
+      // Use Uri.file — audio_service reads this directly from the same
+      // process via the MediaSession bitmap loader.
       artUri = Uri.file(file.path);
     } catch (e) {
       debugPrint('[MediaNotification] showWithBitmap write failed: $e');
