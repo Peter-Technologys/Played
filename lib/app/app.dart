@@ -13,6 +13,7 @@ import '../core/services/custom_theme_manager.dart';
 import '../core/services/fcm_service.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/widgets/announcement_dialog.dart';
+import '../core/widgets/update_dialog.dart';
 
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
@@ -43,6 +44,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     SchedulerBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
         if (mounted) AnnouncementDialog.showIfPending(context);
+      });
+      Future.delayed(const Duration(seconds: 4), () {
+        if (mounted) UpdateDialog.checkAndShow(context);
       });
     });
   }

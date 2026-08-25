@@ -158,7 +158,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   Future<void> _restoreOrientation() async {
     await PipService.instance.setVideoPlaying(playing: false);
-    await SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+    // Reset to portrait when leaving the video player
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
