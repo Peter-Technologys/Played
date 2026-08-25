@@ -54,8 +54,14 @@ jobs:
       - uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
+          # Include pubspec.lock in the cache key so any dependency version
+          # change busts the cache. Keying only on pubspec.yaml caused stale
+          # plugin Android sources to be restored when a package bumped its
+          # version without changing pubspec.yaml constraints.
+          key: pub-${{ hashFiles('pubspec.yaml', 'pubspec.lock') }}
+          restore-keys: |
+            pub-${{ hashFiles('pubspec.yaml') }}
+            pub-
 
       # ── Inject google-services.json ────────────────────────────────────
       # vars can be used in run scripts directly via ${{ vars.X }}
@@ -71,7 +77,7 @@ jobs:
           fi
 
       - name: Flutter pub get
-        run: flutter pub get
+        run: flutter pub get --no-precompile
 
       - name: Flutter analyze (non-fatal)
         run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
