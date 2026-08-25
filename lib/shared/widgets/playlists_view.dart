@@ -63,7 +63,8 @@ class PlaylistsView extends ConsumerWidget {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 120),
+      physics: const BouncingScrollPhysics(),
       itemCount: playlists.length,
       itemBuilder: (context, i) {
         final pl = playlists[i];
