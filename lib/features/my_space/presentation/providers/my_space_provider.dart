@@ -7,7 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/providers/duplicates_provider.dart';
 import '../../../../core/services/duplicate_detector_service.dart';
-import '../../../core/database/otya_database.dart';
+import '../../../../core/database/otya_database.dart';
 import '../../data/media_repository.dart';
 
 /// Live media change event stream from Android MediaStore.

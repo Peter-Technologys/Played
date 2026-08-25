@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
-import '../config/flavor_config.dart';
 import 'api_signer.dart';
 import 'update_notification_service.dart';
 
@@ -22,7 +21,7 @@ class UpdateService {
   String get downloadUrl => Environment.downloadUrl;
 
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
-    if (!FlavorConfig.selfUpdateEnabled) return null;
+    if (!Environment.selfUpdateEnabled) return null;
     if (_checkInProgress) return null;
     _checkInProgress = true;
     try {
@@ -57,7 +56,7 @@ class UpdateService {
         debugPrint('[UpdateService] /latest failed, trying /version fallback…');
         try {
           response = await http
-              .get(Uri.parse(Environment.versionUrl))
+              .get(Uri.parse(Environment.apiVersionUrl))
               .timeout(const Duration(seconds: 10));
         } catch (_) {}
       }
@@ -124,13 +123,7 @@ class UpdateService {
   // which sends the full device payload (model, android_version, locale) using
   // device_info_plus. UpdateService no longer handles device registration.
 
-  String _detectAbi() {
-    // Use the build-time dart-define (same approach as DeviceService) —
-    // more reliable than Abi.current() which can mis-detect on x86_64 emulators.
-    // Build with: flutter build apk --dart-define=APP_ARCH=arm64
-    const arch = String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
-    return arch;
-  }
+  String _detectAbi() => Environment.appArch;
 }
 
 class UpdateInfo {
