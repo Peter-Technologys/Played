@@ -284,7 +284,7 @@ class _SendView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final n = ref.read(_airDropProvider.notifier);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [

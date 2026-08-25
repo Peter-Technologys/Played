@@ -314,7 +314,7 @@ class _LrcView extends StatelessWidget {
 
     return ListView.builder(
       controller: scroll,
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 80),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 80),
       itemCount: lines.length,
       itemBuilder: (context, i) {
         final isActive = i == active;
@@ -356,7 +356,7 @@ class _PlainView extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 32),
       // +1 for the sync-unavailable notice at the top
       itemCount: lines.length + 1,
       itemBuilder: (context, i) {

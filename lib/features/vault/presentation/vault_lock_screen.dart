@@ -556,7 +556,8 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
                   ),
                 )
               : GridView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
+                  physics: const BouncingScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2, crossAxisSpacing: 12,
                     mainAxisSpacing: 12, childAspectRatio: 0.82,

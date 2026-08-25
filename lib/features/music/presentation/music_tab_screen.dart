@@ -52,8 +52,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
   bool _isScrolled = false;
 
   // Approximate height of header + pills + padding — content starts below this.
-  // Header (~60dp) + SizedBox(8) + FilterPills(56dp) + bottom padding(12) = ~136dp.
-  static const double _headerHeight = 136.0;
+  static const double _headerHeight = 152.0;
 
   @override
   bool get wantKeepAlive => true;
@@ -201,7 +200,7 @@ class _MusicHeader extends ConsumerWidget {
         libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 0),
       child: Row(
         children: [
           Container(

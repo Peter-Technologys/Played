@@ -438,7 +438,7 @@ class MySpaceHubScreen extends ConsumerWidget {
             // ── Header ──────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 12, 20, 0),
                 child: Row(
                   children: [
                     Expanded(
