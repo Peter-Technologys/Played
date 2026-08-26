@@ -162,6 +162,20 @@ jobs:
           echo "=== All APKs under android/app/build/ ==="
           find android/app/build/outputs -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
 
+      - name: Stage APKs to Flutter expected location
+        run: |
+          mkdir -p build/app/outputs/flutter-apk
+          # Gradle outputs to android/app/build/outputs/flutter-apk/ but Flutter
+          # expects build/app/outputs/flutter-apk/ (repo root). Copy both ABI splits.
+          for APK in android/app/build/outputs/flutter-apk/*.apk; do
+            [ -f "$APK" ] && cp "$APK" build/app/outputs/flutter-apk/ && echo "Staged: $APK"
+          done
+          # Also check the standard Gradle apk/release path as a fallback
+          for APK in android/app/build/outputs/apk/release/*.apk; do
+            [ -f "$APK" ] && cp "$APK" build/app/outputs/flutter-apk/ && echo "Staged (fallback): $APK"
+          done
+          ls -lh build/app/outputs/flutter-apk/
+
       # Verify APKs exist and are not empty (fails if build was broken)
       - name: Verify APKs
         run: |
