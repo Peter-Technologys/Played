@@ -87,8 +87,6 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          DD_SECRET: ${{ secrets.OTYA_SECRET }}
-          DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
           set -e
           # CI builds must use HTTPS and the production backend when configured.
@@ -100,14 +98,8 @@ jobs:
             --dart-define=APP_ARCH=arm64
             --dart-define=SELF_UPDATE=false
           )
-          if [ -n "$DD_WORKER_URL" ]; then
-            ARGS+=(--dart-define=WORKER_URL="$DD_WORKER_URL")
-          fi
-          # Legacy signing secret is retained only for compatibility with any
-          # endpoint that has not yet migrated; it is never used as an auth
-          # credential for a user session.
-          if [ -n "$DD_SECRET" ]; then
-            ARGS+=(--dart-define=OTYA_SECRET="$DD_SECRET")
+          if [ -n "${{ secrets.WORKER_URL }}" ]; then
+            ARGS+=(--dart-define=WORKER_URL="${{ secrets.WORKER_URL }}")
           fi
           flutter build apk "${ARGS[@]}"
 
