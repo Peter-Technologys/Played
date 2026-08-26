@@ -1,7 +1,7 @@
 // lib/features/auth/verify_email_screen.dart
 //
 // Shows after registration if email not verified.
-// OTP input (4 chars, A123 format), resend button (60s cooldown), submit.
+// OTP input (5 chars, A1234 format), resend button (60s cooldown), submit.
 
 import 'dart:async';
 import 'package:flutter/material.dart';
@@ -39,7 +39,11 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   Future<void> _sendOtp() async {
     if (_cooldown > 0 || _loading) return;
-    setState(() { _error = null; _success = null; _loading = true; });
+    setState(() {
+      _error = null;
+      _success = null;
+      _loading = true;
+    });
     await AuthService.instance.sendVerificationOtp();
     if (!mounted) return;
     setState(() {
@@ -49,7 +53,10 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
     });
     _timer?.cancel();
     _timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (!mounted) { t.cancel(); return; }
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
       setState(() {
         _cooldown--;
         if (_cooldown <= 0) t.cancel();
@@ -59,11 +66,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
 
   Future<void> _verify() async {
     final otp = _otpCtrl.text.trim().toUpperCase();
-    if (!RegExp(r'^[A-Z][0-9]{3}$').hasMatch(otp)) {
-      setState(() => _error = 'Enter the 4-character code from your email, e.g. A123.');
+    if (!RegExp(r'^[A-Z][0-9]{4}$').hasMatch(otp)) {
+      setState(() => _error = 'Enter the 5-character code from your email, e.g. A1234.');
       return;
     }
-    setState(() { _loading = true; _error = null; _success = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+      _success = null;
+    });
     final ok = await AuthService.instance.verifyOtp(otp);
     if (!mounted) return;
     setState(() => _loading = false);
@@ -117,7 +128,7 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                       color: AppColors.textPrimary, fontFamily: 'Inter')),
               const SizedBox(height: 8),
               const Text(
-                'We sent a 4-character code to your email address.\nEnter it below to verify your account.',
+                'We sent a 5-character code to your email address.\nEnter it below to verify your account.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppColors.textSecondary, fontSize: 14,
                     fontFamily: 'Inter', height: 1.5),
@@ -127,14 +138,14 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
                 controller: _otpCtrl,
                 textCapitalization: TextCapitalization.characters,
                 keyboardType: TextInputType.text,
-                maxLength: 4,
+                maxLength: 5,
                 enabled: !_loading,
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textPrimary,
                     fontFamily: 'Inter', fontSize: 28,
                     fontWeight: FontWeight.w800, letterSpacing: 8),
                 decoration: InputDecoration(
-                  hintText: 'A123',
+                  hintText: 'A1234',
                   hintStyle: const TextStyle(color: AppColors.textMuted,
                       fontSize: 28, letterSpacing: 8, fontFamily: 'Inter'),
                   counterText: '', filled: true, fillColor: AppColors.surface,
