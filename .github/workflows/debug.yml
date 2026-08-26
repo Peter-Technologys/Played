@@ -24,10 +24,6 @@ concurrency:
 
 env:
   PUB_ENVIRONMENT: bot.github
-  # -Xmx3g: leave headroom for the OS, Flutter SDK, and Android SDK on the
-  # 7GB GitHub Actions runner. -Xmx4g caused OOM mid-build.
-  # -XX:+UseG1GC: better GC pause behaviour for large heap builds.
-  # org.gradle.caching=true: skip recompiling unchanged tasks on warm runs.
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Xmx3g -XX:MaxMetaspaceSize=512m -XX:+UseG1GC -Dkotlin.incremental=false"
 
 jobs:
@@ -36,7 +32,6 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── Free disk space (keep NDK — it is cached separately below) ────
       - name: Free disk space
         run: |
           sudo rm -rf /usr/share/dotnet || true
@@ -49,18 +44,10 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          # Pin to 3.32.x — Flutter stable 3.32+ contains the fix for the
-          # "Already watching path" crash that occurs with AGP 9.x.
-          # Using channel: stable alone picks up whatever stable is at run
-          # time, which may be an older version without the patch.
           flutter-version: "3.32.x"
           channel: stable
           cache: true
 
-      # ── Cache Android NDK ──────────────────────────────────────────────
-      # The NDK (~1.5 GB) was previously deleted by the free-disk-space step
-      # and re-downloaded every run (3-4 min). Cache it keyed on the version
-      # declared in android/app/build.gradle so a bump auto-busts the cache.
       - name: Cache Android NDK
         uses: actions/cache@v4
         with:
@@ -75,10 +62,6 @@ jobs:
             pub-${{ hashFiles('pubspec.yaml') }}
             pub-
 
-      # Cache Gradle wrapper, caches (including media_kit libmpv JARs), the
-      # Gradle build cache, and the Android SDK CMake install.
-      # Cache key includes gradle.properties and proguard-rules.pro so that
-      # changes to R8/ProGuard config always produce a fresh build.
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -90,9 +73,6 @@ jobs:
           key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml', 'android/app/build.gradle', 'android/gradle.properties', 'android/app/proguard-rules.pro') }}
           restore-keys: |
             gradle-
-
-      # Firebase removed — google-services.json no longer needed.
-      # (Step intentionally omitted.)
 
       - name: Decode keystore
         run: |
@@ -135,42 +115,33 @@ jobs:
           DD_SECRET: ${{ secrets.OTYA_SECRET }}
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
-          set +e
+          set -e
 
+          # Do not pass an explicit --target-platform list here. Flutter's
+          # split-per-ABI builder determines the supported ABIs itself; the
+          # explicit list can leave Gradle's output in a location Flutter's
+          # post-build check does not recognise.
           flutter build apk --release --split-per-abi --verbose \
-            --target-platform android-arm,android-arm64 \
             --dart-define=OTYA_SECRET="$DD_SECRET" \
-            --dart-define=APP_ARCH=arm64 \
             --dart-define=SELF_UPDATE=true \
             --dart-define=WORKER_URL="$DD_WORKER_URL"
 
-          BUILD_EXIT=$?
-
-          set -e
-
-          echo "Flutter build exit code: $BUILD_EXIT"
-          echo "=== APKs produced ==="
-          find android/app/build/outputs -type f -name "*.apk" -print
-
-          mkdir -p build/app/outputs/flutter-apk
-
-          find android/app/build/outputs \
-            -type f -name "*.apk" \
-            -exec cp {} build/app/outputs/flutter-apk/ \;
-
-          echo "=== Final APKs ==="
+          echo "=== APKs produced by Flutter ==="
           find build/app/outputs/flutter-apk -type f -name "*.apk" -print
 
           ARM64="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
           ARM32="build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk"
 
-          if [ -f "$ARM64" ] && [ -f "$ARM32" ]; then
-            echo "Both APKs were successfully produced."
-            exit 0
+          if [ ! -f "$ARM64" ] || [ ! -f "$ARM32" ]; then
+            echo "ERROR: Flutter completed but expected split APKs are missing."
+            echo "=== All APKs under build ==="
+            find build -type f -name "*.apk" -print || true
+            echo "=== All APKs under android/app/build ==="
+            find android/app/build -type f -name "*.apk" -print || true
+            exit 1
           fi
 
-          echo "ERROR: Required APKs were not produced."
-          exit "$BUILD_EXIT"
+          echo "Both ABI APKs were successfully produced."
 
       - name: Diagnose APK outputs
         if: always()
@@ -182,7 +153,6 @@ jobs:
           echo "=== All APKs under android/app/build/ ==="
           find android/app/build/outputs -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
 
-      # Verify APKs exist and are not empty (fails if build was broken)
       - name: Verify APKs and record checksums
         run: |
           echo "Commit: $(git rev-parse HEAD)"
@@ -198,7 +168,7 @@ jobs:
 
       - name: Remove secrets
         if: always()
-        run: rm -f $GITHUB_WORKSPACE/android/app/keystore.jks android/app/google-services.json
+        run: rm -f "$GITHUB_WORKSPACE/android/app/keystore.jks" android/app/google-services.json
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
@@ -219,4 +189,3 @@ jobs:
           ARM64=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | cut -f1)
           ARM32=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk | cut -f1)
           echo "**arm64:** $ARM64 | **arm32:** $ARM32" >> $GITHUB_STEP_SUMMARY
-
