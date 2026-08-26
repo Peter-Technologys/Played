@@ -29,9 +29,11 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -83,8 +85,22 @@ Future<void> main() async {
   }
 
   await runZonedGuarded(() async {
-    await _initDatabase();
-    final savedSettings = await AppSettings.load();
+    var databaseReady = false;
+    try {
+      databaseReady = await _initDatabase();
+    } catch (e, st) {
+      debugPrint('[Database] init failed: $e\n$st');
+      unawaited(CrashReporter.instance.report(e, st));
+    }
+
+    AppSettings savedSettings;
+    try {
+      savedSettings = await AppSettings.load();
+    } catch (e, st) {
+      debugPrint('[Settings] load failed: $e\n$st');
+      unawaited(CrashReporter.instance.report(e, st));
+      savedSettings = AppSettings.defaults();
+    }
 
     runApp(
       ProviderScope(
@@ -97,12 +113,7 @@ Future<void> main() async {
       ),
     );
 
-    unawaited(
-      _initBackground(savedSettings).catchError((Object e, StackTrace st) {
-        debugPrint('[Background init] Error: $e\n$st');
-        unawaited(CrashReporter.instance.report(e, st));
-      }),
-    );
+    unawaited(_initBackground(savedSettings, databaseReady));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
     unawaited(CrashReporter.instance.report(error, stack));
@@ -165,55 +176,82 @@ void _showCrashOverlay(String title, String details) {
   );
 }
 
-Future<void> _initDatabase() async {
+Future<bool> _initDatabase() async {
   try {
     await OtyaDatabase.instance.init();
+    return true;
   } catch (e, st) {
     debugPrint('[OtyaDB] Init error: $e\n$st');
-    try {
-      await OtyaDatabase.instance.deleteAndReinit();
-    } catch (e2, st2) {
-      debugPrint('[OtyaDB] deleteAndReinit also failed: $e2\n$st2');
-    }
+    unawaited(CrashReporter.instance.report(e, st));
+    // Never destroy a user's database as automatic crash recovery.
+    return false;
   }
 }
 
-Future<void> _initBackground(AppSettings savedSettings) async {
-  await Future.wait([
-    _initNotifications(),
-    StorageFolderService.instance.ensureCreated(),
-    ConnectivityService.instance.init(),
-    CacheService.instance.init(),
-  ]);
+Future<void> _initBackground(
+  AppSettings savedSettings,
+  bool databaseReady,
+) async {
+  await _safeBackground('notifications', _initNotifications);
+  await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
+  await _safeBackground('connectivity', ConnectivityService.instance.init);
+  await _safeBackground('cache', CacheService.instance.init);
 
-  unawaited(CacheService.instance.evictExpired());
-  unawaited(DeviceService.instance.registerIfNeeded());
-  unawaited(UpdateService.instance.checkAndNotify());
+  unawaited(_safeBackground('cache eviction', CacheService.instance.evictExpired));
+
+  if (databaseReady) {
+    unawaited(_safeBackground(
+      'device registration',
+      DeviceService.instance.registerIfNeeded,
+    ));
+  }
+
+  unawaited(_safeBackground(
+    'update check',
+    UpdateService.instance.checkAndNotify,
+  ));
 
   PipService.listenForNativePause(
     () => PlaybackCoordinator.instance.activePlayer?.pause(),
     () => PlaybackCoordinator.instance.activePlayer?.play(),
   );
 
-  unawaited(
-    PhoneStateService.instance.setPauseDuringCalls(
+  unawaited(_safeBackground(
+    'call handling',
+    () => PhoneStateService.instance.setPauseDuringCalls(
       savedSettings.pauseDuringCalls,
     ),
-  );
-  unawaited(FcmService.instance.init());
-  unawaited(CrashReporter.instance.init());
+  ));
+  unawaited(_safeBackground('FCM', FcmService.instance.init));
+  unawaited(_safeBackground('crash reporter', CrashReporter.instance.init));
+}
+
+Future<void> _safeBackground(
+  String name,
+  Future<void> Function() task,
+) async {
+  try {
+    await task();
+  } catch (e, st) {
+    debugPrint('[Background:$name] Error: $e\n$st');
+    unawaited(CrashReporter.instance.report(e, st));
+  }
 }
 
 Future<void> _initNotifications() async {
-  try {
-    await NotificationService.instance.init();
-    await UpdateNotificationService.instance.init();
-    await MediaNotificationService.instance.init();
-    await PushNotificationService.instance.init();
-  } catch (e, st) {
-    debugPrint('[Notifications] Init error: $e\n$st');
-    unawaited(CrashReporter.instance.report(e, st));
-  }
+  await _safeBackground('notification service', NotificationService.instance.init);
+  await _safeBackground(
+    'update notifications',
+    UpdateNotificationService.instance.init,
+  );
+  await _safeBackground(
+    'media notifications',
+    MediaNotificationService.instance.init,
+  );
+  await _safeBackground(
+    'push notifications',
+    PushNotificationService.instance.init,
+  );
 }
 
 // CloudflareService has no init — it is stateless HTTP. Accessed via singleton.
