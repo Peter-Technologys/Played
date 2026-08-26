@@ -82,6 +82,22 @@ jobs:
       - name: Decode keystore
         run: echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
 
+      - name: Ensure debug keystore exists (fallback safety net)
+        run: |
+          if [ ! -f android/app/keystore.jks ]; then
+            echo "WARNING: Release keystore not decoded — generating debug keystore as fallback"
+            mkdir -p ~/.android
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
+          fi
+
       - name: Build split APKs (arm64 + arm32)
         env:
           # Absolute path — Gradle's file() resolves relative to android/,
