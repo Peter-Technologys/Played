@@ -79,10 +79,8 @@ jobs:
 
       # Cache Gradle wrapper, caches (including media_kit libmpv JARs), the
       # Gradle build cache, and the Android SDK CMake install.
-      # media_kit downloads ~200MB of libmpv JARs per ABI on every cold run —
-      # caching them saves 3-4 minutes per build.
-      # CMake (~50MB) is installed mid-build if missing, which can cause native
-      # compilation to fail on constrained runners — caching it prevents that.
+      # Cache key includes gradle.properties and proguard-rules.pro so that
+      # changes to R8/ProGuard config always produce a fresh build.
       - name: Cache Gradle
         uses: actions/cache@v4
         with:
@@ -91,7 +89,7 @@ jobs:
             ~/.gradle/caches/
             ~/.gradle/build-cache/
             /usr/local/lib/android/sdk/cmake/
-          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml', 'android/app/build.gradle') }}
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml', 'android/app/build.gradle', 'android/gradle.properties', 'android/app/proguard-rules.pro') }}
           restore-keys: |
             gradle-
 
