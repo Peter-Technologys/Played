@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -20,11 +21,14 @@ class AlbumArtService {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
 
   /// Maximum number of entries kept in the in-memory cache.
-  /// When exceeded the entire cache is cleared to bound memory usage.
   static const int _maxCacheSize = 500;
 
-  /// Simple in-memory cache: albumId → resolved file path (or null if failed).
-  final Map<String, String?> _cache = {};
+  /// Number of oldest entries evicted when the cache is full.
+  static const int _evictCount = 50;
+
+  /// LRU in-memory cache: albumId → resolved file path (or null if failed).
+  /// LinkedHashMap preserves insertion order so the oldest entries are first.
+  final LinkedHashMap<String, String?> _cache = LinkedHashMap<String, String?>();
 
   /// Resolves an `albumid:NNNN` path to a real file path.
   ///
@@ -42,9 +46,12 @@ class AlbumArtService {
     // Return cached result (including cached null for known failures).
     if (_cache.containsKey(albumId)) return _cache[albumId];
 
-    // Evict the entire cache when it exceeds the size cap to prevent
-    // unbounded memory growth on devices with thousands of albums.
-    if (_cache.length >= _maxCacheSize) _cache.clear();
+    // LRU eviction: remove the oldest _evictCount entries instead of clearing
+    // the entire cache, which would cause a thundering herd of re-requests.
+    if (_cache.length >= _maxCacheSize) {
+      final toRemove = _cache.keys.take(_evictCount).toList();
+      toRemove.forEach(_cache.remove);
+    }
 
     try {
       final path = await _channel.invokeMethod<String>(

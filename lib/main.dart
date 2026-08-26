@@ -5,49 +5,37 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:workmanager/workmanager.dart';
 import 'core/services/audio_handler.dart';
 import 'app/app.dart';
-import 'core/database/played_database.dart';
-import 'core/services/cloudflare_service.dart';
-import 'core/services/device_service.dart';
+import 'core/database/otya_database.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/media_notification_service.dart';
 import 'core/services/phone_state_service.dart';
 import 'core/services/pip_service.dart';
 import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/crash_reporter.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/cache_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
+import 'core/services/device_service.dart';
 import 'features/settings/settings_provider.dart';
 
-@pragma('vm:entry-point')
-void callbackDispatcher() {
-  Workmanager().executeTask((taskName, inputData) async {
-    if (taskName == 'otya_update_check') {
-      await UpdateService.instance.checkAndNotify();
-    }
-    return Future.value(true);
-  });
-}
-
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // media_kit MUST be initialized before runApp — without this, video
-  // playback silently fails on some devices (native libs not loaded).
   MediaKit.ensureInitialized();
 
-  // Lock to portrait on startup; video player overrides to landscape.
-  await SystemChrome.setPreferredOrientations([
+  // Do not lock the entire application to portrait: video playback and
+  // responsive layouts need to support landscape and modern Android devices.
+  await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
-  // Transparent status bar, light icons — applied once here.
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
@@ -58,61 +46,82 @@ void main() async {
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
-    if (kDebugMode) _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
+    unawaited(CrashReporter.instance.report(
+      details.exception,
+      details.stack ?? StackTrace.empty,
+    ));
+    if (kDebugMode) {
+      _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
+    }
   };
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
+    unawaited(CrashReporter.instance.report(error, stack));
     if (kDebugMode) _showCrashOverlay('Platform Error', '$error\n\n$stack');
     return true;
   };
 
-  // Initialise audio_service before runApp so the foreground service is ready
-  // before any Player is created.
-  // Wrapped in try/catch so a failure here does not kill the app — audio
-  // simply won't be available, but the rest of the app can still launch.
+  // Media-session setup is optional: the UI must remain usable if Android's
+  // media service is temporarily unavailable or misconfigured.
+  OtyaAudioHandler? audioHandler;
   try {
-    final audioHandler = await AudioService.init(
-      builder: () => OtyaAudioHandler(),
+    final handler = await AudioService.init(
+      builder: OtyaAudioHandler.new,
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
-        androidNotificationChannelName: 'OTYA Player \u2014 Now Playing',
+        androidNotificationChannelName: 'OTYA Player — Now Playing',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
+        androidNotificationIcon: 'drawable/ic_notification',
         notificationColor: Color(0xFF00E5FF),
+        androidShowNotificationBadge: false,
+        preloadArtwork: false,
       ),
     );
-    AudioHandlerSingleton.instance.handler = audioHandler;
+    audioHandler = handler;
+    AudioHandlerSingleton.instance.handler = handler;
   } catch (e, st) {
     debugPrint('[AudioService] init failed: $e\n$st');
-    if (kDebugMode) _showCrashOverlay('AudioService Init Failed', '$e\n\n$st');
-    // Continue without audio service — app can still launch
+    unawaited(CrashReporter.instance.report(e, st));
   }
 
-  await runZonedGuarded(() async {
-    await _initDatabase();
-    final savedSettings = await AppSettings.load();
+  // The application always reaches runApp even when an optional subsystem
+  // fails. Startup must never depend on network, notifications, updates, or
+  // device registration.
+  try {
+    final databaseReady = await _initDatabase();
+    AppSettings savedSettings;
+    try {
+      savedSettings = await AppSettings.load();
+    } catch (e, st) {
+      debugPrint('[Settings] load failed: $e\n$st');
+      unawaited(CrashReporter.instance.report(e, st));
+      savedSettings = AppSettings.defaults();
+    }
 
     runApp(
       ProviderScope(
         overrides: [
           settingsProvider.overrideWith(
-              (ref) => SettingsNotifier(savedSettings)),
+            (ref) => SettingsNotifier(savedSettings),
+          ),
         ],
         child: const OtyaPlayerApp(),
       ),
     );
 
-    unawaited(_initBackground(savedSettings));
-  }, (error, stack) {
-    debugPrint('[ZoneError] $error\n$stack');
-    if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
-  });
+    unawaited(_initBackground(savedSettings, databaseReady));
+  } catch (e, st) {
+    // A catastrophic startup dependency must still produce a recoverable UI
+    // rather than a blank/crashed process. Database data is never deleted here.
+    debugPrint('[Startup] $e\n$st');
+    unawaited(CrashReporter.instance.report(e, st));
+    runApp(const ProviderScope(child: OtyaPlayerApp()));
+    if (kDebugMode) _showCrashOverlay('Startup Error', '$e\n\n$st');
+  }
 }
 
-// REMOVE before Play Store release — only shown in debug builds
 void _showCrashOverlay(String title, String details) {
-  // In release builds, errors are already logged via debugPrint.
-  // Never show internal stack traces to end users in production.
   if (!kDebugMode) return;
   runApp(
     MaterialApp(
@@ -127,14 +136,9 @@ void _showCrashOverlay(String title, String details) {
               children: [
                 const Icon(Icons.bug_report, color: Color(0xFFFF4444), size: 40),
                 const SizedBox(height: 8),
-                Text(
-                  'OTYA CRASH: $title',
-                  style: const TextStyle(
-                    color: Color(0xFFFF4444),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
+                Text('OTYA CRASH: $title', style: const TextStyle(
+                  color: Color(0xFFFF4444), fontSize: 16, fontWeight: FontWeight.bold,
+                )),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -142,20 +146,14 @@ void _showCrashOverlay(String title, String details) {
                     color: const Color(0xFF2A0000),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: SelectableText(
-                    details,
-                    style: const TextStyle(
-                      color: Color(0xFFFFCCCC),
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
+                  child: SelectableText(details, style: const TextStyle(
+                    color: Color(0xFFFFCCCC), fontSize: 11, fontFamily: 'monospace',
+                  )),
                 ),
                 const SizedBox(height: 16),
-                const Text(
-                  'Screenshot this screen and share it here to debug the crash.',
-                  style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
-                ),
+                const Text('This diagnostic screen is debug-only.', style: TextStyle(
+                  color: Color(0xFFAAAAAA), fontSize: 12,
+                )),
               ],
             ),
           ),
@@ -165,90 +163,83 @@ void _showCrashOverlay(String title, String details) {
   );
 }
 
-Future<void> _initDatabase() async {
+Future<bool> _initDatabase() async {
   try {
-    await PlayedDatabase.instance.init();
+    await OtyaDatabase.instance.init();
+    return true;
   } catch (e, st) {
-    debugPrint('[PlayedDB] Init error: $e\n$st');
-    try {
-      await PlayedDatabase.instance.deleteAndReinit();
-    } catch (e2, st2) {
-      debugPrint('[PlayedDB] deleteAndReinit also failed: $e2\n$st2');
-      // App continues with DB unavailable — all DB calls are individually guarded
-    }
+    debugPrint('[OtyaDB] Init error: $e\n$st');
+    unawaited(CrashReporter.instance.report(e, st));
+    // Never destroy a user's database as automatic crash recovery.
+    return false;
   }
 }
 
-Future<void> _initBackground(AppSettings savedSettings) async {
-  await Future.wait([
-    _initNotifications(),
-    _initWorkManager(),
-    StorageFolderService.instance.ensureCreated(),
-  ]);
+Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) async {
+  await _safeBackground('notifications', _initNotifications);
+  await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
+  await _safeBackground('connectivity', ConnectivityService.instance.init);
+  await _safeBackground('cache', CacheService.instance.init);
+  unawaited(_safeBackground('cache eviction', CacheService.instance.evictExpired));
 
-  // BUG 10: Replace UpdateService.registerDevice() (which sends incomplete
-  // device info and causes double-registration) with DeviceService, which
-  // includes model, Android version, locale, and only re-registers when the
-  // build number changes.
-  unawaited(DeviceService.instance.registerIfNeeded());
-  unawaited(UpdateService.instance.checkAndNotify());
+  if (databaseReady) {
+    unawaited(_safeBackground('device registration', DeviceService.instance.registerIfNeeded));
+  }
 
-  // BUG 1: Register the PiP channel handler so MainActivity.kt's
-  // onPause()/onResume() calls to invokeMethod('playerPause') and
-  // invokeMethod('playerResume') are forwarded to the active media_kit Player.
+  unawaited(_safeBackground('update check', UpdateService.instance.checkAndNotify));
+
   PipService.listenForNativePause(
     () => PlaybackCoordinator.instance.activePlayer?.pause(),
     () => PlaybackCoordinator.instance.activePlayer?.play(),
   );
 
-  // BUG 2: Apply the persisted pauseDuringCalls setting on startup so Kotlin
-  // registers (or skips) the TelephonyManager listener immediately, rather
-  // than waiting for the user to open Settings and toggle the switch.
-  unawaited(
-    PhoneStateService.instance.setPauseDuringCalls(savedSettings.pauseDuringCalls),
-  );
-
-  // FcmService handles FCM token retrieval, persistence, and backend
-  // registration — replaces the old manual _registerPushToken() call.
-  unawaited(FcmService.instance.init());
-
-  // CrashReporter installs Flutter/platform error handlers and uploads any
-  // crashes that were stored while the device was offline.
-  unawaited(CrashReporter.instance.init());
+  _initPushNotifications();
+  _initPhoneState();
+  _initFcm();
+  _initUpdateNotifications(savedSettings);
 }
 
-Future<void> _initNotifications() async {
+Future<void> _safeBackground(String name, Future<void> Function() task) async {
   try {
-    await NotificationService.instance.init();
-    await UpdateNotificationService.instance.init();
-    await MediaNotificationService.instance.init();
-    await PushNotificationService.instance.init();
-  } catch (e) {
-    debugPrint('[Notifications] Init error: $e');
+    await task();
+  } catch (e, st) {
+    debugPrint('[$name] failed: $e\n$st');
+    unawaited(CrashReporter.instance.report(e, st));
   }
 }
 
-// CloudflareService has no init — it is stateless HTTP. Accessed via singleton.
-// ignore: unused_element
-CloudflareService get _cf => CloudflareService.instance;
+Future<void> _initNotifications() async {
+  await NotificationService.instance.init();
+}
 
-Future<void> _initWorkManager() async {
+void _initPushNotifications() {
   try {
-    await Workmanager().initialize(
-      callbackDispatcher,
-      isInDebugMode: kDebugMode,
-    );
-    await Workmanager().registerPeriodicTask(
-      'otya_update_check',
-      'otya_update_check',
-      frequency: const Duration(hours: 24),
-      constraints: Constraints(
-        networkType: NetworkType.connected,
-      ),
-      existingWorkPolicy: ExistingPeriodicWorkPolicy.keep,
-    );
-    debugPrint('[WorkManager] Update check scheduled (24h).');
-  } catch (e) {
-    debugPrint('[WorkManager] Init error: $e');
+    PushNotificationService.instance.init();
+  } catch (e, st) {
+    debugPrint('[PushNotifications] init failed: $e\n$st');
+  }
+}
+
+void _initPhoneState() {
+  try {
+    PhoneStateService.instance.initialize();
+  } catch (e, st) {
+    debugPrint('[PhoneState] init failed: $e\n$st');
+  }
+}
+
+void _initFcm() {
+  try {
+    FcmService.instance.initialize();
+  } catch (e, st) {
+    debugPrint('[FCM] init failed: $e\n$st');
+  }
+}
+
+void _initUpdateNotifications(AppSettings settings) {
+  try {
+    UpdateNotificationService.instance.initialize(settings);
+  } catch (e, st) {
+    debugPrint('[UpdateNotifications] init failed: $e\n$st');
   }
 }

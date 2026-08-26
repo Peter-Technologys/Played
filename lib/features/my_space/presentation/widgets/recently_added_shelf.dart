@@ -4,9 +4,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
-import '../../../../core/database/played_database.dart';
+import '../../../../core/database/otya_database.dart';
 import '../providers/my_space_provider.dart';
 import '../../../player/presentation/queue_screen.dart';
+import 'media_card.dart';
 
 /// Horizontal shelf showing files added in the last 7 days.
 class RecentlyAddedShelf extends ConsumerWidget {
@@ -18,7 +19,7 @@ class RecentlyAddedShelf extends ConsumerWidget {
     List<MediaItem> recent;
     try {
       final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-      recent = PlayedDatabase.instance.getRecentlyAddedItems(allItems, days: 7);
+      recent = OtyaDatabase.instance.getRecentlyAddedItems(allItems, days: 7);
     } catch (_) {
       return const SizedBox.shrink();
     }

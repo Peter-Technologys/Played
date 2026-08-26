@@ -24,9 +24,11 @@ concurrency:
 
 env:
   PUB_ENVIRONMENT: bot.github
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g -Dkotlin.incremental=false"
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  # -Xmx3g: leave headroom for the OS, Flutter SDK, and Android SDK on the
+  # 7GB GitHub Actions runner. -Xmx4g caused OOM mid-build.
+  # -XX:+UseG1GC: better GC pause behaviour for large heap builds.
+  # org.gradle.caching=true: skip recompiling unchanged tasks on warm runs.
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Xmx3g -XX:MaxMetaspaceSize=512m -XX:+UseG1GC -Dkotlin.incremental=false"
 
 jobs:
   build_debug:
@@ -34,10 +36,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # ── Free disk space ────────────────────────────────────────────────
+      # ── Free disk space (keep NDK — it is cached separately below) ────
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/local/lib/android/sdk/ndk || true
           sudo rm -rf /usr/share/dotnet || true
           sudo rm -rf /usr/local/share/powershell || true
           sudo rm -rf /usr/share/swift || true
@@ -48,68 +49,158 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
-          flutter-version: '3.x'
+          # Pin to 3.32.x — Flutter stable 3.32+ contains the fix for the
+          # "Already watching path" crash that occurs with AGP 9.x.
+          # Using channel: stable alone picks up whatever stable is at run
+          # time, which may be an older version without the patch.
+          flutter-version: "3.32.x"
           channel: stable
           cache: true
+
+      # ── Cache Android NDK ──────────────────────────────────────────────
+      # The NDK (~1.5 GB) was previously deleted by the free-disk-space step
+      # and re-downloaded every run (3-4 min). Cache it keyed on the version
+      # declared in android/app/build.gradle so a bump auto-busts the cache.
+      - name: Cache Android NDK
+        uses: actions/cache@v4
+        with:
+          path: /usr/local/lib/android/sdk/ndk
+          key: ndk-28.2.13676358
 
       - uses: actions/cache@v4
         with:
           path: ~/.pub-cache
-          key: pub-${{ hashFiles('pubspec.yaml') }}
-          restore-keys: pub-
+          key: pub-${{ hashFiles('pubspec.yaml', 'pubspec.lock') }}
+          restore-keys: |
+            pub-${{ hashFiles('pubspec.yaml') }}
+            pub-
 
-      # ── Inject google-services.json ────────────────────────────────────
-      # vars can be used in run scripts directly via ${{ vars.X }}
-      - name: Write google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ vars.GOOGLE_SERVICES_JSON }}
+      # Cache Gradle wrapper, caches (including media_kit libmpv JARs), the
+      # Gradle build cache, and the Android SDK CMake install.
+      # Cache key includes gradle.properties and proguard-rules.pro so that
+      # changes to R8/ProGuard config always produce a fresh build.
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/wrapper/
+            ~/.gradle/caches/
+            ~/.gradle/build-cache/
+            /usr/local/lib/android/sdk/cmake/
+          key: gradle-${{ hashFiles('android/gradle/wrapper/gradle-wrapper.properties', 'android/settings.gradle', 'pubspec.yaml', 'android/app/build.gradle', 'android/gradle.properties', 'android/app/proguard-rules.pro') }}
+          restore-keys: |
+            gradle-
+
+      # Firebase removed — google-services.json no longer needed.
+      # (Step intentionally omitted.)
+
+      - name: Decode keystore
         run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "WARNING: GOOGLE_SERVICES_JSON not set — creating a placeholder."
-            echo '{"project_info":{"project_number":"000000000000","project_id":"placeholder","storage_bucket":"placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.otyaplayer.app"}},"oauth_client":[],"api_key":[{"current_key":"placeholder"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > android/app/google-services.json
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+            echo "Release keystore decoded successfully."
           else
-            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
+            echo "WARNING: KEYSTORE_BASE64 secret not set — generating debug keystore as fallback."
+            mkdir -p ~/.android
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
           fi
+
+      - name: Stop Gradle daemons
+        run: cd android && ./gradlew --stop || true
+
+      - name: Clean project
+        run: |
+          echo "Building commit: $(git rev-parse HEAD)"
+          git log -1 --oneline
+          rm -rf build .dart_tool android/.gradle android/app/build
+          flutter clean
 
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Flutter analyze (non-fatal)
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
-
-      # ── Decode keystore (if available) ────────────────────────────────
-      # secrets cannot be referenced in shell `if` via ${{ }} — pass via env instead
-      - name: Decode keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > $GITHUB_WORKSPACE/android/app/keystore.jks
-          else
-            echo "WARNING: KEYSTORE_BASE64 not set - APK will use debug signing."
-          fi
-
-      # ── Build release APK (signed, installable on any device) ──────────
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          OTYA_SECRET: ${{ secrets.OTYA_SECRET }}
+          DD_SECRET: ${{ secrets.OTYA_SECRET }}
+          DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
-          flutter build apk --release --no-pub --split-per-abi \
+          set +e
+
+          flutter build apk --release --split-per-abi --verbose \
             --target-platform android-arm,android-arm64 \
-            --dart-define=OTYA_SECRET=$OTYA_SECRET \
+            --dart-define=OTYA_SECRET="$DD_SECRET" \
             --dart-define=APP_ARCH=arm64 \
-            --dart-define=SELF_UPDATE=true
+            --dart-define=SELF_UPDATE=true \
+            --dart-define=WORKER_URL="$DD_WORKER_URL"
 
-      - name: Remove keystore
+          BUILD_EXIT=$?
+
+          set -e
+
+          echo "Flutter build exit code: $BUILD_EXIT"
+          echo "=== APKs produced ==="
+          find android/app/build/outputs -type f -name "*.apk" -print
+
+          mkdir -p build/app/outputs/flutter-apk
+
+          find android/app/build/outputs \
+            -type f -name "*.apk" \
+            -exec cp {} build/app/outputs/flutter-apk/ \;
+
+          echo "=== Final APKs ==="
+          find build/app/outputs/flutter-apk -type f -name "*.apk" -print
+
+          ARM64="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          ARM32="build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk"
+
+          if [ -f "$ARM64" ] && [ -f "$ARM32" ]; then
+            echo "Both APKs were successfully produced."
+            exit 0
+          fi
+
+          echo "ERROR: Required APKs were not produced."
+          exit "$BUILD_EXIT"
+
+      - name: Diagnose APK outputs
         if: always()
-        run: rm -f $GITHUB_WORKSPACE/android/app/keystore.jks
+        run: |
+          echo "=== Flutter APK output ==="
+          ls -la build/app/outputs/flutter-apk/ 2>/dev/null || echo "(directory not found)"
+          echo "=== All APKs under build/ ==="
+          find build -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
+          echo "=== All APKs under android/app/build/ ==="
+          find android/app/build/outputs -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
 
-      # ── Upload artifact ────────────────────────────────────────────────
-      - name: Upload release APKs
+      # Verify APKs exist and are not empty (fails if build was broken)
+      - name: Verify APKs and record checksums
+        run: |
+          echo "Commit: $(git rev-parse HEAD)"
+          for APK in \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
+            if [ ! -f "$APK" ]; then echo "ERROR: $APK not found"; exit 1; fi
+            SIZE=$(stat -c%s "$APK")
+            if [ "$SIZE" -lt 5000000 ]; then echo "ERROR: $APK too small ($SIZE bytes)"; exit 1; fi
+            SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+            echo "OK: $APK | $SIZE bytes | sha256=$SHA"
+          done
+
+      - name: Remove secrets
+        if: always()
+        run: rm -f $GITHUB_WORKSPACE/android/app/keystore.jks android/app/google-services.json
+
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: otya-player-${{ github.sha }}
@@ -120,17 +211,12 @@ jobs:
           if-no-files-found: error
 
       - name: Build summary
+        if: success()
         run: |
-          echo "### ✅ Release APK Built" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Release APK Built" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          ARM64_SIZE=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk 2>/dev/null | cut -f1 || echo 'n/a')
-          ARM32_SIZE=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk 2>/dev/null | cut -f1 || echo 'n/a')
-          echo "**arm64 APK size:** $ARM64_SIZE" >> $GITHUB_STEP_SUMMARY
-          echo "**arm32 APK size:** $ARM32_SIZE" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Download the APKs from the Artifacts section above ↑" >> $GITHUB_STEP_SUMMARY
+          ARM64=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | cut -f1)
+          ARM32=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk | cut -f1)
+          echo "**arm64:** $ARM64 | **arm32:** $ARM32" >> $GITHUB_STEP_SUMMARY
 
-      # Telegram notifications are only sent from the Release workflow (v* tags).
-      # Debug builds do not notify the channel.

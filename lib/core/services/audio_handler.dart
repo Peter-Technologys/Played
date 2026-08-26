@@ -42,15 +42,27 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
     debugPrint('[OtyaAudioHandler] Player attached.');
   }
 
-  void detachPlayer() {
-    debugPrint('[OtyaAudioHandler] Detaching player');
+/// Detaches the player from this handler.
+/// [disposePlayer] controls whether the underlying [Player] is also
+/// disposed. Pass `true` when the player is being permanently torn down
+/// (e.g. app exit), `false` when handing off to a new player instance.
+void detachPlayer({bool disposePlayer = false}) {
+  debugPrint('[OtyaAudioHandler] Detaching player');
     _cancelSubscriptions();
+    final player = _player;
     _player = null;
     playbackState.add(playbackState.value.copyWith(
       processingState: AudioProcessingState.idle,
       playing: false,
     ));
-    debugPrint('[OtyaAudioHandler] Player detached.');
+    if (disposePlayer && player != null) {
+      try {
+        player.dispose();
+      } catch (e) {
+        debugPrint('[OtyaAudioHandler] Player dispose error in detachPlayer: $e');
+      }
+    }
+    debugPrint('[OtyaAudioHandler] Player detached (dispose=$disposePlayer).');
   }
 
   void _subscribeToPlayer(Player player) {
@@ -125,15 +137,16 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   /// Convenience helper used internally to update the media item from
-  /// individual fields (title, artist, artUri, duration).
+  /// individual fields (id, title, artist, artUri, duration).
   void updateMediaItemFromParts({
+    required String id,
     required String title,
     required String artist,
     Uri? artUri,
     Duration? duration,
   }) {
     mediaItem.add(MediaItem(
-      id: title,
+      id: id,
       title: title,
       artist: artist,
       artUri: artUri,
@@ -166,6 +179,42 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   @override
   Future<void> skipToPrevious() async =>
       MediaNotificationService.instance.onSkipPrevious?.call();
+
+  /// Called by the OS when the user removes the app from the recents list
+  /// (swipes it away). This is the correct place to dispose the Player so
+  /// it does not leak native resources (file descriptors, audio sessions,
+  /// hardware decoders) after the app is killed.
+  ///
+  /// Bug 9 fix: Player.dispose() is called here AND in detachPlayer() so
+  /// resources are released regardless of how the app exits.
+  @override
+  Future<void> onTaskRemoved() async {
+    debugPrint('[OtyaAudioHandler] onTaskRemoved — disposing player.');
+    // Fix #7: Capture player in a local variable BEFORE any async gap so
+    // that a concurrent null-assignment to _player cannot cause a NPE on
+    // the dispose() call that follows the await.
+    final player = _player;
+    _cancelSubscriptions();
+    _player = null;
+    if (player != null) {
+      try {
+        await player.stop();
+        player.dispose();
+      } catch (e) {
+        debugPrint('[OtyaAudioHandler] Player dispose error: $e');
+      }
+    }
+    await super.onTaskRemoved();
+  }
+
+  /// Called when the notification is dismissed by the user.
+  /// Stops playback and releases the player.
+  @override
+  Future<void> onNotificationDeleted() async {
+    debugPrint('[OtyaAudioHandler] Notification deleted — stopping.');
+    await stop();
+    await super.onNotificationDeleted();
+  }
 }
 
 // ── Singleton wrapper ─────────────────────────────────────────────────────
@@ -189,5 +238,6 @@ class AudioHandlerSingleton {
     _handler!.attachPlayer(player);
   }
 
-  void detachPlayer() => _handler?.detachPlayer();
+  void detachPlayer({bool disposePlayer = false}) =>
+      _handler?.detachPlayer(disposePlayer: disposePlayer);
 }

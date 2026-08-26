@@ -11,19 +11,20 @@
 -keep class hive.** { *; }
 -keep class com.hivedb.** { *; }
 
-# Flutter
+# Flutter core — keep all plugin registrars and embedding classes
 -keep class io.flutter.** { *; }
 -dontwarn io.flutter.**
-
-# just_audio — REMOVED (replaced by media_kit for audio playback)
+# Plugin registrars are loaded by class name via reflection
+-keep class * extends io.flutter.embedding.engine.plugins.FlutterPlugin { *; }
+# All Android components declared in AndroidManifest are loaded by name
+-keep class * extends android.app.Service { *; }
+-keep class * extends android.content.BroadcastReceiver { *; }
+-keep class * extends android.content.ContentProvider { *; }
+-keep class * extends android.app.Activity { *; }
 
 # audio_service — keep service + handler so background playback works in release
 -keep class com.ryanheise.audioservice.** { *; }
 -dontwarn com.ryanheise.audioservice.**
-
-# audio_session — REMOVED (was only needed by just_audio)
-
-# flutter_vlc_player — REMOVED (not in pubspec; flutter_vlc_player replaced by media_kit)
 
 # media_kit — keep ALL subpackages (video + core + native bridge)
 -keep class com.alexmercerind.media_kit.** { *; }
@@ -44,11 +45,55 @@
 # workmanager
 -keep class be.tramckrijte.workmanager.** { *; }
 -dontwarn be.tramckrijte.workmanager.**
-# Keep our own WorkManager worker so R8 does not rename it
--keep class com.otyaplayer.app.UpdateCheckWorker { *; }
-# Keep BroadcastReceivers declared in AndroidManifest
+# ── App classes (workers, receivers, services, activities) ───────────────
+# Explicit keeps for all app-defined classes.
+# R8 fullMode was stripping MainActivity and BootReceiver by name,
+# causing ClassNotFoundException on launch (14 crashes confirmed).
+-keep class com.otyaplayer.app.** { *; }
+-keep class com.otyaplayer.app.MainActivity { *; }
 -keep class com.otyaplayer.app.BootReceiver { *; }
 -keep class com.otyaplayer.app.NotificationDismissReceiver { *; }
+-keep class com.otyaplayer.app.UpdateCheckWorker { *; }
+
+# connectivity_plus
+-keep class dev.fluttercommunity.plus.connectivity.** { *; }
+-dontwarn dev.fluttercommunity.plus.connectivity.**
+
+# network_info_plus
+-keep class dev.fluttercommunity.plus.network_info.** { *; }
+-dontwarn dev.fluttercommunity.plus.network_info.**
+
+# permission_handler
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.permissionhandler.**
+
+# package_info_plus / device_info_plus
+-keep class dev.fluttercommunity.plus.packageinfo.** { *; }
+-keep class dev.fluttercommunity.plus.deviceinfo.** { *; }
+-dontwarn dev.fluttercommunity.plus.**
+
+# share_plus
+-keep class dev.fluttercommunity.plus.share.** { *; }
+-dontwarn dev.fluttercommunity.plus.share.**
+
+# url_launcher
+-keep class io.flutter.plugins.urllauncher.** { *; }
+-dontwarn io.flutter.plugins.urllauncher.**
+
+# image_picker
+-keep class io.flutter.plugins.imagepicker.** { *; }
+-dontwarn io.flutter.plugins.imagepicker.**
+
+# path_provider
+-keep class io.flutter.plugins.pathprovider.** { *; }
+-dontwarn io.flutter.plugins.pathprovider.**
+
+# Firebase MessagingService subclass (referenced by name in AndroidManifest)
+-keep class * extends com.google.firebase.messaging.FirebaseMessagingService { *; }
+
+# androidx.work — WorkManager internals
+-keep class androidx.work.** { *; }
+-dontwarn androidx.work.**
 
 # open_filex
 -keep class com.crazecoder.openfile.** { *; }
@@ -95,6 +140,18 @@
     public static int d(...);
     public static int i(...);
 }
+
+# WebView (webview_flutter + webview_flutter_android)
+# Keep WebView JavaScript interface classes so JS bridge survives R8.
+-keepclassmembers class * {
+    @android.webkit.JavascriptInterface <methods>;
+}
+-keep class io.flutter.plugins.webviewflutter.** { *; }
+-dontwarn io.flutter.plugins.webviewflutter.**
+
+# Firebase (firebase_core + firebase_messaging)
+-keep class com.google.firebase.** { *; }
+-dontwarn com.google.firebase.**
 
 # General
 -keepattributes *Annotation*

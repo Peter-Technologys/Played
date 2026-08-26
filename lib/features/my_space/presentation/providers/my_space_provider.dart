@@ -5,7 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/models/media_item.dart';
-import '../../../../core/database/played_database.dart';
+import '../../../../core/providers/duplicates_provider.dart';
+import '../../../../core/services/duplicate_detector_service.dart';
+import '../../../../core/database/otya_database.dart';
 import '../../data/media_repository.dart';
 
 /// Live media change event stream from Android MediaStore.
@@ -51,12 +53,12 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
 
     final periodicTimer = Timer.periodic(const Duration(minutes: 15), (_) {
-      // BUG 7: Only refresh when the app is in the foreground — prevents
-      // unnecessary MediaStore scans while the app is backgrounded.
+      // Fix #8: lifecycleState can be null on the first frame (before the
+      // first didChangeAppLifecycleState callback fires). Guard against null
+      // so we don't accidentally scan when the state is unknown.
       final lifecycle = WidgetsBinding.instance.lifecycleState;
-      if (lifecycle == AppLifecycleState.resumed) {
-        _backgroundRefresh();
-      }
+      if (lifecycle == null || lifecycle != AppLifecycleState.resumed) return;
+      _backgroundRefresh();
     });
 
     ref.onDispose(() {
@@ -76,10 +78,30 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     // Phase 1b — Hive history seed (< 5 ms).
     // Returns recently played files immediately so the user sees their
     // library at once. Full scan runs silently in the background.
-    final history = PlayedDatabase.instance.getRecentlyPlayed(limit: 9999);
+    final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
       return history;
+    }
+
+    // Fix #19: Fresh install with files already on device — history is empty
+    // but the shelf cache may have been populated by a previous scan (e.g.
+    // after an app update that cleared history). Reconstruct a seed list from
+    // the cached shelf IDs mapped back to Hive history items.
+    final db = OtyaDatabase.instance;
+    final cinemaIds = db.getShelfCache('cinema');
+    final streetIds = db.getShelfCache('street');
+    if (cinemaIds.isNotEmpty || streetIds.isNotEmpty) {
+      final allCachedIds = {...cinemaIds, ...streetIds};
+      // getRecentlyPlayed(limit:9999) already returned empty, so the history
+      // box is empty. Fall through to the background scan which will populate
+      // it; but return the shelf-cache IDs as a stub so the UI isn't blank.
+      // We can't reconstruct full MediaItems from IDs alone without the scan,
+      // so trigger the scan and return empty — the scan will update state.
+      Future.microtask(_backgroundRefresh);
+      debugPrint('[MediaLibrary] Shelf cache has ${allCachedIds.length} IDs — '
+          'triggering background scan for cold-start population.');
+      return const [];
     }
 
     // First install — no cache, no history.
@@ -110,10 +132,38 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
         // upsert items that are not already in history to avoid overwriting
         // lastPlayedAt timestamps for recently played tracks.
         _writeBackToHive(fresh).ignore();
+
+        // Run duplicate detection after every successful scan and expose
+        // results via duplicatesProvider so the UI can surface them.
+        _detectDuplicates(fresh);
       }
     } catch (e) {
       debugPrint('[MediaLibrary] Background refresh failed: $e');
       // Keep previous state — never wipe library on error
+    }
+  }
+
+  /// Runs [DuplicateDetectorService.findDuplicates] on [items] and updates
+  /// [duplicatesProvider] with the result.
+  void _detectDuplicates(List<MediaItem> items) {
+    try {
+      final metas = items.map((item) => TrackMeta(
+        id:            item.id,
+        title:         item.title,
+        durationMs:    item.duration?.inMilliseconds ?? 0,
+        fileSizeBytes: item.fileSizeBytes,
+      )).toList();
+      final groups = DuplicateDetectorService.instance.findDuplicates(metas);
+      try {
+        ref.read(duplicatesProvider.notifier).state = groups;
+      } catch (_) {
+        // ref disposed — ignore
+      }
+      if (groups.isNotEmpty) {
+        debugPrint('[MediaLibrary] Duplicates found: ${groups.length} group(s).');
+      }
+    } catch (e) {
+      debugPrint('[MediaLibrary] Duplicate detection failed (non-fatal): $e');
     }
   }
 
@@ -126,7 +176,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   /// getRecentlyPlayed(limit:9999) call on every background refresh.
   Future<void> _writeBackToHive(List<MediaItem> items) async {
     try {
-      final db = PlayedDatabase.instance;
+      final db = OtyaDatabase.instance;
       // Populate the known-IDs set on first call only.
       _knownHiveIds ??= LinkedHashSet<String>.from(
         db.getRecentlyPlayed(limit: 9999).map((e) => e.id),

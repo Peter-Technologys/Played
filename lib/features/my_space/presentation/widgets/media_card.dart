@@ -1,7 +1,9 @@
+import 'dart:collection';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../app/theme/app_colors.dart';
@@ -28,9 +30,25 @@ class _MediaCardState extends State<MediaCard>
 
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
 
-  // Thumbnail / album art cache (session-level, shared across all cards)
-  static final Map<String, String?> _thumbCache = {};
-  static final Map<String, String?> _artCache   = {};
+  // ── LRU caches capped at 300 entries each ─────────────────────────────────
+  // LinkedHashMap with access-order tracking: oldest entry is first.
+  // When the cap is reached the oldest entry is evicted (one at a time).
+  static const int _kCacheMax = 300;
+
+  static final LinkedHashMap<String, String?> _thumbCache =
+      LinkedHashMap<String, String?>();
+  static final LinkedHashMap<String, String?> _artCache =
+      LinkedHashMap<String, String?>();
+
+  /// Inserts [key]→[value] into [cache], evicting the oldest entry if the
+  /// cache has reached [_kCacheMax] entries.
+  static void _cacheInsert(
+      LinkedHashMap<String, String?> cache, String key, String? value) {
+    if (cache.length >= _kCacheMax) {
+      cache.remove(cache.keys.first);
+    }
+    cache[key] = value;
+  }
 
   String? _thumbPath;
   String? _artPath;
@@ -43,6 +61,37 @@ class _MediaCardState extends State<MediaCard>
         vsync: this, duration: const Duration(milliseconds: 120));
     _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
         CurvedAnimation(parent: _press, curve: Curves.easeOut));
+
+    // Fix #9: Check cache synchronously before going async — avoids an
+    // unnecessary setState() call when the result is already in memory.
+    final item = widget.item;
+    if (item.isVideo) {
+      // Cache key is filePath — item.id is Uri.encodeComponent(path) which
+      // is NOT the MediaStore integer _ID that getThumbnail() needs.
+      final key = item.filePath;
+      if (_thumbCache.containsKey(key)) {
+        _thumbPath = _thumbCache[key];
+        _loaded = true;
+        return; // no async needed
+      }
+    } else {
+      final raw = item.albumArtPath;
+      if (raw == null) {
+        _loaded = true;
+        return;
+      }
+      if (!raw.startsWith('albumid:')) {
+        _artPath = raw;
+        _loaded = true;
+        return;
+      }
+      if (_artCache.containsKey(raw)) {
+        _artPath = _artCache[raw];
+        _loaded = true;
+        return;
+      }
+    }
+
     _loadArt();
   }
 
@@ -55,40 +104,30 @@ class _MediaCardState extends State<MediaCard>
   Future<void> _loadArt() async {
     final item = widget.item;
     if (item.isVideo) {
-      final key = item.id;
-      if (_thumbCache.containsKey(key)) {
-        if (mounted) setState(() { _thumbPath = _thumbCache[key]; _loaded = true; });
-        return;
-      }
+      // Use filePath as both cache key and 'id' arg. Kotlin uses 'id' only
+      // as the on-disk cache filename; it uses 'path' with
+      // MediaMetadataRetriever which works with any file path.
+      final key = item.filePath;
       try {
         final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
           'path': item.filePath,
-          'id':   item.id,
+          'id':   item.filePath,
         });
-        _thumbCache[key] = path;
+        _cacheInsert(_thumbCache, key, path);
         if (mounted) setState(() { _thumbPath = path; _loaded = true; });
       } catch (_) {
-        _thumbCache[key] = null;
+        _cacheInsert(_thumbCache, key, null);
         if (mounted) setState(() => _loaded = true);
       }
     } else {
-      final raw = item.albumArtPath;
-      if (raw == null) { if (mounted) setState(() => _loaded = true); return; }
-      if (!raw.startsWith('albumid:')) {
-        if (mounted) setState(() { _artPath = raw; _loaded = true; });
-        return;
-      }
-      if (_artCache.containsKey(raw)) {
-        if (mounted) setState(() { _artPath = _artCache[raw]; _loaded = true; });
-        return;
-      }
+      final raw = item.albumArtPath!; // non-albumid: paths handled in initState
       try {
         final albumId = raw.substring('albumid:'.length);
         final path = await _channel.invokeMethod<String>('getAlbumArt', {'albumId': albumId});
-        _artCache[raw] = path;
+        _cacheInsert(_artCache, raw, path);
         if (mounted) setState(() { _artPath = path; _loaded = true; });
       } catch (_) {
-        _artCache[raw] = null;
+        _cacheInsert(_artCache, raw, null);
         if (mounted) setState(() => _loaded = true);
       }
     }
@@ -124,8 +163,9 @@ class _MediaCardState extends State<MediaCard>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: AppColors.surface,
-              border: Border.all(color: AppColors.border),
+              // Fix #18: use theme-aware surface colour
+              color: AppColors.cardOf(context),
+              border: Border.all(color: AppColors.borderOf(context)),
               boxShadow: [
                 BoxShadow(
                   color: accent.withValues(alpha: 0.08),
@@ -145,7 +185,7 @@ class _MediaCardState extends State<MediaCard>
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // Real thumbnail or gradient placeholder
+                        // Real thumbnail, shimmer, or modern placeholder
                         _buildArtwork(isVideo, accent),
 
                         // Bottom gradient scrim
@@ -187,20 +227,30 @@ class _MediaCardState extends State<MediaCard>
                           ),
                         ),
 
-                        // Play button overlay (center)
-                        Center(
-                          child: Container(
-                            width: 40, height: 40,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: Colors.black.withValues(alpha: 0.45),
-                            ),
-                            child: Icon(
-                              Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                          ),
+                        // Fix #15: Play button only visible while pressed
+                        AnimatedBuilder(
+                          animation: _press,
+                          builder: (_, __) {
+                            final opacity = _press.value;
+                            if (opacity == 0) return const SizedBox.shrink();
+                            return Center(
+                              child: Opacity(
+                                opacity: opacity,
+                                child: Container(
+                                  width: 40, height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.black.withValues(alpha: 0.55),
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -215,10 +265,10 @@ class _MediaCardState extends State<MediaCard>
                     children: [
                       Text(
                         widget.item.title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
+                          color: AppColors.textPrimaryOf(context),
                           fontFamily: 'Inter',
                         ),
                         maxLines: 1,
@@ -271,46 +321,74 @@ class _MediaCardState extends State<MediaCard>
   }
 
   Widget _buildArtwork(bool isVideo, Color accent) {
-    if (isVideo) {
-      if (_thumbPath != null) {
-        return Image.file(
-          File(_thumbPath!),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _gradientPlaceholder(isVideo, accent),
-        );
-      }
-      return _gradientPlaceholder(isVideo, accent);
-    } else {
-      if (_artPath != null) {
-        return Image.file(
-          File(_artPath!),
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _gradientPlaceholder(isVideo, accent),
-        );
-      }
-      return _gradientPlaceholder(isVideo, accent);
+    // Fix #2: Show shimmer while loading
+    if (!_loaded) {
+      return _ShimmerPlaceholder(accent: accent)
+          .animate(onPlay: (c) => c.repeat())
+          .shimmer(duration: 1200.ms, color: accent.withValues(alpha: 0.15));
     }
+
+    final path = isVideo ? _thumbPath : _artPath;
+    if (path != null) {
+      // Fix #11: limit decoded image size to reduce memory pressure
+      return RepaintBoundary(
+        child: Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          cacheWidth: 240,
+          errorBuilder: (_, __, ___) => _modernPlaceholder(isVideo, accent),
+        ),
+      );
+    }
+    return _modernPlaceholder(isVideo, accent);
   }
 
-  Widget _gradientPlaceholder(bool isVideo, Color accent) {
+  // Fix #16: Modern placeholder — blurred colour field + first letter
+  Widget _modernPlaceholder(bool isVideo, Color accent) {
+    final letter = widget.item.title.isNotEmpty
+        ? widget.item.title[0].toUpperCase()
+        : (isVideo ? 'V' : 'M');
+    return ClipRect(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // Blurred colour background
+          Container(
+            color: accent.withValues(alpha: 0.22),
+          ),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(color: Colors.transparent),
+          ),
+          // Large first-letter centred
+          Center(
+            child: Text(
+              letter,
+              style: TextStyle(
+                fontSize: 52,
+                fontWeight: FontWeight.w900,
+                color: accent.withValues(alpha: 0.85),
+                fontFamily: 'Inter',
+                height: 1,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Shimmer base widget — a solid coloured container that flutter_animate
+/// overlays with a shimmer effect.
+class _ShimmerPlaceholder extends StatelessWidget {
+  final Color accent;
+  const _ShimmerPlaceholder({required this.accent});
+
+  @override
+  Widget build(BuildContext context) {
     return Container(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            accent.withValues(alpha: 0.18),
-            AppColors.surface,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          isVideo ? Icons.movie_rounded : Icons.music_note_rounded,
-          color: accent.withValues(alpha: 0.5),
-          size: 32,
-        ),
-      ),
+      color: AppColors.cardOf(context),
     );
   }
 }

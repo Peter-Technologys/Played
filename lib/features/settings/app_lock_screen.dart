@@ -64,7 +64,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
     setState(() { _authenticating = true; _error = null; });
     try {
       final ok = await _auth.authenticate(
-        localizedReason: 'Unlock PLAYED',
+        localizedReason: 'Unlock OTYA Player',
         options: const AuthenticationOptions(
             biometricOnly: false, stickyAuth: true),
       );
@@ -88,7 +88,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
             mainAxisSize: MainAxisSize.min,
             children: [
               // Logo
-              Text('PLAYED',
+              Text('OTYA',
                   style: TextStyle(
                     fontSize: 36,
                     fontWeight: FontWeight.w700,

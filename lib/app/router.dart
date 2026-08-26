@@ -7,6 +7,8 @@ import '../features/my_space/presentation/usage_stats_dashboard.dart';
 import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
 import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/my_space/presentation/providers/my_space_provider.dart';
+import '../core/widgets/update_dialog.dart';
+import '../shared/widgets/new_media_banner.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
@@ -30,6 +32,7 @@ import '../shared/widgets/pro_gate.dart';
 import '../features/auth/auth_screen.dart';
 import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/verify_email_screen.dart';
+import '../features/webview/otya_webview_screen.dart';
 
 // ── Shared fade transition (200 ms) used for shell/tab routes ─────────────
 
@@ -74,9 +77,16 @@ class AppRouter {
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
+  static String? _redirect(BuildContext context, GoRouterState state) {
+    // Auth is optional — OTYA Player works fully offline without an account.
+    // The auth screen is only reached by explicit navigation (e.g. from Profile).
+    return null;
+  }
+
   static final GoRouter router = GoRouter(
     navigatorKey: navigatorKey,
     initialLocation: '/',
+    redirect: _redirect,
     routes: [
       ShellRoute(
         pageBuilder: (context, state, child) => _fadePage(
@@ -216,35 +226,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/stats',
-        pageBuilder: (c, s) => _fadePage(
-          context: c,
-          state: s,
-          child: Scaffold(
-            backgroundColor: Theme.of(c).scaffoldBackgroundColor,
-            appBar: AppBar(
-              backgroundColor: Theme.of(c).scaffoldBackgroundColor,
-              elevation: 0,
-              leading: IconButton(
-                icon: Icon(Icons.arrow_back_ios_new_rounded,
-                    color: Theme.of(c).colorScheme.onSurface, size: 20),
-                onPressed: () => Navigator.of(c).pop(),
-              ),
-              title: Text(
-                'Your Stats',
-                style: TextStyle(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(c).colorScheme.onSurface,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-            body: const SingleChildScrollView(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: UsageStatsDashboard(),
-            ),
-          ),
-        ),
+        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const _StatsScreen()),
       ),
       GoRoute(
         path: '/player/equalizer',
@@ -370,6 +352,20 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/webview',
+        pageBuilder: (c, s) {
+          final args = s.extra as Map<String, dynamic>? ?? {};
+          return _fadePage(
+            context: c,
+            state: s,
+            child: OtyaWebViewScreen(
+              url: args['url'] as String? ?? 'https://getotya.petersmartlink.com',
+              title: args['title'] as String?,
+            ),
+          );
+        },
+      ),
+      GoRoute(
         path: '/tools/whatsapp',
         pageBuilder: (c, s) {
           final item = s.extra;
@@ -400,7 +396,7 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
   final List<MediaItem> _allItems;
 
   _GlobalSearchDelegate(this._allItems)
-      : super(searchFieldLabel: 'Search videos & music…');
+      : super(searchFieldLabel: 'Search everything…');
 
   // ── Helpers ──────────────────────────────────────────────────────────
 
@@ -462,7 +458,7 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
                 color: AppColors.textSecondary.withValues(alpha: 0.5)),
             const SizedBox(height: 12),
             Text(
-              query.isEmpty ? 'Start typing to search…' : 'No results for "$query"',
+              query.isEmpty ? 'Type to search…' : 'Nothing found for "$query"',
               style: const TextStyle(color: AppColors.textSecondary),
             ),
           ],
@@ -628,6 +624,17 @@ class _MainShellState extends ConsumerState<_MainShell> {
   // Tab state is preserved by AutomaticKeepAliveClientMixin on each tab screen.
   // widget.child from ShellRoute is the single source of truth.
 
+  @override
+  void initState() {
+    super.initState();
+    // Show the in-app update dialog once on shell mount (after first frame).
+    // AnnouncementDialog is already wired in app.dart with a 2-second delay;
+    // UpdateDialog runs here so both are available on every app start.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) UpdateDialog.checkAndShow(context);
+    });
+  }
+
   void _onTap(int index) {
     HapticFeedback.selectionClick();
     GoRouter.of(context).go(_routes[index]);
@@ -635,8 +642,8 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    final miniItem = ref.watch(miniPlayerItemProvider);
-    final hasMini  = miniItem != null;
+    // Only watch mediaLibraryProvider here — mini player is wrapped in its
+    // own Consumer below so only it rebuilds on miniPlayerItemProvider changes.
     final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
 
     // Derive the active tab index from the current route location so that
@@ -649,40 +656,24 @@ class _MainShellState extends ConsumerState<_MainShell> {
             : 0;
 
     return Scaffold(
-      appBar: AppBar(
-        // Transparent / blends with the page content behind it
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        scrolledUnderElevation: 0,
-        // Search icon only shown on Video (0) and Music (1) tabs.
-        // My Space (2) has its own internal search for tools.
-        actions: currentIndex == 2
-            ? const []
-            : [
-                IconButton(
-                  icon: const Icon(Icons.search_rounded),
-                  tooltip: 'Search',
-                  color: AppColors.textSecondary,
-                  onPressed: () {
-                    showSearch<MediaItem?>(
-                      context: context,
-                      delegate: _GlobalSearchDelegate(allItems),
-                    );
-                  },
-                ),
-              ],
-      ),
       body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini-player — only rendered when a track is loaded
-          if (hasMini) const RepaintBoundary(child: MiniPlayer()),
+          // Mini-player wrapped in Consumer so only it rebuilds when the
+          // current track changes — the rest of the shell is unaffected.
+          Consumer(
+            builder: (context, ref, _) {
+              final hasMini = ref.watch(miniPlayerItemProvider) != null;
+              return hasMini
+                  ? const RepaintBoundary(child: MiniPlayer())
+                  : const SizedBox.shrink();
+            },
+          ),
           // TASK 11: AdBannerSlot already returns SizedBox.shrink() when ads
           // are disabled — no visual gap. No additional guard needed.
-          SafeArea(
-            child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 10),
+          Container(
+              margin: EdgeInsets.fromLTRB(12, 0, 12, MediaQuery.of(context).padding.bottom + 6),
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.dark
                     ? const Color(0xFF1B1E2B)
@@ -708,26 +699,25 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   children: [
                     _NavItem(
                       icon: Icons.play_circle_rounded,
-                      label: 'VIDEO',
+                      label: 'Watch',
                       isActive: currentIndex == 0,
                       onTap: () => _onTap(0),
                     ),
                     _NavItem(
                       icon: Icons.music_note_rounded,
-                      label: 'MUSIC',
+                      label: 'Listen',
                       isActive: currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
                     _NavItem(
                       icon: Icons.person_rounded,
-                      label: 'MY SPACE',
+                      label: 'Hub',
                       isActive: currentIndex == 2,
                       onTap: () => _onTap(2),
                     ),
                   ],
                 ),
               ),
-            ),
           ),
         ],
       ),
@@ -800,6 +790,31 @@ class _NavItem extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+// ── Stats Screen ──────────────────────────────────────────────────────
+
+class _StatsScreen extends StatelessWidget {
+  const _StatsScreen();
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+      appBar: AppBar(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        elevation: 0,
+        leading: IconButton(
+          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: Text('My Stats', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
+      ),
+      body: const SingleChildScrollView(
+        padding: EdgeInsets.symmetric(vertical: 16),
+        child: UsageStatsDashboard(),
       ),
     );
   }

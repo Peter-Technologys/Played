@@ -101,7 +101,7 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     return SlideTransition(
       position: _slideAnim,
       child: GestureDetector(
-        // Swipe down to dismiss
+        // Swipe down to dismiss, left/right to skip
         onVerticalDragUpdate: (d) {
           if (d.delta.dy > 0) {
             setState(() => _dragOffset =
@@ -113,7 +113,21 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
               (d.primaryVelocity ?? 0) > 400) {
             _dismiss();
           } else {
+            // Snap back smoothly — reset drag offset so the mini player
+            // returns to its resting position without staying visually offset.
             setState(() => _dragOffset = 0);
+          }
+        },
+        onHorizontalDragEnd: (d) {
+          final v = d.primaryVelocity ?? 0;
+          if (v.abs() < 300) return;
+          HapticFeedback.mediumImpact();
+          if (v < 0) {
+            // Swipe left → skip next
+            ref.read(audioPlayerProvider.notifier).skipNext();
+          } else {
+            // Swipe right → skip previous
+            ref.read(audioPlayerProvider.notifier).skipPrevious();
           }
         },
         onTap: () {
@@ -125,9 +139,17 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
           duration: const Duration(milliseconds: 80),
           transform: Matrix4.translationValues(0, _dragOffset, 0),
           child: Opacity(
-            opacity: (1 - _dragOffset / (_dismissThreshold * 2)).clamp(0.3, 1.0),
+            // Fade from fully opaque down to 0 as the user drags to dismiss.
+            // Previously clamped at 0.3, which left the mini player partially
+            // visible even at full drag distance — now fades to transparent.
+            opacity: (1 - _dragOffset / (_dismissThreshold * 1.5)).clamp(0.0, 1.0),
             child: Container(
-              margin: const EdgeInsets.fromLTRB(12, 0, 12, 4),
+              // Add system bottom padding so the mini player sits above the
+              // navigation bar on gesture-navigation devices.
+              margin: EdgeInsets.fromLTRB(
+                12, 0, 12,
+                4 + MediaQuery.of(context).padding.bottom,
+              ),
               foregroundDecoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
                 border: Border(

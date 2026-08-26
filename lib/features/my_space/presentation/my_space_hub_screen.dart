@@ -8,9 +8,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import 'providers/my_space_provider.dart';
 
 // ── Tool entry model (used by search delegate and grid) ──────────────────────
@@ -86,7 +87,7 @@ class _ToolsSearchDelegate extends SearchDelegate<void> {
     if (results.isEmpty) {
       return Center(
         child: Text(
-          'No tools found for "$query"',
+          'No results for "$query"',
           style: const TextStyle(color: AppColors.textSecondary),
         ),
       );
@@ -333,75 +334,91 @@ class MySpaceHubScreen extends ConsumerWidget {
   List<_ToolEntry> _buildToolEntries(BuildContext context, WidgetRef ref) => [
         _ToolEntry(
           icon: Icons.folder_open_rounded,
-          label: 'Media Manage',
-          subtitle: 'Browse & organise',
+          label: 'Files',
+          subtitle: 'Browse & sort',
           gradient: const [Color(0xFFFB923C), Color(0xFFEA580C)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/tools/folders'),
         ),
         _ToolEntry(
           icon: Icons.audiotrack_rounded,
-          label: 'MP3 Converter',
-          subtitle: 'Extract audio',
+          label: 'Ripper',
+          subtitle: 'Get audio from video',
           gradient: const [Color(0xFF34D399), Color(0xFF059669)],
           badge: null,
           onTapBuilder: (ctx) => () => _showMp3InstructionSheet(ctx),
         ),
         _ToolEntry(
           icon: Icons.lock_rounded,
-          label: 'Vault',
-          subtitle: 'Private storage',
+          label: 'Safe',
+          subtitle: 'Hidden files',
           gradient: const [Color(0xFF8C52FF), Color(0xFF6B3FD4)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/vault'),
         ),
         _ToolEntry(
           icon: Icons.wifi_tethering_rounded,
-          label: 'Share & Transfer',
-          subtitle: 'AirDrop & web stream',
+          label: 'Beam',
+          subtitle: 'Send files fast',
           gradient: const [Color(0xFF3B82F6), Color(0xFF1D4ED8)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/airdrop'),
         ),
         _ToolEntry(
           icon: Icons.palette_rounded,
-          label: 'Theme',
-          subtitle: 'Appearance',
+          label: 'Look',
+          subtitle: 'Style it up',
           gradient: const [Color(0xFFFBBF24), Color(0xFFD97706)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/theme'),
         ),
         _ToolEntry(
           icon: Icons.history_rounded,
-          label: 'History',
-          subtitle: 'Recently played',
+          label: 'Played',
+          subtitle: 'What you heard',
           gradient: const [Color(0xFF6366F1), Color(0xFF4338CA)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/history'),
         ),
         _ToolEntry(
           icon: Icons.cleaning_services_rounded,
-          label: 'Cleaner',
-          subtitle: 'Free up space',
+          label: 'Clean',
+          subtitle: 'Clear junk',
           gradient: const [Color(0xFFEC4899), Color(0xFFBE185D)],
           badge: null,
           onTapBuilder: (ctx) => () => _showStorageCleanerSheet(ctx),
         ),
         _ToolEntry(
           icon: Icons.bar_chart_rounded,
-          label: 'Stats',
-          subtitle: 'Your activity',
+          label: 'Insights',
+          subtitle: 'Your plays',
           gradient: const [Color(0xFF14B8A6), Color(0xFF0D9488)],
           badge: 'NEW',
           onTapBuilder: (ctx) => () => ctx.push('/stats'),
         ),
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
-          label: 'Equalizer',
-          subtitle: 'Audio tuner',
+          label: 'Sound',
+          subtitle: 'Tune your sound',
           gradient: const [Color(0xFF9CA3AF), Color(0xFF6B7280)],
           badge: null,
           onTapBuilder: (ctx) => () => ctx.push('/player/equalizer'),
+        ),
+        _ToolEntry(
+          icon: Icons.content_cut_rounded,
+          label: 'Trim',
+          subtitle: 'Cut for WhatsApp',
+          gradient: const [Color(0xFF25D366), Color(0xFF128C7E)],
+          badge: null,
+          onTapBuilder: (ctx) => () {
+            // WhatsApp trimmer needs a MediaItem — show a message to open from video player
+            ScaffoldMessenger.of(ctx).showSnackBar(
+              const SnackBar(
+                content: Text('Open a video in the player, then tap ⋮ → Trim for WhatsApp'),
+                duration: Duration(seconds: 4),
+              ),
+            );
+          },
         ),
       ];
 
@@ -413,8 +430,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
     final tools = _buildToolEntries(context, ref);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       body: SafeArea(
         child: CustomScrollView(
           physics: const BouncingScrollPhysics(),
@@ -422,7 +438,7 @@ class MySpaceHubScreen extends ConsumerWidget {
             // ── Header ──────────────────────────────────────────────
             SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+                padding: EdgeInsets.fromLTRB(20, MediaQuery.of(context).padding.top + 12, 20, 0),
                 child: Row(
                   children: [
                     Expanded(
@@ -434,9 +450,9 @@ class MySpaceHubScreen extends ConsumerWidget {
                               colors: [AppColors.accent, AppColors.accentViolet],
                             ).createShader(b),
                             child: const Text(
-                              'My Space',
+                              'Otya Hub',
                               style: TextStyle(
-                                fontSize: 28,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w800,
                                 color: Colors.white,
                                 fontFamily: 'Inter',
@@ -547,7 +563,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   crossAxisCount: 3,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.25,
+                  childAspectRatio: 1.1,
                 ),
                 delegate: SliverChildListDelegate(
                   tools
@@ -581,24 +597,24 @@ class MySpaceHubScreen extends ConsumerWidget {
                   children: [
                     _QuickLink(
                       icon: Icons.person_rounded,
-                      label: 'Account & Profile',
-                      subtitle: 'Sign in, backup, about & updates',
+                      label: 'Profile',
+                      subtitle: 'Account, backup & updates',
                       color: AppColors.accent,
                       onTap: () => context.push('/profile'),
                     ),
                     Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(
                       icon: Icons.settings_rounded,
-                      label: 'Settings',
-                      subtitle: 'Playback, storage, display & more',
+                      label: 'Preferences',
+                      subtitle: 'Playback, display & more',
                       color: AppColors.accentGreen,
                       onTap: () => context.push('/settings'),
                     ),
                     Divider(height: 1, color: AppColors.borderOf(context)),
                     _QuickLink(
                       icon: Icons.help_outline_rounded,
-                      label: 'Help & Feedback',
-                      subtitle: 'Report issues or send feedback',
+                      label: 'Support',
+                      subtitle: 'Help & feedback',
                       color: AppColors.accentViolet,
                       onTap: () => context.push('/about'),
                     ),
@@ -609,7 +625,7 @@ class MySpaceHubScreen extends ConsumerWidget {
 
             SliverToBoxAdapter(
               child: SizedBox(
-                height: MediaQuery.of(context).padding.bottom + 100,
+                height: MediaQuery.of(context).padding.bottom + 140,
               ),
             ),
           ],
@@ -625,7 +641,7 @@ class MySpaceHubScreen extends ConsumerWidget {
       builder: (_) => AlertDialog(
         backgroundColor: AppColors.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Sign In', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
+        title: const Text('Set Display Name', style: TextStyle(color: AppColors.textPrimary, fontFamily: 'Inter', fontWeight: FontWeight.w700)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -643,7 +659,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           ElevatedButton(
             onPressed: () => Navigator.pop(context, controller.text),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-            child: const Text('Sign In', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
+            child: const Text('Save', style: TextStyle(color: Colors.black, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -700,7 +716,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     }
     final messenger = ScaffoldMessenger.of(context);
     messenger.showSnackBar(const SnackBar(
-      content: Text('Backing up to cloud…'),
+      content: Text('Syncing…'),
       duration: Duration(seconds: 30),
       backgroundColor: AppColors.surface,
     ));
@@ -708,7 +724,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
     messenger.showSnackBar(SnackBar(
-      content: Text(ok ? '✅ Backup complete' : '❌ Backup failed'),
+      content: Text(ok ? '✅ Sync done' : '❌ Sync failed'),
       backgroundColor: ok ? AppColors.surface : AppColors.error,
     ));
   }
@@ -846,7 +862,7 @@ class _SignedInCard extends StatelessWidget {
                         color: AppColors.accent.withValues(alpha: 0.4)),
                   ),
                   child: const Text(
-                    'Backup',
+                    'Sync',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w700,
@@ -859,7 +875,7 @@ class _SignedInCard extends StatelessWidget {
               GestureDetector(
                 onTap: onSignOut,
                 child: const Text(
-                  'Sign out',
+                  'Sign Out',
                   style: TextStyle(
                     fontSize: 11,
                     color: AppColors.error,
@@ -895,18 +911,15 @@ class _SignInCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
+                color: AppColors.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(14),
                 border: Border.all(color: AppColors.borderOf(context)),
               ),
               child: const Center(
-                child: Text(
-                  'G',
-                  style: TextStyle(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF4285F4),
-                  ),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: AppColors.accent,
+                  size: 26,
                 ),
               ),
             ),
@@ -916,7 +929,7 @@ class _SignInCard extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'Sign in with Google',
+                    'Set your display name',
                     style: TextStyle(
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
@@ -924,9 +937,9 @@ class _SignInCard extends StatelessWidget {
                       fontFamily: 'Inter',
                     ),
                   ),
-                  SizedBox(height: 2),
-                  Text(
-                    'Back up playlists & history to your account',
+                  const SizedBox(height: 2),
+                  const Text(
+                    'Personalise your experience',
                     style: TextStyle(
                       fontSize: 12,
                       color: AppColors.textSecondary,
@@ -1114,8 +1127,8 @@ class _ToolMiniCard extends StatelessWidget {
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Container(
-              width: 40,
-              height: 40,
+              width: 36,
+              height: 36,
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: gradient,
@@ -1134,7 +1147,7 @@ class _ToolMiniCard extends StatelessWidget {
               ),
               child: Icon(icon, color: Colors.white, size: 20),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               label,
               style: TextStyle(
@@ -1348,7 +1361,7 @@ class _StorageCleanerSheetState extends ConsumerState<_StorageCleanerSheet> {
                   ? null
                   : () async {
                       setState(() => _clearing = true);
-                      await PlayedDatabase.instance.clearAllSeekPositions();
+                      await OtyaDatabase.instance.clearAllSeekPositions();
                       try {
                         final tmpDir = await getTemporaryDirectory();
                         final thumbDir = Directory('${tmpDir.path}/otya_thumbs');

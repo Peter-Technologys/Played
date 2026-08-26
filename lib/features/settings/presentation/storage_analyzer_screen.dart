@@ -1,7 +1,14 @@
 import 'dart:math' as math;
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/services/duplicate_detector_service.dart';
 import '../../../core/services/storage_analyzer_service.dart';
+
+// Top-level function required by compute() — closures cannot cross isolate
+// boundaries, so the entry point must be a top-level or static function.
+List<List<String>> _findDuplicatesIsolate(List<TrackMeta> tracks) =>
+    DuplicateDetectorService.instance.findDuplicates(tracks);
 
 class StorageAnalyzerScreen extends StatefulWidget {
   const StorageAnalyzerScreen({super.key});
@@ -62,7 +69,7 @@ class _State extends State<StorageAnalyzerScreen>
           icon: const Icon(Icons.arrow_back_ios_new_rounded, color: AppColors.textPrimary, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Storage Analyzer',
+        title: const Text('Storage',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
                 color: AppColors.textPrimary, fontFamily: 'Inter')),
         actions: [IconButton(

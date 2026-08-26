@@ -4,41 +4,57 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/models/vault_item.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
 
 // ── PIN helpers ────────────────────────────────────────────────────
+//
+// Security fix: PIN hash is stored in flutter_secure_storage (Android
+// Keystore / iOS Secure Enclave) instead of SharedPreferences, which is
+// readable by any app with root access or a backup extraction.
+//
+// Biometric re-auth timeout: after 5 minutes of vault inactivity the
+// vault is automatically locked and re-authentication is required.
 import 'dart:convert';
 import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:local_auth/local_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 const _kPinKey = 'vault_pin_hash';
+const _kBiometricTimeout = Duration(minutes: 5);
+
+const _vaultStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+);
 
 Future<bool> _hasPinSet() async {
-  final prefs = await SharedPreferences.getInstance();
-  return prefs.containsKey(_kPinKey);
+  final stored = await _vaultStorage.read(key: _kPinKey);
+  return stored != null;
 }
 
 Future<bool> _verifyPin(String pin) async {
-  final prefs = await SharedPreferences.getInstance();
-  final stored = prefs.getString(_kPinKey);
+  final stored = await _vaultStorage.read(key: _kPinKey);
   final hash = sha256.convert(utf8.encode(pin)).toString();
   return stored == hash;
 }
 
 Future<void> _savePin(String pin) async {
-  final prefs = await SharedPreferences.getInstance();
   final hash = sha256.convert(utf8.encode(pin)).toString();
-  await prefs.setString(_kPinKey, hash);
+  await _vaultStorage.write(key: _kPinKey, value: hash);
 }
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
+
+/// Returns true if the vault session has expired (> 5 minutes since unlock).
+bool _isVaultSessionExpired() {
+  if (_VaultLockScreenState._lastUnlockTime == null) return true;
+  return DateTime.now().difference(_VaultLockScreenState._lastUnlockTime!) > _kBiometricTimeout;
+}
 
 // ── Lock Screen ────────────────────────────────────────────────────
 
@@ -50,6 +66,9 @@ class VaultLockScreen extends ConsumerStatefulWidget {
 }
 
 class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
+  /// Static so it persists across widget rebuilds and is shared with _VaultGalleryScreenState.
+  static DateTime? _lastUnlockTime;
+
   final LocalAuthentication _auth = LocalAuthentication();
   bool _isAuthenticating = false;
   String? _errorMessage;
@@ -57,7 +76,15 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // If the vault was previously unlocked but the session has expired,
+      // force re-authentication (Bug 6 fix: biometric re-auth timeout).
+      if (ref.read(vaultUnlockedProvider) && _isVaultSessionExpired()) {
+        ref.read(vaultUnlockedProvider.notifier).state = false;
+        _VaultLockScreenState._lastUnlockTime = null;
+      }
+      _authenticate();
+    });
   }
 
   Future<void> _authenticate() async {
@@ -83,6 +110,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
       );
       if (ok) {
         HapticFeedback.mediumImpact();
+        _VaultLockScreenState._lastUnlockTime = DateTime.now(); // record unlock time for timeout
         ref.read(vaultUnlockedProvider.notifier).state = true;
       } else {
         setState(() => _errorMessage = 'Authentication failed. Try again.');
@@ -153,7 +181,7 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
                     begin: const Offset(0.8, 0.8), end: const Offset(1, 1),
                     duration: 500.ms, curve: Curves.elasticOut),
               const SizedBox(height: 28),
-              Text('Private Vault',
+              Text('Safe',
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700,
                       color: Theme.of(context).colorScheme.onSurface))
                   .animate().fadeIn(delay: 200.ms),
@@ -240,6 +268,7 @@ class _PinDialogState extends State<_PinDialog> {
     setState(() => _loading = false);
     if (ok) {
       HapticFeedback.mediumImpact();
+      _VaultLockScreenState._lastUnlockTime = DateTime.now(); // record unlock time for timeout
       Navigator.of(context).pop();
       widget.onSuccess();
     } else {
@@ -318,11 +347,11 @@ class _SetPinDialogState extends State<_SetPinDialog> {
     return AlertDialog(
       backgroundColor: AppColors.surface,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Create Vault PIN', style: TextStyle(color: AppColors.textPrimary)),
+      title: const Text('Create Safe PIN', style: TextStyle(color: AppColors.textPrimary)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('Set a PIN to protect your Private Vault.',
+          const Text('Set a PIN to protect your Safe.',
               style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           const SizedBox(height: 16),
           _PinField(controller: _pin1, hint: 'New PIN (4–6 digits)'),
@@ -378,16 +407,37 @@ class VaultGalleryScreen extends ConsumerStatefulWidget {
   @override ConsumerState<VaultGalleryScreen> createState() => _VaultGalleryScreenState();
 }
 
-class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
+class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
+    with WidgetsBindingObserver {
   List<VaultItem> _items = [];
   bool _loading = true;
   int? _vaultSizeBytes;
 
   @override
-  void initState() { super.initState(); _load(); }
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _load();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  /// When the app resumes from background, check if the vault session has
+  /// expired and lock the vault if so (biometric re-auth timeout).
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed && _isVaultSessionExpired()) {
+      ref.read(vaultUnlockedProvider.notifier).state = false;
+      _VaultLockScreenState._lastUnlockTime = null;
+    }
+  }
 
   Future<void> _load() async {
-    final items = await PlayedDatabase.instance.getAllVaultItems();
+    final items = await OtyaDatabase.instance.getAllVaultItems();
     final size  = await VaultService.instance.getVaultSize();
     if (mounted) setState(() { _items = items; _vaultSizeBytes = size; _loading = false; });
   }
@@ -454,7 +504,7 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
             Navigator.of(context).pop();
           },
         ),
-        title: Text('Private Vault',
+        title: Text('Safe',
             style: TextStyle(fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface, fontSize: 18)),
         actions: [
@@ -493,12 +543,12 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
                             color: AppColors.textSecondary, size: 36),
                       ),
                       const SizedBox(height: 20),
-                      Text('Vault is empty',
+                      Text('Safe is empty',
                           style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
                               color: Theme.of(context).colorScheme.onSurface)),
                       const SizedBox(height: 8),
                       const Text(
-                        'Long-press any file and tap\n"Move to Vault" to protect it.',
+                        'Long-press any file and tap\n"Move to Safe" to protect it.',
                         textAlign: TextAlign.center,
                         style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
                       ),
@@ -506,7 +556,8 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen> {
                   ),
                 )
               : GridView.builder(
-                  padding: const EdgeInsets.all(16),
+                  padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
+                  physics: const BouncingScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2, crossAxisSpacing: 12,
                     mainAxisSpacing: 12, childAspectRatio: 0.82,

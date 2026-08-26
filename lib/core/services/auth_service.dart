@@ -1,24 +1,43 @@
 // lib/core/services/auth_service.dart
 //
 // Calls https://petersmartlink.com/auth/* endpoints.
-// Stores access_token and refresh_token in SharedPreferences.
+//
+// SECURITY: access_token and refresh_token are stored ONLY in
+// flutter_secure_storage (Android Keystore / iOS Secure Enclave).
+// Non-sensitive profile fields (userId, email, name, avatar) remain in
+// SharedPreferences for fast synchronous access.
+//
 // Auto-refreshes token when expired (checks exp from JWT payload).
 
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../config/environment.dart';
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const _kAuthBase       = 'https://petersmartlink.com/auth';
-const _kAccessToken    = 'otya_access_token';
-const _kRefreshToken   = 'otya_refresh_token';
+// Derived from Environment.workerUrl so the backend domain is never
+// hardcoded here. Environment.workerUrl is injected at build time via
+// --dart-define=WORKER_URL=https://... (see lib/core/config/environment.dart).
+String get _kAuthBase => '${Environment.workerUrl}/auth';
+
+// Secure storage keys (tokens — never in SharedPreferences)
+const _kSecureAccessToken  = 'otya_access_token';
+const _kSecureRefreshToken = 'otya_refresh_token';
+
+// SharedPreferences keys (non-sensitive profile data only)
 const _kUserId         = 'otya_user_id';
 const _kUserEmail      = 'otya_user_email';
 const _kUserName       = 'otya_user_name';
 const _kUserAvatar     = 'otya_user_avatar';
 const _kIsVerified     = 'otya_is_verified';
+
+// flutter_secure_storage instance — shared across all reads/writes in this file.
+const _secureStorage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: true),
+);
 
 // ── Result types ──────────────────────────────────────────────────────────────
 
@@ -109,15 +128,17 @@ class AuthService {
 
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
+    // Tokens from secure storage
+    _accessToken  = await _secureStorage.read(key: _kSecureAccessToken);
+    _refreshToken = await _secureStorage.read(key: _kSecureRefreshToken);
+    // Profile from SharedPreferences (non-sensitive)
     final prefs = await SharedPreferences.getInstance();
-    _accessToken  = prefs.getString(_kAccessToken);
-    _refreshToken = prefs.getString(_kRefreshToken);
-    _userId       = prefs.getString(_kUserId);
-    _userEmail    = prefs.getString(_kUserEmail);
-    _userName     = prefs.getString(_kUserName);
-    _userAvatar   = prefs.getString(_kUserAvatar);
-    _isVerified   = prefs.getBool(_kIsVerified) ?? false;
-    _loaded       = true;
+    _userId     = prefs.getString(_kUserId);
+    _userEmail  = prefs.getString(_kUserEmail);
+    _userName   = prefs.getString(_kUserName);
+    _userAvatar = prefs.getString(_kUserAvatar);
+    _isVerified = prefs.getBool(_kIsVerified) ?? false;
+    _loaded     = true;
   }
 
   Future<void> _persist({
@@ -125,21 +146,23 @@ class AuthService {
     String? refreshToken,
     UserProfile? user,
   }) async {
-    final prefs = await SharedPreferences.getInstance();
+    // Tokens → secure storage only
     if (accessToken != null) {
       _accessToken = accessToken;
-      await prefs.setString(_kAccessToken, accessToken);
+      await _secureStorage.write(key: _kSecureAccessToken, value: accessToken);
     }
     if (refreshToken != null) {
       _refreshToken = refreshToken;
-      await prefs.setString(_kRefreshToken, refreshToken);
+      await _secureStorage.write(key: _kSecureRefreshToken, value: refreshToken);
     }
+    // Profile → SharedPreferences (non-sensitive)
     if (user != null) {
       _userId     = user.id;
       _userEmail  = user.email;
       _userName   = user.name;
       _userAvatar = user.avatarUrl;
       _isVerified = user.isVerified;
+      final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kUserId,    user.id);
       await prefs.setString(_kUserEmail, user.email);
       if (user.name != null)      await prefs.setString(_kUserName,   user.name!);
@@ -149,15 +172,19 @@ class AuthService {
   }
 
   Future<void> _clearPersisted() async {
-    final prefs = await SharedPreferences.getInstance();
+    // Remove tokens from secure storage
+    await _secureStorage.delete(key: _kSecureAccessToken);
+    await _secureStorage.delete(key: _kSecureRefreshToken);
     _accessToken  = null;
     _refreshToken = null;
-    _userId       = null;
-    _userEmail    = null;
-    _userName     = null;
-    _userAvatar   = null;
-    _isVerified   = false;
-    for (final k in [_kAccessToken, _kRefreshToken, _kUserId, _kUserEmail, _kUserName, _kUserAvatar]) {
+    // Remove profile from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    _userId     = null;
+    _userEmail  = null;
+    _userName   = null;
+    _userAvatar = null;
+    _isVerified = false;
+    for (final k in [_kUserId, _kUserEmail, _kUserName, _kUserAvatar]) {
       await prefs.remove(k);
     }
     await prefs.remove(_kIsVerified);
@@ -185,6 +212,7 @@ class AuthService {
   // ── Token management ──────────────────────────────────────────────────────
 
   /// Returns a valid access token, refreshing if expired.
+  /// Tokens are read from and written to flutter_secure_storage exclusively.
   Future<String?> getValidToken() async {
     await _ensureLoaded();
     if (_accessToken == null) return null;
@@ -201,7 +229,9 @@ class AuthService {
         final data = jsonDecode(res.body) as Map<String, dynamic>;
         final newToken = data['access_token'] as String?;
         if (newToken != null) {
-          await _persist(accessToken: newToken);
+          // Write directly to secure storage (not SharedPreferences)
+          _accessToken = newToken;
+          await _secureStorage.write(key: _kSecureAccessToken, value: newToken);
           return newToken;
         }
       }

@@ -155,7 +155,7 @@ class _RateUsSheetState extends State<RateUsSheet>
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
-        const Text('Rate OTYA Player',
+        const Text('Rate Us',
             style: TextStyle(
               fontSize: 20, fontWeight: FontWeight.w800,
               color: AppColors.textPrimary, fontFamily: 'Inter',

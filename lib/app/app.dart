@@ -9,11 +9,11 @@ import 'theme/app_colors.dart';
 import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
-import '../core/widgets/update_dialog.dart';
 import '../core/services/custom_theme_manager.dart';
 import '../core/services/fcm_service.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/widgets/announcement_dialog.dart';
+import '../core/widgets/update_dialog.dart';
 
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
@@ -43,8 +43,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     // "setState after dispose" crashes during the startup window.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
-        if (mounted) UpdateDialog.checkAndShow(context);
-        if (mounted) AnnouncementDialog.showIfPending(context);
+        if (!mounted) return;
+        try { AnnouncementDialog.showIfPending(context); } catch (_) {}
+      });
+      Future.delayed(const Duration(seconds: 4), () {
+        if (!mounted) return;
+        try { UpdateDialog.checkAndShow(context); } catch (_) {}
       });
     });
   }
@@ -228,12 +232,20 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               );
             }
 
-            return Stack(
-              children: [
-                wrappedChild,
-                if (!_onboardingDone)
-                  OnboardingOverlay(onDone: _completeOnboarding),
-              ],
+            return MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: MediaQuery.of(context).textScaler.clamp(
+                  minScaleFactor: 0.85,
+                  maxScaleFactor: 1.2,
+                ),
+              ),
+              child: Stack(
+                children: [
+                  wrappedChild,
+                  if (!_onboardingDone)
+                    OnboardingOverlay(onDone: _completeOnboarding),
+                ],
+              ),
             );
           },
         );

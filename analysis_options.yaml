@@ -10,7 +10,7 @@ linter:
     prefer_final_fields: true
     prefer_final_locals: true
     avoid_print: true
-    use_super_parameters: false
+    use_super_parameters: true
 
     # Safety
     avoid_dynamic_calls: false

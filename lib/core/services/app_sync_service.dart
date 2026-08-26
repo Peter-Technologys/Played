@@ -1,7 +1,7 @@
-// lib/core/services/ai_sync_service.dart
+// lib/core/services/app_sync_service.dart
 //
-// AiSyncService — called once when the app detects an internet connection.
-// Sends device state to /api/sync and handles the AI-powered response.
+// AppSyncService — called once when the app detects an internet connection.
+// Sends device state to /api/sync and handles the response.
 // Fire-and-forget safe: all errors are caught and logged, never thrown.
 
 import 'dart:convert';
@@ -17,14 +17,15 @@ import 'api_signer.dart';
 import 'device_service.dart';
 import 'otya_service.dart';
 
-/// AiSyncService — called once when the app detects an internet connection.
-/// Sends device state to /api/sync and handles the AI-powered response.
+/// AppSyncService — called once when the app detects an internet connection.
+/// Sends device state to /api/sync and handles the response
+/// (update prompts, welcome-back messages, etc.).
 /// Fire-and-forget safe: all errors are caught and logged, never thrown.
-class AiSyncService {
-  AiSyncService._();
-  static final AiSyncService instance = AiSyncService._();
+class AppSyncService {
+  AppSyncService._();
+  static final AppSyncService instance = AppSyncService._();
 
-  static const String _kLastSyncTime = 'otya_ai_last_sync_ms';
+  static const String _kLastSyncTime = 'otya_app_last_sync_ms';
   static const Duration _syncCooldown = Duration(hours: 1);
 
   bool _syncInProgress = false;
@@ -39,25 +40,25 @@ class AiSyncService {
       final lastSyncMs = prefs.getInt(_kLastSyncTime) ?? 0;
       final elapsed = DateTime.now().millisecondsSinceEpoch - lastSyncMs;
       if (elapsed < _syncCooldown.inMilliseconds) {
-        debugPrint('[AiSync] Skipping — last sync was ${elapsed ~/ 1000}s ago '
+        debugPrint('[AppSync] Skipping — last sync was ${elapsed ~/ 1000}s ago '
             '(cooldown: ${_syncCooldown.inSeconds}s).');
         return;
       }
       await syncOnline(context);
     } catch (e) {
-      debugPrint('[AiSync] syncOnlineIfNeeded error (non-fatal): $e');
+      debugPrint('[AppSync] syncOnlineIfNeeded error (non-fatal): $e');
     }
   }
 
   /// Main entry point. Sends device state to /api/sync and handles the
-  /// AI-powered response (update prompts, welcome-back messages, etc.).
+  /// response (update prompts, welcome-back messages, etc.).
   ///
   /// Pass [force] = true to bypass the cooldown check.
   /// Never throws — all errors are caught and logged.
   Future<void> syncOnline(BuildContext? context, {bool force = false}) async {
     // Guard: prevent concurrent syncs.
     if (_syncInProgress) {
-      debugPrint('[AiSync] Sync already in progress — skipping.');
+      debugPrint('[AppSync] Sync already in progress — skipping.');
       return;
     }
 
@@ -65,7 +66,7 @@ class AiSyncService {
     try {
       await _doSync(context, force: force);
     } catch (e) {
-      debugPrint('[AiSync] syncOnline unexpected error (non-fatal): $e');
+      debugPrint('[AppSync] syncOnline unexpected error (non-fatal): $e');
     } finally {
       _syncInProgress = false;
     }
@@ -87,30 +88,30 @@ class AiSyncService {
       final lastSyncMs = prefs.getInt(_kLastSyncTime) ?? 0;
       final elapsed = DateTime.now().millisecondsSinceEpoch - lastSyncMs;
       if (elapsed < _syncCooldown.inMilliseconds) {
-        debugPrint('[AiSync] Skipping — within cooldown window.');
+        debugPrint('[AppSync] Skipping — within cooldown window.');
         return;
       }
     }
 
-    debugPrint('[AiSync] Starting sync…');
+    debugPrint('[AppSync] Starting sync…');
 
     // ── Gather device state ──────────────────────────────────────────────────
 
     final deviceId = await DeviceService.instance.getDeviceId();
-    debugPrint('[AiSync] device_id: $deviceId');
+    debugPrint('[AppSync] device_id: $deviceId');
 
     final packageInfo = await PackageInfo.fromPlatform();
     final appVersion = packageInfo.version;
     final versionCode = int.tryParse(packageInfo.buildNumber) ?? 0;
-    debugPrint('[AiSync] app_version: $appVersion  version_code: $versionCode');
+    debugPrint('[AppSync] app_version: $appVersion  version_code: $versionCode');
 
     // FCM token — stored by FcmService under the key 'fcm_token'.
     final fcmToken = prefs.getString('fcm_token');
-    debugPrint('[AiSync] fcm_token: ${fcmToken != null ? '(present)' : '(absent)'}');
+    debugPrint('[AppSync] fcm_token: ${fcmToken != null ? '(present)' : '(absent)'}');
 
     // ABI — injected at build time via --dart-define=APP_ARCH=arm64.
-    const abi = String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
-    debugPrint('[AiSync] abi: $abi');
+    const abi = Environment.appArch;
+    debugPrint('[AppSync] abi: $abi');
 
     // ── Build request body ───────────────────────────────────────────────────
 
@@ -134,7 +135,7 @@ class AiSyncService {
       'Content-Type': 'application/json',
     };
 
-    debugPrint('[AiSync] POSTing to ${Environment.workerUrl}$path…');
+    debugPrint('[AppSync] POSTing to ${Environment.workerUrl}$path…');
 
     http.Response response;
     try {
@@ -146,14 +147,14 @@ class AiSyncService {
           )
           .timeout(const Duration(seconds: 10));
     } catch (e) {
-      debugPrint('[AiSync] Network error (non-fatal): $e');
+      debugPrint('[AppSync] Network error (non-fatal): $e');
       return;
     }
 
-    debugPrint('[AiSync] Response status: ${response.statusCode}');
+    debugPrint('[AppSync] Response status: ${response.statusCode}');
 
     if (response.statusCode != 200) {
-      debugPrint('[AiSync] Unexpected status ${response.statusCode} — aborting.');
+      debugPrint('[AppSync] Unexpected status ${response.statusCode} — aborting.');
       return;
     }
 
@@ -163,7 +164,7 @@ class AiSyncService {
     try {
       data = jsonDecode(response.body) as Map<String, dynamic>;
     } catch (e) {
-      debugPrint('[AiSync] Response JSON parse error: $e');
+      debugPrint('[AppSync] Response JSON parse error: $e');
       return;
     }
 
@@ -172,13 +173,13 @@ class AiSyncService {
     final message        = (data['message']        as String?) ?? '';
     final welcomeBack    = (data['welcomeBack']    as bool?)   ?? false;
 
-    debugPrint('[AiSync] upToDate=$upToDate  latestVersion=$latestVersion  '
+    debugPrint('[AppSync] upToDate=$upToDate  latestVersion=$latestVersion  '
         'welcomeBack=$welcomeBack  message=$message');
 
     // ── Handle response actions ──────────────────────────────────────────────
 
     if (!upToDate && messenger != null) {
-      debugPrint('[AiSync] Update available — showing snackbar.');
+      debugPrint('[AppSync] Update available — showing snackbar.');
       final label = latestVersion.isNotEmpty
           ? 'Update available: v$latestVersion'
           : 'Update available';
@@ -196,7 +197,7 @@ class AiSyncService {
     }
 
     if (welcomeBack == true && messenger != null) {
-      debugPrint('[AiSync] Welcome back — showing snackbar.');
+      debugPrint('[AppSync] Welcome back — showing snackbar.');
       messenger.showSnackBar(
         const SnackBar(
           content: Text("Welcome back! Here's what's new."),
@@ -208,6 +209,6 @@ class AiSyncService {
     // ── Persist sync timestamp ───────────────────────────────────────────────
 
     await prefs.setInt(_kLastSyncTime, DateTime.now().millisecondsSinceEpoch);
-    debugPrint('[AiSync] Sync complete — timestamp saved.');
+    debugPrint('[AppSync] Sync complete — timestamp saved.');
   }
 }

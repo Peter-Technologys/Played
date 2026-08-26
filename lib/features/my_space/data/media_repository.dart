@@ -1,7 +1,8 @@
+import 'dart:async';
 import 'dart:io';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/media_scanner_service.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/utils/shelf_sorter.dart';
 
 /// Data layer for My Space.
@@ -13,19 +14,21 @@ class MediaRepository {
   List<MediaItem>? get cachedItems => _cachedItems;
   bool _scanning = false;
 
+  /// Completer that all concurrent callers await while a scan is in progress.
+  /// Replaced with a fresh Completer on each new scan so callers never hold
+  /// a stale reference to a completed Completer.
+  Completer<List<MediaItem>>? _scanCompleter;
+
   Future<List<MediaItem>> getAllMedia({bool forceRefresh = false}) async {
     if (_cachedItems != null && !forceRefresh) return _cachedItems!;
-    // Prevent concurrent scans — if a scan is already in progress, wait
-    // for it to complete rather than launching a second parallel scan
-    // that wastes CPU and causes race conditions on the cache.
+    // Prevent concurrent scans — if a scan is already in progress, all
+    // callers await the same Completer instead of busy-polling.
     if (_scanning) {
-      for (var i = 0; i < 100; i++) {
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        if (!_scanning && _cachedItems != null) return _cachedItems!;
-      }
-      return _cachedItems ?? [];
+      _scanCompleter ??= Completer<List<MediaItem>>();
+      return _scanCompleter!.future;
     }
     _scanning = true;
+    _scanCompleter = Completer<List<MediaItem>>();
     try {
 
     final scanned = await MediaScannerService.instance.scanAll();
@@ -59,17 +62,22 @@ class MediaRepository {
     // Fire-and-forget shelf cache update
     try {
       final bundle = ShelfSorter.buildAllShelves(alive);
-      PlayedDatabase.instance
+      OtyaDatabase.instance
           .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
           .ignore();
-      PlayedDatabase.instance
+      OtyaDatabase.instance
           .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
           .ignore();
     } catch (_) {}
 
+    _scanCompleter?.complete(alive);
     return alive;
+    } catch (e) {
+      _scanCompleter?.completeError(e);
+      rethrow;
     } finally {
       _scanning = false;
+      _scanCompleter = null;
     }
   }
 
@@ -77,7 +85,7 @@ class MediaRepository {
     // If cache is ready, filter from it — zero I/O
     if (_cachedItems != null) {
       final cachedPaths = {for (final e in _cachedItems!) e.filePath};
-      final history = PlayedDatabase.instance.getRecentlyPlayed(limit: limit * 2);
+      final history = OtyaDatabase.instance.getRecentlyPlayed(limit: limit * 2);
       return history
           .where((item) => cachedPaths.contains(item.filePath))
           .take(limit)
@@ -87,14 +95,14 @@ class MediaRepository {
     // existsSync() on slow storage can freeze the UI for hundreds of ms;
     // stale entries are harmless — they are filtered on the next full scan.
     try {
-      return PlayedDatabase.instance.getRecentlyPlayed(limit: limit);
+      return OtyaDatabase.instance.getRecentlyPlayed(limit: limit);
     } catch (_) {
       return [];
     }
   }
 
   Future<void> recordPlay(MediaItem item) async {
-    try { await PlayedDatabase.instance.recordPlay(item); } catch (_) {}
+    try { await OtyaDatabase.instance.recordPlay(item); } catch (_) {}
   }
 
   void invalidate() => _cachedItems = null;

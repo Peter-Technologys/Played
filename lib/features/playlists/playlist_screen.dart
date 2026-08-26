@@ -5,7 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:uuid/uuid.dart';
 import '../../app/theme/app_colors.dart';
-import '../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../core/models/media_item.dart';
 import '../../core/models/playlist.dart';
 import '../../features/my_space/data/media_repository.dart';
@@ -25,7 +25,7 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
   PlaylistsNotifier() : super([]);
 
   void load() {
-    state = PlayedDatabase.instance.getAllPlaylists();
+    state = OtyaDatabase.instance.getAllPlaylists();
   }
 
   Future<Playlist> create(String name) async {
@@ -37,13 +37,13 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
       createdAt: DateTime.now(),
       updatedAt: DateTime.now(),
     );
-    await PlayedDatabase.instance.savePlaylist(playlist);
+    await OtyaDatabase.instance.savePlaylist(playlist);
     state = [...state, playlist];
     return playlist;
   }
 
   Future<void> rename(String id, String newName) async {
-    final playlist = PlayedDatabase.instance.getPlaylist(id);
+    final playlist = OtyaDatabase.instance.getPlaylist(id);
     if (playlist == null) return;
     final updated = Playlist(
       id: playlist.id,
@@ -52,25 +52,25 @@ class PlaylistsNotifier extends StateNotifier<List<Playlist>> {
       createdAt: playlist.createdAt,
       updatedAt: DateTime.now(),
     );
-    await PlayedDatabase.instance.savePlaylist(updated);
+    await OtyaDatabase.instance.savePlaylist(updated);
     state = state.map((p) => p.id == id ? updated : p).toList();
   }
 
   Future<void> delete(String id) async {
-    await PlayedDatabase.instance.deletePlaylist(id);
+    await OtyaDatabase.instance.deletePlaylist(id);
     state = state.where((p) => p.id != id).toList();
   }
 
   Future<void> addTrack(String playlistId, MediaItem item) async {
-    await PlayedDatabase.instance.addToPlaylist(playlistId, item);
+    await OtyaDatabase.instance.addToPlaylist(playlistId, item);
     load();
   }
 
   Future<void> removeTrack(String playlistId, String mediaId) async {
-    final playlist = PlayedDatabase.instance.getPlaylist(playlistId);
+    final playlist = OtyaDatabase.instance.getPlaylist(playlistId);
     if (playlist == null) return;
     playlist.mediaIds.remove(mediaId);
-    await PlayedDatabase.instance.savePlaylist(playlist);
+    await OtyaDatabase.instance.savePlaylist(playlist);
     load();
   }
 }
@@ -94,7 +94,7 @@ class PlaylistsScreen extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('Playlists',
+        title: Text('My Lists',
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,
@@ -113,7 +113,8 @@ class PlaylistsScreen extends ConsumerWidget {
           ? _EmptyState(onCreate: () => _showCreateDialog(context, ref))
           : ListView.separated(
               padding: EdgeInsets.fromLTRB(16, 16, 16,
-                  MediaQuery.of(context).padding.bottom + 90),
+                  MediaQuery.of(context).padding.bottom + 120),
+              physics: const BouncingScrollPhysics(),
               itemCount: playlists.length,
               separatorBuilder: (_, __) => const SizedBox(height: 10),
               itemBuilder: (context, i) {
@@ -207,7 +208,7 @@ class PlaylistsScreen extends ConsumerWidget {
         backgroundColor: AppColors.accent,
         foregroundColor: Colors.black,
         icon: const Icon(Icons.add_rounded),
-        label: const Text('New Playlist',
+        label: const Text('New List',
             style: TextStyle(fontWeight: FontWeight.w700)),
       ),
     );
@@ -218,7 +219,7 @@ class PlaylistsScreen extends ConsumerWidget {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => _NameDialog(
-          controller: controller, title: 'New Playlist', hint: 'Playlist name'),
+          controller: controller, title: 'New List', hint: 'List name'),
     );
     if (name != null && name.trim().isNotEmpty) {
       await ref.read(playlistsProvider.notifier).create(name.trim());
@@ -231,7 +232,7 @@ class PlaylistsScreen extends ConsumerWidget {
     final name = await showDialog<String>(
       context: context,
       builder: (_) => _NameDialog(
-          controller: controller, title: 'Rename Playlist', hint: pl.name),
+          controller: controller, title: 'Rename', hint: pl.name),
     );
     if (name != null && name.trim().isNotEmpty) {
       await ref.read(playlistsProvider.notifier).rename(pl.id, name.trim());
@@ -396,7 +397,7 @@ class PlaylistDetailScreenById extends ConsumerWidget {
           ),
         ),
         body: const Center(
-          child: Text('Playlist not found',
+          child: Text('List not found',
               style: TextStyle(color: AppColors.textSecondary)),
         ),
       );
@@ -534,7 +535,7 @@ class _PlaylistDetailScreenState extends ConsumerState<PlaylistDetailScreen> {
                   createdAt: widget.playlist.createdAt,
                   updatedAt: DateTime.now(),
                 );
-                PlayedDatabase.instance.savePlaylist(updated);
+                OtyaDatabase.instance.savePlaylist(updated);
                 ref.read(playlistsProvider.notifier).load();
               },
               itemBuilder: (context, i) {
@@ -750,7 +751,7 @@ class _AddSongsSheetState extends ConsumerState<_AddSongsSheet> {
                             ScaffoldMessenger.of(context).showSnackBar(
                               SnackBar(
                                 content: Text(
-                                    '"${item.title}" added to playlist'),
+                                    '"${item.title}" added to list'),
                                 backgroundColor: AppColors.surface,
                               ),
                             );
@@ -840,14 +841,14 @@ class _EmptyState extends StatelessWidget {
               .scaleXY(begin: 1.0, end: 1.08,
                   duration: 1000.ms, curve: Curves.easeInOut),
           const SizedBox(height: 20),
-          Text('No playlists yet',
+          Text('No lists yet',
               style: TextStyle(
                 fontSize: 18, fontWeight: FontWeight.w700,
                 color: Theme.of(context).colorScheme.onSurface,
               )).animate().fadeIn(duration: 400.ms),
           const SizedBox(height: 8),
           const Text(
-            'Tap + to create your first playlist.',
+            'Tap + to create your first list.',
             style: TextStyle(
                 fontSize: 13, color: AppColors.textSecondary),
           ).animate().fadeIn(duration: 400.ms, delay: 100.ms),
@@ -863,7 +864,7 @@ class _EmptyState extends StatelessWidget {
                 ),
                 borderRadius: BorderRadius.circular(14),
               ),
-              child: const Text('Create Playlist',
+              child: const Text('Create List',
                   style: TextStyle(
                     fontSize: 14, fontWeight: FontWeight.w700,
                     color: Colors.black, fontFamily: 'Inter',

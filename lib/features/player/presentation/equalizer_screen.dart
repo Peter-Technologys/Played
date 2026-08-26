@@ -41,7 +41,7 @@ class EqNotifier extends StateNotifier<EqState> {
     Future.microtask(() async {
       try {
         final prefs = await SharedPreferences.getInstance();
-        final lastPreset = prefs.getString('eq_last_preset');
+        final lastPreset = prefs.getString('otya_eq_last_preset');
         if (lastPreset != null && _presets.containsKey(lastPreset)) {
           applyPreset(lastPreset);
         }
@@ -85,7 +85,7 @@ class EqNotifier extends StateNotifier<EqState> {
     final prefs = await SharedPreferences.getInstance();
     final gains = state.bands.map((b) => b.gain).toList();
     await prefs.setString(
-      'eq_custom_$name',
+      'otya_eq_custom_$name',
       gains.map((g) => g.toString()).join(','),
     );
     state = state.copyWith(preset: name);
@@ -95,15 +95,15 @@ class EqNotifier extends StateNotifier<EqState> {
   Future<List<String>> loadCustomPresetNames() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getKeys()
-        .where((k) => k.startsWith('eq_custom_'))
-        .map((k) => k.substring('eq_custom_'.length))
+        .where((k) => k.startsWith('otya_eq_custom_'))
+        .map((k) => k.substring('otya_eq_custom_'.length))
         .toList();
   }
 
   /// Applies a custom preset by name from SharedPreferences.
   Future<void> applyCustomPreset(String name) async {
     final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('eq_custom_$name');
+    final raw = prefs.getString('otya_eq_custom_$name');
     if (raw == null) return;
     final gains = raw.split(',').map(double.parse).toList();
     if (gains.length != state.bands.length) return;
@@ -118,7 +118,7 @@ class EqNotifier extends StateNotifier<EqState> {
   Future<void> _savePreset(String name) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('eq_last_preset', name);
+      await prefs.setString('otya_eq_last_preset', name);
     } catch (_) {}
   }
 
@@ -232,7 +232,7 @@ class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
           icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: const Text('Equalizer',
+        title: const Text('Sound Tuner',
             style: TextStyle(
               fontFamily: 'Inter',
               fontWeight: FontWeight.w700,

@@ -48,7 +48,7 @@ class _AboutScreenState extends State<AboutScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'About OTYA Player',
+          'About',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -67,13 +67,24 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 24),
 
           // ── Support & Links ───────────────────────────────────────
-          _SectionHeader(label: 'Support & Links'),
+          _SectionHeader(label: 'Links'),
           const SizedBox(height: 10),
 
           _GroupCard(children: [
             _NavTile(
+              icon: Icons.language_rounded,
+              label: 'Visit Website',
+              subtitle: 'getotya.petersmartlink.com',
+              color: AppColors.accent,
+              onTap: () => context.push('/webview', extra: {
+                'url': 'https://getotya.petersmartlink.com',
+                'title': 'OTYA Player',
+              }),
+            ),
+            _Divider(),
+            _NavTile(
               icon: Icons.system_update_outlined,
-              label: 'Check for Updates',
+              label: 'Check Updates',
               subtitle: 'Tap to check for a new version',
               color: AppColors.accent,
               onTap: () => _checkForUpdates(context),
@@ -81,7 +92,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _Divider(),
             _NavTile(
               icon: Icons.new_releases_outlined,
-              label: "What's New",
+              label: 'Updates',
               subtitle: 'See what changed in this version',
               color: AppColors.accentViolet,
               onTap: () => context.push('/whats-new'),
@@ -89,7 +100,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _Divider(),
             _NavTile(
               icon: Icons.email_outlined,
-              label: 'Contact Support',
+              label: 'Support',
               subtitle: 'support@petersmartlink.com',
               color: AppColors.accent,
               onTap: () => _launchEmail(context),
@@ -105,7 +116,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _Divider(),
             _NavTile(
               icon: Icons.privacy_tip_outlined,
-              label: 'Privacy Policy',
+              label: 'Privacy',
               subtitle: 'How we handle your data',
               color: AppColors.textSecondary,
               onTap: () => context.push('/privacy'),
@@ -113,7 +124,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _Divider(),
             _NavTile(
               icon: Icons.star_outline_rounded,
-              label: 'Rate OTYA Player',
+              label: 'Rate Us',
               subtitle: 'Enjoying the app? Leave a review!',
               color: AppColors.accentAmber,
               onTap: () => _launchUrl(context,
@@ -139,7 +150,7 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 4),
           const Center(
             child: Text(
-              '© 2026 PeterSmartLink. All rights reserved.',
+              '© 2026 OTYA · PeterSmartLink',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.textMuted,

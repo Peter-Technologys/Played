@@ -1,15 +1,19 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
+import '../../../core/services/custom_theme_manager.dart';
 import '../../../core/services/update_service.dart';
 import '../../../core/widgets/update_dialog.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../settings_provider.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 
@@ -29,8 +33,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
     final s  = ref.watch(settingsProvider);
     final sn = ref.read(settingsProvider.notifier);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
@@ -41,7 +44,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: Text(
-          'Settings',
+          'Preferences',
           style: TextStyle(
             fontSize: 20,
             fontWeight: FontWeight.w700,
@@ -58,10 +61,26 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
           _GroupCard(children: [
             _NavTile(
               icon: Icons.palette_rounded,
-              label: 'Theme & Appearance',
-              subtitle: 'Dark, AMOLED, Light & wallpaper',
+              label: 'Look & Feel',
+              subtitle: 'Themes, AMOLED & wallpaper',
               color: AppColors.accentViolet,
               onTap: () => context.push('/theme'),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.wallpaper_rounded,
+              label: 'Change Wallpaper',
+              subtitle: 'Set a photo as the app background',
+              color: AppColors.accentAmber,
+              onTap: () => _pickWallpaper(context),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.hide_image_rounded,
+              label: 'Remove Wallpaper',
+              subtitle: 'Restore the default background',
+              color: AppColors.textSecondary,
+              onTap: () => _clearWallpaper(context),
             ),
           ]),
 
@@ -75,7 +94,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.tune_rounded,
               label: 'General',
-              subtitle: 'Language, search history, cache',
+              subtitle: 'Language & cache',
               color: AppColors.accent,
               onTap: () => _showGeneralSheet(context, ref),
             ),
@@ -83,7 +102,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.videocam_rounded,
               label: 'Video',
-              subtitle: 'Pop-up play, orientation, auto-resume',
+              subtitle: 'PiP, rotation & resume',
               color: AppColors.accentViolet,
               onTap: () => _showVideoSheet(context, ref),
             ),
@@ -91,7 +110,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.headphones_rounded,
               label: 'Audio',
-              subtitle: 'Format, equalizer, .nomedia filters',
+              subtitle: 'EQ, format & filters',
               color: AppColors.accentGreen,
               onTap: () => _showAudioSheet(context, ref),
             ),
@@ -121,15 +140,15 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.download_rounded,
               label: 'Downloads',
-              subtitle: 'Download path, max concurrent tasks',
+              subtitle: 'Path & speed',
               color: AppColors.accent,
               onTap: () => _showDownloadsSheet(context, ref),
             ),
             _Divider(),
             _NavTile(
               icon: Icons.security_rounded,
-              label: 'Privacy & Security',
-              subtitle: 'App lock, biometrics, hide vault',
+              label: 'Privacy',
+              subtitle: 'Lock, biometrics & Safe',
               color: AppColors.accentViolet,
               onTap: () => _showPrivacySheet(context, ref),
             ),
@@ -137,7 +156,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
             _NavTile(
               icon: Icons.policy_rounded,
               label: 'Privacy Policy',
-              subtitle: 'How we handle your data',
+              subtitle: 'Read our policy',
               color: AppColors.accentGreen,
               onTap: () => context.push('/privacy'),
             ),
@@ -152,6 +171,62 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
         ],
       ),
     );
+  }
+
+  // ── Wallpaper helpers ─────────────────────────────────────────────────
+
+  Future<void> _pickWallpaper(BuildContext context) async {
+    try {
+      // Use image_picker to let the user choose a photo from the gallery.
+      // image_picker is already a dependency (pubspec.yaml).
+      // We import it lazily here to avoid a top-level import that would
+      // require the plugin to be initialised before it is needed.
+      final picked = await _pickImageFromGallery();
+      if (picked == null) return;
+      await CustomThemeManager.instance.setWallpaper(picked);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Wallpaper updated'),
+            backgroundColor: AppColors.surface,
+          ),
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Could not set wallpaper: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _clearWallpaper(BuildContext context) async {
+    await CustomThemeManager.instance.clearWallpaper();
+    if (context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Wallpaper removed'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
+    }
+  }
+
+  /// Picks an image from the gallery using image_picker.
+  /// Returns the file path, or null if the user cancelled.
+  Future<String?> _pickImageFromGallery() async {
+    try {
+      final picker = ImagePicker();
+      final xFile = await picker.pickImage(source: ImageSource.gallery);
+      return xFile?.path;
+    } catch (e) {
+      debugPrint('[Settings] _pickImageFromGallery error: $e');
+      return null;
+    }
   }
 
   // ── Bottom-sheet helpers ──────────────────────────────────────────────
@@ -285,9 +360,11 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
                         fontFamily: 'Inter',
                       ),
                     ),
-                    activeThumbColor: Colors.black,
+                    thumbColor: WidgetStateProperty.resolveWith((states) =>
+                        states.contains(WidgetState.selected)
+                            ? Colors.black
+                            : AppColors.textSecondary),
                     activeTrackColor: AppColors.accent,
-                    inactiveThumbColor: AppColors.textSecondary,
                     inactiveTrackColor: AppColors.border,
                     contentPadding: EdgeInsets.zero,
                   ),
@@ -557,7 +634,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
 
   Future<void> _clearCache(BuildContext context) async {
     try {
-      await PlayedDatabase.instance.clearAllSeekPositions();
+      await OtyaDatabase.instance.clearAllSeekPositions();
       // Delete temp dirs if they exist
       final tmpDir = await getTemporaryDirectory();
       if (tmpDir.existsSync()) {
@@ -571,7 +648,7 @@ class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
-        content: Text('Cache cleared ✅'),
+        content: Text('Cleared ✅'),
         backgroundColor: AppColors.surface,
       ),
     );
@@ -924,9 +1001,11 @@ class _SwitchRow extends StatelessWidget {
                     HapticFeedback.selectionClick();
                     onChanged!(v);
                   },
-                  activeThumbColor: Colors.black,
+                  thumbColor: WidgetStateProperty.resolveWith((states) =>
+                      states.contains(WidgetState.selected)
+                          ? Colors.black
+                          : AppColors.textSecondary),
                   activeTrackColor: AppColors.accent,
-                  inactiveThumbColor: AppColors.textSecondary,
                   inactiveTrackColor: AppColors.border,
                 )
               : null),
@@ -971,9 +1050,11 @@ class _SheetSwitch extends StatelessWidget {
               ),
             )
           : null,
-      activeThumbColor: Colors.black,
+      thumbColor: WidgetStateProperty.resolveWith((states) =>
+          states.contains(WidgetState.selected)
+              ? Colors.black
+              : AppColors.textSecondary),
       activeTrackColor: AppColors.accent,
-      inactiveThumbColor: AppColors.textSecondary,
       inactiveTrackColor: AppColors.border,
       contentPadding: EdgeInsets.zero,
     );

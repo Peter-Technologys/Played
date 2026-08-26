@@ -1,13 +1,62 @@
-import 'dart:io';
+import 'dart:convert';
 
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
-import 'apk_downloader.dart';
-import 'otya_service.dart';
-import 'push_notification_service.dart';
+import '../config/environment.dart';
+import 'api_signer.dart';
+import 'auth_service.dart';
+
+/// Lightweight FCM-token registration service (Firebase-free).
+///
+/// Firebase SDK has been removed. This service reads any previously stored
+/// FCM token from SharedPreferences and re-registers it with the backend.
+/// Update notifications are handled by [UpdateService] polling instead.
+class FcmService {
+  FcmService._();
+  static final FcmService instance = FcmService._();
+
+  static const _keyFcmToken = 'fcm_token';
+  bool _initialized = false;
+
+  Future<void> init() async {
+    if (_initialized) return;
+    _initialized = true;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final token = prefs.getString(_keyFcmToken);
+      if (token != null && token.isNotEmpty) {
+        await _registerWithBackend(token);
+      }
+      debugPrint('[FcmService] Initialized (Firebase-free).');
+    } catch (e) {
+      debugPrint('[FcmService] init error (non-fatal): $e');
+    }
+  }
+
+  Future<void> _registerWithBackend(String fcmToken) async {
+    try {
+      final accessToken = await AuthService.instance.getValidToken();
+      if (accessToken == null) return;
+      const path = '/api/push/register';
+      final uri = Uri.parse('${Environment.workerUrl}$path');
+      final headers = {
+        ...ApiSigner.signedHeaders(method: 'POST', path: path),
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      };
+      final res = await http
+          .post(uri, headers: headers,
+              body: jsonEncode({'fcm_token': fcmToken}))
+          .timeout(const Duration(seconds: 15));
+      debugPrint('[FcmService] /api/push/register → ${res.statusCode}');
+    } catch (e) {
+      debugPrint('[FcmService] _registerWithBackend failed (non-fatal): $e');
+    }
+  }
+}
+
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Top-level background message handler
@@ -156,17 +205,66 @@ class FcmService {
       await prefs.setString(_keyFcmToken, token);
       debugPrint('[FcmService] FCM token saved to SharedPreferences.');
 
-      // Register with the backend — reuse the device ID already stored by
-      // UpdateService so we don't create a second device identity.
-      final deviceId = prefs.getString('update_device_id');
+      // 1. Register via /api/device (device-level registration, HMAC-signed).
+      //    Reuse the device ID already stored by UpdateService so we don't
+      //    create a second device identity.
+      final deviceId = prefs.getString('otya_device_id');
       if (deviceId != null && deviceId.isNotEmpty) {
         await OtyaService.instance.registerDevicePushToken(
           deviceId: deviceId,
           fcmToken: token,
         );
       }
+
+      // 2. Bug 5 fix: also POST to /api/push/register with the user's JWT
+      //    so the backend can associate the FCM token with the authenticated
+      //    user account (not just the device).
+      await _registerWithUserAccount(token);
     } catch (e) {
       debugPrint('[FcmService] _persistAndRegister error: $e');
+    }
+  }
+
+  /// POSTs the FCM token to /api/push/register with the user's JWT.
+  /// This associates the token with the authenticated user account so
+  /// targeted push notifications (e.g. per-user announcements) work correctly.
+  Future<void> _registerWithUserAccount(String fcmToken) async {
+    try {
+      final accessToken = await AuthService.instance.getValidToken();
+      if (accessToken == null) {
+        // User not logged in — skip user-level registration.
+        // The device-level registration via /api/device is sufficient for
+        // broadcast notifications.
+        debugPrint('[FcmService] No auth token — skipping /api/push/register.');
+        return;
+      }
+
+      const path = '/api/push/register';
+      final uri = Uri.parse('${Environment.workerUrl}$path');
+      final headers = {
+        ...ApiSigner.signedHeaders(method: 'POST', path: path),
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer $accessToken',
+      };
+
+      final res = await http
+          .post(
+            uri,
+            headers: headers,
+            body: jsonEncode({'fcm_token': fcmToken}),
+          )
+          .timeout(const Duration(seconds: 15));
+
+      if (res.statusCode == 200 || res.statusCode == 201) {
+        debugPrint('[FcmService] FCM token registered with user account.');
+      } else {
+        debugPrint(
+          '[FcmService] /api/push/register returned ${res.statusCode}: ${res.body}',
+        );
+      }
+    } catch (e) {
+      // Non-fatal — push notifications degrade gracefully.
+      debugPrint('[FcmService] _registerWithUserAccount failed (non-fatal): $e');
     }
   }
 

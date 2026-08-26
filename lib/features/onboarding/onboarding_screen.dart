@@ -29,7 +29,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay>
   // Glow animation for slide 3
   late final AnimationController _glowCtrl;
 
-  static const _ctaLabels = ['NEXT', 'NEXT', 'GET STARTED'];
+  static const _ctaLabels = ['NEXT', 'NEXT', "LET'S GO"];
 
   @override
   void initState() {
@@ -257,7 +257,7 @@ class _Slide1 extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           const Text(
-            'Welcome to OTYA Player',
+            'Welcome to OTYA',
             textAlign: TextAlign.center,
             style: TextStyle(
               fontSize: 24,

@@ -1,14 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
+import '../../../core/services/auto_eq_service.dart';
 import '../../../core/services/vault_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
@@ -16,6 +20,8 @@ import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';
+import '../../../core/services/sleep_detection_service.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
@@ -79,6 +85,12 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   bool    _loading        = false;
   int     _loadGeneration = 0;
 
+  // Cache the last resolved album art path per item ID so _updateNotification()
+  // does not re-resolve on every play/pause event (which fires AlbumArtService
+  // on every state change). Only re-resolves when the item ID changes.
+  String? _lastNotificationItemId;
+  String? _lastResolvedArtPath;
+
   // Held subscriptions — cancelled on dispose.
   StreamSubscription? _playingSub;
   StreamSubscription? _bufferingSub;
@@ -102,6 +114,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     // Wire notification prev/next buttons to this notifier's queue logic.
     MediaNotificationService.instance.onSkipPrevious = skipPrevious;
     MediaNotificationService.instance.onSkipNext     = skipNext;
+
+    // Wire SleepDetectionService so inactivity pauses playback.
+    // The service is started when the user sets a sleep timer (via
+    // SleepTimerButton) and stopped when the timer fires or is cancelled.
+    // Here we only set the callback — start/stop is controlled by the UI.
+    SleepDetectionService.instance.onSleepDetected = () {
+      debugPrint('[AudioPlayer] Sleep detected — pausing playback.');
+      pause();
+    };
   }
 
   void _attachStreams() {
@@ -131,7 +152,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         final now = DateTime.now();
         if (now.difference(lastSave).inSeconds >= 5) {
           lastSave = now;
-          PlayedDatabase.instance.saveSeekPosition(_currentItemId!, p);
+          OtyaDatabase.instance.saveSeekPosition(_currentItemId!, p);
         }
       }
     });
@@ -186,11 +207,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _loadGeneration++;
     final myGeneration = _loadGeneration;
 
-    // Reset stale _loading flag instead of returning early (avoids deadlock).
-    if (_loading) {
-      debugPrint('[AudioPlayer] _loadCurrent: resetting stale _loading flag.');
-      _loading = false;
-    }
+    // Fix #4: Only set _loading for this generation. If another call has
+    // already incremented _loadGeneration past myGeneration by the time we
+    // reach the finally block, we must NOT clear _loading — that belongs to
+    // the newer call. Guard every _loading mutation with a generation check.
     _loading = true;
 
     try {
@@ -201,7 +221,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         await _player.open(Media(item.filePath), play: false);
       } catch (srcErr) {
         debugPrint('[AudioPlayer] player.open failed: $srcErr\nPath: ${item.filePath}');
-        if (mounted) state = state.copyWith(isLoading: false);
+        if (_loadGeneration == myGeneration && mounted) {
+          state = state.copyWith(isLoading: false);
+        }
         return;
       }
 
@@ -218,9 +240,14 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       await _player.play();
     } catch (e) {
       debugPrint('[AudioPlayer] _loadCurrent error: $e');
-      if (mounted) state = state.copyWith(isLoading: false);
+      if (_loadGeneration == myGeneration && mounted) {
+        state = state.copyWith(isLoading: false);
+      }
     } finally {
-      _loading = false;
+      // Only clear _loading if we are still the active generation.
+      if (_loadGeneration == myGeneration) {
+        _loading = false;
+      }
     }
   }
 
@@ -229,17 +256,25 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     if (mounted) {
       state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
     }
+
+    // Auto-EQ: detect a genre preset from the filename and apply it via
+    // AutoEqService.applyPreset() — single, testable call site.
+    final eqPreset = AutoEqService.instance.detectPreset(item.fileName);
+    if (eqPreset.name != 'Flat') {
+      debugPrint('[AudioPlayer] Auto-EQ: ${eqPreset.name} for ${item.fileName}');
+      unawaited(AutoEqService.instance.applyPreset(eqPreset));
+    }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _updateNotification();
 
-    final saved      = PlayedDatabase.instance.getSeekPosition(item.id);
+    final saved      = OtyaDatabase.instance.getSeekPosition(item.id);
     final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
     final speed      = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
 
     try {
       await _loadCurrent(item, speed: speed, savedPosition: saved);
       if (mounted) state = state.copyWith(speed: speed, isLoading: false);
-      PlayedDatabase.instance.recordPlay(item).ignore();
+      OtyaDatabase.instance.recordPlay(item).ignore();
     } catch (e) {
       debugPrint('[AudioPlayer] load error: $e');
       if (mounted) state = state.copyWith(isLoading: false);
@@ -249,22 +284,36 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void _updateNotification() {
     final item = _container?.read(miniPlayerItemProvider);
     if (item == null) return;
-    // albumArtPath may be an 'albumid:NNNN' URI — not a real file path.
-    // MediaNotificationService calls File(path).existsSync() which always
-    // returns false for albumid: strings. Only pass real file paths.
-    final artPath = item.albumArtPath;
-    final safeArtPath =
-        (artPath != null && !artPath.startsWith('albumid:')) ? artPath : null;
-    MediaNotificationService.instance.show(
-      title: item.title,
-      artist: item.artist ?? 'Unknown Artist',
-      isPlaying: state.isPlaying,
-      albumArtPath: safeArtPath,
-    );
+
+    // Performance: only re-resolve album art when the item ID changes.
+    // On play/pause events the item is the same — reuse the cached path.
+    if (item.id == _lastNotificationItemId) {
+      MediaNotificationService.instance.show(
+        id: item.id,
+        title: item.title,
+        artist: item.artist ?? 'Unknown Artist',
+        isPlaying: state.isPlaying,
+        albumArtPath: _lastResolvedArtPath,
+      );
+      return;
+    }
+
+    // New item — resolve art and cache the result.
+    _lastNotificationItemId = item.id;
+    AlbumArtService.instance.resolve(item.albumArtPath).then((resolvedPath) {
+      _lastResolvedArtPath = resolvedPath;
+      MediaNotificationService.instance.show(
+        id: item.id,
+        title: item.title,
+        artist: item.artist ?? 'Unknown Artist',
+        isPlaying: state.isPlaying,
+        albumArtPath: resolvedPath,
+      );
+    });
   }
 
   bool _loadFavorite(String id) =>
-      PlayedDatabase.instance.getFavoriteFlag(id);
+      OtyaDatabase.instance.getFavoriteFlag(id);
 
   void togglePlay() {
     final willPlay = !state.isPlaying;
@@ -285,7 +334,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   void skipNext() {
     if (_container == null) return;
     if (_currentItemId != null) {
-      PlayedDatabase.instance.saveSeekPosition(_currentItemId!, state.position);
+      OtyaDatabase.instance.saveSeekPosition(_currentItemId!, state.position);
     }
     _container!.read(queueProvider.notifier).next();
     final next = _container!.read(queueProvider).current;
@@ -299,7 +348,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     }
     if (_container == null) return;
     if (_currentItemId != null) {
-      PlayedDatabase.instance.saveSeekPosition(_currentItemId!, Duration.zero);
+      OtyaDatabase.instance.saveSeekPosition(_currentItemId!, Duration.zero);
     }
     _container!.read(queueProvider.notifier).previous();
     final prev = _container!.read(queueProvider).current;
@@ -318,7 +367,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final next = !state.isFavorite;
     state = state.copyWith(isFavorite: next);
     if (_currentItemId != null) {
-      PlayedDatabase.instance.setFavoriteFlag(_currentItemId!, next);
+      OtyaDatabase.instance.setFavoriteFlag(_currentItemId!, next);
     }
   }
 
@@ -336,7 +385,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void savePosition(String id) =>
-      PlayedDatabase.instance.saveSeekPosition(id, state.position);
+      OtyaDatabase.instance.saveSeekPosition(id, state.position);
 
   @override
   void dispose() {
@@ -349,6 +398,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     // disposed notifier after a new AudioPlayerNotifier is created.
     MediaNotificationService.instance.onSkipPrevious = null;
     MediaNotificationService.instance.onSkipNext     = null;
+    // Clear sleep detection callback.
+    SleepDetectionService.instance.onSleepDetected = null;
     PlaybackCoordinator.instance.unregister(_player);
     MediaNotificationService.instance.dismiss();
     AudioHandlerSingleton.instance.detachPlayer();
@@ -414,7 +465,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!widget.resumeOnly) {
-        // load() already calls PlayedDatabase.instance.recordPlay() internally
+        // load() already calls OtyaDatabase.instance.recordPlay() internally
         // — do not call it again here to avoid double-counting play history.
         _startLoad();
       }
@@ -486,8 +537,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final skipIconSize = isTablet ? 34.0 : isSmall ? 24.0 : 30.0;
     final vSpace = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       body: SafeArea(
         child: Column(
           children: [
@@ -527,6 +577,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 child: _AlbumArt(
                   albumArtPath: widget.mediaItem.albumArtPath,
                   isPlaying: ps.isPlaying,
+                  title: widget.mediaItem.title,
+                  onSwipeLeft:  () => ref.read(audioPlayerProvider.notifier).skipNext(),
+                  onSwipeRight: () => ref.read(audioPlayerProvider.notifier).skipPrevious(),
                 ),
               ),
             ),
@@ -737,12 +790,12 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     ),
                     _SecondaryBtn(
                       icon: Icons.graphic_eq_rounded,
-                      label: 'EQ',
+                      label: 'Tuner',
                       onTap: () => context.push('/player/equalizer'),
                     ),
                     _SecondaryBtn(
                       icon: Icons.queue_music_rounded,
-                      label: 'Queue',
+                      label: 'Up Next',
                       onTap: _showQueue,
                     ),
                     _SecondaryBtn(
@@ -784,7 +837,16 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
 class _AlbumArt extends StatefulWidget {
   final String? albumArtPath;
   final bool isPlaying;
-  const _AlbumArt({this.albumArtPath, required this.isPlaying});
+  final String title;
+  final VoidCallback? onSwipeLeft;   // skip next
+  final VoidCallback? onSwipeRight;  // skip previous
+  const _AlbumArt({
+    this.albumArtPath,
+    required this.isPlaying,
+    this.title = '',
+    this.onSwipeLeft,
+    this.onSwipeRight,
+  });
 
   @override
   State<_AlbumArt> createState() => _AlbumArtState();
@@ -793,6 +855,7 @@ class _AlbumArt extends StatefulWidget {
 class _AlbumArtState extends State<_AlbumArt> {
   String? _resolvedPath;
   bool _loading = true;
+  double _dragX = 0;
 
   @override
   void initState() {
@@ -807,67 +870,199 @@ class _AlbumArtState extends State<_AlbumArt> {
   }
 
   Future<void> _resolve() async {
-    // Mark as loading so we show the placeholder while resolving.
+    final path = widget.albumArtPath;
+
+    // Fix #10: non-albumid: paths are already real file paths — resolve
+    // synchronously without going async to avoid unnecessary overhead.
+    if (path == null) {
+      if (mounted) setState(() { _resolvedPath = null; _loading = false; });
+      return;
+    }
+    if (!path.startsWith('albumid:')) {
+      if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+      return;
+    }
+
+    // albumid: paths need an async MethodChannel call.
     if (mounted) setState(() => _loading = true);
-    final path = await AlbumArtService.instance.resolve(widget.albumArtPath);
-    if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+    final resolved = await AlbumArtService.instance.resolve(path);
+    if (mounted) setState(() { _resolvedPath = resolved; _loading = false; });
   }
 
   @override
   Widget build(BuildContext context) {
     final showArt = !_loading && _resolvedPath != null;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
-      transform: Matrix4.diagonal3Values(
-          widget.isPlaying ? 1.0 : 0.88,
-          widget.isPlaying ? 1.0 : 0.88,
-          1.0),
-      transformAlignment: Alignment.center,
-      // AnimatedContainer so the glow shadow also animates with play state.
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.accent.withValues(alpha: widget.isPlaying ? 0.35 : 0.1),
-            blurRadius: widget.isPlaying ? 48 : 16,
-            spreadRadius: widget.isPlaying ? 6 : 0,
-          ),
-          BoxShadow(
-            color: AppColors.accentViolet.withValues(alpha: widget.isPlaying ? 0.20 : 0.05),
-            blurRadius: widget.isPlaying ? 64 : 20,
-            spreadRadius: widget.isPlaying ? 8 : 0,
+    return GestureDetector(
+      onHorizontalDragUpdate: (d) {
+        setState(() => _dragX += d.delta.dx);
+      },
+      onHorizontalDragEnd: (d) {
+        final v = d.primaryVelocity ?? 0;
+        if (_dragX < -60 || v < -400) {
+          HapticFeedback.mediumImpact();
+          widget.onSwipeLeft?.call();
+        } else if (_dragX > 60 || v > 400) {
+          HapticFeedback.mediumImpact();
+          widget.onSwipeRight?.call();
+        }
+        setState(() => _dragX = 0);
+      },
+      onHorizontalDragCancel: () => setState(() => _dragX = 0),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Swipe hint: next (right arrow, shown when dragging left)
+          if (_dragX < -20)
+            Positioned(
+              right: 12,
+              child: AnimatedOpacity(
+                opacity: (_dragX.abs() / 80).clamp(0.0, 1.0),
+                duration: const Duration(milliseconds: 80),
+                child: const Icon(Icons.skip_next_rounded,
+                    color: AppColors.accent, size: 40),
+              ),
+            ),
+          // Swipe hint: previous (left arrow, shown when dragging right)
+          if (_dragX > 20)
+            Positioned(
+              left: 12,
+              child: AnimatedOpacity(
+                opacity: (_dragX.abs() / 80).clamp(0.0, 1.0),
+                duration: const Duration(milliseconds: 80),
+                child: const Icon(Icons.skip_previous_rounded,
+                    color: AppColors.accent, size: 40),
+              ),
+            ),
+          // Album art — translates slightly in the drag direction
+          Transform.translate(
+            offset: Offset(_dragX.clamp(-40.0, 40.0), 0),
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 400),
+              curve: Curves.easeInOut,
+              transform: Matrix4.diagonal3Values(
+                  widget.isPlaying ? 1.0 : 0.88,
+                  widget.isPlaying ? 1.0 : 0.88,
+                  1.0),
+              transformAlignment: Alignment.center,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.accent.withValues(
+                        alpha: widget.isPlaying ? 0.35 : 0.1),
+                    blurRadius: widget.isPlaying ? 48 : 16,
+                    spreadRadius: widget.isPlaying ? 6 : 0,
+                  ),
+                  BoxShadow(
+                    color: AppColors.accentViolet.withValues(
+                        alpha: widget.isPlaying ? 0.20 : 0.05),
+                    blurRadius: widget.isPlaying ? 64 : 20,
+                    spreadRadius: widget.isPlaying ? 8 : 0,
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: showArt
+                    ? RepaintBoundary(
+                        child: Image.file(
+                          File(_resolvedPath!),
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          cacheWidth: 600,
+                        ),
+                      )
+                    : _DynamicArtPlaceholder(
+                        title: widget.title,
+                        isPlaying: widget.isPlaying,
+                      ),
+              ),
+            ),
           ),
         ],
       ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(28),
-        child: showArt
-            ? Image.file(File(_resolvedPath!),
-                fit: BoxFit.cover, width: double.infinity)
-            : Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      AppColors.accent.withValues(alpha: 0.15),
-                      AppColors.accentViolet.withValues(alpha: 0.25),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                child: Center(
-                  child: Icon(
-                    Icons.music_note_rounded,
-                    color: AppColors.accent.withValues(
-                        alpha: widget.isPlaying ? 0.9 : 0.5),
-                    size: 80,
-                  ),
-                ),
-              ),
+    );
+  }
+}
+
+/// Fix #17: Dynamic album art placeholder — blurred gradient background,
+/// first letter of the track title, and a subtle vinyl ring animation.
+class _DynamicArtPlaceholder extends StatelessWidget {
+  final String title;
+  final bool isPlaying;
+  const _DynamicArtPlaceholder({required this.title, required this.isPlaying});
+
+  @override
+  Widget build(BuildContext context) {
+    final letter = title.isNotEmpty ? title[0].toUpperCase() : '♪';
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Blurred gradient background
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.accent.withValues(alpha: 0.20),
+                AppColors.accentViolet.withValues(alpha: 0.35),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
+          child: Container(color: Colors.transparent),
+        ),
+        // Subtle vinyl ring — animated when playing
+        Center(
+          child: _VinylRing(isPlaying: isPlaying),
+        ),
+        // First letter of track title
+        Center(
+          child: Text(
+            letter,
+            style: TextStyle(
+              fontSize: 96,
+              fontWeight: FontWeight.w900,
+              color: AppColors.accent.withValues(
+                  alpha: isPlaying ? 0.95 : 0.60),
+              fontFamily: 'Inter',
+              height: 1,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// Subtle vinyl record ring that rotates when [isPlaying] is true.
+class _VinylRing extends StatelessWidget {
+  final bool isPlaying;
+  const _VinylRing({required this.isPlaying});
+
+  @override
+  Widget build(BuildContext context) {
+    final ring = Container(
+      width: 220,
+      height: 220,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: 0.18),
+          width: 28,
+        ),
       ),
     );
+
+    if (!isPlaying) return ring;
+
+    return ring
+        .animate(onPlay: (c) => c.repeat())
+        .rotate(duration: 4000.ms, curve: Curves.linear);
   }
 }
 
@@ -1022,37 +1217,37 @@ class _OptionsSheet extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final options = [
-      _Opt(Icons.directions_car_rounded, 'Car Mode', AppColors.accent, () {
+      _Opt(Icons.directions_car_rounded, 'Drive Mode', AppColors.accent, () {
         Navigator.pop(context);
         Navigator.of(context).push(
           MaterialPageRoute(builder: (_) => const CarModeScreen()),
         );
       }),
-      _Opt(Icons.playlist_add_rounded, 'Add to Playlist', AppColors.accent, () {
+      _Opt(Icons.playlist_add_rounded, 'Queue It', AppColors.accent, () {
         ref.read(queueProvider.notifier).addToQueue(mediaItem);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Added to queue')));
+            const SnackBar(content: Text('Queued!')));
       }),
-      _Opt(Icons.lock_rounded, 'Move to Vault', AppColors.accentViolet, () async {
+      _Opt(Icons.lock_rounded, 'Hide in Safe', AppColors.accentViolet, () async {
         Navigator.pop(context);
         await VaultService.instance.lockItem(mediaItem);
         if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Moved to Vault'))); }
+            const SnackBar(content: Text('Moved to Safe'))); }
       }),
-      _Opt(Icons.wifi_tethering_rounded, 'Share via Air-Drop', AppColors.accent, () {
+      _Opt(Icons.wifi_tethering_rounded, 'Beam It', AppColors.accent, () {
         Navigator.pop(context);
         context.go('/airdrop');
       }),
-      _Opt(Icons.phone_android_rounded, 'Trim for WhatsApp',   AppColors.accent, onTrimForWhatsApp),
+      _Opt(Icons.phone_android_rounded, 'Trim',   AppColors.accent, onTrimForWhatsApp),
       _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
         Navigator.pop(context);
         await FfmpegService.instance.extractAudio(
             videoPath: mediaItem.filePath, onProgress: (_) {});
         if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Audio extracted to Downloads'))); }
+            const SnackBar(content: Text('Audio saved to Downloads'))); }
       }),
-      _Opt(Icons.info_outline_rounded, 'File Info', AppColors.textSecondary, onFileInfo),
+      _Opt(Icons.info_outline_rounded, 'Details', AppColors.textSecondary, onFileInfo),
     ];
 
     return Padding(

@@ -6,14 +6,12 @@ allprojects {
     }
 }
 
-rootProject.buildDir = '../build'
-subprojects {
-    project.buildDir = "${rootProject.buildDir}/${project.name}"
-}
-subprojects {
-    project.evaluationDependsOn(':app')
-}
+// No subprojects compileSdk override block.
+// file_picker has been removed from pubspec.yaml (it was unused and its
+// pre-built AAR compiled against SDK 34 caused the build to fail).
+// afterEvaluate and plugins.withId() both trigger Flutter 3.47's
+// "Already watching path" watcher crash and must NOT be used here.
 
 tasks.register("clean", Delete) {
-    delete rootProject.buildDir
+    delete rootProject.layout.buildDirectory
 }

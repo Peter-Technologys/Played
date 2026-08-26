@@ -18,7 +18,7 @@ class PrivacyPolicyScreen extends StatelessWidget {
           onPressed: () => Navigator.of(context).pop(),
         ),
         title: const Text(
-          'Privacy Policy',
+          'Privacy',
           style: TextStyle(
             fontSize: 20, fontWeight: FontWeight.w700,
             color: AppColors.textPrimary, fontFamily: 'Inter',
@@ -74,17 +74,25 @@ class _PolicyBody extends StatelessWidget {
               '• MANAGE_EXTERNAL_STORAGE — to access files on SD cards and all folders.\n'
               '• INTERNET / ACCESS_NETWORK_STATE — for optional cloud sync and ads.\n'
               '• BLUETOOTH / NEARBY_WIFI_DEVICES — for the Air-Drop file-sharing feature.\n'
-              '• USE_BIOMETRIC — for Vault unlock; data never leaves the device.\n'
-              '• FOREGROUND_SERVICE — to keep audio playing when the screen is off.\n'
-              '• POST_NOTIFICATIONS — to show the media playback notification.\n\n'
+              '• USE_BIOMETRIC / USE_FINGERPRINT — for Vault unlock; data never leaves the device.\n'
+              '• FOREGROUND_SERVICE / FOREGROUND_SERVICE_MEDIA_PLAYBACK — to keep audio playing when the screen is off.\n'
+              '• POST_NOTIFICATIONS — to show the media playback notification.\n'
+              '• REQUEST_INSTALL_PACKAGES — to install app updates downloaded in-app.\n'
+              '• CAMERA — used by the QR scanner in the Air-Drop feature.\n\n'
               'Each permission is requested only when you use the feature that needs it.',
         ),
 
         _PolicySection(
           title: '4. Third-Party Services',
           body:
-              '• Appwrite — optional cloud backup. Data is stored on your own Appwrite '
-              'project and is not shared with us.',
+              '• Cloudflare Workers / D1 — optional cloud sync for playlists, '
+              'history, and EQ presets. Data is stored on our Cloudflare account '
+              'and is associated only with your account ID.\n'
+              '• Firebase Cloud Messaging (FCM) — used to deliver update alerts '
+              'and announcements. No personal data is shared with Google beyond '
+              'what is required for push delivery.\n'
+              '• Google AdMob — used to serve ads in the free tier. AdMob may '
+              'collect device identifiers in accordance with Google\'s privacy policy.',
         ),
 
         _PolicySection(

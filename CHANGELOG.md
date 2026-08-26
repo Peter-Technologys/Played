@@ -9,6 +9,14 @@ and [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Fixed
+- **Mini player dismiss drag** — opacity now fades fully to transparent during
+  a dismiss drag (was clamped at 0.3, leaving the player partially visible at
+  full drag distance). Fade divisor corrected to match the dismiss threshold.
+- **Mini player snap-back** — drag offset is now explicitly reset on
+  `onVerticalDragEnd` when the dismiss threshold is not reached, preventing
+  the mini player from staying visually offset after a cancelled swipe.
+
 ### Planned
 - Chromecast / Cast to device
 - Home screen now-playing widget

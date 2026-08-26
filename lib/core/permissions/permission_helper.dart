@@ -25,39 +25,70 @@ class PermissionHelper {
 
   /// Request storage/media permissions needed for media scanning.
   /// Returns true if granted.
-  static Future<bool> requestMediaPermissions() async {
+  ///
+  /// Android 13+ (API 33+): requests READ_MEDIA_AUDIO + READ_MEDIA_VIDEO
+  ///   (Permission.audio + Permission.videos via permission_handler).
+  /// Android 12 and below: requests READ_EXTERNAL_STORAGE (Permission.storage).
+  ///
+  /// The AndroidManifest.xml declares both sets with appropriate maxSdkVersion
+  /// constraints so the correct permission is used on each Android version.
+  ///
+  /// If any permission is permanently denied, [context] is used to show the
+  /// "Open Settings" dialog (pass null to skip the dialog).
+  static Future<bool> requestMediaPermissions({BuildContext? context}) async {
     final sdk = await _getSdkInt();
     if (sdk == 0) return true; // iOS — no runtime permission needed
     final perms = sdk >= 33
-        ? [Permission.audio, Permission.videos]
-        : [Permission.storage];
+        ? [Permission.audio, Permission.videos]  // Android 13+ (Bug 6 fix)
+        : [Permission.storage];                  // Android 12 and below
     final statuses = await perms.request();
+
+    // Check for permanently denied permissions and offer Settings dialog.
+    if (context != null && context.mounted) {
+      for (final entry in statuses.entries) {
+        if (entry.value.isPermanentlyDenied) {
+          await showPermanentlyDeniedDialog(
+            context,
+            permissionName: 'Media Access',
+            rationale:
+                'OTYA Player needs access to your audio and video files. '
+                'Please open Settings and grant the permission.',
+          );
+          break;
+        }
+      }
+    }
+
     return statuses.values.every(
       (s) => s == PermissionStatus.granted || s == PermissionStatus.limited,
     );
   }
 
   /// Check (without requesting) if media permissions are already granted.
+  /// On Android 14+ (API 34+) also accepts PermissionStatus.limited which
+  /// represents READ_MEDIA_VISUAL_USER_SELECTED (partial media access).
   static Future<bool> hasMediaPermissions() async {
     final sdk = await _getSdkInt();
     if (sdk == 0) return true;
-    final perms = sdk >= 33
-        ? [Permission.audio, Permission.videos]
-        : [Permission.storage];
-    for (final p in perms) {
-      final s = await p.status;
-      if (!s.isGranted && !s.isLimited) return false;
+    if (sdk >= 33) {
+      final audioStatus  = await Permission.audio.status;
+      final videosStatus = await Permission.videos.status;
+      final audioOk  = audioStatus.isGranted  || audioStatus.isLimited;
+      final videosOk = videosStatus.isGranted || videosStatus.isLimited;
+      return audioOk && videosOk;
     }
-    return true;
+    final storageStatus = await Permission.storage.status;
+    return storageStatus.isGranted || storageStatus.isLimited;
   }
 
-  /// Request Air-Drop permissions (Bluetooth + Location/NearbyWifi).
+  /// Request Air-Drop permissions (Bluetooth + Location/NearbyWifi + Camera).
   ///
   /// On Android 13+ (API >= 33) we request [Permission.nearbyWifiDevices]
   /// instead of location — the manifest declares NEARBY_WIFI_DEVICES with
   /// `neverForLocation` so no location access is granted.
   /// On Android 12 and below (API <= 32) we keep requesting location because
   /// NEARBY_WIFI_DEVICES is not available and Wi-Fi P2P requires it.
+  /// Camera is always requested for the QR code scanner (mobile_scanner).
   static Future<void> requestAirDropPermissions() async {
     final sdk = await _getSdkInt();
     final perms = <Permission>[
@@ -65,6 +96,7 @@ class PermissionHelper {
       Permission.bluetoothScan,
       Permission.bluetoothAdvertise,
       Permission.bluetoothConnect,
+      Permission.camera, // QR scanner in Air-Drop
     ];
     if (sdk >= 33) {
       perms.add(Permission.nearbyWifiDevices);
@@ -72,6 +104,71 @@ class PermissionHelper {
       perms.add(Permission.locationWhenInUse);
     }
     await perms.request();
+  }
+
+  /// Shows a dialog informing the user that a permission is permanently denied
+  /// and offers an "Open Settings" button to let them grant it manually.
+  ///
+  /// Returns true if the user tapped "Open Settings" (they may or may not
+  /// have actually granted the permission — re-check after returning).
+  static Future<bool> showPermanentlyDeniedDialog(
+    BuildContext context, {
+    String permissionName = 'Permission',
+    String? rationale,
+  }) async {
+    final opened = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: AppColors.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          '$permissionName Required',
+          style: const TextStyle(
+            color: AppColors.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontFamily: 'Inter',
+          ),
+        ),
+        content: Text(
+          rationale ??
+              'This permission has been permanently denied. '
+              'Please open Settings and grant it manually.',
+          style: const TextStyle(
+            color: AppColors.textSecondary,
+            fontSize: 13,
+            height: 1.5,
+            fontFamily: 'Inter',
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(ctx, true);
+              await openAppSettings();
+            },
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.accent,
+              foregroundColor: Colors.black,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            child: const Text(
+              'Open Settings',
+              style: TextStyle(fontWeight: FontWeight.w700, fontFamily: 'Inter'),
+            ),
+          ),
+        ],
+      ),
+    );
+    return opened ?? false;
   }
 
   /// Show a branded bottom sheet explaining why storage permission is needed,
@@ -123,7 +220,7 @@ class PermissionHelper {
             ),
             const SizedBox(height: 10),
             const Text(
-              'PLAYED needs access to your audio and video files to show your library. '
+              'OTYA Player needs access to your audio and video files to show your library. '
               'No files are uploaded or shared.',
               textAlign: TextAlign.center,
               style: TextStyle(

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/smart_shuffle_service.dart';
 
 // ── Queue Provider ───────────────────────────────────────────────────
 
@@ -56,14 +58,30 @@ class QueueNotifier extends StateNotifier<QueueState> {
     if (state.items.isEmpty) return;
     final int nextIndex;
     if (state.shuffle) {
-      final pool = List.generate(state.items.length, (i) => i)
-        ..remove(state.currentIndex);
-      pool.shuffle();
-      nextIndex = pool.isEmpty ? state.currentIndex : pool.first;
+      // Build stats from recently played history for weighted shuffle.
+      final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 9999);
+      final statsMap = <String, TrackStats>{
+        for (final item in history)
+          item.id: TrackStats(
+            playCount:    1,
+            lastPlayedMs: item.lastPlayedAt?.millisecondsSinceEpoch ?? 0,
+            rating:       0,
+            skipCount:    0,
+          ),
+      };
+      final ids = state.items.map((i) => i.id).toList();
+      final shuffled = SmartShuffleService.instance.smartShuffle(ids, statsMap);
+      // Find the first shuffled ID that is not the current track.
+      final currentId = state.items[state.currentIndex].id;
+      final nextId = shuffled.firstWhere(
+        (id) => id != currentId,
+        orElse: () => shuffled.first,
+      );
+      nextIndex = state.items.indexWhere((item) => item.id == nextId);
     } else {
       nextIndex = (state.currentIndex + 1) % state.items.length;
     }
-    state = state.copyWith(currentIndex: nextIndex);
+    state = state.copyWith(currentIndex: nextIndex < 0 ? 0 : nextIndex);
   }
 
   void previous() {
@@ -156,7 +174,7 @@ class QueueScreen extends ConsumerWidget {
                     HapticFeedback.mediumImpact();
                     ref.read(queueProvider.notifier).clear();
                   },
-                  child: Text('Clear',
+                  child: Text('Clear All',
                       style: TextStyle(
                           fontSize: 13,
                           color: cs.onSurface.withValues(alpha: 0.55),

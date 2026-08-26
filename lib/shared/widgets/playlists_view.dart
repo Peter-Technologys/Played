@@ -28,7 +28,7 @@ class PlaylistsView extends ConsumerWidget {
         children: [
           _EmptyState(
             icon: Icons.queue_music_rounded,
-            label: 'No playlists yet',
+            label: 'No lists yet',
           ),
           if (showCreateButton) ...[
             const SizedBox(height: 16),
@@ -47,7 +47,7 @@ class PlaylistsView extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Text(
-                  'Create Playlist',
+                  'Create List',
                   style: TextStyle(
                     color: Colors.black,
                     fontWeight: FontWeight.w700,
@@ -63,7 +63,8 @@ class PlaylistsView extends ConsumerWidget {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 100),
+      padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.of(context).padding.bottom + 120),
+      physics: const BouncingScrollPhysics(),
       itemCount: playlists.length,
       itemBuilder: (context, i) {
         final pl = playlists[i];

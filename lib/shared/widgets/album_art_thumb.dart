@@ -1,3 +1,4 @@
+import 'dart:collection';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -38,14 +39,16 @@ class AlbumArtThumb extends StatefulWidget {
 class _AlbumArtThumbState extends State<AlbumArtThumb> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
 
-  // ── 200-entry LRU cache (shared across all instances) ──────────────
-  static final Map<String, String?> _cache = {};
+  // ── 200-entry LRU cache (shared across all instances) ──────────────────
+  // Must be LinkedHashMap so keys.first is always the oldest inserted entry.
+  // A plain HashMap has undefined key order, making LRU eviction incorrect.
+  static final LinkedHashMap<String, String?> _cache =
+      LinkedHashMap<String, String?>();
   static const _maxCache = 200;
 
   static void _cacheSet(String key, String? value) {
     if (_cache.length >= _maxCache) {
-      // LinkedHashMap preserves insertion order — remove the oldest entry.
-      _cache.remove(_cache.keys.first);
+      _cache.remove(_cache.keys.first); // evict oldest (insertion-order)
     }
     _cache[key] = value;
   }

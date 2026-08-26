@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/played_database.dart';
+import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
 import '../../player/presentation/queue_screen.dart';
 
@@ -30,7 +30,7 @@ class _PlaybackHistoryScreenState
 
   void _load() {
     try {
-      final items = PlayedDatabase.instance.getPlaybackHistory(limit: 200);
+      final items = OtyaDatabase.instance.getPlaybackHistory(limit: 200);
       if (mounted) setState(() => _history = items);
     } catch (_) {
       if (mounted) setState(() => _history = []);
@@ -66,7 +66,7 @@ class _PlaybackHistoryScreenState
     );
     if (confirmed == true && mounted) {
       try {
-        await PlayedDatabase.instance.clearPlaybackHistory();
+        await OtyaDatabase.instance.clearPlaybackHistory();
       } catch (_) {}
       _load();
       if (mounted) {
@@ -92,7 +92,7 @@ class _PlaybackHistoryScreenState
               color: AppColors.textPrimary),
           onPressed: () => Navigator.pop(context),
         ),
-        title: const Text('Playback History',
+        title: const Text('History',
             style: TextStyle(
               fontFamily: 'Inter', fontWeight: FontWeight.w700,
               color: AppColors.textPrimary, fontSize: 18,
@@ -127,7 +127,8 @@ class _PlaybackHistoryScreenState
             )
           : ListView.builder(
               padding: EdgeInsets.fromLTRB(0, 8, 0,
-                  MediaQuery.of(context).padding.bottom + 90),
+                  MediaQuery.of(context).padding.bottom + 120),
+              physics: const BouncingScrollPhysics(),
               itemCount: _history.length,
               itemBuilder: (context, i) {
                 final item = _history[i];

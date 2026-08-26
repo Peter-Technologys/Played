@@ -50,7 +50,7 @@ class CarModeScreen extends ConsumerWidget {
                       Icon(Icons.directions_car_rounded,
                           color: AppColors.accent, size: 18),
                       SizedBox(width: 6),
-                      Text('CAR MODE',
+                      Text('DRIVE MODE',
                           style: TextStyle(
                             fontSize: 12, fontWeight: FontWeight.w700,
                             color: AppColors.accent, letterSpacing: 1.5,

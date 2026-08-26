@@ -134,8 +134,15 @@ class _AirDropNotifier extends StateNotifier<_AirDropState> {
         url: url,
         savePath: '${saveDir.path}/$fileName',
         onProgress: (dl, total) {
+          // Guard with mounted — autoDispose tears down the notifier
+          // mid-download, causing StateError if we update state after dispose.
           if (!mounted) return;
-          state = state.copyWith(progress: total > 0 ? dl / total : 0.0);
+          // Clamp to [0,1] — server content-length can be slightly off,
+          // causing values > 1.0 which crash Slider/LinearProgressIndicator.
+          final progress = total > 0
+              ? (dl / total).clamp(0.0, 1.0)
+              : 0.0;
+          state = state.copyWith(progress: progress);
         },
       );
       MediaRepository.instance.invalidate();
@@ -188,7 +195,15 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
   }
 
   @override
-  void dispose() { _tabCtrl.dispose(); _scanCtrl.dispose(); super.dispose(); }
+  void dispose() {
+    _tabCtrl.dispose();
+    // Stop the camera stream before releasing the controller.
+    // Calling dispose() while streaming causes a PlatformException on some
+    // devices (camera already in use / native resource not released).
+    _scanCtrl.stop();
+    _scanCtrl.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -199,7 +214,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
         appBar: AppBar(
           backgroundColor: Theme.of(context).scaffoldBackgroundColor,
           elevation: 0,
-          title: Text('Flash Share',
+          title: Text('Beam',
               style: TextStyle(color: Theme.of(context).colorScheme.onSurface,
                   fontWeight: FontWeight.w800, fontFamily: 'Inter', fontSize: 18)),
           centerTitle: true,
@@ -232,7 +247,7 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
                 unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700, fontFamily: 'Inter', fontSize: 13),
-                tabs: const [Tab(text: '📤  Send'), Tab(text: '📥  Receive')],
+                tabs: const [Tab(text: '📤  Beam'), Tab(text: '📥  Catch')],
               ),
             ),
             Expanded(
@@ -284,7 +299,7 @@ class _SendView extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final n = ref.read(_airDropProvider.notifier);
     return SingleChildScrollView(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 80),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -345,7 +360,7 @@ class _SendView extends ConsumerWidget {
           // Share APK
           _GlassButton(
             icon: Icons.install_mobile_rounded,
-            label: 'Share OTYA Player APK',
+            label: 'Beam OTYA Player APK',
             subtitle: 'Let friends install without internet',
             color: AppColors.accentViolet,
             onTap: () => n.shareApk(),
@@ -414,9 +429,10 @@ class _ReceiveView extends ConsumerWidget {
             borderRadius: BorderRadius.circular(20),
             child: MobileScanner(
               controller: scanCtrl,
-              onDetect: (capture) {
+              onDetect: (BarcodeCapture capture) {
                 if (scanned) return;
-                final url = capture.barcodes.firstOrNull?.rawValue;
+                final barcode = capture.barcodes.firstOrNull;
+                final url = barcode?.displayValue ?? barcode?.rawValue;
                 if (url != null && url.startsWith('http')) {
                   scanned = true;
                   HapticFeedback.mediumImpact();

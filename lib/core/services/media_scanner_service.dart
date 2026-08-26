@@ -1,7 +1,10 @@
+import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show min;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/media_item.dart';
 import '../permissions/permission_helper.dart';
 
@@ -82,6 +85,42 @@ class MediaScannerService {
   // Fix: channel name MUST match MainActivity.kt registration
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
 
+  // ── Incremental scan cache ────────────────────────────────────────────────
+  // Stores {filePath: lastModifiedMs} so subsequent scans can skip files
+  // whose modification timestamp hasn't changed, avoiding redundant stat()
+  // calls on large libraries.
+  static const _kScanCacheKey = 'otya_scan_mtime_cache';
+
+  /// In-memory copy of the mtime cache, loaded once per process lifetime.
+  Map<String, int>? _mtimeCache;
+
+  Future<Map<String, int>> _loadMtimeCache() async {
+    if (_mtimeCache != null) return _mtimeCache!;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_kScanCacheKey);
+      if (raw == null || raw.isEmpty) {
+        _mtimeCache = {};
+        return _mtimeCache!;
+      }
+      final decoded = jsonDecode(raw) as Map<String, dynamic>;
+      _mtimeCache = decoded.map((k, v) => MapEntry(k, v as int));
+    } catch (_) {
+      _mtimeCache = {};
+    }
+    return _mtimeCache!;
+  }
+
+  Future<void> _saveMtimeCache() async {
+    if (_mtimeCache == null) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kScanCacheKey, jsonEncode(_mtimeCache));
+    } catch (e) {
+      debugPrint('[Scanner] Failed to save mtime cache: $e');
+    }
+  }
+
   static const List<String> _receiveDirs = [
     '/storage/emulated/0/Download',
     '/storage/emulated/0/Downloads',
@@ -110,8 +149,8 @@ class MediaScannerService {
     '/storage/emulated/0/MiDrop',
     '/storage/emulated/0/Zapya',
     '/storage/emulated/0/InShare',
-    '/storage/emulated/0/PLAYED',
-    '/storage/emulated/0/Download/PLAYED',
+    '/storage/emulated/0/OTYA',
+    '/storage/emulated/0/Download/OTYA',
   ];
 
   // PRIMARY: query audio + video in parallel
@@ -186,6 +225,8 @@ class MediaScannerService {
   Future<List<MediaItem>> _scanSingleDir(
       String dirPath, Set<String> alreadySeen) async {
     final results = <MediaItem>[];
+    final cache = await _loadMtimeCache();
+    bool cacheUpdated = false;
     try {
       // Use non-recursive listing — recursive: true on large dirs
       // (e.g. WhatsApp) causes thousands of stat() calls and hangs the scan.
@@ -201,6 +242,18 @@ class MediaScannerService {
         try {
           final stat = await entity.stat();
           if (stat.size < 10 * 1024) continue;
+
+          final mtimeMs = stat.modified.millisecondsSinceEpoch;
+          final cachedMtime = cache[path];
+
+          // Skip files whose modification time hasn't changed since the last
+          // scan — they are already in the library and haven't been replaced.
+          if (cachedMtime != null && cachedMtime == mtimeMs) continue;
+
+          // New or modified file — update the cache entry.
+          cache[path] = mtimeMs;
+          cacheUpdated = true;
+
           alreadySeen.add(path);
           final fileName = path.split('/').last;
           results.add(MediaItem(
@@ -215,6 +268,10 @@ class MediaScannerService {
         } catch (_) {}
       }
     } catch (_) {}
+
+    // Persist the updated cache asynchronously so we don't block the scan.
+    if (cacheUpdated) unawaited(_saveMtimeCache());
+
     return results;
   }
 
@@ -288,8 +345,15 @@ class MediaScannerService {
 
     if (merged.isNotEmpty) return merged;
 
-    // Last resort: full filesystem walk (rooted devices, unusual storage layouts)
-    return _filesystemScan();
+    // Last resort: full filesystem walk (rooted devices, unusual storage layouts).
+    // Wrapped in try/catch — if storage permission is revoked mid-scan or the
+    // background isolate fails, return [] rather than crashing the library load.
+    try {
+      return await _filesystemScan();
+    } catch (e) {
+      debugPrint('[Scanner] Filesystem fallback failed: $e');
+      return [];
+    }
   }
 
   /// Scans a single directory (folder browser).

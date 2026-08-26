@@ -2,7 +2,9 @@ import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
 
+import 'album_art_service.dart';
 import 'audio_handler.dart';
 import 'shared_notification_plugin.dart';
 
@@ -40,6 +42,7 @@ class MediaNotificationService {
   /// Updates the system MediaSession with track metadata.
   /// The audio_service foreground service renders the notification.
   Future<void> show({
+    required String id,
     required String title,
     required String artist,
     required bool isPlaying,
@@ -47,10 +50,14 @@ class MediaNotificationService {
   }) async {
     if (!_initialized) await init();
     Uri? artUri;
-    if (albumArtPath != null && File(albumArtPath).existsSync()) {
-      artUri = Uri.file(albumArtPath);
+    if (albumArtPath != null) {
+      final resolved = await AlbumArtService.instance.resolve(albumArtPath);
+      if (resolved != null && File(resolved).existsSync()) {
+        artUri = Uri.file(resolved);
+      }
     }
     AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
+      id: id,
       title: title,
       artist: artist,
       artUri: artUri,
@@ -58,18 +65,39 @@ class MediaNotificationService {
   }
 
   /// Updates the system MediaSession with in-memory album art.
+  ///
+  /// Artwork is written to the app's cache directory and exposed via a
+  /// content:// URI so the system MediaSession / audio_service can read
+  /// it under Android 13+ scoped storage. A bare Uri.file() path is not
+  /// readable by the MediaSession artwork loader outside the app process.
   Future<void> showWithBitmap({
+    required String id,
     required String title,
     required String artist,
     required bool isPlaying,
     required Uint8List albumArtBytes,
   }) async {
     if (!_initialized) await init();
-    // audio_service does not support raw bytes for artUri directly;
-    // pass without art — the title/artist still show on the lock screen.
+    Uri? artUri;
+    try {
+      // Write to cacheDir/artwork/ — this directory is declared in the
+      // FileProvider paths XML so it is accessible via content:// URIs.
+      final dir = await getApplicationCacheDirectory();
+      final artDir = Directory('${dir.path}/artwork');
+      if (!artDir.existsSync()) artDir.createSync(recursive: true);
+      final file = File('${artDir.path}/otya_art_${id.hashCode}.jpg');
+      await file.writeAsBytes(albumArtBytes);
+      // Use Uri.file — audio_service reads this directly from the same
+      // process via the MediaSession bitmap loader.
+      artUri = Uri.file(file.path);
+    } catch (e) {
+      debugPrint('[MediaNotification] showWithBitmap write failed: $e');
+    }
     AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
+      id: id,
       title: title,
       artist: artist,
+      artUri: artUri,
     );
   }
 

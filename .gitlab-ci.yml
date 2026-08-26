@@ -30,9 +30,10 @@ variables:
   PUB_CACHE: "$CI_PROJECT_DIR/.pub-cache"
   # Parallel builds + 4 GB heap. Daemon disabled (stateless CI runners).
   GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=4 -Xmx4g -Dkotlin.incremental=false"
-  R2_ENDPOINT: "https://6c76d2a9e5f95d5f9b393e97374d9afb.r2.cloudflarestorage.com"
+  R2_ENDPOINT: "$R2_ENDPOINT_URL"
   R2_BUCKET: "otya-player-releases"
-  WORKER_URL: "https://petersmartlink.com"
+  # WORKER_URL and R2_ENDPOINT_URL are stored as protected CI/CD variables
+  # (Settings > CI/CD > Variables) and are NOT hardcoded here.
 
 stages:
   - prepare
@@ -151,7 +152,7 @@ build_apk_debug:
     - *free_disk_space
     - *inject_google_services
     # No --flavor flag: build.gradle has no product flavors defined.
-    - flutter build apk --debug --no-pub
+    - flutter build apk --debug --no-pub --dart-define=WORKER_URL="$WORKER_URL"
   artifacts:
     paths:
       # Output path without a flavor suffix.
@@ -180,9 +181,10 @@ build_release:
       flutter build apk --release --split-per-abi --no-pub \
         --target-platform android-arm,android-arm64 \
         --split-debug-info=build/debug-info \
-        --dart-define=OTYA_SECRET="$OTYA_SECRET" \
-        --dart-define=APP_ARCH=split \
-        --dart-define=SELF_UPDATE=true
+        --dart-define=$DART_DEFINE_SECRET \
+        --dart-define=$DART_DEFINE_ARCH \
+        --dart-define=$DART_DEFINE_UPDATE \
+        --dart-define=WORKER_URL="$WORKER_URL"
     # Verify APKs were produced before marking job successful
     - |
       for APK in \
@@ -224,7 +226,7 @@ publish_to_r2:
       - runner_system_failure
   environment:
     name: production
-    url: https://getotya.petersmartlink.com
+    url: https://petersmartlink.com
   rules:
     - if: '$CI_COMMIT_TAG =~ /^v\d+\.\d+\.\d+/ && $R2_ACCESS_KEY_ID && $R2_SECRET_ACCESS_KEY'
   variables:

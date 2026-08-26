@@ -52,7 +52,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
   bool _isScrolled = false;
 
   // Approximate height of header + pills + padding — content starts below this.
-  static const double _headerHeight = 122.0;
+  static const double _headerHeight = 152.0;
 
   @override
   bool get wantKeepAlive => true;
@@ -172,7 +172,8 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
         return _SongListView(songs: songs, scrollController: _scrollCtrl);
       case _MusicFilter.playlist:
         return Padding(
-          padding: const EdgeInsets.only(top: _headerHeight),
+          padding: EdgeInsets.only(
+              top: MediaQuery.of(context).padding.top + 128),
           child: const PlaylistsView(showCreateButton: false),
         );
       case _MusicFilter.folder:
@@ -200,7 +201,7 @@ class _MusicHeader extends ConsumerWidget {
         libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 0),
       child: Row(
         children: [
           Container(
@@ -288,13 +289,6 @@ class _MusicHeader extends ConsumerWidget {
               );
             },
           ),
-          const SizedBox(width: 6),
-          // Refresh
-          _IconBtn(
-            icon: Icons.refresh_rounded,
-            onTap: () =>
-                ref.read(mediaLibraryProvider.notifier).backgroundRefresh(),
-          ),
         ],
       ),
     );
@@ -310,7 +304,7 @@ class _FilterPills extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const pills = [
-      (_MusicFilter.allSongs, 'All Songs'),
+      (_MusicFilter.allSongs, 'Songs'),
       (_MusicFilter.playlist, 'Playlist'),
       (_MusicFilter.folder, 'Folder'),
       (_MusicFilter.album, 'Album'),
@@ -318,10 +312,10 @@ class _FilterPills extends ConsumerWidget {
     ];
 
     return SizedBox(
-      height: MediaQuery.of(context).size.width > 600 ? 60 : 52,
+      height: MediaQuery.of(context).size.width > 600 ? 60 : 56,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
         itemCount: pills.length,
         separatorBuilder: (_, __) => const SizedBox(width: 8),
         itemBuilder: (context, i) {
@@ -385,8 +379,12 @@ class _SongListView extends ConsumerWidget {
       controller: scrollController,
       physics: const BouncingScrollPhysics(),
       slivers: [
-        // Top space so content starts below the floating header
-        const SliverToBoxAdapter(child: SizedBox(height: _MusicTabScreenState._headerHeight)),
+        // Top space so content starts below the floating header.
+        // Use dynamic status-bar height so notch/tall-bar devices are handled
+        // correctly (128 = header content ~60dp + filter pills ~56dp + gaps ~12dp).
+        SliverToBoxAdapter(
+          child: SizedBox(height: MediaQuery.of(context).padding.top + 128),
+        ),
 
         // Shuffle all action bar
         SliverToBoxAdapter(
@@ -396,7 +394,7 @@ class _SongListView extends ConsumerWidget {
         // Song list
         SliverPadding(
           padding: EdgeInsets.fromLTRB(0, 4, 0,
-              MediaQuery.of(context).padding.bottom + 90),
+              MediaQuery.of(context).padding.bottom + 120),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {
@@ -656,7 +654,7 @@ class _SongOptionsSheet extends ConsumerWidget {
             const SizedBox(height: 12),
             const Padding(
               padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Add to Playlist',
+              child: Text('Add to List',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
@@ -668,7 +666,7 @@ class _SongOptionsSheet extends ConsumerWidget {
             if (playlists.isEmpty)
               const Padding(
                 padding: EdgeInsets.all(20),
-                child: Text('No playlists yet. Create one first.',
+                child: Text('No lists yet. Create one first.',
                     style: TextStyle(color: AppColors.textSecondary)),
               )
             else
@@ -781,7 +779,7 @@ class _SongOptionsSheet extends ConsumerWidget {
               ref.read(queueProvider.notifier).addToQueue(item);
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
-                  content: Text('Added to play next'),
+                  content: Text('Queued!'),
                   backgroundColor: AppColors.surface,
                 ),
               );
@@ -789,7 +787,7 @@ class _SongOptionsSheet extends ConsumerWidget {
           ),
           _OptionTile(
             icon: Icons.playlist_add_rounded,
-            label: 'Add to Playlist',
+            label: 'Add to List',
             color: AppColors.accentViolet,
             onTap: () {
               Navigator.pop(context);
@@ -1000,7 +998,7 @@ class _FoldersView extends ConsumerWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
@@ -1150,7 +1148,7 @@ class _AlbumsView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
@@ -1301,7 +1299,7 @@ class _ArtistsView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, _MusicTabScreenState._headerHeight + 8, 16,
+      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
