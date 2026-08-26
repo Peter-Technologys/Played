@@ -44,8 +44,15 @@ class _VerifyEmailScreenState extends State<VerifyEmailScreen> {
       _success = null;
       _loading = true;
     });
-    await AuthService.instance.sendVerificationOtp();
+    final sent = await AuthService.instance.sendVerificationOtp();
     if (!mounted) return;
+    if (!sent) {
+      setState(() {
+        _loading = false;
+        _error = 'We could not send the verification code. Check your connection and try again.';
+      });
+      return;
+    }
     setState(() {
       _loading = false;
       _success = 'If your account can receive verification mail, a code has been sent.';
