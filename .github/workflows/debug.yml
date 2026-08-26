@@ -28,9 +28,7 @@ env:
   # 7GB GitHub Actions runner. -Xmx4g caused OOM mid-build.
   # -XX:+UseG1GC: better GC pause behaviour for large heap builds.
   # org.gradle.caching=true: skip recompiling unchanged tasks on warm runs.
-  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Xmx3g -XX:MaxMetaspaceSize=512m -XX:+UseG1GC -Dkotlin.incremental=false -Dorg.gradle.caching=true"
-  TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-  TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Dorg.gradle.workers.max=2 -Xmx3g -XX:MaxMetaspaceSize=512m -XX:+UseG1GC -Dkotlin.incremental=false"
 
 jobs:
   build_debug:
