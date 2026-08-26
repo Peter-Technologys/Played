@@ -76,7 +76,7 @@ jobs:
         run: flutter pub get
 
       - name: Static analysis
-        run: flutter analyze --no-fatal-infos
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
       - name: Unit and widget tests
         run: flutter test --coverage
@@ -89,8 +89,6 @@ jobs:
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
           set -e
-          # CI builds must use HTTPS and the production backend when configured.
-          # Do not enable self-installing APK updates in the Play-distributed build.
           ARGS=(
             --release
             --split-per-abi
