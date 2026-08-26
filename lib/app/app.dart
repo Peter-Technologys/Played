@@ -10,7 +10,6 @@ import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/services/custom_theme_manager.dart';
-import '../core/services/fcm_service.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/widgets/announcement_dialog.dart';
 import '../core/widgets/update_dialog.dart';
@@ -32,23 +31,19 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     _checkOnboarding();
     CustomThemeManager.instance.load();
     _applyOverlayStyle(isDark: true);
-    // Wire the GoRouter's navigator key into FcmService so that foreground
-    // FCM messages can show in-app SnackBars via navigatorKey.currentContext.
-    FcmService.instance.navigatorKey = AppRouter.navigatorKey;
-    // Init remote theme — loads cache instantly, fetches update in background
     ThemeProvider.instance.initTheme();
-    // Delay dialogs by 2 seconds after the first frame so that DB,
-    // notifications, and background services finish initialising first.
-    // Showing them immediately on the first frame can cause
-    // "setState after dispose" crashes during the startup window.
     SchedulerBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
-        try { AnnouncementDialog.showIfPending(context); } catch (_) {}
+        try {
+          AnnouncementDialog.showIfPending(context);
+        } catch (_) {}
       });
       Future.delayed(const Duration(seconds: 4), () {
         if (!mounted) return;
-        try { UpdateDialog.checkAndShow(context); } catch (_) {}
+        try {
+          UpdateDialog.checkAndShow(context);
+        } catch (_) {}
       });
     });
   }
@@ -56,8 +51,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void _applyOverlayStyle({required bool isDark}) {
     SystemChrome.setSystemUIOverlayStyle(SystemUiOverlayStyle(
       statusBarColor: Colors.transparent,
-      statusBarIconBrightness:
-          isDark ? Brightness.light : Brightness.dark,
+      statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
       systemNavigationBarColor:
           isDark ? const Color(0xFF0F1117) : const Color(0xFFF5F7FA),
       systemNavigationBarIconBrightness:
@@ -69,9 +63,19 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     try {
       final prefs = await SharedPreferences.getInstance();
       final done = prefs.getBool('onboarding_done') ?? false;
-      if (mounted) setState(() { _onboardingDone = done; _checking = false; });
+      if (mounted) {
+        setState(() {
+          _onboardingDone = done;
+          _checking = false;
+        });
+      }
     } catch (_) {
-      if (mounted) setState(() { _onboardingDone = true; _checking = false; });
+      if (mounted) {
+        setState(() {
+          _onboardingDone = true;
+          _checking = false;
+        });
+      }
     }
   }
 
@@ -87,15 +91,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   Widget build(BuildContext context) {
     final settings = ref.watch(settingsProvider);
     final locale = ref.watch(localeProvider);
-    // For System mode, follow the actual platform brightness.
-    final platformBrightness =
-        SchedulerBinding.instance.platformDispatcher.platformBrightness;
-    final isDark = settings.themeMode == AppThemeMode.dark ||
-        settings.themeMode == AppThemeMode.amoled ||
-        (settings.themeMode == AppThemeMode.system &&
-            platformBrightness == Brightness.dark);
 
-    // Update status-bar icon brightness whenever theme changes.
     ref.listen<AppSettings>(settingsProvider, (prev, next) {
       if (prev?.themeMode != next.themeMode) {
         _applyOverlayStyle(isDark: next.themeMode != AppThemeMode.light);
@@ -129,11 +125,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.black,
-                    size: 44,
-                  ),
+                  child: const Icon(Icons.play_arrow_rounded, color: Colors.black, size: 44),
                 ),
                 const SizedBox(height: 20),
                 const Text(
@@ -147,10 +139,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                   ),
                 ),
                 const SizedBox(height: 32),
-                const CircularProgressIndicator(
-                  color: AppColors.accent,
-                  strokeWidth: 2,
-                ),
+                const CircularProgressIndicator(color: AppColors.accent, strokeWidth: 2),
               ],
             ),
           ),
@@ -159,17 +148,11 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     }
 
     return ListenableBuilder(
-      // Listen to both wallpaper changes AND remote theme changes
       listenable: Listenable.merge([
         CustomThemeManager.instance,
         ThemeProvider.instance,
       ]),
       builder: (context, _) {
-        // Use remote theme when available.
-        // If the remote theme declares is_dark_mode: false it goes into the
-        // light slot; otherwise it replaces the dark slot.
-        // This ensures the remote theme is actually applied regardless of
-        // whether the user has dark or light mode selected.
         final remoteThemeData = ThemeProvider.instance.hasTheme
             ? ThemeProvider.instance.currentThemeData
             : null;
@@ -188,21 +171,16 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         return MaterialApp.router(
           title: 'OTYA Player',
           debugShowCheckedModeBanner: false,
-          theme:     effectiveLightTheme,
+          theme: effectiveLightTheme,
           darkTheme: effectiveDarkTheme,
           themeMode: switch (settings.themeMode) {
-            AppThemeMode.dark   => ThemeMode.dark,
+            AppThemeMode.dark => ThemeMode.dark,
             AppThemeMode.amoled => ThemeMode.dark,
-            AppThemeMode.light  => ThemeMode.light,
+            AppThemeMode.light => ThemeMode.light,
             AppThemeMode.system => ThemeMode.system,
           },
           locale: locale,
-          supportedLocales: const [
-            Locale('en'),
-            Locale('fr'),
-            Locale('es'),
-            Locale('sw'),
-          ],
+          supportedLocales: const [Locale('en'), Locale('fr'), Locale('es'), Locale('sw')],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -215,16 +193,13 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                 ? Theme(
                     data: Theme.of(context).copyWith(
                       scaffoldBackgroundColor: Colors.black,
-                      colorScheme: Theme.of(context).colorScheme.copyWith(
-                        surface: Colors.black,
-                      ),
+                      colorScheme: Theme.of(context).colorScheme.copyWith(surface: Colors.black),
                     ),
                     child: child ?? const SizedBox.shrink(),
                   )
                 : (child ?? const SizedBox.shrink());
 
-            final wallpaperDecoration =
-                CustomThemeManager.instance.wallpaperDecoration;
+            final wallpaperDecoration = CustomThemeManager.instance.wallpaperDecoration;
             if (wallpaperDecoration != null) {
               wrappedChild = Container(
                 decoration: BoxDecoration(image: wallpaperDecoration),
