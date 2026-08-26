@@ -60,10 +60,6 @@ dependencies:
   # Notifications
   flutter_local_notifications: ^18.0.1
 
-  # Firebase — FCM push notifications (update alerts + announcements)
-  firebase_core: ^3.13.0
-  firebase_messaging: ^15.2.5
-
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.4
 

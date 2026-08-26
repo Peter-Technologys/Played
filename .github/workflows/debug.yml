@@ -91,18 +91,8 @@ jobs:
           restore-keys: |
             gradle-
 
-      # ── Inject google-services.json ────────────────────────────────────
-      # vars can be used in run scripts directly via ${{ vars.X }}
-      - name: Write google-services.json
-        env:
-          GOOGLE_SERVICES_JSON: ${{ vars.GOOGLE_SERVICES_JSON }}
-        run: |
-          if [ -z "$GOOGLE_SERVICES_JSON" ]; then
-            echo "WARNING: GOOGLE_SERVICES_JSON not set — creating a placeholder."
-            echo '{"project_info":{"project_number":"000000000000","project_id":"placeholder","storage_bucket":"placeholder.appspot.com"},"client":[{"client_info":{"mobilesdk_app_id":"1:000000000000:android:0000000000000000","android_client_info":{"package_name":"com.otyaplayer.app"}},"oauth_client":[],"api_key":[{"current_key":"placeholder"}],"services":{"appinvite_service":{"other_platform_oauth_client":[]}}}],"configuration_version":"1"}' > android/app/google-services.json
-          else
-            echo "$GOOGLE_SERVICES_JSON" > android/app/google-services.json
-          fi
+      # Firebase removed — google-services.json no longer needed.
+      # (Step intentionally omitted.)
 
       - name: Decode keystore
         run: |
