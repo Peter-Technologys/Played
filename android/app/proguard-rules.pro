@@ -45,9 +45,15 @@
 # workmanager
 -keep class be.tramckrijte.workmanager.** { *; }
 -dontwarn be.tramckrijte.workmanager.**
-# Keep our own WorkManager worker so R8 does not rename it
-# Single wildcard covers UpdateCheckWorker, BootReceiver, NotificationDismissReceiver
+# ── App classes (workers, receivers, services, activities) ───────────────
+# Explicit keeps for all app-defined classes.
+# R8 fullMode was stripping MainActivity and BootReceiver by name,
+# causing ClassNotFoundException on launch (14 crashes confirmed).
 -keep class com.otyaplayer.app.** { *; }
+-keep class com.otyaplayer.app.MainActivity { *; }
+-keep class com.otyaplayer.app.BootReceiver { *; }
+-keep class com.otyaplayer.app.NotificationDismissReceiver { *; }
+-keep class com.otyaplayer.app.UpdateCheckWorker { *; }
 
 # connectivity_plus
 -keep class dev.fluttercommunity.plus.connectivity.** { *; }
