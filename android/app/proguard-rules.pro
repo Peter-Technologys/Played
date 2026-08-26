@@ -46,10 +46,48 @@
 -keep class be.tramckrijte.workmanager.** { *; }
 -dontwarn be.tramckrijte.workmanager.**
 # Keep our own WorkManager worker so R8 does not rename it
--keep class com.otyaplayer.app.UpdateCheckWorker { *; }
-# Keep BroadcastReceivers declared in AndroidManifest
--keep class com.otyaplayer.app.BootReceiver { *; }
--keep class com.otyaplayer.app.NotificationDismissReceiver { *; }
+# Single wildcard covers UpdateCheckWorker, BootReceiver, NotificationDismissReceiver
+-keep class com.otyaplayer.app.** { *; }
+
+# connectivity_plus
+-keep class dev.fluttercommunity.plus.connectivity.** { *; }
+-dontwarn dev.fluttercommunity.plus.connectivity.**
+
+# network_info_plus
+-keep class dev.fluttercommunity.plus.network_info.** { *; }
+-dontwarn dev.fluttercommunity.plus.network_info.**
+
+# permission_handler
+-keep class com.baseflow.permissionhandler.** { *; }
+-dontwarn com.baseflow.permissionhandler.**
+
+# package_info_plus / device_info_plus
+-keep class dev.fluttercommunity.plus.packageinfo.** { *; }
+-keep class dev.fluttercommunity.plus.deviceinfo.** { *; }
+-dontwarn dev.fluttercommunity.plus.**
+
+# share_plus
+-keep class dev.fluttercommunity.plus.share.** { *; }
+-dontwarn dev.fluttercommunity.plus.share.**
+
+# url_launcher
+-keep class io.flutter.plugins.urllauncher.** { *; }
+-dontwarn io.flutter.plugins.urllauncher.**
+
+# image_picker
+-keep class io.flutter.plugins.imagepicker.** { *; }
+-dontwarn io.flutter.plugins.imagepicker.**
+
+# path_provider
+-keep class io.flutter.plugins.pathprovider.** { *; }
+-dontwarn io.flutter.plugins.pathprovider.**
+
+# Firebase MessagingService subclass (referenced by name in AndroidManifest)
+-keep class * extends com.google.firebase.messaging.FirebaseMessagingService { *; }
+
+# androidx.work — WorkManager internals
+-keep class androidx.work.** { *; }
+-dontwarn androidx.work.**
 
 # open_filex
 -keep class com.crazecoder.openfile.** { *; }
