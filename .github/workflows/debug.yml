@@ -123,16 +123,18 @@ jobs:
               -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
           fi
 
-      - name: Flutter pub get
-        run: flutter pub get
+      - name: Stop Gradle daemons
+        run: cd android && ./gradlew --stop || true
 
-      # ── Clean stale outputs AFTER pub get so .dart_tool is preserved
-      - name: Clean stale build outputs
+      - name: Clean project
         run: |
           echo "Building commit: $(git rev-parse HEAD)"
           git log -1 --oneline
-          rm -rf build/ android/app/build/
-          rm -rf android/app/build/
+          rm -rf build .dart_tool android/.gradle android/app/build
+          flutter clean
+
+      - name: Flutter pub get
+        run: flutter pub get
 
       - name: Build release APK
         env:
@@ -143,12 +145,22 @@ jobs:
           DD_SECRET: ${{ secrets.OTYA_SECRET }}
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
-          flutter build apk --release --split-per-abi \
+          flutter build apk --release --split-per-abi --verbose \
             --target-platform android-arm,android-arm64 \
             --dart-define=OTYA_SECRET=$DD_SECRET \
             --dart-define=APP_ARCH=arm64 \
             --dart-define=SELF_UPDATE=true \
             --dart-define=WORKER_URL=$DD_WORKER_URL
+
+      - name: Diagnose APK outputs
+        if: always()
+        run: |
+          echo "=== Flutter APK output ==="
+          ls -la build/app/outputs/flutter-apk/ 2>/dev/null || echo "(directory not found)"
+          echo "=== All APKs under build/ ==="
+          find build -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
+          echo "=== All APKs under android/app/build/ ==="
+          find android/app/build/outputs -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
 
       # Verify APKs exist and are not empty (fails if build was broken)
       - name: Verify APKs
