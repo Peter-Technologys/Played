@@ -11,19 +11,20 @@
 -keep class hive.** { *; }
 -keep class com.hivedb.** { *; }
 
-# Flutter
+# Flutter core — keep all plugin registrars and embedding classes
 -keep class io.flutter.** { *; }
 -dontwarn io.flutter.**
-
-# just_audio — REMOVED (replaced by media_kit for audio playback)
+# Plugin registrars are loaded by class name via reflection
+-keep class * extends io.flutter.embedding.engine.plugins.FlutterPlugin { *; }
+# All Android components declared in AndroidManifest are loaded by name
+-keep class * extends android.app.Service { *; }
+-keep class * extends android.content.BroadcastReceiver { *; }
+-keep class * extends android.content.ContentProvider { *; }
+-keep class * extends android.app.Activity { *; }
 
 # audio_service — keep service + handler so background playback works in release
 -keep class com.ryanheise.audioservice.** { *; }
 -dontwarn com.ryanheise.audioservice.**
-
-# audio_session — REMOVED (was only needed by just_audio)
-
-# flutter_vlc_player — REMOVED (not in pubspec; flutter_vlc_player replaced by media_kit)
 
 # media_kit — keep ALL subpackages (video + core + native bridge)
 -keep class com.alexmercerind.media_kit.** { *; }
