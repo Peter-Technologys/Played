@@ -113,6 +113,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
               (d.primaryVelocity ?? 0) > 400) {
             _dismiss();
           } else {
+            // Snap back smoothly — reset drag offset so the mini player
+            // returns to its resting position without staying visually offset.
             setState(() => _dragOffset = 0);
           }
         },
@@ -137,7 +139,10 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
           duration: const Duration(milliseconds: 80),
           transform: Matrix4.translationValues(0, _dragOffset, 0),
           child: Opacity(
-            opacity: (1 - _dragOffset / (_dismissThreshold * 2)).clamp(0.3, 1.0),
+            // Fade from fully opaque down to 0 as the user drags to dismiss.
+            // Previously clamped at 0.3, which left the mini player partially
+            // visible even at full drag distance — now fades to transparent.
+            opacity: (1 - _dragOffset / (_dismissThreshold * 1.5)).clamp(0.0, 1.0),
             child: Container(
               // Add system bottom padding so the mini player sits above the
               // navigation bar on gesture-navigation devices.
