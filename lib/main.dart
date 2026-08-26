@@ -45,15 +45,15 @@ Future<void> main() async {
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
-    unawaited(CrashReporter.instance.report(
+    CrashReporter.instance.report(
       details.exception,
       details.stack ?? StackTrace.empty,
-    ));
+    );
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
-    unawaited(CrashReporter.instance.report(error, stack));
+    CrashReporter.instance.report(error, stack);
     return true;
   };
 
@@ -75,7 +75,7 @@ Future<void> main() async {
       AudioHandlerSingleton.instance.handler = audioHandler;
     } catch (e, st) {
       debugPrint('[AudioService] init failed: $e\n$st');
-      unawaited(CrashReporter.instance.report(e, st));
+      CrashReporter.instance.report(e, st);
     }
 
     final databaseReady = await _initDatabase();
@@ -85,7 +85,7 @@ Future<void> main() async {
       savedSettings = await AppSettings.load();
     } catch (e, st) {
       debugPrint('[Settings] load failed: $e\n$st');
-      unawaited(CrashReporter.instance.report(e, st));
+      CrashReporter.instance.report(e, st);
       savedSettings = const AppSettings();
     }
 
@@ -103,7 +103,7 @@ Future<void> main() async {
     unawaited(_initBackground(savedSettings, databaseReady));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
-    unawaited(CrashReporter.instance.report(error, stack));
+    CrashReporter.instance.report(error, stack);
   });
 }
 
@@ -113,7 +113,7 @@ Future<bool> _initDatabase() async {
     return true;
   } catch (e, st) {
     debugPrint('[OtyaDB] Init error: $e\n$st');
-    unawaited(CrashReporter.instance.report(e, st));
+    CrashReporter.instance.report(e, st);
     return false;
   }
 }
@@ -154,7 +154,7 @@ Future<void> _safeBackground(String name, Future<void> Function() task) async {
     await task();
   } catch (e, st) {
     debugPrint('[Background:$name] Error: $e\n$st');
-    unawaited(CrashReporter.instance.report(e, st));
+    CrashReporter.instance.report(e, st);
   }
 }
 
