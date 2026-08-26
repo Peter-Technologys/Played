@@ -28,8 +28,6 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  // OTYA supports portrait and landscape so video playback and modern
-  // Android devices are not artificially constrained to portrait.
   await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
@@ -51,21 +49,15 @@ Future<void> main() async {
       details.exception,
       details.stack ?? StackTrace.empty,
     ));
-    if (kDebugMode) {
-      _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
-    }
   };
 
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
     unawaited(CrashReporter.instance.report(error, stack));
-    if (kDebugMode) _showCrashOverlay('Platform Error', '$error\n\n$stack');
     return true;
   };
 
   await runZonedGuarded(() async {
-    // Audio is optional during startup. A native audio-service failure must
-    // never prevent the application UI from opening.
     try {
       final audioHandler = await AudioService.init(
         builder: () => OtyaAudioHandler(),
@@ -94,7 +86,7 @@ Future<void> main() async {
     } catch (e, st) {
       debugPrint('[Settings] load failed: $e\n$st');
       unawaited(CrashReporter.instance.report(e, st));
-      savedSettings = AppSettings.defaults();
+      savedSettings = const AppSettings();
     }
 
     runApp(
@@ -108,55 +100,11 @@ Future<void> main() async {
       ),
     );
 
-    // Background services must never become a startup dependency.
     unawaited(_initBackground(savedSettings, databaseReady));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
     unawaited(CrashReporter.instance.report(error, stack));
-    if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
   });
-}
-
-void _showCrashOverlay(String title, String details) {
-  if (!kDebugMode) return;
-  runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: const Color(0xFF1A0000),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.bug_report, color: Color(0xFFFF4444), size: 40),
-                const SizedBox(height: 8),
-                Text('OTYA CRASH: $title', style: const TextStyle(
-                  color: Color(0xFFFF4444), fontSize: 16, fontWeight: FontWeight.bold,
-                )),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A0000),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(details, style: const TextStyle(
-                    color: Color(0xFFFFCCCC), fontSize: 11, fontFamily: 'monospace',
-                  )),
-                ),
-                const SizedBox(height: 16),
-                const Text('This diagnostic screen is debug-only.', style: TextStyle(
-                  color: Color(0xFFAAAAAA), fontSize: 12,
-                )),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 Future<bool> _initDatabase() async {
@@ -166,18 +114,15 @@ Future<bool> _initDatabase() async {
   } catch (e, st) {
     debugPrint('[OtyaDB] Init error: $e\n$st');
     unawaited(CrashReporter.instance.report(e, st));
-    // Never destroy a user's database as automatic crash recovery.
     return false;
   }
 }
 
 Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) async {
-  // Each service owns its failure. One optional service must not cancel the rest.
   await _safeBackground('notifications', _initNotifications);
   await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
   await _safeBackground('connectivity', ConnectivityService.instance.init);
   await _safeBackground('cache', CacheService.instance.init);
-
   unawaited(_safeBackground('cache eviction', CacheService.instance.evictExpired));
 
   if (databaseReady) {
