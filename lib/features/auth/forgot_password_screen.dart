@@ -121,7 +121,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 20),
         _GradientButton(label: 'Reset Password', loading: _loading, onPressed: _resetPassword),
         const SizedBox(height: 12),
-        TextButton(onPressed: _loading ? null : () => setState(() { _step = 1; _error = null; }), child: const Text('Resend code', style: TextStyle(color: AppColors.accent, fontFamily: 'Inter'))),
+        TextButton(onPressed: _loading ? null : _sendOtp, child: const Text('Resend code', style: TextStyle(color: AppColors.accent, fontFamily: 'Inter'))),
       ],
     );
   }
