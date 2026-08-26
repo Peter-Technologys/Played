@@ -9,7 +9,6 @@ import 'core/services/audio_handler.dart';
 import 'app/app.dart';
 import 'core/database/otya_database.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/media_notification_service.dart';
 import 'core/services/phone_state_service.dart';
 import 'core/services/pip_service.dart';
 import 'core/services/playback_coordinator.dart';
@@ -24,13 +23,17 @@ import 'core/services/update_service.dart';
 import 'core/services/device_service.dart';
 import 'features/settings/settings_provider.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations([
+  // Do not lock the entire application to portrait: video playback and
+  // responsive layouts need to support landscape and modern Android devices.
+  await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -58,10 +61,12 @@ void main() async {
     return true;
   };
 
-  // Audio is an enhancement, not a prerequisite for rendering the UI.
+  // Media-session setup is optional: the UI must remain usable if Android's
+  // media service is temporarily unavailable or misconfigured.
+  OtyaAudioHandler? audioHandler;
   try {
-    final audioHandler = await AudioService.init(
-      builder: () => OtyaAudioHandler(),
+    final handler = await AudioService.init(
+      builder: OtyaAudioHandler.new,
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player — Now Playing',
@@ -73,15 +78,26 @@ void main() async {
         preloadArtwork: false,
       ),
     );
-    AudioHandlerSingleton.instance.handler = audioHandler;
+    audioHandler = handler;
+    AudioHandlerSingleton.instance.handler = handler;
   } catch (e, st) {
     debugPrint('[AudioService] init failed: $e\n$st');
     unawaited(CrashReporter.instance.report(e, st));
   }
 
-  await runZonedGuarded(() async {
+  // The application always reaches runApp even when an optional subsystem
+  // fails. Startup must never depend on network, notifications, updates, or
+  // device registration.
+  try {
     final databaseReady = await _initDatabase();
-    final savedSettings = await AppSettings.load();
+    AppSettings savedSettings;
+    try {
+      savedSettings = await AppSettings.load();
+    } catch (e, st) {
+      debugPrint('[Settings] load failed: $e\n$st');
+      unawaited(CrashReporter.instance.report(e, st));
+      savedSettings = AppSettings.defaults();
+    }
 
     runApp(
       ProviderScope(
@@ -94,13 +110,15 @@ void main() async {
       ),
     );
 
-    // Background services must never become a startup dependency.
     unawaited(_initBackground(savedSettings, databaseReady));
-  }, (error, stack) {
-    debugPrint('[ZoneError] $error\n$stack');
-    unawaited(CrashReporter.instance.report(error, stack));
-    if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
-  });
+  } catch (e, st) {
+    // A catastrophic startup dependency must still produce a recoverable UI
+    // rather than a blank/crashed process. Database data is never deleted here.
+    debugPrint('[Startup] $e\n$st');
+    unawaited(CrashReporter.instance.report(e, st));
+    runApp(const ProviderScope(child: OtyaPlayerApp()));
+    if (kDebugMode) _showCrashOverlay('Startup Error', '$e\n\n$st');
+  }
 }
 
 void _showCrashOverlay(String title, String details) {
@@ -158,19 +176,14 @@ Future<bool> _initDatabase() async {
 }
 
 Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) async {
-  // Each service owns its failure. One optional service must not cancel the rest.
   await _safeBackground('notifications', _initNotifications);
   await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
   await _safeBackground('connectivity', ConnectivityService.instance.init);
   await _safeBackground('cache', CacheService.instance.init);
-
   unawaited(_safeBackground('cache eviction', CacheService.instance.evictExpired));
 
   if (databaseReady) {
-    unawaited(_safeBackground(
-      'device registration',
-      DeviceService.instance.registerIfNeeded,
-    ));
+    unawaited(_safeBackground('device registration', DeviceService.instance.registerIfNeeded));
   }
 
   unawaited(_safeBackground('update check', UpdateService.instance.checkAndNotify));
@@ -180,28 +193,53 @@ Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) asyn
     () => PlaybackCoordinator.instance.activePlayer?.play(),
   );
 
-  unawaited(_safeBackground(
-    'call handling',
-    () => PhoneStateService.instance.setPauseDuringCalls(
-      savedSettings.pauseDuringCalls,
-    ),
-  ));
-  unawaited(_safeBackground('FCM', FcmService.instance.init));
-  unawaited(_safeBackground('crash reporter', CrashReporter.instance.init));
+  _initPushNotifications();
+  _initPhoneState();
+  _initFcm();
+  _initUpdateNotifications(savedSettings);
 }
 
 Future<void> _safeBackground(String name, Future<void> Function() task) async {
   try {
     await task();
   } catch (e, st) {
-    debugPrint('[Background:$name] Error: $e\n$st');
+    debugPrint('[$name] failed: $e\n$st');
     unawaited(CrashReporter.instance.report(e, st));
   }
 }
 
 Future<void> _initNotifications() async {
-  await _safeBackground('notification service', NotificationService.instance.init);
-  await _safeBackground('update notifications', UpdateNotificationService.instance.init);
-  await _safeBackground('media notifications', MediaNotificationService.instance.init);
-  await _safeBackground('push notifications', PushNotificationService.instance.init);
+  await NotificationService.instance.init();
+}
+
+void _initPushNotifications() {
+  try {
+    PushNotificationService.instance.init();
+  } catch (e, st) {
+    debugPrint('[PushNotifications] init failed: $e\n$st');
+  }
+}
+
+void _initPhoneState() {
+  try {
+    PhoneStateService.instance.initialize();
+  } catch (e, st) {
+    debugPrint('[PhoneState] init failed: $e\n$st');
+  }
+}
+
+void _initFcm() {
+  try {
+    FcmService.instance.initialize();
+  } catch (e, st) {
+    debugPrint('[FCM] init failed: $e\n$st');
+  }
+}
+
+void _initUpdateNotifications(AppSettings settings) {
+  try {
+    UpdateNotificationService.instance.initialize(settings);
+  } catch (e, st) {
+    debugPrint('[UpdateNotifications] init failed: $e\n$st');
+  }
 }
