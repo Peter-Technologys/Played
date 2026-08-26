@@ -145,6 +145,12 @@ jobs:
           DD_SECRET: ${{ secrets.OTYA_SECRET }}
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
+          # Wipe all known APK output locations so the post-build existence
+          # check can only find APKs produced by THIS run, not stale files.
+          rm -rf build/app/outputs/flutter-apk
+          rm -rf android/app/build/outputs/flutter-apk
+          rm -rf android/app/build/outputs/apk/release
+
           flutter build apk --release --split-per-abi --verbose \
             --target-platform android-arm,android-arm64 \
             --dart-define=OTYA_SECRET=$DD_SECRET \
@@ -157,11 +163,16 @@ jobs:
           # for APKs in build/app/outputs/flutter-apk/ (repo root) but AGP 8.x
           # places them under android/app/build/outputs/. Stage them first,
           # then only propagate the failure if APKs genuinely don't exist.
-          ARM64_GRADLE="android/app/build/outputs/flutter-apk/app-arm64-v8a-release.apk"
-          ARM64_FALLBACK="android/app/build/outputs/apk/release/app-arm64-v8a-release.apk"
+          #
+          # Require BOTH ABI splits — a partial output is not acceptable.
+          ARM64_A="android/app/build/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          ARM32_A="android/app/build/outputs/flutter-apk/app-armeabi-v7a-release.apk"
+          ARM64_B="android/app/build/outputs/apk/release/app-arm64-v8a-release.apk"
+          ARM32_B="android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk"
 
-          if [ -f "$ARM64_GRADLE" ] || [ -f "$ARM64_FALLBACK" ]; then
-            echo "Gradle produced APKs — staging to Flutter expected location."
+          if { [ -f "$ARM64_A" ] && [ -f "$ARM32_A" ]; } || \
+             { [ -f "$ARM64_B" ] && [ -f "$ARM32_B" ]; }; then
+            echo "Gradle produced both APK splits — staging to Flutter expected location."
             mkdir -p build/app/outputs/flutter-apk
             cp android/app/build/outputs/flutter-apk/*.apk \
                build/app/outputs/flutter-apk/ 2>/dev/null || true
@@ -172,8 +183,10 @@ jobs:
             exit 0
           fi
 
-          # No APKs found anywhere — Gradle itself failed. Propagate the real exit code.
-          echo "ERROR: No APKs found. Gradle build genuinely failed."
+          # APKs missing or incomplete — Gradle itself failed.
+          echo "ERROR: Expected both arm64 and arm32 APKs not found. Gradle build genuinely failed."
+          echo "=== Gradle output dirs ==="
+          find android/app/build/outputs -type f -name "*.apk" 2>/dev/null || echo "(none)"
           exit $BUILD_EXIT
 
       - name: Diagnose APK outputs
