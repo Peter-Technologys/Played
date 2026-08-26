@@ -41,10 +41,14 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
       return;
     }
     setState(() { _loading = true; _error = null; });
-    await AuthService.instance.forgotPassword(email);
+    final sent = await AuthService.instance.forgotPassword(email);
     if (!mounted) return;
+    setState(() => _loading = false);
+    if (!sent) {
+      setState(() => _error = 'We could not contact the password-reset service. Check your connection and try again.');
+      return;
+    }
     setState(() {
-      _loading = false;
       _email = email;
       _step = 2;
     });
