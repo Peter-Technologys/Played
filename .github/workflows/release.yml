@@ -59,6 +59,9 @@ jobs:
 
       - uses: subosito/flutter-action@v2
         with:
+          # Pin to 3.32.x — matches debug.yml. Prevents the release workflow
+          # from silently switching toolchains when a new stable drops.
+          flutter-version: "3.32.x"
           channel: stable
           cache: true
 
@@ -100,16 +103,46 @@ jobs:
 
       - name: Build split APKs (arm64 + arm32)
         env:
-          # Absolute path — Gradle's file() resolves relative to android/,
-          # not the repo root, so a relative path always misses the keystore.
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         run: |
+          # Wipe known APK output dirs so the existence check below can only
+          # find APKs produced by THIS run, not stale files from a prior attempt.
+          rm -rf build/app/outputs/flutter-apk
+          rm -rf android/app/build/outputs/flutter-apk
+          rm -rf android/app/build/outputs/apk/release
+
           flutter build apk --release --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --split-debug-info=build/debug-info
+          BUILD_EXIT=$?
+
+          # Flutter may exit 1 even when Gradle succeeded (AGP 8.x outputs APKs
+          # to android/app/build/outputs/ but Flutter scans build/ at repo root).
+          # Require BOTH splits before overriding Flutter's exit code.
+          ARM64_A="android/app/build/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          ARM32_A="android/app/build/outputs/flutter-apk/app-armeabi-v7a-release.apk"
+          ARM64_B="android/app/build/outputs/apk/release/app-arm64-v8a-release.apk"
+          ARM32_B="android/app/build/outputs/apk/release/app-armeabi-v7a-release.apk"
+
+          if { [ -f "$ARM64_A" ] && [ -f "$ARM32_A" ]; } || \
+             { [ -f "$ARM64_B" ] && [ -f "$ARM32_B" ]; }; then
+            echo "Gradle produced both APK splits — staging to Flutter expected location."
+            mkdir -p build/app/outputs/flutter-apk
+            cp android/app/build/outputs/flutter-apk/*.apk \
+               build/app/outputs/flutter-apk/ 2>/dev/null || true
+            cp android/app/build/outputs/apk/release/*.apk \
+               build/app/outputs/flutter-apk/ 2>/dev/null || true
+            echo "Staged APKs:"
+            ls -lh build/app/outputs/flutter-apk/
+            exit 0
+          fi
+
+          echo "ERROR: Expected both arm64 and arm32 APKs not found. Gradle build genuinely failed."
+          find android/app/build/outputs -type f -name "*.apk" 2>/dev/null || echo "(none)"
+          exit $BUILD_EXIT
 
       - name: Remove secrets
         if: always()
@@ -126,8 +159,8 @@ jobs:
           ARM32_SIZE=$(stat -c%s build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk)
           [ "$ARM64_SIZE" -gt 5000000 ] || { echo "ERROR: arm64 APK too small ($ARM64_SIZE bytes)"; exit 1; }
           [ "$ARM32_SIZE" -gt 5000000 ] || { echo "ERROR: arm32 APK too small ($ARM32_SIZE bytes)"; exit 1; }
-          echo "arm64: $ARM64_SIZE bytes OK"
-          echo "arm32: $ARM32_SIZE bytes OK"
+          echo "arm64: $ARM64_SIZE bytes | sha256=$(sha256sum build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | cut -d' ' -f1)"
+          echo "arm32: $ARM32_SIZE bytes | sha256=$(sha256sum build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk | cut -d' ' -f1)"
 
       - name: Resolve APK paths
         id: apk
