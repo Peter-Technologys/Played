@@ -105,39 +105,14 @@ jobs:
           fi
 
       - name: Flutter pub get
-        run: flutter pub get --no-precompile
+        run: flutter pub get
 
-      - name: Flutter analyze (non-fatal)
-        run: flutter analyze --no-fatal-infos --no-fatal-warnings || true
-
-      # ── Decode keystore (if available) ────────────────────────────────
-      # secrets cannot be referenced in shell `if` via ${{ }} — pass via env instead
-      - name: Decode keystore
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
-        run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > $GITHUB_WORKSPACE/android/app/keystore.jks
-          else
-            echo "WARNING: KEYSTORE_BASE64 not set - APK will use debug signing."
-          fi
-
-      # ── Pre-build diagnostics ──────────────────────────────────────
-      - name: Pre-build diagnostics
-        run: |
-          echo "=== Commit being built ==="
-          git rev-parse HEAD
-          git log -1 --oneline
-          df -h
-          ls /usr/local/lib/android/sdk/cmake/ || echo "CMake not cached — will be downloaded"
-
-      # ── Clean stale outputs ────────────────────────────────────────
-      # Removes any APKs left over from previous runs so the upload step
-      # can never pick up a stale artifact from a failed build.
+      # ── Clean stale outputs AFTER pub get so .dart_tool is preserved
       - name: Clean stale build outputs
         run: |
-          flutter clean
-          rm -rf build/
+          echo "Building commit: $(git rev-parse HEAD)"
+          git log -1 --oneline
+          rm -rf build/ android/app/build/
           rm -rf android/app/build/
 
       # ── Build release APK ───────────────────────────────────────
