@@ -11,11 +11,15 @@ Play any audio or video file, 100% offline. No account required.
 [![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev)
 [![License: MIT](https://img.shields.io/badge/License-MIT-00D4FF.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)]()
-[![Version](https://img.shields.io/badge/Version-1.4.0-8A2BE2)]()
+[![Version](https://img.shields.io/badge/Version-1.6.0-8A2BE2)]()
 
 </div>
 
 ---
+
+## OTYA System
+
+OTYA Player is the official Android media product of **OTYA System**. Authentication, platform APIs, updates, downloads and account services are provided by the OTYA platform backend.
 
 ## Features
 
@@ -23,11 +27,11 @@ Play any audio or video file, 100% offline. No account required.
 |---|---|
 | **My Space** | Unified media hub — songs, videos, folders tabs, recently played, search, sort, pin folders |
 | **Audio Player** | Shuffle, repeat, speed (0.5×–2×), 5-band EQ, LRC lyrics, queue, sleep timer, share |
-| **Video Player** | Hardware-accelerated VLC, subtitles (.srt/.ass), aspect ratio, PiP, battery saver, gesture controls |
-| **Air-Drop** | Zero-data file sharing via Wi-Fi Direct + Bluetooth (Nearby Connections) |
+| **Video Player** | Hardware-accelerated media playback, subtitles, aspect ratio, PiP, battery saver, gesture controls |
+| **Air-Drop** | Zero-data file sharing over supported local connectivity |
 | **Vault** | Private media vault with biometric + PIN unlock |
 | **Playlists** | Create, rename, reorder, play playlists |
-| **Profile & Settings** | Google sign-in, cloud backup, appearance, audio, privacy |
+| **Profile & Settings** | Account, cloud backup, appearance, audio and privacy settings |
 | **Tools** | Browse by Folder, Storage Cleaner |
 
 ---
@@ -49,12 +53,12 @@ lib/
 │   ├── database/           # Hive setup, adapters
 │   ├── models/             # MediaItem, Playlist, VaultItem
 │   ├── permissions/        # Permission helper
-│   ├── services/           # Auth, Cloudflare backup, Notification, Vault
+│   ├── services/           # Auth, OTYA backend, notifications, vault
 │   └── utils/              # Formatters, helpers
 ├── features/
 │   ├── my_space/           # Home tab — media library
 │   ├── player/             # Audio + Video players, mini player, lyrics, EQ
-│   ├── air_drop/           # Nearby Connections file sharing
+│   ├── air_drop/           # Local file sharing
 │   ├── vault/              # Encrypted media vault
 │   ├── playlists/          # Playlist management
 │   ├── profile/            # Profile & Settings screen
@@ -72,16 +76,15 @@ lib/
 
 | Layer | Library |
 |---|---|
-| Video & Audio playback | `media_kit` — hardware-accelerated, MKV/AVI/4K, unified engine |
-| Background audio | `audio_service` — lock screen controls, OS media notifications |
-| Offline trim/extract | Android `MediaExtractor` + `MediaMuxer` (native, no FFmpeg binary) |
-| Database | `hive` — 100% offline, AES-256 encrypted vault box |
-| Cloud backup | Cloudflare Workers — playlist + history sync |
-| Nearby sharing | `nearby_connections` — Wi-Fi Direct + Bluetooth |
+| Video & Audio playback | `media_kit` — unified audio + video engine |
+| Background audio | `audio_service` — lock-screen and OS media controls |
+| Offline trim/extract | Android native media APIs |
+| Database | `hive` — local encrypted storage |
+| Cloud backup | OTYA Backend on Cloudflare Workers |
 | State management | `flutter_riverpod` |
 | Navigation | `go_router` |
-| UI / Animations | `flutter_animate`, AMOLED dark theme (violet + cyan) |
-| Biometrics | `local_auth` — fingerprint + PIN vault unlock |
+| UI / Animations | `flutter_animate`, AMOLED dark theme |
+| Biometrics | `local_auth` |
 | Ads | `google_mobile_ads` |
 
 ---
@@ -90,15 +93,17 @@ lib/
 
 ### Prerequisites
 
-- Flutter `>=3.0.0` (stable channel)
-- Android SDK 21+ (Android 5.0 minimum, 9.0+ recommended)
+- Flutter stable
+- Android SDK 21+ (Android 5.0 minimum)
 - Java 17
 
 ### Setup
 
+Clone the GitHub repository and run it from the repository root:
+
 ```bash
-git clone https://gitlab.com/apk-v1/played.git
-cd played
+git clone https://github.com/PeterSmartLink/OtyaPlayer.git
+cd OtyaPlayer
 flutter pub get
 flutter run
 ```
@@ -109,7 +114,7 @@ flutter run
 # Debug APK (for testing)
 flutter build apk --debug
 
-# Release — split APKs per ABI (smaller download)
+# Release — split APKs per ABI
 flutter build apk --release --split-per-abi
 
 # App Bundle (Play Store)
@@ -130,8 +135,8 @@ Builds run on **GitHub Actions** (`.github/workflows/build.yml`).
 
 **To publish a release:**
 ```bash
-git tag v1.2.0
-git push origin v1.2.0
+git tag v1.6.0
+git push origin v1.6.0
 ```
 
 ---
@@ -160,5 +165,5 @@ MIT — see [LICENSE](LICENSE).
 ---
 
 <div align="center">
-Built with ❤️ in Uganda · Flutter · Dart · Clean Architecture
+Part of OTYA System · Built with Flutter and Dart
 </div>
