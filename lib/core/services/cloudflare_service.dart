@@ -11,57 +11,44 @@ import 'app_sync_service.dart';
 import 'api_signer.dart';
 import 'http_client.dart';
 
-/// CloudflareService — handles playlists, history, and pro status via
-/// the Cloudflare Worker + D1 backend at petersmartlink.com.
-/// Every request is HMAC-signed via ApiSigner.
-/// Every method is fire-and-forget safe: errors are logged, never thrown.
+/// Cloud sync client for playlists, history and Pro status.
+/// Network failures are non-fatal and local data remains authoritative.
 class CloudflareService {
   CloudflareService._();
   static final CloudflareService instance = CloudflareService._();
 
   static const Duration _timeout = Duration(seconds: 12);
+  static const String _kPendingBackupUserId = 'otya_pending_backup_user_id';
+  static bool _backupInProgress = false;
 
-  // Delegate to the app-wide singleton HTTP client — avoids duplicate
-  // persistent connections and lets AppHttpClient manage the lifecycle.
   http.Client get _client => AppHttpClient.instance.client;
 
-  // SharedPreferences key: stores the userId of a backup that was skipped
-  // because the device was offline. Flushed on the next successful online sync.
-  static const String _kPendingBackupUserId = 'otya_pending_backup_user_id';
-
-  /// Stores userId so the next online sync picks up what was missed offline.
   Future<void> _queuePendingBackup(String userId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kPendingBackupUserId, userId);
-      debugPrint('[Cloudflare] Queued pending backup for $userId.');
     } catch (e) {
-      debugPrint('[Cloudflare] _queuePendingBackup failed: $e');
+      debugPrint('[Cloudflare] queue failed: $e');
     }
   }
 
-  /// If a backup was queued while offline, run it now (device is online).
+  /// Flushes an offline backup without calling backupAll(), avoiding recursive
+  /// backupPlaylists -> flush -> backupAll -> backupPlaylists recursion.
   Future<void> _flushPendingBackup() async {
+    if (_backupInProgress) return;
     try {
       final prefs = await SharedPreferences.getInstance();
       final userId = prefs.getString(_kPendingBackupUserId);
-      if (userId == null) return;
-      debugPrint('[Cloudflare] Flushing pending backup for $userId.');
-      // Remove the key ONLY after a successful backup so that a network
-      // failure during backupAll keeps the queue entry for the next retry.
-      final success = await backupAll(userId);
-      if (success) {
-        await prefs.remove(_kPendingBackupUserId);
-        debugPrint('[Cloudflare] Pending backup flushed successfully.');
-      } else {
-        debugPrint('[Cloudflare] backupAll returned false — retaining queued backup.');
-      }
+      if (userId == null || !await isOnline()) return;
+      _backupInProgress = true;
+      final ok = await _backupData(userId);
+      if (ok) await prefs.remove(_kPendingBackupUserId);
     } catch (e) {
-      debugPrint('[Cloudflare] _flushPendingBackup failed: $e');
+      debugPrint('[Cloudflare] pending backup failed: $e');
+    } finally {
+      _backupInProgress = false;
     }
   }
-
-  // ── Signed header helpers ─────────────────────────────────────────────────
 
   Map<String, String> _getHeaders(String path) =>
       ApiSigner.signedHeaders(method: 'GET', path: path);
@@ -71,17 +58,22 @@ class CloudflareService {
     'Content-Type': 'application/json',
   };
 
-  // ── Playlists ─────────────────────────────────────────────────────────────
-
-  Future<void> backupPlaylists(String userId) async {
+  Future<bool> backupPlaylists(String userId) async {
     if (!await isOnline()) {
-      debugPrint('[Cloudflare] backupPlaylists: offline — queuing for later.');
       await _queuePendingBackup(userId);
-      return;
+      return false;
     }
-    // Flush any backup that was missed while the device was last offline.
-    // await instead of unawaited to prevent concurrent backupPlaylists race.
+    if (_backupInProgress) return false;
     await _flushPendingBackup();
+    try {
+      _backupInProgress = true;
+      return await _backupPlaylistsOnly(userId);
+    } finally {
+      _backupInProgress = false;
+    }
+  }
+
+  Future<bool> _backupPlaylistsOnly(String userId) async {
     final playlists = OtyaDatabase.instance.getAllPlaylists();
     int synced = 0;
     const batchSize = 5;
@@ -94,52 +86,55 @@ class CloudflareService {
             Uri.parse(Environment.apiPlaylistsUrl),
             headers: _postHeaders(path),
             body: jsonEncode({
-              'id':        '${userId}_${pl.id}',
-              'user_id':   userId,
-              'name':      pl.name,
+              'id': '${userId}_${pl.id}',
+              'user_id': userId,
+              'name': pl.name,
               'media_ids': jsonEncode(pl.mediaIds),
             }),
           ).timeout(_timeout);
           return res.statusCode == 200;
         } catch (e) {
-          debugPrint('[Cloudflare] backupPlaylists item failed: $e');
+          debugPrint('[Cloudflare] playlist upload failed: $e');
           return false;
         }
       }));
       synced += results.where((ok) => ok).length;
     }
-    debugPrint('[Cloudflare] Synced $synced/${playlists.length} playlists.');
+    return synced == playlists.length;
   }
 
   Future<int> restorePlaylists(String userId) async {
     try {
       const path = '/api/playlists';
-      final res = await _client
-          .get(
-            Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'),
-            headers: _getHeaders(path),
-          )
-          .timeout(_timeout);
+      final res = await _client.get(
+        Uri.parse('${Environment.apiPlaylistsUrl}?user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: _getHeaders(path),
+      ).timeout(_timeout);
       if (res.statusCode != 200) return -1;
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       final list = (data['playlists'] as List<dynamic>?) ?? [];
       int restored = 0;
-      for (final item in list) {
-        final map   = item as Map<String, dynamic>;
-        final rawId = (map['id'] as String).replaceFirst('${userId}_', '');
+      for (final raw in list) {
+        final map = raw as Map<String, dynamic>;
+        final id = map['id']?.toString();
+        if (id == null) continue;
+        final mediaRaw = map['media_ids']?.toString() ?? '[]';
+        List<String> mediaIds;
+        try {
+          mediaIds = List<String>.from(jsonDecode(mediaRaw) as List);
+        } catch (_) {
+          mediaIds = const [];
+        }
         final playlist = Playlist(
-          id:        rawId,
-          name:      map['name'] as String,
-          mediaIds:  List<String>.from(
-              jsonDecode(map['media_ids'] as String) as List),
-          createdAt: DateTime.tryParse(map['created_at'] as String? ?? '') ??
-              DateTime.now(),
+          id: id.replaceFirst('${userId}_', ''),
+          name: map['name']?.toString() ?? 'Playlist',
+          mediaIds: mediaIds,
+          createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
           updatedAt: DateTime.now(),
         );
         await OtyaDatabase.instance.savePlaylist(playlist);
         restored++;
       }
-      debugPrint('[Cloudflare] Restored $restored playlists.');
       return restored;
     } catch (e) {
       debugPrint('[Cloudflare] restorePlaylists failed: $e');
@@ -147,15 +142,21 @@ class CloudflareService {
     }
   }
 
-  // ── Play history ──────────────────────────────────────────────────────────
-
   Future<void> backupHistory(String userId) async {
     if (!await isOnline()) {
-      debugPrint('[Cloudflare] backupHistory: offline — queuing for later.');
       await _queuePendingBackup(userId);
       return;
     }
-    unawaited(_flushPendingBackup());
+    if (_backupInProgress) return;
+    try {
+      _backupInProgress = true;
+      await _backupHistoryOnly(userId);
+    } finally {
+      _backupInProgress = false;
+    }
+  }
+
+  Future<bool> _backupHistoryOnly(String userId) async {
     final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 200);
     int synced = 0;
     const batchSize = 10;
@@ -168,12 +169,12 @@ class CloudflareService {
             Uri.parse(Environment.apiHistoryUrl),
             headers: _postHeaders(path),
             body: jsonEncode({
-              'id':             '${userId}_${item.id}',
-              'user_id':        userId,
-              'title':          item.title,
-              'artist':         item.artist ?? '',
-              'file_path':      item.filePath,
-              'is_video':       item.isVideo ? '1' : '0',
+              'id': '${userId}_${item.id}',
+              'user_id': userId,
+              'title': item.title,
+              'artist': item.artist ?? '',
+              'file_path': item.filePath,
+              'is_video': item.isVideo ? '1' : '0',
               'last_played_at': item.lastPlayedAt?.toIso8601String() ?? '',
             }),
           ).timeout(_timeout);
@@ -184,16 +185,11 @@ class CloudflareService {
       }));
       synced += results.where((ok) => ok).length;
     }
-    debugPrint('[Cloudflare] Synced $synced/${history.length} history items.');
+    return synced == history.length;
   }
 
-  // ── Pro status ────────────────────────────────────────────────────────────
-
   Future<void> saveProExpiry(String userId, int expiryMs) async {
-    if (!await isOnline()) {
-      debugPrint('[Cloudflare] saveProExpiry: offline, skipping.');
-      return;
-    }
+    if (!await isOnline()) return;
     try {
       const path = '/api/pro';
       await _client.post(
@@ -207,18 +203,13 @@ class CloudflareService {
   }
 
   Future<int> fetchProExpiry(String userId) async {
-    if (!await isOnline()) {
-      debugPrint('[Cloudflare] fetchProExpiry: offline, skipping.');
-      return 0;
-    }
+    if (!await isOnline()) return 0;
     try {
       const path = '/api/pro';
-      final res = await _client
-          .get(
-            Uri.parse('${Environment.apiProUrl}?user_id=$userId'),
-            headers: _getHeaders(path),
-          )
-          .timeout(_timeout);
+      final res = await _client.get(
+        Uri.parse('${Environment.apiProUrl}?user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: _getHeaders(path),
+      ).timeout(_timeout);
       if (res.statusCode != 200) return 0;
       final data = jsonDecode(res.body) as Map<String, dynamic>;
       return (data['expiry_ms'] as num?)?.toInt() ?? 0;
@@ -228,20 +219,30 @@ class CloudflareService {
     }
   }
 
-  // ── Full backup ───────────────────────────────────────────────────────────
-
-  Future<bool> backupAll(String userId) async {
-    try {
-      await Future.wait([
-        backupPlaylists(userId),
-        backupHistory(userId),
-      ]);
-      // Trigger AI sync now that we know the device is online (backup succeeded).
+  Future<bool> _backupData(String userId) async {
+    final playlistsOk = await _backupPlaylistsOnly(userId);
+    final historyOk = await _backupHistoryOnly(userId);
+    if (playlistsOk && historyOk) {
       unawaited(AppSyncService.instance.syncOnlineIfNeeded(null));
       return true;
+    }
+    return false;
+  }
+
+  Future<bool> backupAll(String userId) async {
+    if (!await isOnline() || _backupInProgress) {
+      await _queuePendingBackup(userId);
+      return false;
+    }
+    _backupInProgress = true;
+    try {
+      return await _backupData(userId);
     } catch (e) {
       debugPrint('[Cloudflare] backupAll failed: $e');
+      await _queuePendingBackup(userId);
       return false;
+    } finally {
+      _backupInProgress = false;
     }
   }
 }
