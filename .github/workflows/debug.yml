@@ -115,9 +115,6 @@ jobs:
           rm -rf build/ android/app/build/
           rm -rf android/app/build/
 
-      # ── Build release APK ───────────────────────────────────────
-      # || true has been intentionally removed. If Gradle fails, the job
-      # fails immediately with a clear error — no stale APK is uploaded.
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
@@ -125,77 +122,32 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           DD_SECRET: ${{ secrets.OTYA_SECRET }}
-          DD_ARCH: arm64
-          DD_UPDATE: "true"
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
-          flutter build apk --release --no-pub --split-per-abi \
+          flutter build apk --release --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --dart-define=OTYA_SECRET=$DD_SECRET \
-            --dart-define=APP_ARCH=$DD_ARCH \
-            --dart-define=SELF_UPDATE=$DD_UPDATE \
+            --dart-define=APP_ARCH=arm64 \
+            --dart-define=SELF_UPDATE=true \
             --dart-define=WORKER_URL=$DD_WORKER_URL
 
-      # ── Post-build diagnostics (always runs) ───────────────────────
-      - name: Post-build diagnostics
-        if: always()
+      # Verify APKs exist and are not empty (fails if build was broken)
+      - name: Verify APKs
         run: |
-          echo "=== Disk usage ==="
-          df -h
-          echo "=== APKs found in android/app/build/ ==="
-          find android/app/build/ -name '*.apk' 2>/dev/null || echo "(none)"
-          echo "=== APKs found in build/ ==="
-          find build/ -name '*.apk' 2>/dev/null || echo "(none)"
-
-      # Gradle (invoked directly) writes APKs to android/app/build/outputs/apk/release/.
-      # Copy them to the conventional flutter-apk path so the upload step works unchanged.
-      - name: Locate and verify APKs
-        run: |
-          GRADLE_OUT="android/app/build/outputs/apk/release"
-          OUTDIR="build/app/outputs/flutter-apk"
-          mkdir -p "$OUTDIR"
-
-          echo "=== Gradle APK output dir ==="
-          ls -lh "$GRADLE_OUT/" 2>/dev/null || echo "(empty or missing)"
-
-          # Copy arm64 and arm32 release APKs to the expected output path
-          for ABI in arm64-v8a armeabi-v7a; do
-            SRC="$GRADLE_OUT/app-${ABI}-release.apk"
-            DST="$OUTDIR/app-${ABI}-release.apk"
-            if [ -f "$SRC" ]; then
-              cp -v "$SRC" "$DST"
-            else
-              echo "WARNING: $SRC not found — searching entire build tree"
-              FOUND=$(find . -name "app-${ABI}-release.apk" 2>/dev/null | head -1)
-              if [ -n "$FOUND" ]; then
-                cp -v "$FOUND" "$DST"
-              fi
-            fi
-          done
-
-          echo "=== Contents of $OUTDIR ==="
-          ls -lh "$OUTDIR/" 2>/dev/null || echo "(empty)"
-
-          # Verify the two required ABI APKs exist
-          MISSING=0
           for APK in \
-            "$OUTDIR/app-arm64-v8a-release.apk" \
-            "$OUTDIR/app-armeabi-v7a-release.apk"; do
-            if [ -f "$APK" ]; then
-              echo "OK: $APK ($(du -sh "$APK" | cut -f1))"
-            else
-              echo "MISSING: $APK"
-              MISSING=1
-            fi
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
+            if [ ! -f "$APK" ]; then echo "ERROR: $APK not found"; exit 1; fi
+            SIZE=$(stat -c%s "$APK")
+            if [ "$SIZE" -lt 5000000 ]; then echo "ERROR: $APK too small ($SIZE bytes)"; exit 1; fi
+            echo "OK: $APK ($SIZE bytes)"
           done
-          [ $MISSING -eq 0 ] || exit 1
 
-      - name: Remove keystore
+      - name: Remove secrets
         if: always()
-        run: rm -f $GITHUB_WORKSPACE/android/app/keystore.jks
+        run: rm -f $GITHUB_WORKSPACE/android/app/keystore.jks android/app/google-services.json
 
-      # ── Upload artifact ────────────────────────────────────────────────
-      - name: Upload release APKs
+      - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: otya-player-${{ github.sha }}
@@ -206,17 +158,12 @@ jobs:
           if-no-files-found: error
 
       - name: Build summary
+        if: success()
         run: |
-          echo "### ✅ Release APK Built" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Release APK Built" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          ARM64_SIZE=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk 2>/dev/null | cut -f1 || echo 'n/a')
-          ARM32_SIZE=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk 2>/dev/null | cut -f1 || echo 'n/a')
-          echo "**arm64 APK size:** $ARM64_SIZE" >> $GITHUB_STEP_SUMMARY
-          echo "**arm32 APK size:** $ARM32_SIZE" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "Download the APKs from the Artifacts section above ↑" >> $GITHUB_STEP_SUMMARY
+          ARM64=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | cut -f1)
+          ARM32=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk | cut -f1)
+          echo "**arm64:** $ARM64 | **arm32:** $ARM32" >> $GITHUB_STEP_SUMMARY
 
-      # Telegram notifications are only sent from the Release workflow (v* tags).
-      # Debug builds do not notify the channel.
