@@ -151,6 +151,30 @@ jobs:
             --dart-define=APP_ARCH=arm64 \
             --dart-define=SELF_UPDATE=true \
             --dart-define=WORKER_URL=$DD_WORKER_URL
+          BUILD_EXIT=$?
+
+          # Flutter may exit 1 even when Gradle succeeded, because it looks
+          # for APKs in build/app/outputs/flutter-apk/ (repo root) but AGP 8.x
+          # places them under android/app/build/outputs/. Stage them first,
+          # then only propagate the failure if APKs genuinely don't exist.
+          ARM64_GRADLE="android/app/build/outputs/flutter-apk/app-arm64-v8a-release.apk"
+          ARM64_FALLBACK="android/app/build/outputs/apk/release/app-arm64-v8a-release.apk"
+
+          if [ -f "$ARM64_GRADLE" ] || [ -f "$ARM64_FALLBACK" ]; then
+            echo "Gradle produced APKs — staging to Flutter expected location."
+            mkdir -p build/app/outputs/flutter-apk
+            cp android/app/build/outputs/flutter-apk/*.apk \
+               build/app/outputs/flutter-apk/ 2>/dev/null || true
+            cp android/app/build/outputs/apk/release/*.apk \
+               build/app/outputs/flutter-apk/ 2>/dev/null || true
+            echo "Staged APKs:"
+            ls -lh build/app/outputs/flutter-apk/
+            exit 0
+          fi
+
+          # No APKs found anywhere — Gradle itself failed. Propagate the real exit code.
+          echo "ERROR: No APKs found. Gradle build genuinely failed."
+          exit $BUILD_EXIT
 
       - name: Diagnose APK outputs
         if: always()
@@ -162,30 +186,18 @@ jobs:
           echo "=== All APKs under android/app/build/ ==="
           find android/app/build/outputs -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
 
-      - name: Stage APKs to Flutter expected location
-        run: |
-          mkdir -p build/app/outputs/flutter-apk
-          # Gradle outputs to android/app/build/outputs/flutter-apk/ but Flutter
-          # expects build/app/outputs/flutter-apk/ (repo root). Copy both ABI splits.
-          for APK in android/app/build/outputs/flutter-apk/*.apk; do
-            [ -f "$APK" ] && cp "$APK" build/app/outputs/flutter-apk/ && echo "Staged: $APK"
-          done
-          # Also check the standard Gradle apk/release path as a fallback
-          for APK in android/app/build/outputs/apk/release/*.apk; do
-            [ -f "$APK" ] && cp "$APK" build/app/outputs/flutter-apk/ && echo "Staged (fallback): $APK"
-          done
-          ls -lh build/app/outputs/flutter-apk/
-
       # Verify APKs exist and are not empty (fails if build was broken)
-      - name: Verify APKs
+      - name: Verify APKs and record checksums
         run: |
+          echo "Commit: $(git rev-parse HEAD)"
           for APK in \
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
             if [ ! -f "$APK" ]; then echo "ERROR: $APK not found"; exit 1; fi
             SIZE=$(stat -c%s "$APK")
             if [ "$SIZE" -lt 5000000 ]; then echo "ERROR: $APK too small ($SIZE bytes)"; exit 1; fi
-            echo "OK: $APK ($SIZE bytes)"
+            SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+            echo "OK: $APK | $SIZE bytes | sha256=$SHA"
           done
 
       - name: Remove secrets
