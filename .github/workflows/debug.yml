@@ -127,15 +127,24 @@ jobs:
       # ── Pre-build diagnostics ──────────────────────────────────────
       - name: Pre-build diagnostics
         run: |
+          echo "=== Commit being built ==="
+          git rev-parse HEAD
+          git log -1 --oneline
           df -h
           ls /usr/local/lib/android/sdk/cmake/ || echo "CMake not cached — will be downloaded"
 
+      # ── Clean stale outputs ────────────────────────────────────────
+      # Removes any APKs left over from previous runs so the upload step
+      # can never pick up a stale artifact from a failed build.
+      - name: Clean stale build outputs
+        run: |
+          flutter clean
+          rm -rf build/
+          rm -rf android/app/build/
+
       # ── Build release APK ───────────────────────────────────────
-      # AGP 8.7.3 + Gradle 8.10.2 triggers a "Already watching path" watcher
-      # crash in Flutter's output resolver. Gradle still builds the APKs
-      # successfully — they land in android/app/build/outputs/apk/release/.
-      # We allow the flutter command to fail (|| true) ONLY because of this
-      # known watcher bug, then verify APKs exist in the next step.
+      # || true has been intentionally removed. If Gradle fails, the job
+      # fails immediately with a clear error — no stale APK is uploaded.
       - name: Build release APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
@@ -152,7 +161,7 @@ jobs:
             --dart-define=OTYA_SECRET=$DD_SECRET \
             --dart-define=APP_ARCH=$DD_ARCH \
             --dart-define=SELF_UPDATE=$DD_UPDATE \
-            --dart-define=WORKER_URL=$DD_WORKER_URL || true
+            --dart-define=WORKER_URL=$DD_WORKER_URL
 
       # ── Post-build diagnostics (always runs) ───────────────────────
       - name: Post-build diagnostics
