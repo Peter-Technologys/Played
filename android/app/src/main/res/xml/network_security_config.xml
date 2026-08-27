@@ -1,51 +1,19 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Network security config for OTYA Player.
-
-  cleartextTrafficPermitted="true" in base-config is intentional and required
-  for two core features:
-
-  1. Flash Share — pure-Dart HTTP P2P file transfer over a local Wi-Fi hotspot.
-     The server binds to a raw local IP (e.g. 192.168.43.1) chosen at runtime
-     by the OS. Because the IP is dynamic and not a registered domain name,
-     Android's <domain-config> cannot enumerate it. Cleartext must be permitted
-     at the base level.
-
-  2. Web Mirror — streams the phone's media library to any PC browser on the
-     same Wi-Fi network over HTTP on port 8085. Same raw-IP constraint applies.
-
-  All external (internet) traffic uses HTTPS. The cleartext allowance only
-  affects local-network connections in practice.
+  OTYA uses short-lived HTTP only for local-device features such as Beam and
+  Web Mirror. Android Network Security Config cannot express RFC1918 wildcard
+  IP ranges (for example every 192.168.x.x address), so dynamic phone/hotspot
+  addresses require cleartext at the base policy. OTYA's internet endpoints are
+  hard-coded as HTTPS and the PeterSmart Link domain is explicitly HTTPS-only.
 -->
 <network-security-config>
-    <!-- Block cleartext (HTTP) for all traffic by default -->
-    <base-config cleartextTrafficPermitted="false">
+    <base-config cleartextTrafficPermitted="true">
         <trust-anchors>
             <certificates src="system" />
         </trust-anchors>
     </base-config>
 
-    <!--
-        Allow cleartext for local/private IP ranges used by Flash Share and
-        Web Mirror (device-to-device over the same Wi-Fi network).
-        These are RFC 1918 private address ranges — no internet traffic.
-    -->
-    <domain-config cleartextTrafficPermitted="true">
-        <!-- 192.168.x.x — most home/office routers -->
-        <domain includeSubdomains="false">192.168.0.1</domain>
-        <!-- 10.x.x.x — corporate and hotspot networks -->
-        <domain includeSubdomains="false">10.0.0.1</domain>
-        <!-- 172.16.x.x – 172.31.x.x — less common private range -->
-        <domain includeSubdomains="false">172.16.0.1</domain>
-    </domain-config>
-
-    <!--
-        Explicit HTTPS-only config for OTYA web properties.
-        Cleartext is blocked; only TLS connections are permitted.
-        Certificate pinning is intentionally omitted to allow CDN rotation.
-    -->
     <domain-config cleartextTrafficPermitted="false">
-        <domain includeSubdomains="true">getotya.petersmartlink.com</domain>
         <domain includeSubdomains="true">petersmartlink.com</domain>
         <trust-anchors>
             <certificates src="system" />
