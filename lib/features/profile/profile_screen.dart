@@ -133,10 +133,10 @@ class ProfileScreen extends ConsumerWidget {
           _TappableTile(
             icon: Icons.language_rounded,
             label: 'Visit OTYA Website',
-            subtitle: 'getotya.petersmartlink.com',
+            subtitle: 'petersmartlink.com/otya-player',
             iconColor: AppColors.accent,
             onTap: () => context.push('/webview', extra: {
-              'url': 'https://getotya.petersmartlink.com',
+              'url': 'https://petersmartlink.com/otya-player',
               'title': 'OTYA Player',
             }),
           ),

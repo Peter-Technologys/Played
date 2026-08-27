@@ -119,6 +119,16 @@ class _AirDropNotifier extends StateNotifier<_AirDropState> {
 
   Future<void> onQrScanned(String url) async {
     if (state.receiveStep == _ReceiveStep.downloading) return;
+    final uri = Uri.tryParse(url);
+    final host = uri?.host ?? '';
+    if (uri == null || uri.scheme != 'http' || !_isPrivateHost(host)) {
+      state = state.copyWith(
+        receiveStep: _ReceiveStep.error,
+        errorMessage: 'Beam only accepts links from a nearby device on your local Wi-Fi or hotspot.',
+      );
+      _log('Rejected non-local Beam link.');
+      return;
+    }
     state = state.copyWith(
         receiveStep: _ReceiveStep.downloading, progress: 0, errorMessage: null);
     _log('Connecting to $url…');
@@ -127,9 +137,16 @@ class _AirDropNotifier extends StateNotifier<_AirDropState> {
                       await getApplicationDocumentsDirectory();
       final saveDir = Directory('${dir.path}/OTYA_Received');
       await saveDir.create(recursive: true);
-      final fileName = url.split('/').last.contains('.')
-          ? url.split('/').last
-          : 'received_${DateTime.now().millisecondsSinceEpoch}.mp4';
+      final transferUri = Uri.parse(url);
+      final advertisedName = transferUri.queryParameters['name'];
+      final cleanedName = advertisedName
+          ?.replaceAll('\\', '/')
+          .split('/')
+          .last
+          .trim();
+      final fileName = (cleanedName != null && cleanedName.isNotEmpty)
+          ? cleanedName
+          : 'received_${DateTime.now().millisecondsSinceEpoch}.bin';
       final file = await _receiver.download(
         url: url,
         savePath: '${saveDir.path}/$fileName',
@@ -161,6 +178,18 @@ class _AirDropNotifier extends StateNotifier<_AirDropState> {
       receivedPath: null, errorMessage: null);
 
   void cancelDownload() { _receiver.cancel(); resetReceive(); _log('Cancelled.'); }
+
+  bool _isPrivateHost(String host) {
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    final nums = parts.map(int.tryParse).toList();
+    if (nums.any((n) => n == null)) return false;
+    final a = nums[0]!;
+    final b = nums[1]!;
+    return a == 10 ||
+        (a == 192 && b == 168) ||
+        (a == 172 && b >= 16 && b <= 31);
+  }
 
   @override
   void dispose() { _sender.stop(); super.dispose(); }
@@ -239,15 +268,15 @@ class _AirDropScreenState extends ConsumerState<AirDropScreen>
               child: TabBar(
                 controller: _tabCtrl,
                 indicator: BoxDecoration(
-                    gradient: AppColors.accentGradient,
+                    color: AppColors.accent,
                     borderRadius: BorderRadius.circular(12)),
                 indicatorSize: TabBarIndicatorSize.tab,
                 dividerColor: Colors.transparent,
-                labelColor: Colors.black,
+                labelColor: Colors.white,
                 unselectedLabelColor: AppColors.textSecondary,
                 labelStyle: const TextStyle(
                     fontWeight: FontWeight.w700, fontFamily: 'Inter', fontSize: 13),
-                tabs: const [Tab(text: '📤  Beam'), Tab(text: '📥  Catch')],
+                tabs: const [Tab(text: 'Send'), Tab(text: 'Receive')],
               ),
             ),
             Expanded(
@@ -347,7 +376,7 @@ class _SendView extends ConsumerWidget {
                   ),
                   if (state.selectedItem != null) ...[
                     const SizedBox(height: 8),
-                    Text('🎥 ${state.selectedItem!.title}  •  ${state.selectedItem!.formattedSize}',
+                    Text('${state.selectedItem!.title}  •  ${state.selectedItem!.formattedSize}',
                         style: const TextStyle(fontSize: 12,
                             color: AppColors.textSecondary, fontFamily: 'Inter'),
                         textAlign: TextAlign.center),
@@ -424,21 +453,26 @@ class _ReceiveView extends ConsumerWidget {
             style: TextStyle(fontSize: 13,
                 color: AppColors.textSecondary, fontFamily: 'Inter')),
         const SizedBox(height: 16),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
-            child: MobileScanner(
-              controller: scanCtrl,
-              onDetect: (BarcodeCapture capture) {
-                if (scanned) return;
-                final barcode = capture.barcodes.firstOrNull;
-                final url = barcode?.displayValue ?? barcode?.rawValue;
-                if (url != null && url.startsWith('http')) {
-                  scanned = true;
-                  HapticFeedback.mediumImpact();
-                  n.onQrScanned(url);
-                }
-              },
+        Center(
+          child: SizedBox(
+            width: 260,
+            height: 260,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: MobileScanner(
+                controller: scanCtrl,
+                fit: BoxFit.cover,
+                onDetect: (BarcodeCapture capture) {
+                  if (scanned) return;
+                  final barcode = capture.barcodes.firstOrNull;
+                  final url = barcode?.displayValue ?? barcode?.rawValue;
+                  if (url != null && url.startsWith('http://')) {
+                    scanned = true;
+                    HapticFeedback.mediumImpact();
+                    n.onQrScanned(url);
+                  }
+                },
+              ),
             ),
           ),
         ),
@@ -506,7 +540,7 @@ class _ReceiveView extends ConsumerWidget {
             color: AppColors.accentGreen, size: 44),
       ),
       const SizedBox(height: 16),
-      const Text('File received! ✔',
+      const Text('File received',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800,
               color: AppColors.textPrimary, fontFamily: 'Inter')),
       const SizedBox(height: 8),
@@ -516,7 +550,7 @@ class _ReceiveView extends ConsumerWidget {
                 fontFamily: 'Inter', fontSize: 12),
             textAlign: TextAlign.center),
       const SizedBox(height: 8),
-      const Text('Added to your media library.',
+      const Text('Saved on this device.',
           style: TextStyle(color: AppColors.accentGreen,
               fontFamily: 'Inter', fontSize: 13)),
       const SizedBox(height: 24),

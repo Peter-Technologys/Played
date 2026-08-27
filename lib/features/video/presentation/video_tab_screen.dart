@@ -22,10 +22,6 @@ enum _VideoFilter { videos, folders, playlists }
 final _videoFilterProvider =
     StateProvider<_VideoFilter>((_) => _VideoFilter.videos);
 
-// ── List / Grid toggle — true = list view (default), false = grid view ────
-
-final _videoListViewProvider = StateProvider<bool>((_) => true);
-
 // ── Video Tab Screen ──────────────────────────────────────────────────────
 
 class VideoTabScreen extends ConsumerStatefulWidget {
@@ -124,8 +120,7 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 
     switch (filter) {
       case _VideoFilter.videos:
-        final isListView = ref.watch(_videoListViewProvider);
-        return _VideoGrid(items: videos, isListView: isListView);
+        return _VideoGrid(items: videos, isListView: true);
       case _VideoFilter.folders:
         return _VideoFoldersTab(items: videos);
       case _VideoFilter.playlists:
@@ -223,18 +218,6 @@ class _VideoHeader extends ConsumerWidget {
                 context: context,
                 delegate: _VideoSearchDelegate(videos: videos, ref: ref),
               );
-            },
-          ),
-          const SizedBox(width: 6),
-          // List / Grid toggle
-          _IconBtn(
-            icon: ref.watch(_videoListViewProvider)
-                ? Icons.grid_view_rounded
-                : Icons.view_list_rounded,
-            onTap: () {
-              HapticFeedback.selectionClick();
-              ref.read(_videoListViewProvider.notifier).state =
-                  !ref.read(_videoListViewProvider);
             },
           ),
           const SizedBox(width: 6),
