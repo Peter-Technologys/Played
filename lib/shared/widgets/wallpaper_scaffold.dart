@@ -2,12 +2,13 @@
 //
 // WallpaperScaffold — the visual foundation for OTYA's image-first UI.
 // It keeps every screen readable over user-selected artwork while preserving
-// the PeterSmart Link / OTYA purple identity.
+// the OTYA visual identity.
 
 import 'dart:io';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/services/custom_theme_manager.dart';
@@ -45,34 +46,58 @@ class WallpaperScaffold extends StatelessWidget {
       builder: (context, _) {
         final manager = CustomThemeManager.instance;
         final wallpaperPath = manager.wallpaperPath;
-        final hasWallpaper = wallpaperPath != null && File(wallpaperPath).existsSync();
+        final hasWallpaper = manager.hasImageWallpaper;
         final storyTheme = manager.storyTheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            if (hasWallpaper)
-              _ImageThemeBackground(
-                path: wallpaperPath,
-                dimAmount: manager.artOpacity,
-                blur: manager.artBlur,
-              )
-            else if (storyTheme != null)
-              StoryThemeBackground(theme: storyTheme)
-            else
-              const OtyaMountainBackground(),
-            Scaffold(
-              backgroundColor: Colors.transparent,
-              appBar: appBar,
-              body: body,
-              bottomNavigationBar: bottomNavigationBar,
-              floatingActionButton: floatingActionButton,
-              floatingActionButtonLocation: floatingActionButtonLocation,
-              extendBodyBehindAppBar: extendBodyBehindAppBar,
-              extendBody: extendBody,
-              resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-            ),
-          ],
+        // Keep Android system bars visually attached to the active OTYA
+        // background. SafeArea remains the responsibility of each screen, but
+        // the navigation/status regions no longer become unrelated opaque bars.
+        final overlayStyle = SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
+          statusBarIconBrightness: isDark || hasWallpaper
+              ? Brightness.light
+              : Brightness.dark,
+          statusBarBrightness: isDark || hasWallpaper
+              ? Brightness.dark
+              : Brightness.light,
+          systemNavigationBarColor: Colors.transparent,
+          systemNavigationBarDividerColor: Colors.transparent,
+          systemNavigationBarIconBrightness: isDark || hasWallpaper
+              ? Brightness.light
+              : Brightness.dark,
+          systemStatusBarContrastEnforced: false,
+          systemNavigationBarContrastEnforced: false,
+        );
+
+        return AnnotatedRegion<SystemUiOverlayStyle>(
+          value: overlayStyle,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (hasWallpaper && wallpaperPath != null)
+                _ImageThemeBackground(
+                  path: wallpaperPath,
+                  dimAmount: manager.artOpacity,
+                  blur: manager.artBlur,
+                )
+              else if (storyTheme != null)
+                StoryThemeBackground(theme: storyTheme)
+              else
+                const OtyaMountainBackground(),
+              Scaffold(
+                backgroundColor: backgroundColor ?? Colors.transparent,
+                appBar: appBar,
+                body: body,
+                bottomNavigationBar: bottomNavigationBar,
+                floatingActionButton: floatingActionButton,
+                floatingActionButtonLocation: floatingActionButtonLocation,
+                extendBodyBehindAppBar: extendBodyBehindAppBar,
+                extendBody: extendBody,
+                resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+              ),
+            ],
+          ),
         );
       },
     );
@@ -97,6 +122,7 @@ class _ImageThemeBackground extends StatelessWidget {
       fit: BoxFit.cover,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
+      errorBuilder: (_, __, ___) => const OtyaMountainBackground(),
     );
 
     if (blur > 0) {
@@ -110,7 +136,9 @@ class _ImageThemeBackground extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         ColoredBox(color: const Color(0xFF08080B), child: image),
-        ColoredBox(color: Colors.black.withValues(alpha: dimAmount.clamp(0.18, 0.70))),
+        ColoredBox(
+          color: Colors.black.withValues(alpha: dimAmount.clamp(0.18, 0.70)),
+        ),
         const DecoratedBox(
           decoration: BoxDecoration(
             gradient: LinearGradient(
