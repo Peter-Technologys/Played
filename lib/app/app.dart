@@ -155,11 +155,18 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         RemoteControlService.instance,
       ]),
       builder: (context, _) {
+        final themeManager = CustomThemeManager.instance;
+        final hasArtwork = themeManager.hasImageWallpaper ||
+            themeManager.storyTheme != null;
+        final activeTheme = hasArtwork
+            ? AppTheme.dark.copyWith(scaffoldBackgroundColor: Colors.transparent)
+            : AppTheme.dark;
+
         return MaterialApp.router(
           title: 'OTYA Player',
           debugShowCheckedModeBanner: false,
-          theme: AppTheme.dark,
-          darkTheme: AppTheme.dark,
+          theme: activeTheme,
+          darkTheme: activeTheme,
           themeMode: ThemeMode.dark,
           locale: locale,
           supportedLocales: const [
@@ -177,8 +184,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           builder: (context, child) {
             Widget wrappedChild = child ?? const SizedBox.shrink();
 
-            final wallpaperDecoration =
-                CustomThemeManager.instance.wallpaperDecoration;
+            final wallpaperDecoration = themeManager.wallpaperDecoration;
             if (wallpaperDecoration != null) {
               wrappedChild = Container(
                 decoration: BoxDecoration(image: wallpaperDecoration),
