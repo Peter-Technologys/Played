@@ -1,4 +1,5 @@
 name: Wire remote control into app routes
+# trigger-v2
 on:
   push:
     paths:
@@ -15,7 +16,6 @@ jobs:
         run: |
           from pathlib import Path
 
-          # Router-level feature enforcement.
           p = Path('lib/app/router.dart')
           s = p.read_text()
           imp = "import '../core/services/remote_control_service.dart';\n"
@@ -51,7 +51,6 @@ jobs:
               s = s.replace(old, new)
           p.write_text(s)
 
-          # Hub: hide disabled tools and never create fake local accounts.
           p = Path('lib/features/my_space/presentation/my_space_hub_screen.dart')
           s = p.read_text()
           s = s.replace("import 'package:uuid/uuid.dart';\n", '')
