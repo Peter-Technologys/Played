@@ -26,6 +26,11 @@ class CustomThemeManager extends ChangeNotifier {
   String get themeId => _themeId;
   double get artOpacity => _artOpacity;
   double get artBlur => _artBlur;
+  bool get hasImageWallpaper {
+    final path = _wallpaperPath;
+    return path != null && File(path).existsSync();
+  }
+
   Map<String, dynamic>? get storyTheme => _storyTheme == null
       ? null
       : Map<String, dynamic>.unmodifiable(_storyTheme!);
@@ -40,11 +45,19 @@ class CustomThemeManager extends ChangeNotifier {
       final json = jsonDecode(await file.readAsString()) as Map<String, dynamic>;
       final path = json['wallpaperPath'] as String?;
       _themeId = json['themeId'] as String? ?? 'otya-midnight';
-      _artOpacity = (json['artOpacity'] as num?)?.toDouble() ?? 0.55;
-      _artBlur = (json['artBlur'] as num?)?.toDouble() ?? 0;
+      _artOpacity = ((json['artOpacity'] as num?)?.toDouble() ?? 0.55).clamp(0.0, 1.0);
+      _artBlur = ((json['artBlur'] as num?)?.toDouble() ?? 0).clamp(0.0, 24.0);
       final story = json['storyTheme'];
       if (story is Map<String, dynamic>) _storyTheme = story;
-      if (path != null && await File(path).exists()) _wallpaperPath = path;
+      if (path != null && await File(path).exists()) {
+        _wallpaperPath = path;
+      } else if (path != null) {
+        // Do not keep a dead file path after restore/storage cleanup. Falling
+        // back to the story/default background is safer than a blank screen.
+        _wallpaperPath = null;
+        if (_themeId == 'otya-image') _themeId = 'otya-midnight';
+        await _persist();
+      }
       notifyListeners();
     } catch (e) {
       debugPrint('[ThemeManager] Load error: $e');
@@ -121,7 +134,7 @@ class CustomThemeManager extends ChangeNotifier {
   /// automatically-applied seasonal theme. A user photo or manually selected
   /// story theme is never overwritten.
   Future<void> refreshSeasonalTheme() async {
-    final userHasWallpaper = _wallpaperPath != null;
+    final userHasWallpaper = hasImageWallpaper;
     final userChoseNonSeasonalStory =
         _storyTheme != null && !_currentThemeWasAutoSeasonal;
     if (userHasWallpaper || userChoseNonSeasonalStory) return;
@@ -168,24 +181,41 @@ class CustomThemeManager extends ChangeNotifier {
     if (!await source.exists()) {
       throw FileSystemException('Not found', sourcePath);
     }
+    final length = await source.length();
+    if (length <= 0 || length > 20 * 1024 * 1024) {
+      throw FileSystemException('Unsupported wallpaper size', sourcePath);
+    }
+
     final dir = await getApplicationDocumentsDirectory();
     final dest = Directory('${dir.path}/themes/$_themeId');
     await dest.create(recursive: true);
-    final ext = sourcePath.contains('.') ? sourcePath.split('.').last : 'jpg';
+    final rawExt = sourcePath.contains('.') ? sourcePath.split('.').last.toLowerCase() : 'jpg';
+    final ext = const {'jpg', 'jpeg', 'png', 'webp'}.contains(rawExt) ? rawExt : 'jpg';
     final out = File('${dest.path}/background.$ext');
-    await source.copy(out.path);
+
+    // Copy through a temporary file so an interrupted write cannot destroy the
+    // currently selected background.
+    final temp = File('${out.path}.tmp');
+    if (await temp.exists()) await temp.delete();
+    await source.copy(temp.path);
+    if (await out.exists()) await out.delete();
+    await temp.rename(out.path);
     _wallpaperPath = out.path;
   }
 
   Future<void> clearWallpaper() async {
-    if (_wallpaperPath != null) {
-      try {
-        await File(_wallpaperPath!).delete();
-      } catch (_) {}
-      _wallpaperPath = null;
-    }
+    final oldPath = _wallpaperPath;
+    _wallpaperPath = null;
+    if (_themeId == 'otya-image') _themeId = 'otya-midnight';
     await _persist();
     notifyListeners();
+
+    if (oldPath != null) {
+      try {
+        final file = File(oldPath);
+        if (await file.exists()) await file.delete();
+      } catch (_) {}
+    }
   }
 
   DecorationImage? get wallpaperDecoration {
@@ -195,7 +225,7 @@ class CustomThemeManager extends ChangeNotifier {
       image: FileImage(File(path)),
       fit: BoxFit.cover,
       colorFilter: ColorFilter.mode(
-        Colors.black.withValues(alpha: _artOpacity),
+        Colors.black.withValues(alpha: _artOpacity.clamp(0.0, 1.0)),
         BlendMode.darken,
       ),
     );
@@ -203,13 +233,18 @@ class CustomThemeManager extends ChangeNotifier {
 
   Future<void> _persist() async {
     try {
-      await (await _file()).writeAsString(jsonEncode({
+      final file = await _file();
+      final temp = File('${file.path}.tmp');
+      final payload = jsonEncode({
         'themeId': _themeId,
         'artOpacity': _artOpacity,
         'artBlur': _artBlur,
         if (_wallpaperPath != null) 'wallpaperPath': _wallpaperPath,
         if (_storyTheme != null) 'storyTheme': _storyTheme,
-      }));
+      });
+      await temp.writeAsString(payload, flush: true);
+      if (await file.exists()) await file.delete();
+      await temp.rename(file.path);
     } catch (e) {
       debugPrint('[ThemeManager] Persist error: $e');
     }
