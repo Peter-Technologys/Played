@@ -4,25 +4,17 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/theme/app_colors.dart';
 
-/// Shared album-art thumbnail widget used by [MusicTabScreen] song rows
-/// and [MiniPlayer].
+/// Shared album-art thumbnail widget used across OTYA media surfaces.
 ///
 /// Resolves `albumid:<id>` paths via the MediaStore MethodChannel and
-/// displays the album art at the requested [size]. Falls back to a
-/// gradient placeholder when art is unavailable.
+/// displays the album art at the requested [size]. Falls back to a restrained
+/// charcoal/purple placeholder when art is unavailable.
 ///
-/// A 200-entry LRU cache (insertion-order eviction) is shared across all
-/// instances so repeated lookups for the same album never hit the channel
-/// twice.
+/// A 200-entry insertion-order cache is shared across all instances so
+/// repeated lookups for the same album do not hit the platform channel again.
 class AlbumArtThumb extends StatefulWidget {
-  /// Raw album-art path from [MediaItem.albumArtPath].
-  /// May be `null`, a file path, or an `albumid:<id>` URI.
   final String? albumArtPath;
-
-  /// Side length of the square thumbnail. Defaults to 44.
   final double size;
-
-  /// Corner radius. Defaults to 8.
   final double borderRadius;
 
   const AlbumArtThumb({
@@ -38,17 +30,13 @@ class AlbumArtThumb extends StatefulWidget {
 
 class _AlbumArtThumbState extends State<AlbumArtThumb> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
-
-  // ── 200-entry LRU cache (shared across all instances) ──────────────────
-  // Must be LinkedHashMap so keys.first is always the oldest inserted entry.
-  // A plain HashMap has undefined key order, making LRU eviction incorrect.
   static final LinkedHashMap<String, String?> _cache =
       LinkedHashMap<String, String?>();
   static const _maxCache = 200;
 
   static void _cacheSet(String key, String? value) {
     if (_cache.length >= _maxCache) {
-      _cache.remove(_cache.keys.first); // evict oldest (insertion-order)
+      _cache.remove(_cache.keys.first);
     }
     _cache[key] = value;
   }
@@ -87,7 +75,7 @@ class _AlbumArtThumbState extends State<AlbumArtThumb> {
       if (!_disposed && mounted) setState(() => _loading = false);
       return;
     }
-    // Plain file path — use directly.
+
     if (!raw.startsWith('albumid:')) {
       if (!_disposed && mounted) {
         setState(() {
@@ -97,7 +85,7 @@ class _AlbumArtThumbState extends State<AlbumArtThumb> {
       }
       return;
     }
-    // Cache hit.
+
     if (_cache.containsKey(raw)) {
       if (!_disposed && mounted) {
         setState(() {
@@ -107,7 +95,7 @@ class _AlbumArtThumbState extends State<AlbumArtThumb> {
       }
       return;
     }
-    // Resolve via MethodChannel.
+
     try {
       final albumId = raw.substring('albumid:'.length);
       final path = await _channel
@@ -132,31 +120,76 @@ class _AlbumArtThumbState extends State<AlbumArtThumb> {
       child: SizedBox(
         width: widget.size,
         height: widget.size,
-        child: _loading
-            ? Container(color: AppColors.border)
-            : _resolvedPath != null
-                ? Image.file(
-                    File(_resolvedPath!),
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => _placeholder(),
-                  )
-                : _placeholder(),
+        child: AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: _loading
+              ? _loadingSurface(context)
+              : _resolvedPath != null
+                  ? Image.file(
+                      File(_resolvedPath!),
+                      key: ValueKey(_resolvedPath),
+                      fit: BoxFit.cover,
+                      cacheWidth: (widget.size * MediaQuery.devicePixelRatioOf(context)).round(),
+                      errorBuilder: (_, __, ___) => _placeholder(context),
+                    )
+                  : _placeholder(context),
+        ),
       ),
     );
   }
 
-  Widget _placeholder() => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            colors: [AppColors.accentViolet, AppColors.accent],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
+  Widget _loadingSurface(BuildContext context) => Container(
+        key: const ValueKey('loading-art'),
+        color: AppColors.cardOf(context),
+        alignment: Alignment.center,
+        child: SizedBox(
+          width: widget.size * 0.22,
+          height: widget.size * 0.22,
+          child: const CircularProgressIndicator(
+            strokeWidth: 1.8,
+            color: AppColors.accent,
           ),
         ),
-        child: Icon(
-          Icons.music_note_rounded,
-          color: Colors.white,
-          size: widget.size * 0.45,
+      );
+
+  Widget _placeholder(BuildContext context) => Container(
+        key: const ValueKey('placeholder-art'),
+        decoration: BoxDecoration(
+          color: AppColors.cardOf(context),
+          border: Border.all(
+            color: AppColors.accent.withValues(alpha: 0.16),
+          ),
+        ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Align(
+              alignment: Alignment.topRight,
+              child: Container(
+                width: widget.size * 0.65,
+                height: widget.size * 0.65,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.accent.withValues(alpha: 0.08),
+                ),
+              ),
+            ),
+            Center(
+              child: Container(
+                width: widget.size * 0.52,
+                height: widget.size * 0.52,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.accent.withValues(alpha: 0.14),
+                ),
+                child: Icon(
+                  Icons.music_note_rounded,
+                  color: AppColors.accent,
+                  size: widget.size * 0.28,
+                ),
+              ),
+            ),
+          ],
         ),
       );
 }
