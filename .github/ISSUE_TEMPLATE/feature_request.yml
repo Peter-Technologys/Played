@@ -1,0 +1,43 @@
+name: Feature request
+description: Propose an improvement for OTYA Player
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or opportunity
+      description: What user problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: solution
+    attributes:
+      label: Proposed solution
+      description: Describe the behavior you want.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Optional alternatives or tradeoffs.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Playback
+        - Library and media scanning
+        - Downloads
+        - Authentication
+        - Sharing
+        - Vault and privacy
+        - Notifications
+        - Updates
+        - UI/UX
+        - Build and release
+        - Other
+    validations:
+      required: true
