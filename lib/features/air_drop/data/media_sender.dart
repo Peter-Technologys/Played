@@ -3,18 +3,11 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
 
-/// MediaSender — pure Dart HTTP file server.
+/// MediaSender — pure Dart HTTP file server for OTYA Beam.
 ///
-/// Why no native plugin:
-///   nearby_connections requires CMake native compilation which causes
-///   CI runner timeouts. This uses only dart:io HttpServer — zero native
-///   dependencies, compiles in milliseconds.
-///
-/// Features:
-///   • Range-request support (HTTP 206 Partial Content) so the receiver
-///     can seek through the video while it is still downloading.
-///   • Chunked streaming — the file is never fully loaded into memory;
-///     piped in 256 KB chunks directly from disk to the socket.
+/// Beam is deliberately local-network only. No cloud relay or internet upload
+/// is used. A one-time random token protects the transfer URL from other LAN
+/// devices that did not scan the QR code.
 class MediaSender {
   static const int port        = 8080;
   static const int _chunkBytes = 256 * 1024; // 256 KB per chunk
@@ -22,38 +15,40 @@ class MediaSender {
   HttpServer? _server;
   String?     _filePath;
   String?     _localIp;
-  /// One-time random token appended to the URL as a query parameter.
-  /// Prevents any device on the same LAN from downloading the file
-  /// without scanning the QR code (which contains the token).
   String?     _token;
 
   String? get localIp => _localIp;
 
-  /// Generates a cryptographically random 16-char hex token.
   static String _generateToken() {
     final rng = Random.secure();
-    return List.generate(16, (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+    return List.generate(
+      16,
+      (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0'),
+    ).join();
   }
-
-  // ── Public API ────────────────────────────────────────────────────────────
 
   Future<String> startServing(String filePath) async {
     await stop();
     await Future<void>.delayed(const Duration(milliseconds: 100));
     final file = File(filePath);
     if (!await file.exists()) throw FileSystemException('File not found', filePath);
+
+    final ip = await _getLocalIp();
     _filePath = filePath;
-    _localIp  = await _getLocalIp();
-    _token    = _generateToken();
-    _server   = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
-    final name = Uri.encodeQueryComponent(file.uri.pathSegments.isNotEmpty
-        ? file.uri.pathSegments.last
-        : 'otya-transfer');
-    final url = 'http://$_localIp:$port/media?t=$_token&name=$name';
-    debugPrint('[MediaSender] Serving $filePath on $url');
-    _server!.listen(_handleRequest,
-        onError: (Object e) => debugPrint('[MediaSender] Error: $e'),
-        cancelOnError: false);
+    _localIp = ip;
+    _token = _generateToken();
+    _server = await HttpServer.bind(InternetAddress.anyIPv4, port, shared: true);
+
+    final name = Uri.encodeQueryComponent(
+      file.uri.pathSegments.isNotEmpty ? file.uri.pathSegments.last : 'otya-transfer',
+    );
+    final url = 'http://$ip:$port/media?t=$_token&name=$name';
+    debugPrint('[MediaSender] Beam server ready on local network.');
+    _server!.listen(
+      _handleRequest,
+      onError: (Object e) => debugPrint('[MediaSender] Error: $e'),
+      cancelOnError: false,
+    );
     return url;
   }
 
@@ -65,8 +60,6 @@ class MediaSender {
     _token = null;
     debugPrint('[MediaSender] Stopped.');
   }
-
-  // ── Request handler ───────────────────────────────────────────────────────
 
   Future<void> _handleRequest(HttpRequest req) async {
     if (req.uri.path != '/media') {
@@ -81,9 +74,9 @@ class MediaSender {
     if (_token != null && requestToken != _token) {
       req.response
         ..statusCode = HttpStatus.forbidden
-        ..write('Forbidden: invalid token');
+        ..write('Forbidden');
       await req.response.close();
-      debugPrint('[MediaSender] Rejected request with invalid token: $requestToken');
+      debugPrint('[MediaSender] Rejected a request with an invalid transfer token.');
       return;
     }
 
@@ -172,29 +165,30 @@ class MediaSender {
     }
   }
 
-  // ── Helpers ───────────────────────────────────────────────────────────────
-
   Future<String> _getLocalIp() async {
     try {
       final ifaces = await NetworkInterface.list(
-          type: InternetAddressType.IPv4, includeLinkLocal: false);
+        type: InternetAddressType.IPv4,
+        includeLinkLocal: false,
+      );
       for (final iface in ifaces) {
         for (final addr in iface.addresses) {
-          if (addr.address.startsWith('192.168.') ||
-              addr.address.startsWith('10.')) {
-            return addr.address;
-          }
-        }
-      }
-      for (final iface in ifaces) {
-        for (final addr in iface.addresses) {
-          if (!addr.isLoopback) return addr.address;
+          final parts = addr.address.split('.');
+          if (parts.length != 4) continue;
+          final a = int.tryParse(parts[0]);
+          final b = int.tryParse(parts[1]);
+          final isPrivate = a == 10 ||
+              (a == 192 && b == 168) ||
+              (a == 172 && b != null && b >= 16 && b <= 31);
+          if (isPrivate) return addr.address;
         }
       }
     } catch (e) {
-      debugPrint('[MediaSender] IP error: $e');
+      debugPrint('[MediaSender] Local network discovery failed: $e');
     }
-    return '127.0.0.1';
+    throw StateError(
+      'Connect both devices to the same Wi-Fi or hotspot before using Beam.',
+    );
   }
 
   String _mimeType(String path) {
