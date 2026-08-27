@@ -1,21 +1,13 @@
-MIT License
+OTYA PLAYER PROPRIETARY LICENSE
 
-Copyright (c) 2024 APK-v1 / Played
+Copyright © 2026 PeterSmartLink. All rights reserved.
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+OTYA Player and its source code, application design, backend integration code, documentation, branding, assets, release infrastructure, and associated materials are proprietary to PeterSmartLink unless a file or component expressly states otherwise.
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+No permission is granted to copy, reproduce, modify, merge, publish, distribute, sublicense, sell, reverse engineer, create derivative works from, or commercially exploit this repository or substantial portions of it without prior written permission from PeterSmartLink.
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+Third-party open-source libraries used by OTYA Player remain governed by their respective licenses. This license does not alter or restrict rights granted by those third-party licenses.
+
+Historical copies of OTYA/Played source code that were previously distributed under another license remain subject to the license terms that accompanied those specific copies. This proprietary license applies to this repository and versions distributed under it from this change forward.
+
+For licensing, partnership, or commercial enquiries, use the official PeterSmartLink channels at https://petersmartlink.com.
