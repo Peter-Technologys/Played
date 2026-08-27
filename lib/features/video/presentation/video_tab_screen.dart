@@ -282,12 +282,7 @@ class _FilterPills extends ConsumerWidget {
               duration: const Duration(milliseconds: 200),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                gradient: isActive
-                    ? const LinearGradient(
-                        colors: [AppColors.accent, AppColors.accentViolet],
-                      )
-                    : null,
-                color: isActive ? null : AppColors.surface,
+                color: isActive ? AppColors.accent : AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
                   color: isActive ? Colors.transparent : AppColors.border,
@@ -297,13 +292,13 @@ class _FilterPills extends ConsumerWidget {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(icon, size: 14,
-                      color: isActive ? Colors.black : AppColors.textSecondary),
+                      color: isActive ? Colors.white : AppColors.textSecondary),
                   const SizedBox(width: 4),
                   Text(label,
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: isActive ? Colors.black : AppColors.textSecondary,
+                        color: isActive ? Colors.white : AppColors.textSecondary,
                         fontFamily: 'Inter',
                       )),
                 ],
@@ -374,7 +369,7 @@ class _VideoGrid extends ConsumerWidget {
             16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
         physics: const BouncingScrollPhysics(),
         cacheExtent: 600,
-        itemExtent: 102,
+        itemExtent: 86,
         itemCount: items.length + 1, // slot 0 = shuffle bar
         itemBuilder: (context, i) {
           if (i == 0) return shuffleBar;
@@ -413,7 +408,7 @@ class _VideoGrid extends ConsumerWidget {
               crossAxisSpacing: 12,
               mainAxisSpacing: 12,
               childAspectRatio:
-                  MediaQuery.of(context).size.width > 600 ? 16 / 11 : 16 / 13,
+                  MediaQuery.of(context).size.width > 600 ? 16 / 10.5 : 16 / 11,
             ),
             delegate: SliverChildBuilderDelegate(
               (context, i) {
@@ -444,7 +439,7 @@ class _VideoGrid extends ConsumerWidget {
 
 /// Row-layout list item used when the Videos tab is in list-view mode.
 ///
-/// Layout: [Thumbnail Stack (130×75) | Metadata Column | 3-dot menu]
+/// Layout: [Compact 16:9 thumbnail | Metadata Column | 3-dot menu]
 class _VideoListItem extends StatefulWidget {
   final MediaItem item;
   final VoidCallback onTap;
@@ -564,8 +559,8 @@ class _VideoListItemState extends State<_VideoListItem> {
     return GestureDetector(
       onTap: widget.onTap,
       child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        padding: const EdgeInsets.all(10),
+        margin: const EdgeInsets.only(bottom: 8),
+        padding: const EdgeInsets.all(8),
         decoration: BoxDecoration(
           color: AppColors.surface,
           borderRadius: BorderRadius.circular(14),
@@ -581,12 +576,12 @@ class _VideoListItemState extends State<_VideoListItem> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // ── LEFT: Thumbnail (130×75) ──────────────────────────────
+            // ── LEFT: Compact 16:9 thumbnail ─────────────────────────
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
-                width: 130,
-                height: 75,
+                width: 104,
+                height: 60,
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
@@ -595,7 +590,7 @@ class _VideoListItemState extends State<_VideoListItem> {
                         ? Image.file(
                             File(_thumbPath!),
                             fit: BoxFit.cover,
-                            cacheWidth: 200,
+                            cacheWidth: 160,
                             errorBuilder: (_, __, ___) =>
                                 _thumbnailPlaceholder(),
                           )
@@ -642,12 +637,12 @@ class _VideoListItemState extends State<_VideoListItem> {
                         ? widget.item.fileName
                         : widget.item.title,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w600,
                       color: Theme.of(context).colorScheme.onSurface,
                       fontFamily: 'Inter',
                     ),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
@@ -900,7 +895,7 @@ class _VideoCardState extends State<_VideoCard> {
                         ? Image.file(
                             File(_thumbPath!),
                             fit: BoxFit.cover,
-                            cacheWidth: 200,
+                            cacheWidth: 160,
                             errorBuilder: (_, __, ___) => _gradientBg(),
                           )
                         : _gradientBg(),
@@ -908,14 +903,14 @@ class _VideoCardState extends State<_VideoCard> {
                     // Play button overlay
                     Center(
                       child: Container(
-                        width: 40,
-                        height: 40,
+                        width: 34,
+                        height: 34,
                         decoration: BoxDecoration(
                           color: Colors.black.withValues(alpha: 0.45),
                           shape: BoxShape.circle,
                         ),
                         child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 26),
+                            color: Colors.white, size: 22),
                       ),
                     ),
 
@@ -1022,15 +1017,9 @@ class _VideoCardState extends State<_VideoCard> {
   }
 
   Widget _gradientBg() => Container(
-    decoration: const BoxDecoration(
-      gradient: LinearGradient(
-        colors: [Color(0xFF1a1a2e), AppColors.accentViolet],
-        begin: Alignment.topLeft,
-        end: Alignment.bottomRight,
-      ),
-    ),
+    color: const Color(0xFF171820),
     child: const Center(
-      child: Icon(Icons.movie_rounded, color: Colors.white38, size: 32),
+      child: Icon(Icons.movie_rounded, color: AppColors.accent, size: 28),
     ),
   );
 }
@@ -1512,8 +1501,8 @@ class VideoFolderDetailPage extends ConsumerWidget {
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: MediaQuery.of(context).size.width > 600
-              ? 16 / 11
-              : 16 / 13,
+              ? 16 / 10.5
+              : 16 / 11,
         ),
         itemCount: items.length,
         itemBuilder: (context, i) {
@@ -1604,7 +1593,7 @@ class _VideoSearchDelegate extends SearchDelegate<MediaItem?> {
           crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 16 / 13,
+          childAspectRatio: 16 / 11,
         ),
         itemCount: results.length,
         itemBuilder: (context, i) {
