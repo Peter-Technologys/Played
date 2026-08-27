@@ -18,23 +18,17 @@ class _ToolEntry {
   final IconData icon;
   final String label;
   final String subtitle;
-  final List<Color> gradient;
   final VoidCallback Function(BuildContext) onTapBuilder;
 
   const _ToolEntry({
     required this.icon,
     required this.label,
     required this.subtitle,
-    required this.gradient,
     required this.onTapBuilder,
   });
 }
 
-/// A quieter, modern OTYA Hub.
-///
-/// The old screen surfaced every tool, account action and preference at once.
-/// This version keeps the four most useful actions visible and moves secondary
-/// tools behind one deliberate “All tools” sheet so the Hub stays scannable.
+/// OTYA Hub: useful tools without the old rainbow-card clutter.
 class MySpaceHubScreen extends ConsumerWidget {
   const MySpaceHubScreen({super.key});
 
@@ -43,76 +37,64 @@ class MySpaceHubScreen extends ConsumerWidget {
           icon: Icons.folder_rounded,
           label: 'Files',
           subtitle: 'Browse your media',
-          gradient: const [Color(0xFFFFA14A), Color(0xFFEF6C00)],
           onTapBuilder: (context) => () => context.push('/tools/folders'),
         ),
         _ToolEntry(
           icon: Icons.wifi_tethering_rounded,
           label: 'Beam',
           subtitle: 'Send files nearby',
-          gradient: const [Color(0xFF5B8CFF), Color(0xFF3156D9)],
           onTapBuilder: (context) => () => context.push('/airdrop'),
         ),
         _ToolEntry(
           icon: Icons.lock_rounded,
           label: 'Safe',
           subtitle: 'Private media vault',
-          gradient: const [Color(0xFF9D6CFF), Color(0xFF6B3FD4)],
           onTapBuilder: (context) => () => context.push('/vault'),
         ),
         _ToolEntry(
           icon: Icons.history_rounded,
           label: 'History',
           subtitle: 'Recently played',
-          gradient: const [Color(0xFF6E75FF), Color(0xFF4549C6)],
           onTapBuilder: (context) => () => context.push('/history'),
         ),
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
           label: 'Sound',
           subtitle: 'Equalizer & tuning',
-          gradient: const [Color(0xFF8A94A7), Color(0xFF596273)],
           onTapBuilder: (context) => () => context.push('/player/equalizer'),
         ),
         _ToolEntry(
           icon: Icons.bar_chart_rounded,
           label: 'Insights',
           subtitle: 'Your listening stats',
-          gradient: const [Color(0xFF24C7B1), Color(0xFF0C8D80)],
           onTapBuilder: (context) => () => context.push('/stats'),
         ),
         _ToolEntry(
           icon: Icons.audiotrack_rounded,
           label: 'Ripper',
           subtitle: 'Extract audio from video',
-          gradient: const [Color(0xFF42D99A), Color(0xFF079A65)],
           onTapBuilder: (context) => () => _showRipperHelp(context),
         ),
         _ToolEntry(
           icon: Icons.cleaning_services_rounded,
           label: 'Clean',
           subtitle: 'Clear OTYA cache',
-          gradient: const [Color(0xFFFF6685), Color(0xFFC92D52)],
           onTapBuilder: (context) => () => _cleanCache(context),
         ),
         _ToolEntry(
           icon: Icons.palette_rounded,
           label: 'Appearance',
           subtitle: 'Theme and look',
-          gradient: const [Color(0xFFFFC44C), Color(0xFFD98500)],
           onTapBuilder: (context) => () => context.push('/theme'),
         ),
         _ToolEntry(
           icon: Icons.content_cut_rounded,
           label: 'Trim',
           subtitle: 'Prepare clips to share',
-          gradient: const [Color(0xFF40D77B), Color(0xFF128C7E)],
           onTapBuilder: (context) => () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
-                content: Text(
-                  'Open a video, then use ⋮ → Trim for WhatsApp.',
-                ),
+                content: Text('Open a video, then use ⋮ → Trim for WhatsApp.'),
               ),
             );
           },
@@ -144,10 +126,10 @@ class MySpaceHubScreen extends ConsumerWidget {
                           Text(
                             'OTYA Hub',
                             style: TextStyle(
-                              fontSize: 28,
+                              fontSize: 29,
                               height: 1,
-                              letterSpacing: -1,
-                              fontWeight: FontWeight.w800,
+                              letterSpacing: -1.1,
+                              fontWeight: FontWeight.w900,
                               color: AppColors.textPrimaryOf(context),
                               fontFamily: 'Inter',
                             ),
@@ -156,7 +138,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                           Text(
                             signedIn
                                 ? 'Good to see you, ${_firstName(displayName)}.'
-                                : 'Your media, tools and account.',
+                                : 'Tools when you need them. Nothing in the way.',
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
@@ -180,7 +162,6 @@ class MySpaceHubScreen extends ConsumerWidget {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 22)),
-
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -194,8 +175,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
+            const SliverToBoxAdapter(child: SizedBox(height: 26)),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -208,7 +188,6 @@ class MySpaceHubScreen extends ConsumerWidget {
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimaryOf(context),
-                          fontFamily: 'Inter',
                         ),
                       ),
                     ),
@@ -222,7 +201,6 @@ class MySpaceHubScreen extends ConsumerWidget {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
@@ -238,8 +216,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 26)),
-
+            const SliverToBoxAdapter(child: SizedBox(height: 28)),
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -249,13 +226,11 @@ class MySpaceHubScreen extends ConsumerWidget {
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                     color: AppColors.textPrimaryOf(context),
-                    fontFamily: 'Inter',
                   ),
                 ),
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 10)),
-
             SliverToBoxAdapter(
               child: Container(
                 margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -324,18 +299,12 @@ class MySpaceHubScreen extends ConsumerWidget {
           final query = controller.text.trim().toLowerCase();
           final visible = query.isEmpty
               ? tools
-              : tools
-                  .where((tool) =>
-                      tool.label.toLowerCase().contains(query) ||
-                      tool.subtitle.toLowerCase().contains(query))
-                  .toList();
+              : tools.where((tool) =>
+                    tool.label.toLowerCase().contains(query) ||
+                    tool.subtitle.toLowerCase().contains(query)).toList();
           return Padding(
             padding: EdgeInsets.fromLTRB(
-              18,
-              10,
-              18,
-              MediaQuery.of(context).viewInsets.bottom + 22,
-            ),
+              18, 10, 18, MediaQuery.of(context).viewInsets.bottom + 22),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -357,7 +326,6 @@ class MySpaceHubScreen extends ConsumerWidget {
                           fontSize: 20,
                           fontWeight: FontWeight.w800,
                           color: AppColors.textPrimaryOf(context),
-                          fontFamily: 'Inter',
                         ),
                       ),
                     ),
@@ -388,8 +356,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   child: GridView.builder(
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(bottom: 12),
-                    gridDelegate:
-                        const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
@@ -430,22 +397,14 @@ class MySpaceHubScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Extract audio',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textPrimaryOf(context),
-              ),
-            ),
+            Text('Extract audio', style: TextStyle(
+              fontSize: 20, fontWeight: FontWeight.w800,
+              color: AppColors.textPrimaryOf(context))),
             const SizedBox(height: 10),
             const Text(
               'Open a video, tap ⋮, then choose Extract Audio. OTYA saves the audio as an M4A file and adds it back to your media library.',
-              style: TextStyle(
-                fontSize: 13,
-                height: 1.5,
-                color: AppColors.textSecondary,
-              ),
+              style: TextStyle(fontSize: 13, height: 1.5,
+                color: AppColors.textSecondary),
             ),
             const SizedBox(height: 18),
             SizedBox(
@@ -507,9 +466,9 @@ class MySpaceHubScreen extends ConsumerWidget {
     controller.dispose();
     if (name == null || name.trim().isEmpty) return;
     await ref.read(authNotifierProvider.notifier).signIn(
-          userId: const Uuid().v4(),
-          displayName: name.trim(),
-        );
+      userId: const Uuid().v4(),
+      displayName: name.trim(),
+    );
   }
 
   Future<void> _runBackup(BuildContext context, WidgetRef ref) async {
@@ -529,35 +488,31 @@ class MySpaceHubScreen extends ConsumerWidget {
 class _HeaderButton extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
-
   const _HeaderButton({required this.icon, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.cardOf(context),
-      borderRadius: BorderRadius.circular(14),
-      child: InkWell(
+  Widget build(BuildContext context) => Material(
+        color: AppColors.cardOf(context),
         borderRadius: BorderRadius.circular(14),
-        onTap: onTap,
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.borderOf(context)),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: onTap,
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppColors.borderOf(context)),
+            ),
+            child: Icon(icon, size: 21),
           ),
-          child: Icon(icon, size: 21),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _Avatar extends StatelessWidget {
   final String? photoUrl;
   final String? displayName;
-
   const _Avatar({this.photoUrl, this.displayName});
 
   @override
@@ -570,10 +525,8 @@ class _Avatar extends StatelessWidget {
       height: 44,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: const LinearGradient(
-          colors: [AppColors.accent, AppColors.accentViolet],
-        ),
-        border: Border.all(color: AppColors.borderOf(context)),
+        color: AppColors.surfaceElevated,
+        border: Border.all(color: AppColors.accent.withValues(alpha: .35)),
       ),
       clipBehavior: Clip.antiAlias,
       child: photoUrl != null && photoUrl!.isNotEmpty
@@ -589,23 +542,14 @@ class _Avatar extends StatelessWidget {
 
 class _Initial extends StatelessWidget {
   final String initial;
-
   const _Initial({required this.initial});
 
   @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Text(
-        initial,
-        style: const TextStyle(
-          color: Colors.white,
-          fontSize: 17,
-          fontWeight: FontWeight.w800,
-          fontFamily: 'Inter',
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Center(
+        child: Text(initial, style: const TextStyle(
+          color: AppColors.accent, fontSize: 17,
+          fontWeight: FontWeight.w900, fontFamily: 'Inter')),
+      );
 }
 
 class _AccountBanner extends StatelessWidget {
@@ -613,7 +557,6 @@ class _AccountBanner extends StatelessWidget {
   final String? displayName;
   final VoidCallback onPrimary;
   final VoidCallback onProfile;
-
   const _AccountBanner({
     required this.signedIn,
     this.displayName,
@@ -622,191 +565,158 @@ class _AccountBanner extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.accent.withValues(alpha: 0.16),
-            AppColors.accentViolet.withValues(alpha: 0.09),
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: AppColors.cardOf(context),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: AppColors.accent.withValues(alpha: .22)),
+          boxShadow: [BoxShadow(
+            color: AppColors.accent.withValues(alpha: .06), blurRadius: 24)],
         ),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppColors.accent.withValues(alpha: 0.22)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 46,
-            height: 46,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(15),
+        child: Row(
+          children: [
+            Container(
+              width: 46,
+              height: 46,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: .12),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(
+                signedIn ? Icons.cloud_done_rounded : Icons.person_add_alt_1_rounded,
+                color: AppColors.accent,
+              ),
             ),
-            child: Icon(
-              signedIn ? Icons.cloud_done_rounded : Icons.person_add_alt_1_rounded,
-              color: AppColors.accent,
-            ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  signedIn ? (displayName ?? 'OTYA account') : 'Make OTYA yours',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimaryOf(context),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    signedIn ? (displayName ?? 'OTYA account') : 'Make OTYA yours',
+                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimaryOf(context)),
                   ),
+                  const SizedBox(height: 3),
+                  Text(
+                    signedIn ? 'Your data is ready to sync.' : 'Set a name and personalise your Hub.',
+                    style: const TextStyle(fontSize: 11.5,
+                      color: AppColors.textSecondary),
+                  ),
+                ],
+              ),
+            ),
+            FilledButton.tonal(
+              onPressed: onPrimary,
+              child: Text(signedIn ? 'Sync' : 'Start'),
+            ),
+            IconButton(
+              tooltip: 'Profile',
+              onPressed: onProfile,
+              icon: const Icon(Icons.chevron_right_rounded),
+            ),
+          ],
+        ),
+      );
+}
+
+class _FeatureToolCard extends StatelessWidget {
+  final _ToolEntry tool;
+  const _FeatureToolCard({required this.tool});
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.cardOf(context),
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(20),
+          onTap: () {
+            HapticFeedback.selectionClick();
+            tool.onTapBuilder(context)();
+          },
+          child: Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.borderOf(context)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 46,
+                  height: 46,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: .11),
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: .18)),
+                  ),
+                  child: Icon(tool.icon, color: AppColors.accent, size: 23),
                 ),
-                const SizedBox(height: 3),
-                Text(
-                  signedIn ? 'Your data is ready to sync.' : 'Set a name and personalise your Hub.',
-                  style: const TextStyle(
-                    fontSize: 11.5,
-                    color: AppColors.textSecondary,
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(tool.label, maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimaryOf(context))),
+                      const SizedBox(height: 3),
+                      Text(tool.subtitle, maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 10.5,
+                          color: AppColors.textSecondary)),
+                    ],
                   ),
                 ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          FilledButton.tonal(
-            onPressed: onPrimary,
-            child: Text(signedIn ? 'Sync' : 'Start'),
-          ),
-          IconButton(
-            tooltip: 'Profile',
-            onPressed: onProfile,
-            icon: const Icon(Icons.chevron_right_rounded),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FeatureToolCard extends StatelessWidget {
-  final _ToolEntry tool;
-
-  const _FeatureToolCard({required this.tool});
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppColors.cardOf(context),
-      borderRadius: BorderRadius.circular(20),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: () {
-          HapticFeedback.selectionClick();
-          tool.onTapBuilder(context)();
-        },
-        child: Container(
-          padding: const EdgeInsets.all(14),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.borderOf(context)),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 46,
-                height: 46,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: tool.gradient),
-                  borderRadius: BorderRadius.circular(15),
-                ),
-                child: Icon(tool.icon, color: Colors.white, size: 23),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      tool.label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w800,
-                        color: AppColors.textPrimaryOf(context),
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      tool.subtitle,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 10.5,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _CompactToolCard extends StatelessWidget {
   final _ToolEntry tool;
   final VoidCallback onTap;
-
   const _CompactToolCard({required this.tool, required this.onTap});
 
   @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Theme.of(context).scaffoldBackgroundColor,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        onTap: onTap,
+  Widget build(BuildContext context) => Material(
+        color: Theme.of(context).scaffoldBackgroundColor,
         borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: [
-              Container(
-                width: 38,
-                height: 38,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(colors: tool.gradient),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(tool.icon, color: Colors.white, size: 19),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Text(
-                  tool.label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimaryOf(context),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
+              children: [
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: .10),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  child: Icon(tool.icon, color: AppColors.accent, size: 19),
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(tool.label, maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryOf(context))),
+                ),
+              ],
+            ),
           ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 class _ManagementRow extends StatelessWidget {
@@ -814,7 +724,6 @@ class _ManagementRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-
   const _ManagementRow({
     required this.icon,
     required this.title,
@@ -823,31 +732,21 @@ class _ManagementRow extends StatelessWidget {
   });
 
   @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: onTap,
-      leading: Container(
-        width: 40,
-        height: 40,
-        decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.09),
-          borderRadius: BorderRadius.circular(12),
+  Widget build(BuildContext context) => ListTile(
+        onTap: onTap,
+        leading: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Icon(icon, color: AppColors.accent, size: 20),
         ),
-        child: Icon(icon, color: AppColors.accent, size: 20),
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w700,
-          color: AppColors.textPrimaryOf(context),
-        ),
-      ),
-      subtitle: Text(
-        subtitle,
-        style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
-      ),
-      trailing: const Icon(Icons.chevron_right_rounded, size: 20),
-    );
-  }
+        title: Text(title, style: TextStyle(fontSize: 14,
+          fontWeight: FontWeight.w700, color: AppColors.textPrimaryOf(context))),
+        subtitle: Text(subtitle, style: const TextStyle(
+          fontSize: 11, color: AppColors.textSecondary)),
+        trailing: const Icon(Icons.chevron_right_rounded, size: 20),
+      );
 }
