@@ -37,11 +37,6 @@ class GoogleAccountService {
   String? get email => _account?.email;
   bool get hasGoogleSession => _account != null;
 
-  /// Authenticates the Google identity with OTYA Auth.
-  ///
-  /// Drive permission is intentionally NOT requested here and no Drive access
-  /// token is sent to /auth/google. This keeps normal account sign-in separate
-  /// from optional cloud recovery consent.
   Future<AuthResult> signInAndAuthenticate() async {
     if (!isConfigured) {
       return const AuthResult(
@@ -62,8 +57,6 @@ class GoogleAccountService {
         return const AuthResult(ok: false, error: 'Google did not return an ID token.');
       }
 
-      // Keep the existing AuthService contract compatible while deliberately
-      // sending no Drive credential during basic authentication.
       final result = await AuthService.instance.loginWithGoogle(idToken, '');
       if (result.ok) {
         _account = account;
@@ -79,7 +72,6 @@ class GoogleAccountService {
     }
   }
 
-  /// Restores an existing identity session without asking for Drive permission.
   Future<bool> restoreSession() async {
     if (!isConfigured) return false;
     try {
@@ -94,8 +86,6 @@ class GoogleAccountService {
     }
   }
 
-  /// Requests only the private app-data Drive scope when cloud recovery is
-  /// actually used. The resulting access token remains memory-only.
   Future<String?> _freshDriveToken() async {
     if (_account == null) {
       await restoreSession();
@@ -128,13 +118,12 @@ class GoogleAccountService {
     await BackupService.instance.backup(data, token);
   }
 
-  Future<bool> restoreFromDrive() async {
+  Future<int> restoreFromDrive() async {
     final token = await _freshDriveToken();
     if (token == null) throw StateError('Google Drive permission is required for restore.');
     final data = await BackupService.instance.restore(token);
-    if (data == null) return false;
-    await BackupService.instance.restoreFromData(data);
-    return true;
+    if (data == null) return 0;
+    return BackupService.instance.restoreFromData(data);
   }
 
   Future<void> deleteDriveBackup() async {
