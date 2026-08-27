@@ -99,17 +99,6 @@ class _AirDropNotifier extends StateNotifier<_AirDropState> {
     }
   }
 
-  Future<void> shareApk() async {
-    state = state.copyWith(sendStep: _SendStep.serving, serverUrl: null);
-    _log('Preparing APK…');
-    try {
-      final url = await _sender.startServingApk();
-      if (url == null) { _log('APK not found.'); state = state.copyWith(sendStep: _SendStep.idle); return; }
-      state = state.copyWith(serverUrl: url);
-      _log('APK ready. Show QR.');
-    } catch (e) { _log('APK error: $e'); state = state.copyWith(sendStep: _SendStep.idle); }
-  }
-
   void stopSending() {
     _sender.stop();
     state = state.copyWith(sendStep: _SendStep.idle, serverUrl: null);
@@ -386,15 +375,6 @@ class _SendView extends ConsumerWidget {
             ),
             const SizedBox(height: 16),
           ],
-          // Share APK
-          _GlassButton(
-            icon: Icons.install_mobile_rounded,
-            label: 'Beam OTYA Player APK',
-            subtitle: 'Let friends install without internet',
-            color: AppColors.accentViolet,
-            onTap: () => n.shareApk(),
-          ),
-          const SizedBox(height: 8),
           // File list
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 8),
