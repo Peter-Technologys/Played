@@ -8,6 +8,7 @@ import '../features/my_space/presentation/folder_browser_screen.dart' show Folde
 import '../features/my_space/presentation/playback_history_screen.dart';
 import '../features/my_space/presentation/providers/my_space_provider.dart';
 import '../core/widgets/update_dialog.dart';
+import '../core/services/remote_control_service.dart';
 import '../shared/widgets/new_media_banner.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
@@ -78,8 +79,17 @@ class AppRouter {
       GlobalKey<NavigatorState>();
 
   static String? _redirect(BuildContext context, GoRouterState state) {
-    // Auth is optional — OTYA Player works fully offline without an account.
-    // The auth screen is only reached by explicit navigation (e.g. from Profile).
+    final remote = RemoteControlService.instance;
+    final feature = switch (state.matchedLocation) {
+      '/airdrop' => 'beam',
+      '/vault' => 'safe',
+      '/player/equalizer' => 'equalizer',
+      '/tools/whatsapp' => 'whatsappTrimmer',
+      _ => null,
+    };
+    if (feature != null && !remote.featureEnabled(feature)) {
+      return '/myspace';
+    }
     return null;
   }
 

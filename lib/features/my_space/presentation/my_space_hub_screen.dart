@@ -6,7 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:uuid/uuid.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
@@ -170,7 +169,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   displayName: displayName,
                   onPrimary: signedIn
                       ? () => _runBackup(context, ref)
-                      : () => _signIn(context, ref),
+                      : () => context.push('/auth'),
                   onProfile: () => context.push('/profile'),
                 ),
               ),
@@ -436,39 +435,6 @@ class MySpaceHubScreen extends ConsumerWidget {
       messenger.hideCurrentSnackBar();
       messenger.showSnackBar(const SnackBar(content: Text('Could not clear all cache files.')));
     }
-  }
-
-  Future<void> _signIn(BuildContext context, WidgetRef ref) async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: const Text('Your display name'),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          textInputAction: TextInputAction.done,
-          decoration: const InputDecoration(hintText: 'Name'),
-          onSubmitted: (value) => Navigator.pop(dialogContext, value),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext),
-            child: const Text('Cancel'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, controller.text),
-            child: const Text('Save'),
-          ),
-        ],
-      ),
-    );
-    controller.dispose();
-    if (name == null || name.trim().isEmpty) return;
-    await ref.read(authNotifierProvider.notifier).signIn(
-      userId: const Uuid().v4(),
-      displayName: name.trim(),
-    );
   }
 
   Future<void> _runBackup(BuildContext context, WidgetRef ref) async {
