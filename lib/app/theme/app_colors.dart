@@ -1,79 +1,83 @@
 import 'package:flutter/material.dart';
 
+/// PeterSmart Link / OTYA visual system.
+///
+/// This palette intentionally follows the approved product concept: near-black
+/// foundations, layered charcoal surfaces, one restrained purple brand family,
+/// bright readable type, and media artwork as the main source of colour.
+/// Keep semantic status colours only for actual success/warning/error states.
 abstract class AppColors {
-  // ── Backgrounds ────────────────────────────────────────────────────────
-  static const Color background       = Color(0xFF0F1117); // dark navy — readable
-  static const Color surface          = Color(0xFF161B27);
-  static const Color surfaceElevated  = Color(0xFF1C2333);
-  static const Color surfaceHighlight = Color(0xFF222A3A);
-  static const Color border           = Color(0xFF2A3550);
-  static const Color borderSubtle     = Color(0xFF1A2235);
+  // ── Foundations ────────────────────────────────────────────────────────
+  static const Color background       = Color(0xFF08080B);
+  static const Color surface          = Color(0xFF101014);
+  static const Color surfaceElevated  = Color(0xFF16161D);
+  static const Color surfaceHighlight = Color(0xFF1D1D27);
+  static const Color border           = Color(0xFF2A2A35);
+  static const Color borderSubtle     = Color(0xFF202029);
 
-  // ── Brand Accents ───────────────────────────────────────────────────
-  static const Color accent       = Color(0xFF00E5FF); // Electric Cyan
-  static const Color accentViolet = Color(0xFF8B5CF6); // Violet
-  static const Color accentPink   = Color(0xFFF472B6);
-  static const Color accentGreen  = Color(0xFF34D399);
+  // ── PeterSmart Link / OTYA brand ─────────────────────────────────────
+  // `accent` remains the compatibility alias used throughout the app.
+  static const Color accent       = Color(0xFF8B5CF6);
+  static const Color accentViolet = Color(0xFFA855F7);
+  static const Color accentPink   = Color(0xFFC084FC);
+
+  // Semantic colours only — do not use these as decorative screen colours.
+  static const Color accentGreen  = Color(0xFF4ADE80);
   static const Color accentAmber  = Color(0xFFFBBF24);
 
-  // ── Glow colours ───────────────────────────────────────────────────
-  static const Color glowBlue   = Color(0x5000E5FF);
+  // ── Glow / depth ──────────────────────────────────────────────────────
+  static const Color glowBlue   = Color(0x408B5CF6); // legacy alias
   static const Color glowViolet = Color(0x508B5CF6);
 
-  // ── Gradient presets ───────────────────────────────────────────────
+  // ── Gradients ─────────────────────────────────────────────────────────
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [accent, accentViolet],
+    colors: [Color(0xFF7C3AED), Color(0xFFA855F7)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
   static const LinearGradient accentGradientDiag = LinearGradient(
-    colors: [accent, accentViolet],
+    colors: [Color(0xFF7C3AED), Color(0xFF9333EA)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF161B27), Color(0xFF1C2333)],
+    colors: [Color(0xFF111116), Color(0xFF181820)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
   static const LinearGradient darkOverlay = LinearGradient(
-    colors: [Colors.transparent, Color(0xCC0F1117)],
+    colors: [Colors.transparent, Color(0xE608080B)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
-  // ── Text ─────────────────────────────────────────────────────────────
-  static const Color textPrimary   = Color(0xFFF0F6FF);
-  static const Color textSecondary = Color(0xFF8BA3C7); // boosted contrast
-  static const Color textMuted     = Color(0xFF3D5070);
+  // ── Text ──────────────────────────────────────────────────────────────
+  static const Color textPrimary   = Color(0xFFF7F7FB);
+  static const Color textSecondary = Color(0xFFA4A4B3);
+  static const Color textMuted     = Color(0xFF676776);
 
-  // ── Status ───────────────────────────────────────────────────────────
-  static const Color error   = Color(0xFFFF4D6A);
-  static const Color success = Color(0xFF34D399);
+  // ── Status ────────────────────────────────────────────────────────────
+  static const Color error   = Color(0xFFFF5D73);
+  static const Color success = Color(0xFF4ADE80);
   static const Color warning = Color(0xFFFBBF24);
 
   // ── Theme-aware helpers ───────────────────────────────────────────────
-  /// Returns the scaffold background colour for the current theme.
   static Color backgroundOf(BuildContext context) =>
       Theme.of(context).scaffoldBackgroundColor;
 
-  /// Returns the surface colour for the current theme.
   static Color surfaceOf(BuildContext context) =>
       Theme.of(context).colorScheme.surface;
 
-  /// Returns the primary text colour for the current theme.
   static Color textPrimaryOf(BuildContext context) =>
       Theme.of(context).colorScheme.onSurface;
 
-  /// Returns the border colour for the current theme.
   static Color borderOf(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF2A2F45)
+          ? border
           : const Color(0xFFE5E7EB);
 
-  /// Returns the card background colour for the current theme.
   static Color cardOf(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF1B1E2B)
+          ? surfaceElevated
           : Colors.white;
 }
