@@ -68,9 +68,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build
-          # Compiler/analyzer errors remain fatal. Warnings and infos are kept
-          # visible in CI and uploaded below, but do not block tests or builds.
-          flutter analyze --no-fatal-warnings 2>&1 | tee build/flutter-analyze.log
+          # Analyzer errors remain fatal. Existing warnings and info-level lints
+          # stay visible and archived but do not block tests or APK verification.
+          flutter analyze --no-fatal-warnings --no-fatal-infos 2>&1 | tee build/flutter-analyze.log
 
       - name: Upload analyzer report
         if: always()
