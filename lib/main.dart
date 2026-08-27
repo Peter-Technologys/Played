@@ -9,7 +9,6 @@ import 'app/app.dart';
 import 'core/database/otya_database.dart';
 import 'core/services/audio_handler.dart';
 import 'core/services/cache_service.dart';
-import 'core/services/cloudflare_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/crash_reporter.dart';
 import 'core/services/device_service.dart';
@@ -73,7 +72,7 @@ Future<void> main() async {
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
-        notificationColor: 0xFF8B5CF6,
+        notificationColor: Color(0xFF8B5CF6),
         androidShowNotificationBadge: false,
         preloadArtwork: true,
       ),
@@ -252,5 +251,3 @@ Future<void> _initNotifications() async {
     PushNotificationService.instance.init,
   );
 }
-
-CloudflareService get _cf => CloudflareService.instance;
