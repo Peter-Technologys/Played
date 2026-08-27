@@ -2,99 +2,105 @@
 //
 // SleepDetectionService — tracks user interaction timestamps and emits a
 // callback when no interaction has occurred for a configurable timeout.
-//
-// Interactions tracked:
-//   - recordInteraction() — call on any tap, seek, or skip event.
-//
-// Usage:
-//   SleepDetectionService.instance.onSleepDetected = () { /* pause playback */ };
-//   SleepDetectionService.instance.start(const Duration(minutes: 30));
-//   // ... on user tap:
-//   SleepDetectionService.instance.recordInteraction();
-//   // ... when done:
-//   SleepDetectionService.instance.stop();
 
 import 'dart:async';
 import 'package:flutter/foundation.dart';
 
 /// Singleton that detects user inactivity and fires [onSleepDetected].
+///
+/// Uses a single deadline timer instead of polling every 30 seconds. This keeps
+/// the service effectively idle while the user is listening, reducing wakeups,
+/// battery work and timer churn on low-end devices.
 class SleepDetectionService {
   SleepDetectionService._();
   static final SleepDetectionService instance = SleepDetectionService._();
 
-  // ── State ─────────────────────────────────────────────────────────────────
-
-  /// Called when the inactivity timeout elapses with no recorded interaction.
-  /// Set this before calling [start].
   VoidCallback? onSleepDetected;
 
   Duration _timeout = const Duration(minutes: 30);
   DateTime? _lastInteractionAt;
   Timer? _timer;
   bool _running = false;
+  int _generation = 0;
 
-  // ── Public API ────────────────────────────────────────────────────────────
-
-  /// Start monitoring for inactivity.
-  ///
-  /// [timeout] — how long without interaction before [onSleepDetected] fires.
-  /// Defaults to 30 minutes. Calling [start] while already running resets the
-  /// timer with the new timeout.
+  /// Start monitoring for inactivity. Calling [start] again safely replaces
+  /// the previous deadline.
   void start([Duration timeout = const Duration(minutes: 30)]) {
+    if (timeout <= Duration.zero) {
+      stop();
+      return;
+    }
     _timeout = timeout;
     _running = true;
     _lastInteractionAt = DateTime.now();
-    _scheduleCheck();
-    debugPrint('[SleepDetection] Started — timeout: ${_timeout.inMinutes}m');
+    _scheduleDeadline();
+    if (kDebugMode) {
+      debugPrint('[SleepDetection] Started — timeout: ${_timeout.inMinutes}m');
+    }
   }
 
-  /// Stop monitoring. Cancels any pending timer.
+  /// Stop monitoring and invalidate any callback already queued by an older
+  /// timer generation.
   void stop() {
     _running = false;
+    _generation++;
     _timer?.cancel();
     _timer = null;
-    debugPrint('[SleepDetection] Stopped.');
+    if (kDebugMode) debugPrint('[SleepDetection] Stopped.');
   }
 
-  /// Record a user interaction (tap, seek, skip, etc.).
-  /// Resets the inactivity countdown.
+  /// Record user interaction and move the deadline forward. This is cheap and
+  /// safe to call for taps, seeks and skips.
   void recordInteraction() {
+    if (!_running) return;
     _lastInteractionAt = DateTime.now();
-    if (kDebugMode) debugPrint('[SleepDetection] Interaction recorded at $_lastInteractionAt');
+    _scheduleDeadline();
   }
 
-  /// Whether the service is currently running.
   bool get isRunning => _running;
 
-  /// Time elapsed since the last recorded interaction.
-  /// Returns [Duration.zero] if no interaction has been recorded yet.
   Duration get timeSinceLastInteraction {
-    if (_lastInteractionAt == null) return Duration.zero;
-    return DateTime.now().difference(_lastInteractionAt!);
+    final last = _lastInteractionAt;
+    if (last == null) return Duration.zero;
+    final elapsed = DateTime.now().difference(last);
+    return elapsed.isNegative ? Duration.zero : elapsed;
   }
 
-  // ── Internal ──────────────────────────────────────────────────────────────
-
-  void _scheduleCheck() {
+  void _scheduleDeadline() {
     _timer?.cancel();
     if (!_running) return;
 
-    // Check every 30 seconds for responsiveness; fire when elapsed ≥ timeout.
-    _timer = Timer.periodic(const Duration(seconds: 30), (_) => _check());
+    final generation = ++_generation;
+    final remaining = _timeout - timeSinceLastInteraction;
+    if (remaining <= Duration.zero) {
+      scheduleMicrotask(() => _fireIfCurrent(generation));
+      return;
+    }
+    _timer = Timer(remaining, () => _fireIfCurrent(generation));
   }
 
-  void _check() {
-    if (!_running) return;
+  void _fireIfCurrent(int generation) {
+    if (!_running || generation != _generation) return;
 
-    final elapsed = timeSinceLastInteraction;
-    if (kDebugMode) {
-      debugPrint('[SleepDetection] Inactivity check — elapsed: ${elapsed.inSeconds}s / timeout: ${_timeout.inSeconds}s');
+    // Timers may wake slightly early on some devices. Recalculate rather than
+    // firing prematurely.
+    final remaining = _timeout - timeSinceLastInteraction;
+    if (remaining > Duration.zero) {
+      _timer = Timer(remaining, () => _fireIfCurrent(generation));
+      return;
     }
 
-    if (elapsed >= _timeout) {
-      debugPrint('[SleepDetection] Sleep detected — firing callback.');
-      stop();
-      onSleepDetected?.call();
+    final callback = onSleepDetected;
+    stop();
+    try {
+      callback?.call();
+    } catch (error, stackTrace) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stackTrace,
+        library: 'OTYA sleep detection',
+        context: ErrorDescription('while invoking the inactivity callback'),
+      ));
     }
   }
 }
