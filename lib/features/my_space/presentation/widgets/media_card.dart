@@ -30,11 +30,12 @@ class _MediaCardState extends State<MediaCard>
 
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
   static const int _kCacheMax = 300;
-  static final LinkedHashMap<String, String?> _thumbCache = LinkedHashMap();
-  static final LinkedHashMap<String, String?> _artCache = LinkedHashMap();
+  static final LinkedHashMap<String, String> _thumbCache = LinkedHashMap();
+  static final LinkedHashMap<String, String> _artCache = LinkedHashMap();
 
   static void _cacheInsert(
-      LinkedHashMap<String, String?> cache, String key, String? value) {
+      LinkedHashMap<String, String> cache, String key, String? value) {
+    if (value == null || value.isEmpty) return;
     if (cache.length >= _kCacheMax) cache.remove(cache.keys.first);
     cache[key] = value;
   }
@@ -52,9 +53,9 @@ class _MediaCardState extends State<MediaCard>
 
     final item = widget.item;
     if (item.isVideo) {
-      final key = item.filePath;
-      if (_thumbCache.containsKey(key)) {
-        _thumbPath = _thumbCache[key];
+      final cached = _thumbCache[item.filePath];
+      if (cached != null && File(cached).existsSync()) {
+        _thumbPath = cached;
         _loaded = true;
         return;
       }
@@ -65,17 +66,30 @@ class _MediaCardState extends State<MediaCard>
         return;
       }
       if (!raw.startsWith('albumid:')) {
-        _artPath = raw;
+        if (File(raw).existsSync()) _artPath = raw;
         _loaded = true;
         return;
       }
-      if (_artCache.containsKey(raw)) {
-        _artPath = _artCache[raw];
+      final cached = _artCache[raw];
+      if (cached != null && File(cached).existsSync()) {
+        _artPath = cached;
         _loaded = true;
         return;
       }
     }
     _loadArt();
+  }
+
+  @override
+  void didUpdateWidget(covariant MediaCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.id != widget.item.id ||
+        oldWidget.item.filePath != widget.item.filePath) {
+      _thumbPath = null;
+      _artPath = null;
+      _loaded = false;
+      _loadArt();
+    }
   }
 
   @override
@@ -88,32 +102,59 @@ class _MediaCardState extends State<MediaCard>
     final item = widget.item;
     if (item.isVideo) {
       final key = item.filePath;
-      final mediaStoreId = item.mediaStoreId;
-      if (mediaStoreId == null || mediaStoreId.isEmpty) {
-        _cacheInsert(_thumbCache, key, null);
-        if (mounted) setState(() => _loaded = true);
-        return;
-      }
       try {
+        // Always ask native code for a thumbnail. Some MediaStore entries do
+        // not expose an ID after moves/restores, but the native implementation
+        // can still fall back to MediaMetadataRetriever using the file path.
         final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
           'path': item.filePath,
-          'id': mediaStoreId,
+          'id': item.mediaStoreId ?? '',
         });
-        _cacheInsert(_thumbCache, key, path);
-        if (mounted) setState(() { _thumbPath = path; _loaded = true; });
+        if (path != null && path.isNotEmpty && File(path).existsSync()) {
+          _cacheInsert(_thumbCache, key, path);
+        }
+        if (mounted) {
+          setState(() {
+            _thumbPath = path;
+            _loaded = true;
+          });
+        }
       } catch (_) {
-        _cacheInsert(_thumbCache, key, null);
+        // Do not cache failures. A later MediaStore refresh or file move may
+        // make the same thumbnail resolvable without restarting OTYA.
         if (mounted) setState(() => _loaded = true);
       }
     } else {
-      final raw = item.albumArtPath!;
+      final raw = item.albumArtPath;
+      if (raw == null) {
+        if (mounted) setState(() => _loaded = true);
+        return;
+      }
+      if (!raw.startsWith('albumid:')) {
+        if (mounted) {
+          setState(() {
+            _artPath = File(raw).existsSync() ? raw : null;
+            _loaded = true;
+          });
+        }
+        return;
+      }
       try {
         final albumId = raw.substring('albumid:'.length);
-        final path = await _channel.invokeMethod<String>('getAlbumArt', {'albumId': albumId});
-        _cacheInsert(_artCache, raw, path);
-        if (mounted) setState(() { _artPath = path; _loaded = true; });
+        final path = await _channel.invokeMethod<String>(
+          'getAlbumArt',
+          {'albumId': albumId},
+        );
+        if (path != null && path.isNotEmpty && File(path).existsSync()) {
+          _cacheInsert(_artCache, raw, path);
+        }
+        if (mounted) {
+          setState(() {
+            _artPath = path;
+            _loaded = true;
+          });
+        }
       } catch (_) {
-        _cacheInsert(_artCache, raw, null);
         if (mounted) setState(() => _loaded = true);
       }
     }
@@ -259,10 +300,15 @@ class _MediaCardState extends State<MediaCard>
           .shimmer(duration: 1200.ms, color: accent.withValues(alpha: 0.15));
     }
     final path = isVideo ? _thumbPath : _artPath;
-    if (path != null) {
+    if (path != null && File(path).existsSync()) {
       return RepaintBoundary(
-        child: Image.file(File(path), fit: BoxFit.cover, cacheWidth: 240,
-          errorBuilder: (_, __, ___) => _modernPlaceholder(isVideo, accent)),
+        child: Image.file(
+          File(path),
+          fit: BoxFit.cover,
+          cacheWidth: 360,
+          filterQuality: FilterQuality.medium,
+          errorBuilder: (_, __, ___) => _modernPlaceholder(isVideo, accent),
+        ),
       );
     }
     return _modernPlaceholder(isVideo, accent);
@@ -274,12 +320,24 @@ class _MediaCardState extends State<MediaCard>
         : (isVideo ? 'V' : 'M');
     return ClipRect(
       child: Stack(fit: StackFit.expand, children: [
-        Container(color: accent.withValues(alpha: 0.22)),
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                AppColors.accentBlue.withValues(alpha: .26),
+                AppColors.accentViolet.withValues(alpha: .28),
+                AppColors.accentPink.withValues(alpha: .22),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+        ),
         BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
           child: Container(color: Colors.transparent)),
         Center(child: Text(letter,
           style: TextStyle(fontSize: 52, fontWeight: FontWeight.w900,
-            color: accent.withValues(alpha: 0.85), fontFamily: 'Inter', height: 1))),
+            color: Colors.white.withValues(alpha: 0.88), fontFamily: 'Inter', height: 1))),
       ]),
     );
   }
