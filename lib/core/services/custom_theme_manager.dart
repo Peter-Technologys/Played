@@ -2,15 +2,15 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
+import 'http_client.dart';
 import 'online_theme_service.dart';
 
 /// Offline-first visual theme manager.
 ///
-/// A user photo or a tiny online story-theme manifest is stored in app-owned
-/// storage. No network connection is required after a story theme is installed.
+/// A user photo or an online story-theme manifest/image is copied into
+/// app-owned storage. No network connection is required after installation.
 class CustomThemeManager extends ChangeNotifier {
   CustomThemeManager._();
   static final CustomThemeManager instance = CustomThemeManager._();
@@ -84,16 +84,24 @@ class CustomThemeManager extends ChangeNotifier {
       final uri = Uri.tryParse(imageUrl);
       if (uri != null && uri.scheme == 'https') {
         try {
-          final response = await http.get(uri).timeout(const Duration(seconds: 12));
-          final type = response.headers['content-type'] ?? '';
+          final response = await AppHttpClient.instance.client
+              .get(uri, headers: const {'Accept': 'image/*'})
+              .timeout(const Duration(seconds: 12));
+          final type = (response.headers['content-type'] ?? '').toLowerCase();
           if (response.statusCode == 200 &&
               response.bodyBytes.isNotEmpty &&
               response.bodyBytes.length <= 6 * 1024 * 1024 &&
-              type.toLowerCase().startsWith('image/')) {
+              type.startsWith('image/')) {
             final dir = await getApplicationDocumentsDirectory();
             final dest = Directory('${dir.path}/themes/${theme.id}');
             await dest.create(recursive: true);
-            final out = File('${dest.path}/background.jpg');
+            final extension = switch (type.split(';').first.trim()) {
+              'image/png' => 'png',
+              'image/webp' => 'webp',
+              'image/jpeg' || 'image/jpg' => 'jpg',
+              _ => 'img',
+            };
+            final out = File('${dest.path}/background.$extension');
             await out.writeAsBytes(response.bodyBytes, flush: true);
             _wallpaperPath = out.path;
           }
