@@ -8,25 +8,16 @@ import 'album_art_service.dart';
 import 'audio_handler.dart';
 import 'shared_notification_plugin.dart';
 
-/// Manages the media playback notification / MediaSession metadata.
-///
-/// Previously this posted a MediaStyle notification via
-/// flutter_local_notifications (ID 1000). It now delegates to
-/// [OtyaAudioHandler.updateMediaItem] instead, which updates the system
-/// MediaSession. audio_service renders the notification natively via
-/// MediaSession — no flutter_local_notifications involvement for media.
-///
-/// The shared plugin is still initialised here because other services
-/// (UpdateNotificationService, PushNotificationService, NotificationService)
-/// depend on it.
+/// Owns system Now Playing metadata for notification shade, lock screen,
+/// Bluetooth/headset controls and Android media surfaces.
 class MediaNotificationService {
   MediaNotificationService._();
   static final MediaNotificationService instance = MediaNotificationService._();
 
   bool _initialized = false;
+  String? _lastArtworkKey;
+  Uri? _lastArtworkUri;
 
-  // Callbacks wired by AudioPlayerNotifier so notification skip buttons
-  // can trigger queue navigation.
   void Function()? onSkipPrevious;
   void Function()? onSkipNext;
 
@@ -37,10 +28,41 @@ class MediaNotificationService {
     debugPrint('[MediaNotificationService] Initialized.');
   }
 
-  // ── Public API ────────────────────────────────────────────────────────
+  Future<Directory> _artworkDir() async {
+    final cache = await getApplicationCacheDirectory();
+    final dir = Directory('${cache.path}/now_playing_art');
+    if (!dir.existsSync()) await dir.create(recursive: true);
+    return dir;
+  }
 
-  /// Updates the system MediaSession with track metadata.
-  /// The audio_service foreground service renders the notification.
+  Future<Uri?> _stableArtUri(String? albumArtPath, String id) async {
+    if (albumArtPath == null || albumArtPath.isEmpty) return null;
+    final resolved = await AlbumArtService.instance.resolve(albumArtPath);
+    if (resolved == null || resolved.isEmpty) return null;
+
+    final source = File(resolved);
+    if (!await source.exists()) return null;
+
+    final key = '$id|$resolved';
+    if (_lastArtworkKey == key && _lastArtworkUri != null) {
+      return _lastArtworkUri;
+    }
+
+    try {
+      final dir = await _artworkDir();
+      final ext = resolved.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+      final target = File('${dir.path}/now_playing_${id.hashCode}.$ext');
+      await source.copy(target.path);
+      final uri = Uri.file(target.path);
+      _lastArtworkKey = key;
+      _lastArtworkUri = uri;
+      return uri;
+    } catch (e) {
+      debugPrint('[MediaNotification] artwork cache failed: $e');
+      return Uri.file(source.path);
+    }
+  }
+
   Future<void> show({
     required String id,
     required String title,
@@ -49,13 +71,7 @@ class MediaNotificationService {
     String? albumArtPath,
   }) async {
     if (!_initialized) await init();
-    Uri? artUri;
-    if (albumArtPath != null) {
-      final resolved = await AlbumArtService.instance.resolve(albumArtPath);
-      if (resolved != null && File(resolved).existsSync()) {
-        artUri = Uri.file(resolved);
-      }
-    }
+    final artUri = await _stableArtUri(albumArtPath, id);
     AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
       id: id,
       title: title,
@@ -64,12 +80,6 @@ class MediaNotificationService {
     );
   }
 
-  /// Updates the system MediaSession with in-memory album art.
-  ///
-  /// Artwork is written to the app's cache directory and exposed via a
-  /// content:// URI so the system MediaSession / audio_service can read
-  /// it under Android 13+ scoped storage. A bare Uri.file() path is not
-  /// readable by the MediaSession artwork loader outside the app process.
   Future<void> showWithBitmap({
     required String id,
     required String title,
@@ -80,18 +90,14 @@ class MediaNotificationService {
     if (!_initialized) await init();
     Uri? artUri;
     try {
-      // Write to cacheDir/artwork/ — this directory is declared in the
-      // FileProvider paths XML so it is accessible via content:// URIs.
-      final dir = await getApplicationCacheDirectory();
-      final artDir = Directory('${dir.path}/artwork');
-      if (!artDir.existsSync()) artDir.createSync(recursive: true);
-      final file = File('${artDir.path}/otya_art_${id.hashCode}.jpg');
-      await file.writeAsBytes(albumArtBytes);
-      // Use Uri.file — audio_service reads this directly from the same
-      // process via the MediaSession bitmap loader.
+      final dir = await _artworkDir();
+      final file = File('${dir.path}/now_playing_${id.hashCode}.jpg');
+      await file.writeAsBytes(albumArtBytes, flush: true);
       artUri = Uri.file(file.path);
+      _lastArtworkKey = '$id|bitmap';
+      _lastArtworkUri = artUri;
     } catch (e) {
-      debugPrint('[MediaNotification] showWithBitmap write failed: $e');
+      debugPrint('[MediaNotification] bitmap cache failed: $e');
     }
     AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
       id: id,
@@ -101,12 +107,11 @@ class MediaNotificationService {
     );
   }
 
-  /// No-op: playbackState is updated automatically by OtyaAudioHandler
-  /// stream subscriptions whenever the Player emits a playing event.
   Future<void> updatePlayState(bool isPlaying) async {}
 
-  /// Clears the MediaSession metadata.
   Future<void> dismiss() async {
+    _lastArtworkKey = null;
+    _lastArtworkUri = null;
     AudioHandlerSingleton.instance.handler?.mediaItem.add(null);
   }
 }
