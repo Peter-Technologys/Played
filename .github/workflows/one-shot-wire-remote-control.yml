@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - '.github/workflows/one-shot-wire-remote-control.yml'
+      - 'tools/wire_remote_control.py'
 
 permissions:
   contents: write
@@ -16,50 +17,7 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
       - name: Apply source wiring
-        run: |
-          python3 <<'PY'
-          from pathlib import Path
-
-          router = Path('lib/app/router.dart')
-          s = router.read_text()
-          anchor = "import '../core/widgets/update_dialog.dart';\n"
-          remote_import = "import '../core/services/remote_control_service.dart';\n"
-          if remote_import not in s:
-              s = s.replace(anchor, anchor + remote_import)
-          old = """  static String? _redirect(BuildContext context, GoRouterState state) {
-    // Auth is optional — OTYA Player works fully offline without an account.
-    // The auth screen is only reached by explicit navigation (e.g. from Profile).
-    return null;
-  }
-"""
-          new = """  static String? _redirect(BuildContext context, GoRouterState state) {
-    final remote = RemoteControlService.instance;
-    final feature = switch (state.matchedLocation) {
-      '/airdrop' => 'beam',
-      '/vault' => 'safe',
-      '/player/equalizer' => 'equalizer',
-      '/tools/whatsapp' => 'whatsappTrimmer',
-      _ => null,
-    };
-    if (feature != null && !remote.featureEnabled(feature)) return '/myspace';
-    return null;
-  }
-"""
-          if old in s:
-              s = s.replace(old, new)
-          router.write_text(s)
-
-          hub = Path('lib/features/my_space/presentation/my_space_hub_screen.dart')
-          s = hub.read_text()
-          s = s.replace("import 'package:uuid/uuid.dart';\n", '')
-          s = s.replace(": () => _signIn(context, ref),", ": () => context.push('/auth'),")
-          start = s.find('  Future<void> _signIn(BuildContext context, WidgetRef ref) async {')
-          if start >= 0:
-              end = s.find('  Future<void> _runBackup(', start)
-              if end >= 0:
-                  s = s[:start] + s[end:]
-          hub.write_text(s)
-          PY
+        run: python3 tools/wire_remote_control.py
       - name: Commit migrated source
         run: |
           git config user.name 'PeterSmart Link Automation'
