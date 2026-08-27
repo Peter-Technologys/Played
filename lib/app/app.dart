@@ -10,9 +10,11 @@ import 'router.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../core/services/custom_theme_manager.dart';
+import '../core/services/remote_control_service.dart';
 import '../core/providers/theme_provider.dart';
 import '../core/widgets/announcement_dialog.dart';
 import '../core/widgets/update_dialog.dart';
+import '../core/widgets/remote_control_gate.dart';
 
 class OtyaPlayerApp extends ConsumerStatefulWidget {
   const OtyaPlayerApp({super.key});
@@ -30,6 +32,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     super.initState();
     _checkOnboarding();
     _loadVisualTheme();
+    RemoteControlService.instance.init();
     _applyOverlayStyle(isDark: true);
     ThemeProvider.instance.initTheme();
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -50,8 +53,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
   Future<void> _loadVisualTheme() async {
     await CustomThemeManager.instance.load();
-    // Non-blocking in spirit: this method catches network failures internally,
-    // so offline startup and local playback are never held hostage by themes.
     await CustomThemeManager.instance.refreshSeasonalTheme();
   }
 
@@ -158,6 +159,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       listenable: Listenable.merge([
         CustomThemeManager.instance,
         ThemeProvider.instance,
+        RemoteControlService.instance,
       ]),
       builder: (context, _) {
         final remoteThemeData = ThemeProvider.instance.hasTheme
@@ -221,12 +223,14 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                   maxScaleFactor: 1.2,
                 ),
               ),
-              child: Stack(
-                children: [
-                  wrappedChild,
-                  if (!_onboardingDone)
-                    OnboardingOverlay(onDone: _completeOnboarding),
-                ],
+              child: RemoteControlGate(
+                child: Stack(
+                  children: [
+                    wrappedChild,
+                    if (!_onboardingDone)
+                      OnboardingOverlay(onDone: _completeOnboarding),
+                  ],
+                ),
               ),
             );
           },
