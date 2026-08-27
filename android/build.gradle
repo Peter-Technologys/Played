@@ -6,11 +6,21 @@ allprojects {
     }
 }
 
-// No subprojects compileSdk override block.
-// file_picker has been removed from pubspec.yaml (it was unused and its
-// pre-built AAR compiled against SDK 34 caused the build to fail).
-// afterEvaluate and plugins.withId() both trigger Flutter 3.47's
-// "Already watching path" watcher crash and must NOT be used here.
+// Keep Android/Gradle outputs under Flutter's repository-level build/
+// directory. Flutter's APK tooling expects app outputs there after Gradle
+// completes; without this mapping Gradle can succeed while `flutter build`
+// reports that it cannot find the generated APK.
+def flutterBuildDir = rootProject.layout.buildDirectory.dir("../../build").get()
+rootProject.layout.buildDirectory.set(flutterBuildDir)
+
+subprojects {
+    project.layout.buildDirectory.set(flutterBuildDir.dir(project.name))
+}
+
+// No compileSdk override, afterEvaluate, or plugins.withId hooks here.
+// Those hooks previously triggered Flutter watcher issues. file_picker was
+// also removed because it was unused and its pre-built AAR caused SDK
+// compatibility failures.
 
 tasks.register("clean", Delete) {
     delete rootProject.layout.buildDirectory
