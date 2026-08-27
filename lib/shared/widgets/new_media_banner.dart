@@ -7,13 +7,6 @@ import '../../core/models/media_item.dart';
 
 /// A dismissible banner that slides in from the top when new media files are
 /// detected in the library (i.e. the item count increases after the first load).
-///
-/// - Auto-dismisses after 4 seconds.
-/// - Debounced: will not re-appear within 10 seconds of the last show.
-/// - Style: dark surface card with a cyan left border, slide-in from top.
-///
-/// Integrate by wrapping the shell body in a [Stack] and placing this widget
-/// at the top of the stack.
 class NewMediaBanner extends ConsumerStatefulWidget {
   const NewMediaBanner({super.key});
 
@@ -22,14 +15,11 @@ class NewMediaBanner extends ConsumerStatefulWidget {
 }
 
 class _NewMediaBannerState extends ConsumerState<NewMediaBanner> {
-  // Track previous counts so we can detect increases.
   int? _prevVideoCount;
   int? _prevAudioCount;
-
   bool _visible = false;
   String _title = '';
   String _subtitle = '';
-
   Timer? _autoDismiss;
   DateTime? _lastShown;
 
@@ -45,47 +35,37 @@ class _NewMediaBannerState extends ConsumerState<NewMediaBanner> {
   void _onLibraryChanged(List<MediaItem> items) {
     final videoCount = items.where((i) => i.isVideo).length;
     final audioCount = items.where((i) => !i.isVideo).length;
-
     final prevVideo = _prevVideoCount;
     final prevAudio = _prevAudioCount;
-
     _prevVideoCount = videoCount;
     _prevAudioCount = audioCount;
-
-    // Skip on first load — we only care about increases after the initial scan.
     if (prevVideo == null || prevAudio == null) return;
 
     final newVideos = videoCount > prevVideo;
     final newAudios = audioCount > prevAudio;
-
     if (!newVideos && !newAudios) return;
 
-    // Debounce: don't show again within 10 seconds.
     final now = DateTime.now();
     if (_lastShown != null && now.difference(_lastShown!) < _debounce) return;
 
-    String title;
-    String subtitle;
-    if (newVideos && newAudios) {
-      title = 'New files found! 🎵🎬';
-      subtitle = 'Your library has been updated';
-    } else if (newVideos) {
-      title = 'New videos found! 🎬';
-      subtitle = 'Your video list has been updated';
-    } else {
-      title = 'New songs found! 🎵';
-      subtitle = 'Your music list has been updated';
-    }
+    final title = newVideos && newAudios
+        ? 'New files found! 🎵🎬'
+        : newVideos
+            ? 'New videos found! 🎬'
+            : 'New songs found! 🎵';
+    final subtitle = newVideos && newAudios
+        ? 'Your library has been updated'
+        : newVideos
+            ? 'Your video list has been updated'
+            : 'Your music list has been updated';
 
     _lastShown = now;
     _autoDismiss?.cancel();
-
     setState(() {
       _title = title;
       _subtitle = subtitle;
       _visible = true;
     });
-
     _autoDismiss = Timer(_autoDismissDuration, _dismiss);
   }
 
@@ -96,7 +76,6 @@ class _NewMediaBannerState extends ConsumerState<NewMediaBanner> {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to library changes without rebuilding the whole widget tree.
     ref.listen<AsyncValue<List<MediaItem>>>(mediaLibraryProvider, (_, next) {
       next.whenData(_onLibraryChanged);
     });
@@ -127,7 +106,6 @@ class _NewMediaBannerState extends ConsumerState<NewMediaBanner> {
               ),
               child: Row(
                 children: [
-                  // Cyan left accent border
                   Container(
                     width: 4,
                     height: 56,
@@ -147,32 +125,15 @@ class _NewMediaBannerState extends ConsumerState<NewMediaBanner> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text(
-                            _title,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
+                          Text(_title, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: Colors.white, fontFamily: 'Inter')),
                           const SizedBox(height: 2),
-                          Text(
-                            _subtitle,
-                            style: const TextStyle(
-                              fontSize: 11,
-                              color: Color(0xFF8C94A8),
-                              fontFamily: 'Inter',
-                            ),
-                          ),
+                          Text(_subtitle, style: const TextStyle(fontSize: 11, color: Color(0xFF8C94A8), fontFamily: 'Inter')),
                         ],
                       ),
                     ),
                   ),
-                  // Dismiss button
                   IconButton(
-                    icon: const Icon(Icons.close_rounded,
-                        size: 18, color: Color(0xFF8C94A8)),
+                    icon: const Icon(Icons.close_rounded, size: 18, color: Color(0xFF8C94A8)),
                     onPressed: _dismiss,
                     padding: const EdgeInsets.all(8),
                     constraints: const BoxConstraints(),
@@ -180,15 +141,7 @@ class _NewMediaBannerState extends ConsumerState<NewMediaBanner> {
                   const SizedBox(width: 4),
                 ],
               ),
-            )
-                .animate()
-                .slideY(
-                  begin: -1.5,
-                  end: 0,
-                  duration: 350.ms,
-                  curve: Curves.easeOut,
-                )
-                .fadeIn(duration: 250.ms),
+            ).animate().slideY(begin: -1.5, end: 0, duration: 350.ms, curve: Curves.easeOut).fadeIn(duration: 250.ms),
           ),
         ),
       ),

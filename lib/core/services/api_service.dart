@@ -1,33 +1,24 @@
 // lib/core/services/api_service.dart
 //
-// Wraps all Otya-Store API calls.
-// Automatically adds Authorization: Bearer {token} when user is logged in.
-// Falls back to HMAC signing when not logged in (backward compat).
+// Wraps all OTYA Backend API calls.
+// Protected requests use the short-lived Bearer access token issued by
+// OTYA Auth. No shared secret is embedded in the APK.
 
 import 'dart:convert';
 import 'dart:io';
+import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import '../config/environment.dart';
-import 'api_signer.dart';
 import 'auth_service.dart';
 
 class ApiService {
   ApiService._();
   static final ApiService instance = ApiService._();
 
-  // Instance-level client so dispose() actually closes this object.
-  // (A static client + instance dispose() was a bug — dispose() would be
-  // called on the instance but close the shared static client, breaking
-  // any concurrent requests.)
   final http.Client _client = http.Client();
-  static const Duration _timeout   = Duration(seconds: 12);
+  static const Duration _timeout = Duration(seconds: 12);
 
-  // ── Retry helper ──────────────────────────────────────────────────────────
-
-  /// Executes [fn] with up to [maxRetries] retries on transient network
-  /// errors (SocketException, TimeoutException). Uses exponential backoff
-  /// starting at [initialDelay]. Non-retryable errors (4xx) are not retried.
   Future<T?> _withRetry<T>(
     Future<T?> Function() fn, {
     int maxRetries = 2,
@@ -48,7 +39,6 @@ class ApiService {
           return null;
         }
       } catch (_) {
-        // Non-retryable error (e.g. 4xx decoded as exception) — bail immediately.
         rethrow;
       }
       await Future<void>.delayed(delay);
@@ -57,43 +47,31 @@ class ApiService {
     return null;
   }
 
-  // ── Header helpers ────────────────────────────────────────────────────────
-
-  Future<Map<String, String>> _getHeaders(String path) async {
+  Future<Map<String, String>> _getHeaders() async {
     final token = await AuthService.instance.getValidToken();
-    if (token != null) {
-      return {
-        'Authorization': 'Bearer $token',
-        'Accept':        'application/json',
-      };
-    }
-    return ApiSigner.signedHeaders(method: 'GET', path: path);
-  }
-
-  Future<Map<String, String>> _postHeaders(String path) async {
-    final token = await AuthService.instance.getValidToken();
-    if (token != null) {
-      return {
-        'Authorization': 'Bearer $token',
-        'Content-Type':  'application/json',
-        'Accept':        'application/json',
-      };
-    }
+    if (token == null) return {'Accept': 'application/json'};
     return {
-      ...ApiSigner.signedHeaders(method: 'POST', path: path),
-      'Content-Type': 'application/json',
+      'Authorization': 'Bearer $token',
+      'Accept': 'application/json',
     };
   }
 
-  // ── Device sync ───────────────────────────────────────────────────────────
+  Future<Map<String, String>> _postHeaders() async {
+    final token = await AuthService.instance.getValidToken();
+    final headers = <String, String>{
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+    if (token != null) headers['Authorization'] = 'Bearer $token';
+    return headers;
+  }
 
   Future<Map<String, dynamic>?> syncDevice(Map<String, dynamic> payload) async {
     return _withRetry(() async {
       try {
-        const path = '/api/sync';
         final res = await _client.post(
           Uri.parse(Environment.apiSyncUrl),
-          headers: await _postHeaders(path),
+          headers: await _postHeaders(),
           body: jsonEncode(payload),
         ).timeout(_timeout);
         if (res.statusCode != 200) return null;
@@ -108,10 +86,9 @@ class ApiService {
   Future<Map<String, dynamic>?> syncStatus(String deviceId) async {
     return _withRetry(() async {
       try {
-        const path = '/api/sync';
         final res = await _client.get(
-          Uri.parse('${Environment.apiSyncUrl}?device_id=$deviceId'),
-          headers: await _getHeaders(path),
+          Uri.parse('${Environment.apiSyncUrl}?device_id=${Uri.encodeQueryComponent(deviceId)}'),
+          headers: await _getHeaders(),
         ).timeout(_timeout);
         if (res.statusCode != 200) return null;
         return jsonDecode(res.body) as Map<String, dynamic>;
@@ -122,15 +99,12 @@ class ApiService {
     });
   }
 
-  // ── History ───────────────────────────────────────────────────────────────
-
   Future<List<dynamic>> getHistory(String userId) async {
     return await _withRetry(() async {
       try {
-        const path = '/api/history';
         final res = await _client.get(
-          Uri.parse('${Environment.apiHistoryUrl}?user_id=$userId'),
-          headers: await _getHeaders(path),
+          Uri.parse('${Environment.apiHistoryUrl}?user_id=${Uri.encodeQueryComponent(userId)}'),
+          headers: await _getHeaders(),
         ).timeout(_timeout);
         if (res.statusCode != 200) return <dynamic>[];
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -144,10 +118,9 @@ class ApiService {
 
   Future<void> addHistory(Map<String, dynamic> entry) async {
     try {
-      const path = '/api/history';
       await _client.post(
         Uri.parse(Environment.apiHistoryUrl),
-        headers: await _postHeaders(path),
+        headers: await _postHeaders(),
         body: jsonEncode(entry),
       ).timeout(_timeout);
     } catch (e) {
@@ -155,15 +128,12 @@ class ApiService {
     }
   }
 
-  // ── Playlists ─────────────────────────────────────────────────────────────
-
   Future<List<dynamic>> getPlaylists(String userId) async {
     return await _withRetry(() async {
       try {
-        const path = '/api/playlists';
         final res = await _client.get(
-          Uri.parse('${Environment.apiPlaylistsUrl}?user_id=$userId'),
-          headers: await _getHeaders(path),
+          Uri.parse('${Environment.apiPlaylistsUrl}?user_id=${Uri.encodeQueryComponent(userId)}'),
+          headers: await _getHeaders(),
         ).timeout(_timeout);
         if (res.statusCode != 200) return <dynamic>[];
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -177,10 +147,9 @@ class ApiService {
 
   Future<void> savePlaylist(Map<String, dynamic> playlist) async {
     try {
-      const path = '/api/playlists';
       await _client.post(
         Uri.parse(Environment.apiPlaylistsUrl),
-        headers: await _postHeaders(path),
+        headers: await _postHeaders(),
         body: jsonEncode(playlist),
       ).timeout(_timeout);
     } catch (e) {
@@ -190,25 +159,21 @@ class ApiService {
 
   Future<void> deletePlaylist(String playlistId, String userId) async {
     try {
-      const path = '/api/playlists';
       await _client.delete(
-        Uri.parse('${Environment.apiPlaylistsUrl}?id=$playlistId&user_id=$userId'),
-        headers: await _getHeaders(path),
+        Uri.parse('${Environment.apiPlaylistsUrl}?id=${Uri.encodeQueryComponent(playlistId)}&user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: await _getHeaders(),
       ).timeout(_timeout);
     } catch (e) {
       debugPrint('[ApiService] deletePlaylist failed: $e');
     }
   }
 
-  // ── Pro status ────────────────────────────────────────────────────────────
-
   Future<int> getProStatus(String userId) async {
     return await _withRetry(() async {
       try {
-        const path = '/api/pro';
         final res = await _client.get(
-          Uri.parse('${Environment.apiProUrl}?user_id=$userId'),
-          headers: await _getHeaders(path),
+          Uri.parse('${Environment.apiProUrl}?user_id=${Uri.encodeQueryComponent(userId)}'),
+          headers: await _getHeaders(),
         ).timeout(_timeout);
         if (res.statusCode != 200) return 0;
         final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -220,14 +185,11 @@ class ApiService {
     }) ?? 0;
   }
 
-  // ── Feedback ──────────────────────────────────────────────────────────────
-
   Future<void> submitFeedback(Map<String, dynamic> feedback) async {
     try {
-      const path = '/api/feedback';
       await _client.post(
         Uri.parse(Environment.apiFeedbackUrl),
-        headers: await _postHeaders(path),
+        headers: await _postHeaders(),
         body: jsonEncode(feedback),
       ).timeout(_timeout);
     } catch (e) {
@@ -235,14 +197,11 @@ class ApiService {
     }
   }
 
-  // ── Crash reports ─────────────────────────────────────────────────────────
-
   Future<void> submitCrashReport(Map<String, dynamic> report) async {
     try {
-      const path = '/api/crash-report';
       await _client.post(
         Uri.parse(Environment.apiCrashUrl),
-        headers: await _postHeaders(path),
+        headers: await _postHeaders(),
         body: jsonEncode(report),
       ).timeout(_timeout);
     } catch (e) {
@@ -250,14 +209,11 @@ class ApiService {
     }
   }
 
-  // ── Bookmarks ─────────────────────────────────────────────────────────────
-
   Future<List<dynamic>> getBookmarks(String userId) async {
     try {
-      const path = '/api/bookmarks';
       final res = await _client.get(
-        Uri.parse('${Environment.workerUrl}/api/bookmarks?user_id=$userId'),
-        headers: await _getHeaders(path),
+        Uri.parse('${Environment.workerUrl}/api/bookmarks?user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: await _getHeaders(),
       ).timeout(_timeout);
       if (res.statusCode != 200) return [];
       final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -270,10 +226,9 @@ class ApiService {
 
   Future<void> saveBookmark(Map<String, dynamic> bookmark) async {
     try {
-      const path = '/api/bookmarks';
       await _client.post(
         Uri.parse('${Environment.workerUrl}/api/bookmarks'),
-        headers: await _postHeaders(path),
+        headers: await _postHeaders(),
         body: jsonEncode(bookmark),
       ).timeout(_timeout);
     } catch (e) {
@@ -283,33 +238,22 @@ class ApiService {
 
   Future<void> deleteBookmark(String bookmarkId, String userId) async {
     try {
-      const path = '/api/bookmarks';
       await _client.delete(
-        Uri.parse('${Environment.workerUrl}/api/bookmarks?id=$bookmarkId&user_id=$userId'),
-        headers: await _getHeaders(path),
+        Uri.parse('${Environment.workerUrl}/api/bookmarks?id=${Uri.encodeQueryComponent(bookmarkId)}&user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: await _getHeaders(),
       ).timeout(_timeout);
     } catch (e) {
       debugPrint('[ApiService] deleteBookmark failed: $e');
     }
   }
 
-  // ── Lifecycle ─────────────────────────────────────────────────────────────
-
-  /// Closes the underlying HTTP client and releases the connection pool.
-  /// Call this from the app's dispose lifecycle (e.g. in main.dart or a
-  /// top-level provider's onDispose callback).
-  void dispose() {
-    _client.close();
-  }
-
-  // ── EQ presets ────────────────────────────────────────────────────────────
+  void dispose() => _client.close();
 
   Future<List<dynamic>> getEqPresets(String userId) async {
     try {
-      const path = '/api/equalizer';
       final res = await _client.get(
-        Uri.parse('${Environment.workerUrl}/api/equalizer?user_id=$userId'),
-        headers: await _getHeaders(path),
+        Uri.parse('${Environment.workerUrl}/api/equalizer?user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: await _getHeaders(),
       ).timeout(_timeout);
       if (res.statusCode != 200) return [];
       final data = jsonDecode(res.body) as Map<String, dynamic>;
@@ -322,10 +266,9 @@ class ApiService {
 
   Future<void> saveEqPreset(Map<String, dynamic> preset) async {
     try {
-      const path = '/api/equalizer';
       await _client.post(
         Uri.parse('${Environment.workerUrl}/api/equalizer'),
-        headers: await _postHeaders(path),
+        headers: await _postHeaders(),
         body: jsonEncode(preset),
       ).timeout(_timeout);
     } catch (e) {
@@ -335,10 +278,9 @@ class ApiService {
 
   Future<void> deleteEqPreset(String presetId, String userId) async {
     try {
-      const path = '/api/equalizer';
       await _client.delete(
-        Uri.parse('${Environment.workerUrl}/api/equalizer?id=$presetId&user_id=$userId'),
-        headers: await _getHeaders(path),
+        Uri.parse('${Environment.workerUrl}/api/equalizer?id=${Uri.encodeQueryComponent(presetId)}&user_id=${Uri.encodeQueryComponent(userId)}'),
+        headers: await _getHeaders(),
       ).timeout(_timeout);
     } catch (e) {
       debugPrint('[ApiService] deleteEqPreset failed: $e');

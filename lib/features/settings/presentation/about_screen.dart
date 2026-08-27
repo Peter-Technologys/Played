@@ -9,7 +9,7 @@ import '../../../core/services/update_service.dart';
 import '../../../core/widgets/update_dialog.dart';
 
 /// Standalone About screen — reached via /about route.
-/// Shows app logo, version, description, and support links.
+/// Shows OTYA Player identity, OTYA System affiliation, version and support links.
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
@@ -60,25 +60,20 @@ class _AboutScreenState extends State<AboutScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
-          // ── App card ──────────────────────────────────────────────
           const SizedBox(height: 8),
           _AppCard(version: _version, buildNumber: _build),
-
           const SizedBox(height: 24),
-
-          // ── Support & Links ───────────────────────────────────────
           _SectionHeader(label: 'Links'),
           const SizedBox(height: 10),
-
           _GroupCard(children: [
             _NavTile(
               icon: Icons.language_rounded,
-              label: 'Visit Website',
-              subtitle: 'getotya.petersmartlink.com',
+              label: 'OTYA System',
+              subtitle: 'Official OTYA System website',
               color: AppColors.accent,
               onTap: () => context.push('/webview', extra: {
-                'url': 'https://getotya.petersmartlink.com',
-                'title': 'OTYA Player',
+                'url': 'https://petersmartlink.com',
+                'title': 'OTYA System',
               }),
             ),
             _Divider(),
@@ -100,7 +95,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _Divider(),
             _NavTile(
               icon: Icons.email_outlined,
-              label: 'Support',
+              label: 'OTYA Support',
               subtitle: 'support@petersmartlink.com',
               color: AppColors.accent,
               onTap: () => _launchEmail(context),
@@ -108,7 +103,7 @@ class _AboutScreenState extends State<AboutScreen> {
             _Divider(),
             _NavTile(
               icon: Icons.share_rounded,
-              label: 'Share App',
+              label: 'Share OTYA Player',
               subtitle: 'Send OTYA Player to a friend',
               color: AppColors.accentGreen,
               onTap: () => _shareApp(context),
@@ -117,29 +112,24 @@ class _AboutScreenState extends State<AboutScreen> {
             _NavTile(
               icon: Icons.privacy_tip_outlined,
               label: 'Privacy',
-              subtitle: 'How we handle your data',
+              subtitle: 'How OTYA handles your data',
               color: AppColors.textSecondary,
               onTap: () => context.push('/privacy'),
             ),
             _Divider(),
             _NavTile(
               icon: Icons.star_outline_rounded,
-              label: 'Rate Us',
+              label: 'Rate OTYA Player',
               subtitle: 'Enjoying the app? Leave a review!',
               color: AppColors.accentAmber,
               onTap: () => _launchUrl(context,
                   'https://play.google.com/store/apps/details?id=com.otyaplayer.app'),
             ),
           ]),
-
           const SizedBox(height: 32),
-
-          // ── Footer ────────────────────────────────────────────────
           Center(
             child: Text(
-              _version.isEmpty
-                  ? 'OTYA Player'
-                  : 'OTYA Player v$_version',
+              _version.isEmpty ? 'OTYA Player' : 'OTYA Player v$_version',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textMuted,
@@ -150,7 +140,7 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 4),
           const Center(
             child: Text(
-              '© 2026 OTYA · PeterSmartLink',
+              'Part of OTYA System · © 2026',
               style: TextStyle(
                 fontSize: 11,
                 color: AppColors.textMuted,
@@ -223,9 +213,9 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final info = await PackageInfo.fromPlatform();
       await Share.share(
-        'Download OTYA Player v${info.version} — free offline media player for Android:\n'
+        'Download OTYA Player v${info.version}, part of OTYA System — a premium offline media player for Android:\n'
         'https://petersmartlink.com/download/otya-player',
-        subject: 'OTYA Player',
+        subject: 'OTYA Player · OTYA System',
       );
     } catch (e) {
       if (context.mounted) {
@@ -252,8 +242,6 @@ class _AboutScreenState extends State<AboutScreen> {
     }
   }
 }
-
-// ── App Card ──────────────────────────────────────────────────────────────
 
 class _AppCard extends StatelessWidget {
   final String version;
@@ -285,7 +273,6 @@ class _AppCard extends StatelessWidget {
         ),
         child: Column(
           children: [
-            // Logo
             ClipRRect(
               borderRadius: BorderRadius.circular(16),
               child: Image.asset(
@@ -313,7 +300,6 @@ class _AppCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            // Title
             const Text(
               'OTYA Player',
               style: TextStyle(
@@ -325,9 +311,8 @@ class _AppCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            // Tagline
             const Text(
-              'Otya? Play. Your media, your rules.',
+              'An OTYA System media experience.',
               style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
@@ -335,20 +320,15 @@ class _AppCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Version
             Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
               decoration: BoxDecoration(
                 color: AppColors.accent.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.3)),
+                border: Border.all(color: AppColors.accent.withValues(alpha: 0.3)),
               ),
               child: Text(
-                version.isEmpty
-                    ? 'Loading...'
-                    : 'Version $version (build $buildNumber)',
+                version.isEmpty ? 'Loading...' : 'Version $version (build $buildNumber)',
                 style: const TextStyle(
                   fontSize: 12,
                   color: AppColors.accent,
@@ -358,7 +338,6 @@ class _AppCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            // Support email
             const Text(
               'support@petersmartlink.com',
               style: TextStyle(
@@ -370,10 +349,8 @@ class _AppCard extends StatelessWidget {
             const SizedBox(height: 20),
             const Divider(color: AppColors.border, height: 1),
             const SizedBox(height: 20),
-            // Description
             const Text(
-              'A premium offline media player inspired by the Luganda word "Otya?". '
-              'Play, organise, and share your local audio and video — no internet required.',
+              'OTYA Player is part of the OTYA System. Play, organise, and share local audio and video with a private, reliable experience.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
@@ -388,8 +365,6 @@ class _AppCard extends StatelessWidget {
     );
   }
 }
-
-// ── Shared widgets ────────────────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   final String label;
@@ -511,8 +486,7 @@ class _NavTile extends StatelessWidget {
         color: AppColors.textSecondary,
         size: 18,
       ),
-      contentPadding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
     );
   }
 }

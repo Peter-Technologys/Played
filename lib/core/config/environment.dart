@@ -8,6 +8,9 @@ abstract class Environment {
     defaultValue: 'https://petersmartlink.com',
   );
 
+  static const String systemName  = 'OTYA System';
+  static const String productName = 'OTYA Player';
+
   static const String apiSyncUrl      = '$workerUrl/api/sync';
   static const String apiCrashUrl     = '$workerUrl/api/crash-report';
   static const String checkUpdateUrl  = '$workerUrl/check-update';
@@ -24,7 +27,7 @@ abstract class Environment {
   static const String arm32DownloadUrl = '$workerUrl/apk/arm32';
   static const String downloadUrl      = '$workerUrl/download/otya-player';
 
-  static const String appName      = 'OTYA Player';
+  static const String appName      = productName;
   static const String appPackageId = 'com.otyaplayer.app';
   static const String supportEmail = 'support@petersmartlink.com';
   static const String websiteUrl   = workerUrl;
