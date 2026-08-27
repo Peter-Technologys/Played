@@ -1,169 +1,83 @@
 <div align="center">
 
-<img src="assets/icons/play_store_512.png" alt="OTYA Player" width="96" height="96" />
+<img src="assets/icons/play_store_512.png" alt="OTYA Player" width="112" height="112" />
 
 # OTYA Player
 
-**Premium offline media player — built for Android.**  
-Play any audio or video file, 100% offline. No account required.
+**Private. Powerful. Offline-first media.**
 
-[![Flutter](https://img.shields.io/badge/Flutter-3.x-02569B?logo=flutter)](https://flutter.dev)
-[![Dart](https://img.shields.io/badge/Dart-3.x-0175C2?logo=dart)](https://dart.dev)
-[![License: MIT](https://img.shields.io/badge/License-MIT-00D4FF.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)]()
-[![Version](https://img.shields.io/badge/Version-1.6.0-8A2BE2)]()
+OTYA Player is the official Android media experience of the OTYA System by PeterSmartLink.
+
+[Website](https://petersmartlink.com) · [Download](https://petersmartlink.com/download/otya-player) · [Latest Release](https://github.com/PeterSmartLink/OtyaPlayer/releases/latest) · [Security](SECURITY.md)
+
+![Version](https://img.shields.io/badge/OTYA-1.6.0-6C5CE7)
+![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)
+![Status](https://img.shields.io/badge/Status-Production-2EA44F)
+![License](https://img.shields.io/badge/License-Proprietary-critical)
 
 </div>
 
 ---
 
-## OTYA System
+## Welcome to OTYA
 
-OTYA Player is the official Android media product of **OTYA System**. Authentication, platform APIs, updates, downloads and account services are provided by the OTYA platform backend.
+This repository page is the official GitHub home for OTYA Player releases, product information, security notices and public documentation.
 
-## Features
+OTYA Player is designed around local-first playback: your music and videos remain usable without a network connection, while account, recovery, updates and optional online services connect securely to the OTYA backend when needed.
 
-| Screen | What it does |
+## What OTYA Player includes
+
+| Experience | Highlights |
 |---|---|
-| **My Space** | Unified media hub — songs, videos, folders tabs, recently played, search, sort, pin folders |
-| **Audio Player** | Shuffle, repeat, speed (0.5×–2×), 5-band EQ, LRC lyrics, queue, sleep timer, share |
-| **Video Player** | Hardware-accelerated media playback, subtitles, aspect ratio, PiP, battery saver, gesture controls |
-| **Air-Drop** | Zero-data file sharing over supported local connectivity |
-| **Vault** | Private media vault with biometric + PIN unlock |
-| **Playlists** | Create, rename, reorder, play playlists |
-| **Profile & Settings** | Account, cloud backup, appearance, audio and privacy settings |
-| **Tools** | Browse by Folder, Storage Cleaner |
+| **My Space** | Unified songs, videos and folder library with search, sorting, recent media and pinned folders |
+| **Audio Player** | Queue, shuffle, repeat, speed control, 5-band EQ, lyrics, sleep timer and background playback |
+| **Video Player** | Hardware-accelerated playback, subtitles, PiP, aspect controls, battery saver and gestures |
+| **Beam** | Local Wi-Fi / hotspot file transfer designed to work without mobile data |
+| **Safe** | Private media protection with device authentication, biometric unlock and PIN fallback |
+| **Playlists** | Create, organize and play personal collections |
+| **Themes** | Offline themes plus remotely managed optional theme catalog |
+| **Account** | Real OTYA authentication with email verification and password recovery |
+| **Google & Drive** | Google identity sign-in and explicit opt-in private recovery backup |
+| **Updates** | Secure version checks and signed Android release delivery |
 
----
+## Privacy-first design
 
-## Architecture
+OTYA Player is built so core local playback does not depend on an online account or a permanently available backend. Google Drive recovery is optional and user-initiated. The OTYA recovery snapshot is designed for application recovery data rather than uploading a user's raw media library or Safe media.
 
-```
-Clean Architecture · Feature-First · Riverpod · Offline-First
-```
+## OTYA 1.6.0
 
-```
-lib/
-├── main.dart
-├── app/
-│   ├── app.dart            # MaterialApp entry
-│   ├── router.dart         # go_router — all routes
-│   └── theme/              # AppColors, AppTextStyles, AppTheme
-├── core/
-│   ├── database/           # Hive setup, adapters
-│   ├── models/             # MediaItem, Playlist, VaultItem
-│   ├── permissions/        # Permission helper
-│   ├── services/           # Auth, OTYA backend, notifications, vault
-│   └── utils/              # Formatters, helpers
-├── features/
-│   ├── my_space/           # Home tab — media library
-│   ├── player/             # Audio + Video players, mini player, lyrics, EQ
-│   ├── air_drop/           # Local file sharing
-│   ├── vault/              # Encrypted media vault
-│   ├── playlists/          # Playlist management
-│   ├── profile/            # Profile & Settings screen
-│   ├── settings/           # Settings provider, privacy policy
-│   ├── video/              # Video tab screen
-│   └── tools/              # Tools tab screen
-└── shared/
-    ├── extensions/         # BuildContext extensions
-    └── widgets/            # AdBannerSlot, LoadingShimmer, Logo
-```
+**OTYA Player 1.6.0 is the first official release of the current OTYA generation.**
 
----
+The new generation uses a fresh production account/session model and does not migrate legacy application user data. Users of this generation should create or sign in to a current OTYA account.
 
-## Tech Stack
+Release builds are produced by the protected GitHub Actions pipeline, verified with checksums, and distributed through the OTYA release infrastructure.
 
-| Layer | Library |
-|---|---|
-| Video & Audio playback | `media_kit` — unified audio + video engine |
-| Background audio | `audio_service` — lock-screen and OS media controls |
-| Offline trim/extract | Android native media APIs |
-| Database | `hive` — local encrypted storage |
-| Cloud backup | OTYA Backend on Cloudflare Workers |
-| State management | `flutter_riverpod` |
-| Navigation | `go_router` |
-| UI / Animations | `flutter_animate`, AMOLED dark theme |
-| Biometrics | `local_auth` |
-| Ads | `google_mobile_ads` |
+## Download
 
----
+Use the official OTYA download page:
 
-## Getting Started
+**https://petersmartlink.com/download/otya-player**
 
-### Prerequisites
+Do not trust APKs redistributed by unknown third parties. Official release files should correspond to OTYA-published version and checksum information.
 
-- Flutter stable
-- Android SDK 21+ (Android 5.0 minimum)
-- Java 17
+## Support and security
 
-### Setup
+For normal product support, downloads and service information, visit **https://petersmartlink.com**.
 
-Clone the GitHub repository and run it from the repository root:
+Security vulnerabilities should not be posted publicly. Follow the private reporting process in [SECURITY.md](SECURITY.md).
 
-```bash
-git clone https://github.com/PeterSmartLink/OtyaPlayer.git
-cd OtyaPlayer
-flutter pub get
-flutter run
-```
+## Source and licensing
 
-### Build
+OTYA Player is proprietary software. The current source, application design, backend integration code, release infrastructure, branding and project materials may not be copied, redistributed, modified or commercially reused without written permission from PeterSmartLink, except where third-party components are separately licensed.
 
-```bash
-# Debug APK (for testing)
-flutter build apk --debug
-
-# Release — split APKs per ABI
-flutter build apk --release --split-per-abi
-
-# App Bundle (Play Store)
-flutter build appbundle --release
-```
-
----
-
-## CI / CD
-
-Builds run on **GitHub Actions** (`.github/workflows/build.yml`).
-
-| Trigger | Jobs |
-|---|---|
-| Pull request | Analyze, Unit tests, Debug APK |
-| Push to `main` | Analyze only |
-| Version tag `v*` | Signed release AAB + split APKs → GitHub Release |
-
-**To publish a release:**
-```bash
-git tag v1.6.0
-git push origin v1.6.0
-```
-
----
-
-## Roadmap
-
-- [ ] Chromecast / Cast to device
-- [ ] Home screen now-playing widget
-- [ ] Android Auto support
-- [ ] iOS support
-
----
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
-
-## Security
-
-See [SECURITY.md](SECURITY.md) for how to report vulnerabilities.
-
-## License
-
-MIT — see [LICENSE](LICENSE).
+Historical copies previously distributed under another license remain governed by the license that accompanied those specific copies. See [LICENSE](LICENSE) for the current repository terms.
 
 ---
 
 <div align="center">
-Part of OTYA System · Built with Flutter and Dart
+
+**OTYA System · PeterSmartLink**
+
+Built for reliable everyday media playback.
+
 </div>
