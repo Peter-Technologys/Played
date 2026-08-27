@@ -22,9 +22,43 @@ permissions:
   contents: read
 
 jobs:
+  baseline-security:
+    name: Private repository security baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Block tracked secret/signing files
+        shell: bash
+        run: |
+          set -euo pipefail
+          forbidden='(^|/)(\.env($|\.)|key\.properties$|keystore\.jks$|.*\.(jks|keystore|p12|pfx|pem|key)$)'
+          if git ls-files | grep -E "$forbidden"; then
+            echo '::error::Potential secret/signing material is tracked by Git.'
+            exit 1
+          fi
+      - name: Block private-key material
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -I -E -- '-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----' -- ':!*.md'; then
+            echo '::error::Private-key material detected in tracked source.'
+            exit 1
+          fi
+      - name: Check Flutter dependency resolution
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.32.x'
+          channel: stable
+          cache: true
+      - run: flutter pub get
+
   dependency-review:
-    name: Dependency review
-    if: github.event_name == 'pull_request'
+    name: Dependency review (GHAS)
+    if: github.event_name == 'pull_request' && vars.GHAS_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -37,8 +71,8 @@ jobs:
           fail-on-severity: high
 
   codeql:
-    name: CodeQL (Java/Kotlin)
-    if: github.event_name != 'pull_request'
+    name: CodeQL (Java/Kotlin, GHAS)
+    if: github.event_name != 'pull_request' && vars.GHAS_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
