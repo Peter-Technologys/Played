@@ -11,6 +11,7 @@ import 'auth_service.dart';
 import 'http_client.dart';
 
 const _kAuthBase = 'https://petersmartlink.com/auth';
+const _kBackupSchemaVersion = 1;
 
 class BackupService {
   BackupService._();
@@ -21,45 +22,73 @@ class BackupService {
   http.Client get _client => AppHttpClient.instance.client;
   static const Duration _timeout = Duration(seconds: 30);
 
+  String _errorMessage(http.Response res, String fallback) {
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) {
+        final error = decoded['error'];
+        if (error is String && error.trim().isNotEmpty) return error;
+      }
+    } catch (_) {
+      // Never expose FormatException/HTML edge responses to the user.
+    }
+    return '$fallback (${res.statusCode})';
+  }
+
+  Map<String, dynamic> _decodeObject(http.Response res, String fallback) {
+    try {
+      final decoded = jsonDecode(res.body);
+      if (decoded is Map<String, dynamic>) return decoded;
+    } catch (_) {
+      // Converted below to a stable application error.
+    }
+    throw Exception(fallback);
+  }
+
   Future<void> backup(Map<String, dynamic> data, String driveAccessToken) async {
     final token = await AuthService.instance.getValidToken();
-    if (token == null) throw Exception('Not logged in');
+    if (token == null) throw Exception('Please sign in to OTYA first.');
     final res = await _client.post(
       Uri.parse('$_kAuthBase/backup'),
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
       body: jsonEncode({'drive_token': driveAccessToken, 'data': data}),
     ).timeout(_timeout);
     if (res.statusCode != 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(body['error'] ?? 'Backup failed (${res.statusCode})');
+      throw Exception(_errorMessage(res, 'Backup failed'));
     }
   }
 
   Future<Map<String, dynamic>?> restore(String driveAccessToken) async {
     final token = await AuthService.instance.getValidToken();
-    if (token == null) throw Exception('Not logged in');
+    if (token == null) throw Exception('Please sign in to OTYA first.');
     final uri = Uri.parse('$_kAuthBase/backup')
         .replace(queryParameters: {'drive_token': driveAccessToken});
-    final res = await _client.get(uri, headers: {'Authorization': 'Bearer $token'}).timeout(_timeout);
+    final res = await _client.get(
+      uri,
+      headers: {'Authorization': 'Bearer $token'},
+    ).timeout(_timeout);
     if (res.statusCode != 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(body['error'] ?? 'Restore failed (${res.statusCode})');
+      throw Exception(_errorMessage(res, 'Restore failed'));
     }
-    final body = jsonDecode(res.body) as Map<String, dynamic>;
-    return body['data'] as Map<String, dynamic>?;
+    final body = _decodeObject(res, 'The backup response was not valid.');
+    final data = body['data'];
+    if (data == null) return null;
+    if (data is! Map<String, dynamic>) {
+      throw Exception('The Drive backup has an unsupported format.');
+    }
+    return data;
   }
 
   Future<void> deleteBackup(String driveAccessToken) async {
     final token = await AuthService.instance.getValidToken();
-    if (token == null) throw Exception('Not logged in');
+    if (token == null) throw Exception('Please sign in to OTYA first.');
     final res = await _client.delete(
       Uri.parse('$_kAuthBase/backup'),
       headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
       body: jsonEncode({'drive_token': driveAccessToken}),
     ).timeout(_timeout);
     if (res.statusCode != 200) {
-      final body = jsonDecode(res.body) as Map<String, dynamic>;
-      throw Exception(body['error'] ?? 'Delete failed (${res.statusCode})');
+      throw Exception(_errorMessage(res, 'Delete failed'));
     }
   }
 
@@ -75,32 +104,46 @@ class BackupService {
         .toList();
 
     return {
-      'version':    1,
-      'created_at': DateTime.now().toIso8601String(),
-      'playlists':  playlists,
+      'schema_version': _kBackupSchemaVersion,
+      'payload_type': 'otya_recovery_snapshot',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'playlists': playlists,
       'eq_presets': <dynamic>[],
-      'bookmarks':  <dynamic>[],
+      'bookmarks': <dynamic>[],
     };
   }
 
   Future<void> restoreFromData(Map<String, dynamic> data) async {
-    // Restore playlists
-    try {
-      final playlists = data['playlists'] as List<dynamic>? ?? [];
-      debugPrint('[BackupService] Restoring ${playlists.length} playlists');
-      for (final raw in playlists) {
-        final map = raw as Map<String, dynamic>;
-        final now = DateTime.now();
-        final playlist = Playlist(
-          id:        map['id'] as String,
-          name:      map['name'] as String,
-          mediaIds:  List<String>.from(map['mediaIds'] as List? ?? []),
-          createdAt: DateTime.tryParse(map['createdAt'] as String? ?? '') ?? now,
-          updatedAt: DateTime.tryParse(map['updatedAt'] as String? ?? '') ?? now,
-        );
-        await OtyaDatabase.instance.savePlaylist(playlist);
-      }
-    } catch (e) { debugPrint('[BackupService] playlists restore failed: $e'); }
+    final schemaVersion = data['schema_version'] ?? data['version'];
+    if (schemaVersion is! int || schemaVersion != _kBackupSchemaVersion) {
+      throw Exception('This backup version is not supported by this OTYA build.');
+    }
 
+    final rawPlaylists = data['playlists'];
+    if (rawPlaylists != null && rawPlaylists is! List) {
+      throw Exception('The Drive backup is damaged or incomplete.');
+    }
+
+    // Restore playlists. Backups intentionally contain metadata/app state only;
+    // local music/video files and private Safe media are never uploaded here.
+    final playlists = rawPlaylists as List<dynamic>? ?? const [];
+    debugPrint('[BackupService] Restoring ${playlists.length} playlists');
+
+    for (final raw in playlists) {
+      if (raw is! Map<String, dynamic>) continue;
+      final id = raw['id'];
+      final name = raw['name'];
+      if (id is! String || id.isEmpty || name is! String || name.isEmpty) continue;
+
+      final now = DateTime.now();
+      final playlist = Playlist(
+        id: id,
+        name: name,
+        mediaIds: List<String>.from(raw['mediaIds'] as List? ?? const []),
+        createdAt: DateTime.tryParse(raw['createdAt'] as String? ?? '') ?? now,
+        updatedAt: DateTime.tryParse(raw['updatedAt'] as String? ?? '') ?? now,
+      );
+      await OtyaDatabase.instance.savePlaylist(playlist);
+    }
   }
 }
