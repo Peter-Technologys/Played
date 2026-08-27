@@ -1,10 +1,13 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/services/custom_theme_manager.dart';
+import '../../../core/services/online_theme_service.dart';
+import '../../../shared/widgets/story_theme_background.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 class ThemeSelectionScreen extends StatefulWidget {
@@ -17,11 +20,33 @@ class ThemeSelectionScreen extends StatefulWidget {
 class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
   String? _wallpaperPath;
   bool _saving = false;
+  bool _loadingCatalog = true;
+  String? _catalogError;
+  List<OnlineTheme> _themes = const [];
 
   @override
   void initState() {
     super.initState();
     _wallpaperPath = CustomThemeManager.instance.wallpaperPath;
+    _loadCatalog();
+  }
+
+  Future<void> _loadCatalog() async {
+    try {
+      final themes = await OnlineThemeService.fetchCatalog();
+      if (!mounted) return;
+      setState(() {
+        _themes = themes;
+        _loadingCatalog = false;
+        _catalogError = null;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _loadingCatalog = false;
+        _catalogError = 'Story themes are unavailable right now';
+      });
+    }
   }
 
   Future<void> _chooseImage() async {
@@ -48,7 +73,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
         _saving = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Image theme applied')),
+        const SnackBar(content: Text('Your image theme is active')),
       );
     } catch (_) {
       if (!mounted) return;
@@ -59,10 +84,27 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
     }
   }
 
+  Future<void> _install(OnlineTheme theme) async {
+    HapticFeedback.selectionClick();
+    await CustomThemeManager.instance.installOnlineTheme(theme);
+    if (!mounted) return;
+    setState(() => _wallpaperPath = null);
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('${theme.name} installed for offline use')),
+    );
+  }
+
+  Future<void> _useDefault() async {
+    await CustomThemeManager.instance.useDefaultMountainTheme();
+    if (!mounted) return;
+    setState(() => _wallpaperPath = null);
+  }
+
   @override
   Widget build(BuildContext context) {
     final path = _wallpaperPath;
     final hasImage = path != null && File(path).existsSync();
+    final activeId = CustomThemeManager.instance.themeId;
 
     return WallpaperScaffold(
       appBar: AppBar(
@@ -75,120 +117,72 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
         ),
         title: const Text(
           'Image Theme',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            fontFamily: 'Inter',
-          ),
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(20, 12, 20, 40),
         children: [
           const Text(
-            'ONE APPEARANCE',
+            'YOUR BACKGROUND',
             style: TextStyle(
               fontSize: 11,
               letterSpacing: 1.4,
               fontWeight: FontWeight.w700,
               color: AppColors.textSecondary,
-              fontFamily: 'Inter',
             ),
           ),
           const SizedBox(height: 12),
-          GestureDetector(
+          _PhotoThemeCard(
+            path: hasImage ? path : null,
+            saving: _saving,
+            active: activeId == 'otya-image',
             onTap: _chooseImage,
-            child: Container(
-              height: 360,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.accent, width: 1.4),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.18),
-                    blurRadius: 28,
-                    spreadRadius: 1,
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              const Expanded(
+                child: Text(
+                  'OTYA STORIES',
+                  style: TextStyle(
+                    fontSize: 11,
+                    letterSpacing: 1.4,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textSecondary,
                   ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(23),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    if (hasImage)
-                      Image.file(File(path), fit: BoxFit.cover)
-                    else
-                      Container(
-                        decoration: const BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: [Color(0xFF17111F), Color(0xFF08080B)],
-                          ),
-                        ),
-                      ),
-                    Container(color: Colors.black.withValues(alpha: 0.28)),
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 22,
-                          vertical: 18,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xB3121218),
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.14),
-                          ),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_saving)
-                              const SizedBox(
-                                width: 28,
-                                height: 28,
-                                child: CircularProgressIndicator(strokeWidth: 2.5),
-                              )
-                            else
-                              Icon(
-                                hasImage
-                                    ? Icons.wallpaper_rounded
-                                    : Icons.add_photo_alternate_rounded,
-                                color: AppColors.accent,
-                                size: 32,
-                              ),
-                            const SizedBox(height: 10),
-                            Text(
-                              hasImage ? 'Change Background Image' : 'Choose Background Image',
-                              style: const TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            const Text(
-                              'OTYA uses transparent panels over your image',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ),
-            ),
+              TextButton.icon(
+                onPressed: _loadingCatalog ? null : _loadCatalog,
+                icon: const Icon(Icons.refresh_rounded, size: 16),
+                label: const Text('Refresh'),
+              ),
+            ],
           ),
-          const SizedBox(height: 18),
+          const SizedBox(height: 10),
+          _DefaultThemeCard(
+            active: activeId == 'otya-midnight',
+            onTap: _useDefault,
+          ),
+          const SizedBox(height: 12),
+          if (_loadingCatalog)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 28),
+              child: Center(child: CircularProgressIndicator(strokeWidth: 2.5)),
+            )
+          else if (_catalogError != null)
+            _CatalogError(message: _catalogError!, onRetry: _loadCatalog)
+          else
+            ..._themes.map((theme) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: _StoryThemeCard(
+                    theme: theme,
+                    active: activeId == theme.id,
+                    onInstall: () => _install(theme),
+                  ),
+                )),
+          const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -199,22 +193,223 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
             child: const Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(Icons.layers_outlined, color: AppColors.accent, size: 20),
+                Icon(Icons.offline_pin_rounded, color: AppColors.accent, size: 20),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'This is the only OTYA theme. Your selected photo stays on the device and becomes the visual background across supported screens.',
+                    'Story themes are downloaded as tiny visual recipes. After installation they render on-device and work offline. Your own photo never leaves your phone.',
                     style: TextStyle(
                       fontSize: 12,
                       height: 1.45,
                       color: AppColors.textSecondary,
-                      fontFamily: 'Inter',
                     ),
                   ),
                 ),
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PhotoThemeCard extends StatelessWidget {
+  const _PhotoThemeCard({
+    required this.path,
+    required this.saving,
+    required this.active,
+    required this.onTap,
+  });
+
+  final String? path;
+  final bool saving;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        height: 220,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(22),
+          border: Border.all(
+            color: active ? AppColors.accent : AppColors.border,
+            width: active ? 1.5 : 1,
+          ),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(21),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              if (path != null)
+                Image.file(File(path!), fit: BoxFit.cover)
+              else
+                const DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFF1E1430), Color(0xFF08080B)],
+                    ),
+                  ),
+                ),
+              ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (saving)
+                      const CircularProgressIndicator(strokeWidth: 2.5)
+                    else
+                      Icon(
+                        path == null
+                            ? Icons.add_photo_alternate_rounded
+                            : Icons.wallpaper_rounded,
+                        color: AppColors.accent,
+                        size: 34,
+                      ),
+                    const SizedBox(height: 10),
+                    Text(
+                      path == null ? 'Choose Your Photo' : 'Change Your Photo',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _DefaultThemeCard extends StatelessWidget {
+  const _DefaultThemeCard({required this.active, required this.onTap});
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListTile(
+      onTap: onTap,
+      tileColor: const Color(0xA6101014),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(18),
+        side: BorderSide(color: active ? AppColors.accent : AppColors.border),
+      ),
+      leading: const Icon(Icons.landscape_rounded, color: AppColors.accent),
+      title: const Text('OTYA Mountains', style: TextStyle(fontWeight: FontWeight.w700)),
+      subtitle: const Text('The built-in mountain and lake story'),
+      trailing: active
+          ? const Icon(Icons.check_circle_rounded, color: AppColors.accent)
+          : const Icon(Icons.chevron_right_rounded),
+    );
+  }
+}
+
+class _StoryThemeCard extends StatelessWidget {
+  const _StoryThemeCard({
+    required this.theme,
+    required this.active,
+    required this.onInstall,
+  });
+
+  final OnlineTheme theme;
+  final bool active;
+  final VoidCallback onInstall;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      height: 250,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: active ? AppColors.accent : AppColors.border,
+          width: active ? 1.5 : 1,
+        ),
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(21),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            StoryThemeBackground(theme: theme.toJson()),
+            Padding(
+              padding: const EdgeInsets.all(18),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Spacer(),
+                  Text(
+                    theme.name,
+                    style: const TextStyle(
+                      fontSize: 21,
+                      fontWeight: FontWeight.w800,
+                      color: Colors.white,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    theme.story,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: Color(0xFFD3D0DC),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: FilledButton.icon(
+                      onPressed: active ? null : onInstall,
+                      icon: Icon(
+                        active ? Icons.check_rounded : Icons.download_rounded,
+                        size: 18,
+                      ),
+                      label: Text(active ? 'Installed' : 'Install'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CatalogError extends StatelessWidget {
+  const _CatalogError({required this.message, required this.onRetry});
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: const Color(0xA6101014),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.cloud_off_rounded, color: AppColors.textSecondary),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message)),
+          TextButton(onPressed: onRetry, child: const Text('Retry')),
         ],
       ),
     );
