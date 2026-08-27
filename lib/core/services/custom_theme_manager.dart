@@ -29,6 +29,9 @@ class CustomThemeManager extends ChangeNotifier {
       ? null
       : Map<String, dynamic>.unmodifiable(_storyTheme!);
 
+  bool get _currentThemeWasAutoSeasonal =>
+      _storyTheme?['seasonal'] is Map && _storyTheme?['autoAppliedSeasonal'] == true;
+
   Future<void> load() async {
     try {
       final file = await _file();
@@ -62,16 +65,50 @@ class CustomThemeManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> installOnlineTheme(OnlineTheme theme) async {
-    // Story manifests are deliberately tiny. Persist the complete validated
-    // manifest locally so the selected theme still renders with no internet.
+  Future<void> installOnlineTheme(
+    OnlineTheme theme, {
+    bool autoSeasonal = false,
+  }) async {
+    final manifest = theme.toJson();
+    if (autoSeasonal) manifest['autoAppliedSeasonal'] = true;
+
     _themeId = theme.id;
-    _storyTheme = theme.toJson();
+    _storyTheme = manifest;
     _artOpacity = theme.overlay.clamp(0.18, 0.70);
     _artBlur = 0;
     _wallpaperPath = null;
     await _persist();
     notifyListeners();
+  }
+
+  /// Checks the server catalog for an active event theme.
+  ///
+  /// Automatic event themes only replace the built-in default or a previous
+  /// automatically-applied seasonal theme. A user photo or manually selected
+  /// story theme is never overwritten.
+  Future<void> refreshSeasonalTheme() async {
+    final userHasWallpaper = _wallpaperPath != null;
+    final userChoseNonSeasonalStory =
+        _storyTheme != null && !_currentThemeWasAutoSeasonal;
+    if (userHasWallpaper || userChoseNonSeasonalStory) return;
+
+    try {
+      final catalog = await OnlineThemeService.fetchCatalog();
+      final active = OnlineThemeService.activeSeasonalTheme(catalog);
+      if (active != null) {
+        if (_themeId != active.id || !_currentThemeWasAutoSeasonal) {
+          await installOnlineTheme(active, autoSeasonal: true);
+        }
+        return;
+      }
+
+      if (_currentThemeWasAutoSeasonal) {
+        await useDefaultMountainTheme();
+      }
+    } catch (e) {
+      // Seasonal switching must never block startup or offline playback.
+      debugPrint('[ThemeManager] Seasonal refresh skipped: $e');
+    }
   }
 
   Future<void> useDefaultMountainTheme() async {
