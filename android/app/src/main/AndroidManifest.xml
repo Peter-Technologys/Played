@@ -12,66 +12,47 @@
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
-    <!-- MANAGE_MEDIA removed — not needed by this app -->
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-    <!-- CHANGE_NETWORK_STATE — required for Flash Share P2P hotspot -->
     <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
-    <!-- ACCESS_WIFI_STATE / CHANGE_WIFI_STATE — required for Flash Share & Web Mirror -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
 
-    <!-- Legacy Bluetooth — kept for Android ≤ 10 (API 30) only -->
     <uses-permission android:name="android.permission.BLUETOOTH"
         android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"
         android:maxSdkVersion="30" />
-    <!-- Modern Bluetooth (API 31+) -->
     <uses-permission android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADVERTISE" />
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
-    <!-- Location — required for Wi-Fi P2P on Android ≤ 12 (API 32) only -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"
         android:maxSdkVersion="32" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"
         android:maxSdkVersion="32" />
-    <!-- NearbyWifiDevices — replaces location for Wi-Fi P2P on Android 13+ -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"
         android:usesPermissionFlags="neverForLocation" />
 
-    <!-- CAMERA — required by mobile_scanner for QR code scanning in Air-Drop -->
     <uses-permission android:name="android.permission.CAMERA" />
-
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
-
-    <!-- Android 14 (API 34): partial media access — user can grant access
-         to a subset of their photo/video library instead of all media. -->
-    <uses-permission
-        android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
+    <uses-permission android:name="android.permission.READ_MEDIA_VISUAL_USER_SELECTED" />
 
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <!-- Required by WorkManager on Android 14+ for background data sync -->
     <uses-permission
         android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <!-- REQUEST_IGNORE_BATTERY_OPTIMIZATIONS removed — WorkManager handles background correctly -->
-    <!-- SYSTEM_ALERT_WINDOW removed — not needed for a media player -->
-    <!-- REQUEST_INSTALL_PACKAGES is managed per-flavor (standard removes it, huawei keeps it) -->
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.READ_PHONE_STATE" />
-    <!-- SCHEDULE_EXACT_ALARM / USE_EXACT_ALARM removed — not needed -->
 
     <queries>
-        <!-- HTTPS and HTTP VIEW intents (WebView, url_launcher) -->
         <intent>
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
@@ -80,7 +61,6 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="http" />
         </intent>
-        <!-- Email / SEND intent (share_plus, mailto links) -->
         <intent>
             <action android:name="android.intent.action.SENDTO" />
             <data android:scheme="mailto" />
@@ -89,12 +69,9 @@
             <action android:name="android.intent.action.SEND" />
             <data android:mimeType="*/*" />
         </intent>
-        <!-- WhatsApp package query (for WhatsApp Trimmer feature) -->
         <package android:name="com.whatsapp" />
     </queries>
 
-    <!-- Declare support for all screen sizes so the app is not filtered
-         out on tablets, foldables, or large-screen devices in the Play Store. -->
     <supports-screens
         android:smallScreens="true"
         android:normalScreens="true"
@@ -131,14 +108,13 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
 
-            
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:mimeType="video/*" />
             </intent-filter>
-            
+
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -157,25 +133,26 @@
             </intent-filter>
         </activity>
 
-        
         <service
             android:name="com.ryanheise.audioservice.AudioService"
             android:exported="true"
             android:foregroundServiceType="mediaPlayback"
-            android:stopWithTask="false">
+            android:stopWithTask="false"
+            tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.media.browse.MediaBrowserService" />
             </intent-filter>
         </service>
 
-        
-        <receiver android:name="androidx.media.session.MediaButtonReceiver" android:exported="true">
+        <receiver
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true"
+            tools:ignore="Instantiatable">
             <intent-filter>
                 <action android:name="android.intent.action.MEDIA_BUTTON" />
             </intent-filter>
         </receiver>
 
-        
         <receiver
             android:name=".BootReceiver"
             android:exported="false"
@@ -186,12 +163,10 @@
             </intent-filter>
         </receiver>
 
-        
         <receiver
             android:name=".NotificationDismissReceiver"
             android:exported="false" />
 
-        
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -210,15 +185,12 @@
             android:name="com.ryanheise.audioservice.NOTIFICATION_CHANNEL_ID"
             android:value="com.otyaplayer.app.audio" />
 
-        <!-- FCM: default small notification icon (monochrome white drawable) -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@drawable/ic_notification" />
-        <!-- FCM: default notification accent colour -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
-        <!-- FCM: default channel for data-only messages that arrive in the background -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="otya_updates" />
