@@ -1,42 +1,64 @@
 import 'package:flutter/material.dart';
 import '../providers/theme_provider.dart';
+import '../services/remote_control_service.dart';
 import '../../app/theme/app_colors.dart';
 
-/// Shows the remote announcement dialog from /configs/theme.
-/// Only shown once per announcement ID — ThemeProvider tracks seen IDs.
-///
-/// Call [AnnouncementDialog.showIfPending] from app.dart after the first
-/// frame so it never blocks startup.
 class AnnouncementDialog extends StatelessWidget {
-  final OtyaAnnouncement announcement;
+  final String id;
+  final String title;
+  final String message;
+  final String buttonText;
+  final bool remoteControl;
 
-  const AnnouncementDialog({super.key, required this.announcement});
+  const AnnouncementDialog({
+    super.key,
+    required this.id,
+    required this.title,
+    required this.message,
+    required this.buttonText,
+    required this.remoteControl,
+  });
 
-  /// Checks ThemeProvider for a pending announcement and shows the dialog
-  /// if one exists. Safe to call on every app foreground — the provider
-  /// guards against showing the same ID twice.
   static Future<void> showIfPending(BuildContext context) async {
-    final pending = await ThemeProvider.instance.pendingAnnouncement();
-    if (pending == null) return;
-    if (!context.mounted) return;
+    final remote = await RemoteControlService.instance.pendingAnnouncement();
+    if (remote != null && context.mounted) {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => AnnouncementDialog(
+          id: remote['id']?.toString() ?? 'remote',
+          title: remote['title']?.toString() ?? 'OTYA',
+          message: remote['message']?.toString() ?? '',
+          buttonText: remote['buttonText']?.toString() ?? 'Got it',
+          remoteControl: true,
+        ),
+      );
+      return;
+    }
 
+    final legacy = await ThemeProvider.instance.pendingAnnouncement();
+    if (legacy == null || !context.mounted) return;
     await showDialog<void>(
-      context:             context,
+      context: context,
       barrierDismissible: false,
-      builder: (_) => AnnouncementDialog(announcement: pending),
+      builder: (_) => AnnouncementDialog(
+        id: legacy.id,
+        title: legacy.title,
+        message: legacy.message,
+        buttonText: legacy.buttonText,
+        remoteControl: false,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // force user to tap the button
+      canPop: false,
       child: AlertDialog(
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(20),
-          side: BorderSide(
-            color: AppColors.accent.withValues(alpha: 0.3),
-          ),
+          side: BorderSide(color: AppColors.accent.withValues(alpha: 0.3)),
         ),
         title: Row(
           children: [
@@ -44,46 +66,29 @@ class AnnouncementDialog extends StatelessWidget {
               width: 36,
               height: 36,
               decoration: BoxDecoration(
-                gradient: AppColors.accentGradient,
+                color: AppColors.accent,
                 borderRadius: BorderRadius.circular(10),
               ),
-              child: const Icon(
-                Icons.campaign_rounded,
-                color: Colors.black,
-                size: 20,
-              ),
+              child: const Icon(Icons.campaign_rounded, color: Colors.white, size: 20),
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                announcement.title,
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface,
-                  fontFamily: 'Inter',
-                ),
-              ),
+              child: Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
             ),
           ],
         ),
-        content: Text(
-          announcement.message,
-          style: const TextStyle(
-            fontSize: 14,
-            color: AppColors.textSecondary,
-            fontFamily: 'Inter',
-            height: 1.5,
-          ),
-        ),
+        content: Text(message, style: const TextStyle(fontSize: 14, color: AppColors.textSecondary, fontFamily: 'Inter', height: 1.5)),
         actions: [
           ElevatedButton(
             onPressed: () async {
-              await ThemeProvider.instance
-                  .markAnnouncementSeen(announcement.id);
+              if (remoteControl) {
+                await RemoteControlService.instance.markAnnouncementSeen(id);
+              } else {
+                await ThemeProvider.instance.markAnnouncementSeen(id);
+              }
               if (context.mounted) Navigator.of(context).pop();
             },
-            child: Text(announcement.buttonText),
+            child: Text(buttonText),
           ),
         ],
       ),
