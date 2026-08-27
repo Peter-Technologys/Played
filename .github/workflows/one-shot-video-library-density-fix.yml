@@ -44,20 +44,15 @@ jobs:
               print(f'WARN: expected pattern not found: {old[:80]!r}')
             s = s.replace(old, new)
 
-          # Active filter pills: approved single-accent fill rather than legacy two-color gradient.
           old = '''                gradient: isActive\n                    ? const LinearGradient(\n                        colors: [AppColors.accent, AppColors.accentViolet],\n                      )\n                    : null,\n                color: isActive ? null : AppColors.surface,'''
           new = '''                color: isActive ? AppColors.accent : AppColors.surface,'''
           if old in s:
             s = s.replace(old, new)
 
-          # White content on purple active pills.
           s = s.replace('color: isActive ? Colors.black : AppColors.textSecondary',
                         'color: isActive ? Colors.white : AppColors.textSecondary')
 
           p.write_text(s)
-
-      - name: Format changed Dart file
-        run: dart format lib/features/video/presentation/video_tab_screen.dart
 
       - name: Commit migration
         shell: bash
