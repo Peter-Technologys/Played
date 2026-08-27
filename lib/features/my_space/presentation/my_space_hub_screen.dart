@@ -11,6 +11,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/cloudflare_service.dart';
+import '../../../core/services/remote_control_service.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 class _ToolEntry {
@@ -31,19 +32,23 @@ class _ToolEntry {
 class MySpaceHubScreen extends ConsumerWidget {
   const MySpaceHubScreen({super.key});
 
-  List<_ToolEntry> _tools(WidgetRef ref) => [
+  List<_ToolEntry> _tools(WidgetRef ref) {
+    final remote = RemoteControlService.instance;
+    return [
         _ToolEntry(
           icon: Icons.folder_rounded,
           label: 'Files',
           subtitle: 'Browse your media',
           onTapBuilder: (context) => () => context.push('/tools/folders'),
         ),
+        if (remote.featureEnabled('beam'))
         _ToolEntry(
           icon: Icons.wifi_tethering_rounded,
           label: 'Beam',
           subtitle: 'Send files nearby',
           onTapBuilder: (context) => () => context.push('/airdrop'),
         ),
+        if (remote.featureEnabled('safe'))
         _ToolEntry(
           icon: Icons.lock_rounded,
           label: 'Safe',
@@ -56,6 +61,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           subtitle: 'Recently played',
           onTapBuilder: (context) => () => context.push('/history'),
         ),
+        if (remote.featureEnabled('equalizer'))
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
           label: 'Sound',
@@ -86,6 +92,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           subtitle: 'Theme and look',
           onTapBuilder: (context) => () => context.push('/theme'),
         ),
+        if (remote.featureEnabled('whatsappTrimmer'))
         _ToolEntry(
           icon: Icons.content_cut_rounded,
           label: 'Trim',
@@ -99,6 +106,7 @@ class MySpaceHubScreen extends ConsumerWidget {
           },
         ),
       ];
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
