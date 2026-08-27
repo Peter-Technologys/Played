@@ -1,27 +1,31 @@
-name: Wire remote control into app routes
-# trigger-v2
+name: OTYA remote control wiring
+
 on:
   push:
     paths:
-      - .github/workflows/one-shot-wire-remote-control.yml
+      - '.github/workflows/one-shot-wire-remote-control.yml'
+
 permissions:
   contents: write
+
 jobs:
-  wire:
+  migrate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Wire flags and real auth entry
-        shell: python
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply source wiring
         run: |
+          python3 <<'PY'
           from pathlib import Path
 
-          p = Path('lib/app/router.dart')
-          s = p.read_text()
-          imp = "import '../core/services/remote_control_service.dart';\n"
-          if imp not in s:
-              anchor = "import '../core/widgets/update_dialog.dart';\n"
-              s = s.replace(anchor, anchor + imp)
+          router = Path('lib/app/router.dart')
+          s = router.read_text()
+          anchor = "import '../core/widgets/update_dialog.dart';\n"
+          remote_import = "import '../core/services/remote_control_service.dart';\n"
+          if remote_import not in s:
+              s = s.replace(anchor, anchor + remote_import)
           old = """  static String? _redirect(BuildContext context, GoRouterState state) {
     // Auth is optional — OTYA Player works fully offline without an account.
     // The auth screen is only reached by explicit navigation (e.g. from Profile).
@@ -29,53 +33,40 @@ jobs:
   }
 """
           new = """  static String? _redirect(BuildContext context, GoRouterState state) {
-    // Auth is optional — OTYA Player works fully offline without an account.
-    // Remote feature flags are enforced here as a second layer so a disabled
-    // feature cannot be opened through a stale/deep link or another menu.
     final remote = RemoteControlService.instance;
-    final path = state.matchedLocation;
-    final feature = switch (path) {
+    final feature = switch (state.matchedLocation) {
       '/airdrop' => 'beam',
       '/vault' => 'safe',
       '/player/equalizer' => 'equalizer',
       '/tools/whatsapp' => 'whatsappTrimmer',
       _ => null,
     };
-    if (feature != null && !remote.featureEnabled(feature)) {
-      return '/myspace';
-    }
+    if (feature != null && !remote.featureEnabled(feature)) return '/myspace';
     return null;
   }
 """
           if old in s:
               s = s.replace(old, new)
-          p.write_text(s)
+          router.write_text(s)
 
-          p = Path('lib/features/my_space/presentation/my_space_hub_screen.dart')
-          s = p.read_text()
+          hub = Path('lib/features/my_space/presentation/my_space_hub_screen.dart')
+          s = hub.read_text()
           s = s.replace("import 'package:uuid/uuid.dart';\n", '')
-          imp = "import '../../../core/services/remote_control_service.dart';\n"
-          if imp not in s:
-              anchor = "import '../../../core/services/cloudflare_service.dart';\n"
-              s = s.replace(anchor, anchor + imp)
-          s = s.replace("  List<_ToolEntry> _tools(WidgetRef ref) => [\n", "  List<_ToolEntry> _tools(WidgetRef ref) {\n    final remote = RemoteControlService.instance;\n    return [\n")
-          s = s.replace("        _ToolEntry(\n          icon: Icons.wifi_tethering_rounded,\n          label: 'Beam',", "        if (remote.featureEnabled('beam'))\n          _ToolEntry(\n          icon: Icons.wifi_tethering_rounded,\n          label: 'Beam',")
-          s = s.replace("        _ToolEntry(\n          icon: Icons.lock_rounded,\n          label: 'Safe',", "        if (remote.featureEnabled('safe'))\n          _ToolEntry(\n          icon: Icons.lock_rounded,\n          label: 'Safe',")
-          s = s.replace("        _ToolEntry(\n          icon: Icons.graphic_eq_rounded,\n          label: 'Sound',", "        if (remote.featureEnabled('equalizer'))\n          _ToolEntry(\n          icon: Icons.graphic_eq_rounded,\n          label: 'Sound',")
-          s = s.replace("        _ToolEntry(\n          icon: Icons.content_cut_rounded,\n          label: 'Trim',", "        if (remote.featureEnabled('whatsappTrimmer'))\n          _ToolEntry(\n          icon: Icons.content_cut_rounded,\n          label: 'Trim',")
-          s = s.replace("      ];\n\n  @override\n  Widget build", "      ];\n  }\n\n  @override\n  Widget build", 1)
-          s = s.replace("                      : () => _signIn(context, ref),", "                      : () => context.push('/auth'),")
+          s = s.replace(": () => _signIn(context, ref),", ": () => context.push('/auth'),")
           start = s.find('  Future<void> _signIn(BuildContext context, WidgetRef ref) async {')
           if start >= 0:
               end = s.find('  Future<void> _runBackup(', start)
               if end >= 0:
                   s = s[:start] + s[end:]
-          p.write_text(s)
-      - name: Commit wiring
+          hub.write_text(s)
+          PY
+      - name: Commit migrated source
         run: |
           git config user.name 'PeterSmart Link Automation'
           git config user.email 'actions@users.noreply.github.com'
           git add lib/app/router.dart lib/features/my_space/presentation/my_space_hub_screen.dart
-          if git diff --cached --quiet; then exit 0; fi
-          git commit -m 'Wire remote feature flags and real Hub authentication'
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'Enforce remote routes and real Hub sign in'
           git push
