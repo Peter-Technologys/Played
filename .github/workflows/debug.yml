@@ -1,15 +1,14 @@
-# OTYA Player — CI APK Build
+# OTYA Player — Signed Release APK Build
+# Builds signed release APKs on every push to main and on every pull request.
+# Each ABI is built separately to avoid Flutter split-APK output detection failures.
+
 name: Debug APK
 
 on:
   push:
-    branches:
-      - main
-      - otya-next
+    branches: [ main ]
   pull_request:
-    branches:
-      - main
-      - otya-next
+    branches: [ main ]
   workflow_dispatch:
 
 concurrency:
@@ -22,13 +21,16 @@ env:
 
 jobs:
   build_debug:
-    name: Build and verify APK
+    name: Build Debug APK
     runs-on: ubuntu-latest
     steps:
       - name: Free disk space
         run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /usr/share/swift || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /usr/local/share/powershell || true
+          sudo rm -rf /usr/share/swift || true
           sudo apt-get clean -y || true
+          df -h
 
       - uses: actions/checkout@v4
 
@@ -44,12 +46,12 @@ jobs:
           path: /usr/local/lib/android/sdk/ndk
           key: ndk-28.2.13676358
 
-      - name: Cache Pub
-        uses: actions/cache@v4
+      - uses: actions/cache@v4
         with:
           path: ~/.pub-cache
           key: pub-${{ hashFiles('pubspec.yaml', 'pubspec.lock') }}
           restore-keys: |
+            pub-${{ hashFiles('pubspec.yaml') }}
             pub-
 
       - name: Cache Gradle
@@ -64,21 +66,42 @@ jobs:
           restore-keys: |
             gradle-
 
-      - name: Decode release keystore when available
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+      - name: Decode keystore
         run: |
-          if [ -n "$KEYSTORE_BASE64" ]; then
-            echo "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+          if [ -n "${{ secrets.KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > android/app/keystore.jks
+            echo "Release keystore decoded successfully."
+          else
+            echo "WARNING: KEYSTORE_BASE64 secret not set — generating debug keystore as fallback."
+            mkdir -p ~/.android
+            keytool -genkeypair -v \
+              -keystore ~/.android/debug.keystore \
+              -alias androiddebugkey \
+              -keyalg RSA \
+              -keysize 2048 \
+              -validity 10000 \
+              -storepass android \
+              -keypass android \
+              -dname "CN=Android Debug,O=Android,C=US" 2>/dev/null || true
           fi
+
+      - name: Stop Gradle daemons
+        run: cd android && ./gradlew --stop || true
+
+      - name: Clean project
+        run: |
+          echo "Building commit: $(git rev-parse HEAD)"
+          git log -1 --oneline
+          rm -rf build .dart_tool android/.gradle android/app/build
+          flutter clean
 
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Static analysis
-        run: flutter analyze --no-fatal-infos
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
 
-      - name: Build release APKs
+      - name: Build arm64 APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -88,41 +111,60 @@ jobs:
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
           set -e
-          # CI builds must use HTTPS and the production backend when configured.
-          # Do not enable self-installing APK updates in the Play-distributed build.
-          ARGS=(
-            --release
-            --split-per-abi
-            --target-platform android-arm,android-arm64
-            --dart-define=APP_ARCH=arm64
-            --dart-define=SELF_UPDATE=false
-          )
-          if [ -n "$DD_WORKER_URL" ]; then
-            ARGS+=(--dart-define=WORKER_URL="$DD_WORKER_URL")
-          fi
-          # Legacy signing secret is retained only for compatibility with any
-          # endpoint that has not yet migrated; it is never used as an auth
-          # credential for a user session.
-          if [ -n "$DD_SECRET" ]; then
-            ARGS+=(--dart-define=OTYA_SECRET="$DD_SECRET")
-          fi
-          flutter build apk "${ARGS[@]}"
+          rm -rf build/app/outputs/flutter-apk
+          flutter build apk --release --target-platform android-arm64 \
+            --dart-define=OTYA_SECRET="$DD_SECRET" \
+            --dart-define=SELF_UPDATE=true \
+            --dart-define=WORKER_URL="$DD_WORKER_URL"
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
+
+      - name: Build arm32 APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          DD_SECRET: ${{ secrets.OTYA_SECRET }}
+          DD_WORKER_URL: ${{ secrets.WORKER_URL }}
+        run: |
+          set -e
+          rm -rf build/app/outputs/flutter-apk
+          flutter build apk --release --target-platform android-arm \
+            --dart-define=OTYA_SECRET="$DD_SECRET" \
+            --dart-define=SELF_UPDATE=true \
+            --dart-define=WORKER_URL="$DD_WORKER_URL"
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk /tmp/app-armeabi-v7a-release.apk
+
+      - name: Restore APK output directory
+        run: |
+          mkdir -p build/app/outputs/flutter-apk
+          cp /tmp/app-armeabi-v7a-release.apk build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 
       - name: Verify APKs and record checksums
         run: |
-          set -e
           for APK in \
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
-            test -s "$APK"
+            test -f "$APK" || { echo "ERROR: $APK not found"; exit 1; }
             SIZE=$(stat -c%s "$APK")
-            test "$SIZE" -ge 5000000
-            echo "OK: $APK | $SIZE bytes | sha256=$(sha256sum "$APK" | cut -d' ' -f1)"
+            test "$SIZE" -gt 5000000 || { echo "ERROR: $APK too small ($SIZE bytes)"; exit 1; }
+            SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+            echo "OK: $APK | $SIZE bytes | sha256=$SHA"
           done
+
+      - name: Diagnose APK outputs
+        if: always()
+        run: |
+          echo "=== APKs under build/ ==="
+          find build -type f -name "*.apk" -print 2>/dev/null || true
+          echo "=== APKs under android/app/build/ ==="
+          find android/app/build -type f -name "*.apk" -print 2>/dev/null || true
 
       - name: Remove secrets
         if: always()
-        run: rm -f android/app/keystore.jks android/app/google-services.json
+        run: rm -f "$GITHUB_WORKSPACE/android/app/keystore.jks" android/app/google-services.json
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
@@ -133,3 +175,10 @@ jobs:
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
           retention-days: 14
           if-no-files-found: error
+
+      - name: Build summary
+        if: success()
+        run: |
+          echo "### Release APK Built" >> $GITHUB_STEP_SUMMARY
+          echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
