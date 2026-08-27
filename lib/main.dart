@@ -5,32 +5,35 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'core/services/audio_handler.dart';
 import 'app/app.dart';
 import 'core/database/otya_database.dart';
-import 'core/services/notification_service.dart';
+import 'core/services/audio_handler.dart';
+import 'core/services/cache_service.dart';
+import 'core/services/cloudflare_service.dart';
+import 'core/services/connectivity_service.dart';
+import 'core/services/crash_reporter.dart';
+import 'core/services/device_service.dart';
+import 'core/services/fcm_service.dart';
 import 'core/services/media_notification_service.dart';
+import 'core/services/notification_service.dart';
 import 'core/services/phone_state_service.dart';
 import 'core/services/pip_service.dart';
 import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
-import 'core/services/crash_reporter.dart';
-import 'core/services/fcm_service.dart';
-import 'core/services/cache_service.dart';
-import 'core/services/connectivity_service.dart';
 import 'core/services/storage_folder_service.dart';
 import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
-import 'core/services/device_service.dart';
 import 'features/settings/settings_provider.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   MediaKit.ensureInitialized();
 
-  await SystemChrome.setPreferredOrientations([
+  await SystemChrome.setPreferredOrientations(const [
     DeviceOrientation.portraitUp,
     DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
   ]);
 
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
@@ -51,26 +54,28 @@ void main() async {
       _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
     }
   };
+
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
     unawaited(CrashReporter.instance.report(error, stack));
-    if (kDebugMode) _showCrashOverlay('Platform Error', '$error\n\n$stack');
+    if (kDebugMode) {
+      _showCrashOverlay('Platform Error', '$error\n\n$stack');
+    }
     return true;
   };
 
-  // Audio is an enhancement, not a prerequisite for rendering the UI.
   try {
     final audioHandler = await AudioService.init(
       builder: () => OtyaAudioHandler(),
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player — Now Playing',
-        androidNotificationOngoing: true,
+        androidNotificationOngoing: false,
         androidStopForegroundOnPause: true,
         androidNotificationIcon: 'drawable/ic_notification',
         notificationColor: Color(0xFF00E5FF),
         androidShowNotificationBadge: false,
-        preloadArtwork: false,
+        preloadArtwork: true,
       ),
     );
     AudioHandlerSingleton.instance.handler = audioHandler;
@@ -80,8 +85,22 @@ void main() async {
   }
 
   await runZonedGuarded(() async {
-    final databaseReady = await _initDatabase();
-    final savedSettings = await AppSettings.load();
+    var databaseReady = false;
+    try {
+      databaseReady = await _initDatabase();
+    } catch (e, st) {
+      debugPrint('[Database] init failed: $e\n$st');
+      unawaited(CrashReporter.instance.report(e, st));
+    }
+
+    AppSettings savedSettings;
+    try {
+      savedSettings = await AppSettings.load();
+    } catch (e, st) {
+      debugPrint('[Settings] load failed: $e\n$st');
+      unawaited(CrashReporter.instance.report(e, st));
+      savedSettings = AppSettings.defaults();
+    }
 
     runApp(
       ProviderScope(
@@ -94,12 +113,13 @@ void main() async {
       ),
     );
 
-    // Background services must never become a startup dependency.
     unawaited(_initBackground(savedSettings, databaseReady));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
     unawaited(CrashReporter.instance.report(error, stack));
-    if (kDebugMode) _showCrashOverlay('Startup Crash', '$error\n\n$stack');
+    if (kDebugMode) {
+      _showCrashOverlay('Startup Crash', '$error\n\n$stack');
+    }
   });
 }
 
@@ -118,9 +138,14 @@ void _showCrashOverlay(String title, String details) {
               children: [
                 const Icon(Icons.bug_report, color: Color(0xFFFF4444), size: 40),
                 const SizedBox(height: 8),
-                Text('OTYA CRASH: $title', style: const TextStyle(
-                  color: Color(0xFFFF4444), fontSize: 16, fontWeight: FontWeight.bold,
-                )),
+                Text(
+                  'OTYA CRASH: $title',
+                  style: const TextStyle(
+                    color: Color(0xFFFF4444),
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -128,14 +153,20 @@ void _showCrashOverlay(String title, String details) {
                     color: const Color(0xFF2A0000),
                     borderRadius: BorderRadius.circular(8),
                   ),
-                  child: SelectableText(details, style: const TextStyle(
-                    color: Color(0xFFFFCCCC), fontSize: 11, fontFamily: 'monospace',
-                  )),
+                  child: SelectableText(
+                    details,
+                    style: const TextStyle(
+                      color: Color(0xFFFFCCCC),
+                      fontSize: 11,
+                      fontFamily: 'monospace',
+                    ),
+                  ),
                 ),
                 const SizedBox(height: 16),
-                const Text('This diagnostic screen is debug-only.', style: TextStyle(
-                  color: Color(0xFFAAAAAA), fontSize: 12,
-                )),
+                const Text(
+                  'This diagnostic screen is debug-only.',
+                  style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -157,8 +188,10 @@ Future<bool> _initDatabase() async {
   }
 }
 
-Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) async {
-  // Each service owns its failure. One optional service must not cancel the rest.
+Future<void> _initBackground(
+  AppSettings savedSettings,
+  bool databaseReady,
+) async {
   await _safeBackground('notifications', _initNotifications);
   await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
   await _safeBackground('connectivity', ConnectivityService.instance.init);
@@ -173,7 +206,10 @@ Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) asyn
     ));
   }
 
-  unawaited(_safeBackground('update check', UpdateService.instance.checkAndNotify));
+  unawaited(_safeBackground(
+    'update check',
+    UpdateService.instance.checkAndNotify,
+  ));
 
   PipService.listenForNativePause(
     () => PlaybackCoordinator.instance.activePlayer?.pause(),
@@ -190,7 +226,10 @@ Future<void> _initBackground(AppSettings savedSettings, bool databaseReady) asyn
   unawaited(_safeBackground('crash reporter', CrashReporter.instance.init));
 }
 
-Future<void> _safeBackground(String name, Future<void> Function() task) async {
+Future<void> _safeBackground(
+  String name,
+  Future<void> Function() task,
+) async {
   try {
     await task();
   } catch (e, st) {
@@ -201,7 +240,20 @@ Future<void> _safeBackground(String name, Future<void> Function() task) async {
 
 Future<void> _initNotifications() async {
   await _safeBackground('notification service', NotificationService.instance.init);
-  await _safeBackground('update notifications', UpdateNotificationService.instance.init);
-  await _safeBackground('media notifications', MediaNotificationService.instance.init);
-  await _safeBackground('push notifications', PushNotificationService.instance.init);
+  await _safeBackground(
+    'update notifications',
+    UpdateNotificationService.instance.init,
+  );
+  await _safeBackground(
+    'media notifications',
+    MediaNotificationService.instance.init,
+  );
+  await _safeBackground(
+    'push notifications',
+    PushNotificationService.instance.init,
+  );
 }
+
+// CloudflareService has no init — it is stateless HTTP. Accessed via singleton.
+// ignore: unused_element
+CloudflareService get _cf => CloudflareService.instance;
