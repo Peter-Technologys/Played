@@ -15,6 +15,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
+import 'http_client.dart';
 
 String get _kAuthBase => '${Environment.workerUrl}/auth';
 
@@ -95,7 +96,7 @@ class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
-  static final http.Client _client = http.Client();
+  http.Client get _client => AppHttpClient.instance.client;
   static const Duration _timeout = Duration(seconds: 15);
 
   String? _accessToken;
@@ -106,6 +107,9 @@ class AuthService {
   String? _userAvatar;
   bool _isVerified = false;
   bool _loaded = false;
+
+  static const _networkError =
+      'Could not reach OTYA right now. Check your connection and try again.';
 
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
@@ -189,16 +193,18 @@ class AuthService {
         body: jsonEncode({'refresh_token': _refreshToken}),
       ).timeout(_timeout);
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final newToken = data['access_token'] as String?;
-        if (newToken != null) {
-          _accessToken = newToken;
-          await _secureStorage.write(key: _kSecureAccessToken, value: newToken);
-          return newToken;
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) {
+          final newToken = decoded['access_token'] as String?;
+          if (newToken != null && newToken.isNotEmpty) {
+            _accessToken = newToken;
+            await _secureStorage.write(key: _kSecureAccessToken, value: newToken);
+            return newToken;
+          }
         }
       }
     } catch (e) {
-      debugPrint('[AuthService] Token refresh failed: $e');
+      debugPrint('[AuthService] Token refresh failed: ${e.runtimeType}');
     }
     return null;
   }
@@ -212,7 +218,8 @@ class AuthService {
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
-      return AuthResult(ok: false, error: 'Network error: $e');
+      debugPrint('[AuthService] Register request failed: ${e.runtimeType}');
+      return const AuthResult(ok: false, error: _networkError);
     }
   }
 
@@ -225,7 +232,8 @@ class AuthService {
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
-      return AuthResult(ok: false, error: 'Network error: $e');
+      debugPrint('[AuthService] Login request failed: ${e.runtimeType}');
+      return const AuthResult(ok: false, error: _networkError);
     }
   }
 
@@ -238,7 +246,8 @@ class AuthService {
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
-      return AuthResult(ok: false, error: 'Network error: $e');
+      debugPrint('[AuthService] Google auth request failed: ${e.runtimeType}');
+      return const AuthResult(ok: false, error: _networkError);
     }
   }
 
@@ -252,7 +261,7 @@ class AuthService {
           body: jsonEncode({'refresh_token': _refreshToken}),
         ).timeout(_timeout);
       } catch (e) {
-        debugPrint('[AuthService] Logout request failed: $e');
+        debugPrint('[AuthService] Logout request failed: ${e.runtimeType}');
       }
     }
     await _clearPersisted();
@@ -267,12 +276,15 @@ class AuthService {
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(_timeout);
       if (res.statusCode != 200) return null;
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final user = UserProfile.fromJson(data['user'] as Map<String, dynamic>);
+      final decoded = jsonDecode(res.body);
+      if (decoded is! Map<String, dynamic> || decoded['user'] is! Map<String, dynamic>) {
+        return null;
+      }
+      final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
       await _persist(user: user);
       return user;
     } catch (e) {
-      debugPrint('[AuthService] getProfile failed: $e');
+      debugPrint('[AuthService] getProfile failed: ${e.runtimeType}');
       return null;
     }
   }
@@ -290,12 +302,14 @@ class AuthService {
         body: jsonEncode(body),
       ).timeout(_timeout);
       if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final user = UserProfile.fromJson(data['user'] as Map<String, dynamic>);
-        await _persist(user: user);
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic> && decoded['user'] is Map<String, dynamic>) {
+          final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
+          await _persist(user: user);
+        }
       }
     } catch (e) {
-      debugPrint('[AuthService] updateProfile failed: $e');
+      debugPrint('[AuthService] updateProfile failed: ${e.runtimeType}');
     }
   }
 
@@ -309,7 +323,7 @@ class AuthService {
       ).timeout(_timeout);
       return res.statusCode >= 200 && res.statusCode < 300;
     } catch (e) {
-      debugPrint('[AuthService] sendVerificationOtp failed: $e');
+      debugPrint('[AuthService] sendVerificationOtp failed: ${e.runtimeType}');
       return false;
     }
   }
@@ -331,7 +345,7 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      debugPrint('[AuthService] verifyOtp failed: $e');
+      debugPrint('[AuthService] verifyOtp failed: ${e.runtimeType}');
       return false;
     }
   }
@@ -345,7 +359,7 @@ class AuthService {
       ).timeout(_timeout);
       return res.statusCode >= 200 && res.statusCode < 300;
     } catch (e) {
-      debugPrint('[AuthService] forgotPassword failed: $e');
+      debugPrint('[AuthService] forgotPassword failed: ${e.runtimeType}');
       return false;
     }
   }
@@ -359,7 +373,7 @@ class AuthService {
       ).timeout(_timeout);
       return res.statusCode == 200;
     } catch (e) {
-      debugPrint('[AuthService] resetPassword failed: $e');
+      debugPrint('[AuthService] resetPassword failed: ${e.runtimeType}');
       return false;
     }
   }
@@ -373,7 +387,7 @@ class AuthService {
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(_timeout);
     } catch (e) {
-      debugPrint('[AuthService] deleteAccount failed: $e');
+      debugPrint('[AuthService] deleteAccount failed: ${e.runtimeType}');
     }
     await _clearPersisted();
   }
@@ -389,7 +403,10 @@ class AuthService {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
-        return AuthResult(ok: false, error: 'Authentication service returned an invalid response (HTTP ${res.statusCode}).');
+        return AuthResult(
+          ok: false,
+          error: 'Authentication service returned an invalid response (HTTP ${res.statusCode}).',
+        );
       }
       final data = decoded;
       if (res.statusCode >= 200 && res.statusCode < 300 && data['ok'] == true) {
@@ -398,12 +415,30 @@ class AuthService {
         final userJson = data['user'] as Map<String, dynamic>?;
         final user = userJson != null ? UserProfile.fromJson(userJson) : null;
         await _persist(accessToken: accessToken, refreshToken: refreshToken, user: user);
-        return AuthResult(ok: true, accessToken: accessToken, refreshToken: refreshToken, user: user);
+        return AuthResult(
+          ok: true,
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+          user: user,
+        );
       }
-      return AuthResult(ok: false, error: data['error'] as String? ?? 'Unknown error');
+      final error = data['error'];
+      return AuthResult(
+        ok: false,
+        error: error is String && error.trim().isNotEmpty
+            ? error
+            : 'Authentication failed. Please try again.',
+      );
     } catch (e) {
-      debugPrint('[AuthService] Invalid auth response HTTP ${res.statusCode}: ${res.body}');
-      return AuthResult(ok: false, error: 'Authentication service response was invalid (HTTP ${res.statusCode}).');
+      // Do not log the body here: an upstream/misconfigured endpoint could
+      // include tokens, HTML internals or other sensitive diagnostics.
+      debugPrint(
+        '[AuthService] Invalid auth response: HTTP ${res.statusCode}, ${e.runtimeType}',
+      );
+      return AuthResult(
+        ok: false,
+        error: 'Authentication service response was invalid (HTTP ${res.statusCode}).',
+      );
     }
   }
 }
