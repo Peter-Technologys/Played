@@ -1,49 +1,38 @@
-# Security Policy
+# OTYA Player Security Policy
 
-## Supported Versions
+## Supported version
 
-| Version | Supported |
-|---|---|
-| 1.0.x | ✅ Yes |
+Security fixes are maintained for the current production release line. The current source version is `1.6.0+10`.
 
----
+## Reporting a vulnerability
 
-## Reporting a Vulnerability
+Do not publish secrets, credentials, private user data, exploit details, account-recovery material, signing information, OTPs or tokens in a public issue.
 
-**Please do NOT open a public issue for security vulnerabilities.**
+Use a private GitHub security advisory when available, or the official support/contact channel published on `petersmartlink.com`.
 
-If you discover a security vulnerability in Played, please report it responsibly:
+Please include:
+- affected OTYA version and build number;
+- device and Android version when relevant;
+- reproducible steps;
+- expected and actual behavior;
+- security impact;
+- sanitized logs or screenshots with personal data and secrets removed.
 
-1. **Email:** Send details to the project maintainer via GitLab's private messaging or the email listed on the profile.
-2. **Include:**
-   - Description of the vulnerability
-   - Steps to reproduce
-   - Potential impact
-   - Suggested fix (if any)
-3. **Response time:** You will receive an acknowledgement within 48 hours and a resolution timeline within 7 days.
+## Security-sensitive areas
 
----
+The following require extra review:
+- authentication, JWT and refresh-token handling;
+- Google Sign-In and Drive App Data recovery;
+- Safe/vault encryption, biometric and PIN access;
+- Beam local transfer authorization;
+- update/download integrity and APK signing;
+- backend URLs, remote configuration and cloud synchronization;
+- dependency and GitHub Actions changes.
 
-## Scope
+## Security boundaries
 
-The following are in scope:
+OTYA must never commit or bundle production secrets in Flutter. Authentication secrets, Resend keys, Cloudflare credentials, signing keys and internal service secrets belong in GitHub/Cloudflare secret storage or server-side runtime configuration.
 
-- AES-256 Vault encryption implementation
-- Biometric / PIN authentication bypass
-- Data leakage from the encrypted Vault
-- Insecure file permissions on vault-stored media
-- Nearby Connections (Air-Drop) data interception
+Google Drive recovery requires explicit user action and must not upload raw music/video files or Safe/private media. Production releases must fail closed when release signing credentials are missing.
 
----
-
-## Out of Scope
-
-- Issues in third-party dependencies (report to the respective maintainers)
-- Issues requiring physical access to an unlocked device
-- UI/UX bugs (use the Bug Report issue template instead)
-
----
-
-## Disclosure Policy
-
-We follow **responsible disclosure**. Once a fix is released, the vulnerability will be documented in [CHANGELOG.md](CHANGELOG.md) with credit to the reporter (unless anonymity is requested).
+Third-party dependency vulnerabilities should still be reported when they materially affect OTYA so the project can update, mitigate or document the risk.

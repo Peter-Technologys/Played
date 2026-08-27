@@ -1,0 +1,36 @@
+changelog:
+  exclude:
+    labels:
+      - skip-changelog
+      - dependencies
+    authors:
+      - dependabot[bot]
+  categories:
+    - title: "🚀 New features"
+      labels:
+        - feature
+        - enhancement
+    - title: "🛡️ Security"
+      labels:
+        - security
+    - title: "🐛 Fixes"
+      labels:
+        - bug
+        - fix
+    - title: "🎨 UI and experience"
+      labels:
+        - ui
+        - ux
+    - title: "⚙️ Backend and integration"
+      labels:
+        - backend
+        - integration
+        - cloud
+    - title: "📦 Build and release"
+      labels:
+        - build
+        - release
+        - ci
+    - title: "🧰 Other changes"
+      labels:
+        - "*"
