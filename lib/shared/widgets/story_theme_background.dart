@@ -69,6 +69,7 @@ class _StoryPainter extends CustomPainter {
     final land = _color('land', const Color(0xFF09070E));
     final water = _color('water', const Color(0xFF100B1D));
     final accent = _color('accent', const Color(0xFF8B5CF6));
+    final warm = _color('warm', const Color(0xFFFDE68A));
 
     final horizonY = size.height * 0.48;
     final skyRect = Rect.fromLTWH(0, 0, size.width, horizonY + 70);
@@ -83,10 +84,17 @@ class _StoryPainter extends CustomPainter {
         ).createShader(skyRect),
     );
 
-    if (scene == 'river_sunset') {
-      _paintRiver(canvas, size, horizonY, land, water, accent, horizon);
-    } else {
-      _paintMountains(canvas, size, horizonY, land, water, accent);
+    switch (scene) {
+      case 'river_sunset':
+        _paintRiver(canvas, size, horizonY, land, water, accent, horizon);
+      case 'winter_lights':
+        _paintMountains(canvas, size, horizonY, land, water, accent);
+        _paintWinterLights(canvas, size, horizonY, warm, accent);
+      case 'fireworks_lake':
+        _paintMountains(canvas, size, horizonY, land, water, accent);
+        _paintFireworks(canvas, size, horizonY, accent, warm);
+      default:
+        _paintMountains(canvas, size, horizonY, land, water, accent);
     }
   }
 
@@ -139,6 +147,97 @@ class _StoryPainter extends CustomPainter {
         Paint()
           ..color = accent.withValues(alpha: 0.08)
           ..strokeWidth = 1,
+      );
+    }
+  }
+
+  void _paintWinterLights(
+    Canvas canvas,
+    Size size,
+    double horizonY,
+    Color warm,
+    Color accent,
+  ) {
+    final starPaint = Paint()..color = Colors.white.withValues(alpha: 0.75);
+    for (var i = 0; i < 34; i++) {
+      final x = ((i * 53) % 101) / 101 * size.width;
+      final y = 24 + (((i * 37) % 97) / 97) * horizonY * 0.58;
+      canvas.drawCircle(Offset(x, y), i % 5 == 0 ? 1.6 : 0.9, starPaint);
+    }
+
+    final lightPaint = Paint()
+      ..color = warm.withValues(alpha: 0.92)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    for (var i = 0; i < 12; i++) {
+      final x = size.width * (0.12 + (i * 0.067));
+      final y = horizonY + 8 + (i % 3) * 7;
+      canvas.drawCircle(Offset(x, y), 2.4, lightPaint);
+    }
+
+    final treePaint = Paint()..color = const Color(0xFF06080B).withValues(alpha: 0.94);
+    for (var i = 0; i < 10; i++) {
+      final x = size.width * (0.06 + i * 0.095);
+      final base = horizonY + 26 + (i % 3) * 8;
+      final h = 28.0 + (i % 4) * 8;
+      final tree = Path()
+        ..moveTo(x, base - h)
+        ..lineTo(x - h * 0.26, base)
+        ..lineTo(x + h * 0.26, base)
+        ..close();
+      canvas.drawPath(tree, treePaint);
+    }
+
+    canvas.drawCircle(
+      Offset(size.width * 0.82, horizonY * 0.28),
+      math.min(size.width, size.height) * 0.018,
+      Paint()..color = accent.withValues(alpha: 0.40),
+    );
+  }
+
+  void _paintFireworks(
+    Canvas canvas,
+    Size size,
+    double horizonY,
+    Color accent,
+    Color warm,
+  ) {
+    void burst(Offset center, double radius, Color color, int rays) {
+      final paint = Paint()
+        ..color = color.withValues(alpha: 0.82)
+        ..strokeWidth = 1.5
+        ..strokeCap = StrokeCap.round;
+      for (var i = 0; i < rays; i++) {
+        final angle = (math.pi * 2 * i) / rays;
+        final inner = radius * 0.22;
+        final outer = radius * (0.72 + (i % 3) * 0.12);
+        canvas.drawLine(
+          Offset(center.dx + math.cos(angle) * inner, center.dy + math.sin(angle) * inner),
+          Offset(center.dx + math.cos(angle) * outer, center.dy + math.sin(angle) * outer),
+          paint,
+        );
+      }
+      canvas.drawCircle(
+        center,
+        2.5,
+        Paint()
+          ..color = color
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+      );
+    }
+
+    burst(Offset(size.width * 0.28, horizonY * 0.35), size.width * 0.11, accent, 18);
+    burst(Offset(size.width * 0.70, horizonY * 0.27), size.width * 0.14, warm, 22);
+    burst(Offset(size.width * 0.52, horizonY * 0.50), size.width * 0.075, Colors.white, 14);
+
+    final reflectionPaint = Paint()
+      ..strokeWidth = 1
+      ..color = accent.withValues(alpha: 0.18);
+    for (var i = 0; i < 7; i++) {
+      final y = horizonY + 22 + i * 24;
+      canvas.drawLine(
+        Offset(size.width * 0.34, y),
+        Offset(size.width * 0.66, y),
+        reflectionPaint,
       );
     }
   }
