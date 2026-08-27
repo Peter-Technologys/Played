@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../services/remote_control_service.dart';
@@ -34,24 +35,41 @@ class _RemoteControlGateState extends State<RemoteControlGate> {
     if (mounted) setState(() => _version = value);
   }
 
+  Future<void> _openUpdate() async {
+    final url = RemoteControlService.instance.link(
+      'download',
+      'https://petersmartlink.com/download/otya-player',
+    );
+    final uri = Uri.tryParse(url);
+    if (uri == null || uri.scheme != 'https') return;
+    await launchUrl(uri, mode: LaunchMode.externalApplication);
+  }
+
   @override
   Widget build(BuildContext context) {
     final remote = RemoteControlService.instance;
     final version = _version;
 
+    // Offline playback is intentionally preserved when maintenance is for
+    // backend services only. A full blocking maintenance page is used only
+    // when the remotely supplied policy explicitly disallows offline use.
     if (remote.maintenanceEnabled && !remote.allowOfflinePlayback) {
       return _BlockingPage(
         icon: Icons.construction_rounded,
         title: remote.maintenance['title']?.toString() ?? 'Maintenance',
-        message: remote.maintenance['message']?.toString() ?? 'Please try again shortly.',
+        message: remote.maintenance['message']?.toString() ??
+            'Please try again shortly.',
       );
     }
 
     if (version?.forceUpdate == true) {
-      return const _BlockingPage(
+      return _BlockingPage(
         icon: Icons.system_update_alt_rounded,
         title: 'Update required',
-        message: 'This version of OTYA is no longer compatible with online services. Update OTYA to continue.',
+        message:
+            'This OTYA version is no longer compatible with online services. Update to continue securely.',
+        actionLabel: 'Update OTYA',
+        onAction: _openUpdate,
       );
     }
 
@@ -60,10 +78,19 @@ class _RemoteControlGateState extends State<RemoteControlGate> {
 }
 
 class _BlockingPage extends StatelessWidget {
-  const _BlockingPage({required this.icon, required this.title, required this.message});
+  const _BlockingPage({
+    required this.icon,
+    required this.title,
+    required this.message,
+    this.actionLabel,
+    this.onAction,
+  });
+
   final IconData icon;
   final String title;
   final String message;
+  final String? actionLabel;
+  final VoidCallback? onAction;
 
   @override
   Widget build(BuildContext context) {
@@ -78,9 +105,33 @@ class _BlockingPage extends StatelessWidget {
               children: [
                 Icon(icon, size: 48, color: AppColors.accent),
                 const SizedBox(height: 18),
-                Text(title, textAlign: TextAlign.center, style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.w800)),
+                Text(
+                  title,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
                 const SizedBox(height: 10),
-                Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary, fontSize: 14, height: 1.5)),
+                Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 14,
+                    height: 1.5,
+                  ),
+                ),
+                if (actionLabel != null && onAction != null) ...[
+                  const SizedBox(height: 22),
+                  FilledButton.icon(
+                    onPressed: onAction,
+                    icon: const Icon(Icons.download_rounded),
+                    label: Text(actionLabel!),
+                  ),
+                ],
               ],
             ),
           ),
