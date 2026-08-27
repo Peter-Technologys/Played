@@ -1,0 +1,15 @@
+# OTYA Player code ownership
+* @PeterSmartLink
+
+# Production release and CI
+/.github/workflows/ @PeterSmartLink
+/android/ @PeterSmartLink
+
+# Authentication, cloud and recovery integrations
+/lib/services/auth_service.dart @PeterSmartLink
+/lib/services/google_account_service.dart @PeterSmartLink
+/lib/services/backup_service.dart @PeterSmartLink
+/lib/services/cloudflare_service.dart @PeterSmartLink
+
+# Security-sensitive local vault
+/lib/ @PeterSmartLink
