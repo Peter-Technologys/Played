@@ -88,8 +88,10 @@ dependencies:
   audio_service: ^0.18.15
 
   # In-app WebView
-  webview_flutter: ^4.8.0
-  webview_flutter_android: ^3.16.0
+  # Pinned to the last versions known to support the Dart 3.8.x SDK used by
+  # Flutter 3.32.x in CI. Newer webview_flutter_android releases require Dart 3.9+.
+  webview_flutter: 4.9.0
+  webview_flutter_android: 3.16.9
 
 
 dev_dependencies:
