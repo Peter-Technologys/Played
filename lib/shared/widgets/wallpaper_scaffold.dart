@@ -1,13 +1,15 @@
 // lib/shared/widgets/wallpaper_scaffold.dart
 //
-// WallpaperScaffold — wraps Scaffold and applies the user's wallpaper (if set)
-// as the background via CustomThemeManager.
-//
-// Without a custom wallpaper OTYA uses a restrained ambient background instead
-// of a single flat colour. This keeps screens visually layered without turning
-// the UI into a collection of bright colour blocks.
+// WallpaperScaffold — the visual foundation for OTYA's image-first UI.
+// It keeps every screen readable over user-selected artwork while preserving
+// the PeterSmart Link / OTYA purple identity.
+
+import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
+
+import '../../app/theme/app_colors.dart';
 import '../../core/services/custom_theme_manager.dart';
 
 class WallpaperScaffold extends StatelessWidget {
@@ -39,91 +41,22 @@ class WallpaperScaffold extends StatelessWidget {
     return AnimatedBuilder(
       animation: CustomThemeManager.instance,
       builder: (context, _) {
-        final wallpaper = CustomThemeManager.instance.wallpaperDecoration;
+        final manager = CustomThemeManager.instance;
+        final wallpaperPath = manager.wallpaperPath;
+        final hasWallpaper = wallpaperPath != null && File(wallpaperPath).existsSync();
         final effectiveBg = backgroundColor ?? Theme.of(context).scaffoldBackgroundColor;
-
-        if (wallpaper == null) {
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              DecoratedBox(
-                decoration: BoxDecoration(
-                  color: effectiveBg,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color.alphaBlend(
-                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.055),
-                        effectiveBg,
-                      ),
-                      effectiveBg,
-                      Color.alphaBlend(
-                        Theme.of(context).colorScheme.secondary.withValues(alpha: 0.04),
-                        effectiveBg,
-                      ),
-                    ],
-                    stops: const [0.0, 0.48, 1.0],
-                  ),
-                ),
-              ),
-              Positioned(
-                top: -120,
-                right: -100,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 290,
-                    height: 290,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                bottom: -150,
-                left: -110,
-                child: IgnorePointer(
-                  child: Container(
-                    width: 320,
-                    height: 320,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: [
-                          Theme.of(context).colorScheme.secondary.withValues(alpha: 0.055),
-                          Colors.transparent,
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Scaffold(
-                backgroundColor: Colors.transparent,
-                appBar: appBar,
-                body: body,
-                bottomNavigationBar: bottomNavigationBar,
-                floatingActionButton: floatingActionButton,
-                floatingActionButtonLocation: floatingActionButtonLocation,
-                extendBodyBehindAppBar: extendBodyBehindAppBar,
-                extendBody: extendBody,
-                resizeToAvoidBottomInset: resizeToAvoidBottomInset,
-              ),
-            ],
-          );
-        }
 
         return Stack(
           fit: StackFit.expand,
           children: [
-            Container(decoration: BoxDecoration(image: wallpaper)),
+            if (hasWallpaper)
+              _ImageThemeBackground(
+                path: wallpaperPath,
+                dimAmount: manager.artOpacity,
+                blur: manager.artBlur,
+              )
+            else
+              _OtyaAmbientBackground(background: effectiveBg),
             Scaffold(
               backgroundColor: Colors.transparent,
               appBar: appBar,
@@ -138,6 +71,148 @@ class WallpaperScaffold extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+class _ImageThemeBackground extends StatelessWidget {
+  const _ImageThemeBackground({
+    required this.path,
+    required this.dimAmount,
+    required this.blur,
+  });
+
+  final String path;
+  final double dimAmount;
+  final double blur;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget image = Image.file(
+      File(path),
+      fit: BoxFit.cover,
+      filterQuality: FilterQuality.medium,
+      gaplessPlayback: true,
+    );
+
+    if (blur > 0) {
+      image = ImageFiltered(
+        imageFilter: ImageFilter.blur(sigmaX: blur, sigmaY: blur),
+        child: Transform.scale(scale: 1.04, child: image),
+      );
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        ColoredBox(color: const Color(0xFF08080B), child: image),
+        // The image is intentionally visible. These layers are only for text
+        // contrast, not to hide the selected artwork.
+        ColoredBox(color: Colors.black.withValues(alpha: dimAmount.clamp(0.18, 0.70))),
+        const DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0x5208080B),
+                Color(0x1208080B),
+                Color(0x9A08080B),
+              ],
+              stops: [0.0, 0.48, 1.0],
+            ),
+          ),
+        ),
+        Positioned(
+          top: -140,
+          right: -100,
+          child: IgnorePointer(
+            child: Container(
+              width: 330,
+              height: 330,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.accent.withValues(alpha: 0.20),
+                    AppColors.accent.withValues(alpha: 0.045),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _OtyaAmbientBackground extends StatelessWidget {
+  const _OtyaAmbientBackground({required this.background});
+
+  final Color background;
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: background,
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Color(0xFF100C18),
+                Color(0xFF08080B),
+                Color(0xFF0B0910),
+              ],
+              stops: [0.0, 0.52, 1.0],
+            ),
+          ),
+        ),
+        Positioned(
+          top: -110,
+          right: -90,
+          child: IgnorePointer(
+            child: Container(
+              width: 310,
+              height: 310,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    AppColors.accent.withValues(alpha: 0.22),
+                    AppColors.accent.withValues(alpha: 0.05),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          bottom: -170,
+          left: -130,
+          child: IgnorePointer(
+            child: Container(
+              width: 360,
+              height: 360,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  colors: [
+                    const Color(0xFF5B21B6).withValues(alpha: 0.13),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
