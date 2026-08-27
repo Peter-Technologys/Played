@@ -1,4 +1,5 @@
 name: One-shot video list and Beam finalize
+# Execute once, then remove this workflow.
 
 on:
   push:
