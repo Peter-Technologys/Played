@@ -1,7 +1,6 @@
 // lib/features/auth/auth_screen.dart
 //
 // Login / Register screen.
-// AMOLED dark theme — violet #8B5CF6 + cyan #00E5FF matching AppColors.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -9,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/auth_provider.dart';
+import '../../core/services/google_account_service.dart';
 import '../../shared/widgets/wallpaper_scaffold.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
@@ -21,6 +21,7 @@ class AuthScreen extends ConsumerStatefulWidget {
 class _AuthScreenState extends ConsumerState<AuthScreen>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
+  bool _googleLoading = false;
 
   @override
   void initState() {
@@ -34,6 +35,24 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
     super.dispose();
   }
 
+  Future<void> _signInWithGoogle() async {
+    if (_googleLoading) return;
+    setState(() => _googleLoading = true);
+    final result = await GoogleAccountService.instance.signInAndAuthenticate();
+    if (!mounted) return;
+    setState(() => _googleLoading = false);
+    if (result.ok && result.user != null) {
+      _onSuccess(result.user!);
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(result.error ?? 'Google Sign-In failed'),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return WallpaperScaffold(
@@ -41,8 +60,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
       body: SafeArea(
         child: Column(
           children: [
-            const SizedBox(height: 40),
-            // Logo / title
+            const SizedBox(height: 32),
             ShaderMask(
               shaderCallback: (bounds) =>
                   AppColors.accentGradient.createShader(bounds),
@@ -59,19 +77,67 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
             ),
             const SizedBox(height: 8),
             const Text(
-              'Sign in to sync your music across devices',
+              'Sign in to sync your OTYA data across devices',
               style: TextStyle(
                 fontSize: 13,
                 color: AppColors.textSecondary,
                 fontFamily: 'Inter',
               ),
             ),
-            const SizedBox(height: 32),
-            // Tab bar
+            const SizedBox(height: 22),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 24),
+              child: SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: OutlinedButton.icon(
+                  onPressed: _googleLoading ? null : _signInWithGoogle,
+                  icon: _googleLoading
+                      ? const SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.account_circle_rounded, size: 22),
+                  label: Text(
+                    GoogleAccountService.instance.isConfigured
+                        ? 'Continue with Google'
+                        : 'Google Sign-In setup required',
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    backgroundColor: AppColors.surface.withValues(alpha: 0.78),
+                    side: const BorderSide(color: AppColors.border),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 24),
+              child: Row(
+                children: [
+                  Expanded(child: Divider(color: AppColors.border)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('OR', style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                    )),
+                  ),
+                  Expanded(child: Divider(color: AppColors.border)),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 24),
               decoration: BoxDecoration(
-                color: AppColors.surface,
+                color: AppColors.surface.withValues(alpha: 0.78),
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: AppColors.border),
               ),
@@ -90,13 +156,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
                   fontFamily: 'Inter',
                   fontSize: 14,
                 ),
-                tabs: const [
-                  Tab(text: 'Login'),
-                  Tab(text: 'Register'),
-                ],
+                tabs: const [Tab(text: 'Login'), Tab(text: 'Register')],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -113,12 +176,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 
   void _onSuccess(UserProfile user) {
-    // Update legacy auth provider so existing screens still work
     ref.read(authNotifierProvider.notifier).signIn(
-      userId:      user.id,
+      userId: user.id,
       displayName: user.name ?? user.email,
-      email:       user.email,
-      photoUrl:    user.avatarUrl,
+      email: user.email,
+      photoUrl: user.avatarUrl,
     );
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -133,8 +195,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
   }
 }
 
-// ── Login Tab ─────────────────────────────────────────────────────────────────
-
 class _LoginTab extends StatefulWidget {
   final void Function(UserProfile) onSuccess;
   const _LoginTab({required this.onSuccess});
@@ -144,11 +204,11 @@ class _LoginTab extends StatefulWidget {
 }
 
 class _LoginTabState extends State<_LoginTab> {
-  final _emailCtrl    = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _loading       = false;
+  bool _loading = false;
   String? _error;
-  bool _obscure       = true;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -209,14 +269,11 @@ class _LoginTabState extends State<_LoginTab> {
             alignment: Alignment.centerRight,
             child: TextButton(
               onPressed: () => context.push('/auth/forgot-password'),
-              child: const Text(
-                'Forgot password?',
-                style: TextStyle(
-                  color: AppColors.accent,
-                  fontSize: 13,
-                  fontFamily: 'Inter',
-                ),
-              ),
+              child: const Text('Forgot password?', style: TextStyle(
+                color: AppColors.accent,
+                fontSize: 13,
+                fontFamily: 'Inter',
+              )),
             ),
           ),
           if (_error != null) ...[
@@ -224,19 +281,13 @@ class _LoginTabState extends State<_LoginTab> {
             _ErrorBanner(message: _error!),
           ],
           const SizedBox(height: 16),
-          _GradientButton(
-            label: 'Login',
-            loading: _loading,
-            onPressed: _login,
-          ),
+          _GradientButton(label: 'Login', loading: _loading, onPressed: _login),
           const SizedBox(height: 32),
         ],
       ),
     );
   }
 }
-
-// ── Register Tab ──────────────────────────────────────────────────────────────
 
 class _RegisterTab extends StatefulWidget {
   final void Function(UserProfile) onSuccess;
@@ -247,12 +298,12 @@ class _RegisterTab extends StatefulWidget {
 }
 
 class _RegisterTabState extends State<_RegisterTab> {
-  final _nameCtrl     = TextEditingController();
-  final _emailCtrl    = TextEditingController();
+  final _nameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _passwordCtrl = TextEditingController();
-  bool _loading       = false;
+  bool _loading = false;
   String? _error;
-  bool _obscure       = true;
+  bool _obscure = true;
 
   @override
   void dispose() {
@@ -277,8 +328,7 @@ class _RegisterTabState extends State<_RegisterTab> {
     setState(() => _loading = false);
     if (result.ok && result.user != null) {
       widget.onSuccess(result.user!);
-      // Navigate to verify email if not verified
-      if (!(result.user!.isVerified)) {
+      if (!result.user!.isVerified) {
         context.push('/auth/verify-email');
       }
     } else {
@@ -293,11 +343,7 @@ class _RegisterTabState extends State<_RegisterTab> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          _AuthField(
-            controller: _nameCtrl,
-            label: 'Name (optional)',
-            icon: Icons.person_outline_rounded,
-          ),
+          _AuthField(controller: _nameCtrl, label: 'Name (optional)', icon: Icons.person_outline_rounded),
           const SizedBox(height: 12),
           _AuthField(
             controller: _emailCtrl,
@@ -325,19 +371,13 @@ class _RegisterTabState extends State<_RegisterTab> {
             _ErrorBanner(message: _error!),
           ],
           const SizedBox(height: 20),
-          _GradientButton(
-            label: 'Create Account',
-            loading: _loading,
-            onPressed: _register,
-          ),
+          _GradientButton(label: 'Create Account', loading: _loading, onPressed: _register),
           const SizedBox(height: 32),
         ],
       ),
     );
   }
 }
-
-// ── Shared widgets ────────────────────────────────────────────────────────────
 
 class _AuthField extends StatelessWidget {
   final TextEditingController controller;
@@ -359,8 +399,8 @@ class _AuthField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return TextField(
-      controller:   controller,
-      obscureText:  obscure,
+      controller: controller,
+      obscureText: obscure,
       keyboardType: keyboardType,
       style: const TextStyle(
         color: AppColors.textPrimary,
@@ -368,23 +408,23 @@ class _AuthField extends StatelessWidget {
         fontSize: 15,
       ),
       decoration: InputDecoration(
-        labelText:     label,
-        labelStyle:    const TextStyle(color: AppColors.textSecondary, fontFamily: 'Inter'),
-        prefixIcon:    Icon(icon, color: AppColors.textSecondary, size: 20),
-        suffixIcon:    suffix,
-        filled:        true,
-        fillColor:     AppColors.surface,
+        labelText: label,
+        labelStyle: const TextStyle(color: AppColors.textSecondary, fontFamily: 'Inter'),
+        prefixIcon: Icon(icon, color: AppColors.textSecondary, size: 20),
+        suffixIcon: suffix,
+        filled: true,
+        fillColor: AppColors.surface.withValues(alpha: 0.78),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide:   const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide:   const BorderSide(color: AppColors.border),
+          borderSide: const BorderSide(color: AppColors.border),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(14),
-          borderSide:   const BorderSide(color: AppColors.accent, width: 1.5),
+          borderSide: const BorderSide(color: AppColors.accent, width: 1.5),
         ),
       ),
     );
@@ -411,37 +451,29 @@ class _GradientButton extends StatelessWidget {
         height: 52,
         decoration: BoxDecoration(
           gradient: loading ? null : AppColors.accentGradient,
-          color:    loading ? AppColors.surface : null,
+          color: loading ? AppColors.surface : null,
           borderRadius: BorderRadius.circular(16),
           boxShadow: loading
               ? null
-              : [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.3),
-                    blurRadius: 16,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
+              : [BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.3),
+                  blurRadius: 16,
+                  offset: const Offset(0, 4),
+                )],
         ),
         child: Center(
           child: loading
               ? const SizedBox(
                   width: 22,
                   height: 22,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2.5,
-                    color: AppColors.accent,
-                  ),
+                  child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.accent),
                 )
-              : Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    fontFamily: 'Inter',
-                  ),
-                ),
+              : Text(label, style: const TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                  fontFamily: 'Inter',
+                )),
         ),
       ),
     );
@@ -465,16 +497,11 @@ class _ErrorBanner extends StatelessWidget {
         children: [
           const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 16),
           const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 13,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ),
+          Expanded(child: Text(message, style: const TextStyle(
+            color: AppColors.error,
+            fontSize: 13,
+            fontFamily: 'Inter',
+          ))),
         ],
       ),
     );
