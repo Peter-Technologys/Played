@@ -358,7 +358,16 @@ class _StoryThemeCard extends StatelessWidget {
                 fit: BoxFit.cover,
                 filterQuality: FilterQuality.medium,
                 errorBuilder: (_, __, ___) =>
+                    if ((theme.previewUrl ?? theme.wallpaperUrl) != null)
+              Image.network(
+                (theme.previewUrl ?? theme.wallpaperUrl)!,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) =>
                     StoryThemeBackground(theme: theme.toJson()),
+              )
+            else
+              StoryThemeBackground(theme: theme.toJson()),
               )
             else
               StoryThemeBackground(theme: theme.toJson()),
@@ -382,7 +391,7 @@ class _StoryThemeCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       height: 1.4,
                       color: Color(0xFFD3D0DC),
                     ),
