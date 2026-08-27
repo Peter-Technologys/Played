@@ -4,36 +4,28 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../features/settings/settings_provider.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
 import 'audio_player_screen.dart';
 
-// ── Provider ────────────────────────────────────────────────────────
-
 final miniPlayerItemProvider = StateProvider<MediaItem?>((_) => null);
 
-// ── TASK 2: Granular selectors — each rebuilds only its own subtree ─
-
-/// Watches only [isPlaying] — rebuilds on play/pause toggle only.
 final _miniIsPlayingProvider = Provider<bool>((ref) {
   return ref.watch(audioPlayerProvider.select((s) => s.isPlaying));
 });
 
-/// Watches only [position] — rebuilds on every position tick.
 final _miniPositionProvider = Provider<Duration>((ref) {
   return ref.watch(audioPlayerProvider.select((s) => s.position));
 });
 
-/// Watches only [duration] — rebuilds when duration changes (once per track).
 final _miniDurationProvider = Provider<Duration>((ref) {
   return ref.watch(audioPlayerProvider.select((s) => s.duration));
 });
 
-// ── Mini Player Widget ──────────────────────────────────────────────
-
-/// Persistent collapsible mini player shown across all tabs.
-/// Tap to expand to full audio player screen.
-/// Swipe down to dismiss.
+/// Persistent Now Playing surface used across the app.
+///
+/// Design rule: media artwork is the visual focus; OTYA purple is reserved for
+/// playback state/progress. The player intentionally avoids feature-card colors
+/// so it matches the approved charcoal + purple product system.
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key});
 
@@ -46,11 +38,8 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
   late final AnimationController _slideCtrl;
   late final Animation<Offset> _slideAnim;
   MediaItem? _lastItem;
-
-  // Swipe-to-dismiss tracking
   double _dragOffset = 0;
-  // Raised from 40 → 80 px to prevent accidental dismissal during normal
-  // vertical scrolling gestures on the home screen.
+
   static const _dismissThreshold = 80.0;
 
   @override
@@ -58,12 +47,12 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     super.initState();
     _slideCtrl = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 280),
+      duration: const Duration(milliseconds: 240),
     );
     _slideAnim = Tween<Offset>(
       begin: const Offset(0, 1),
       end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOut));
+    ).animate(CurvedAnimation(parent: _slideCtrl, curve: Curves.easeOutCubic));
   }
 
   @override
@@ -72,8 +61,14 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     super.dispose();
   }
 
+  void _openPlayer(MediaItem item) {
+    HapticFeedback.selectionClick();
+    context.push('/player/audio', extra: {'item': item, 'resumeOnly': true});
+  }
+
   void _dismiss() {
     HapticFeedback.lightImpact();
+    ref.read(audioPlayerProvider.notifier).pause();
     ref.read(miniPlayerItemProvider.notifier).state = null;
     setState(() => _dragOffset = 0);
   }
@@ -83,11 +78,13 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     final item = ref.watch(miniPlayerItemProvider);
 
     if (item != null && _lastItem == null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-          (_) { if (mounted) _slideCtrl.forward(); });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _slideCtrl.forward();
+      });
     } else if (item == null && _lastItem != null) {
-      WidgetsBinding.instance.addPostFrameCallback(
-          (_) { if (mounted) _slideCtrl.reverse(); });
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) _slideCtrl.reverse();
+      });
     }
     _lastItem = item;
 
@@ -98,168 +95,134 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     final displayItem = item ?? _lastItem;
     if (displayItem == null) return const SizedBox.shrink();
 
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+
     return SlideTransition(
       position: _slideAnim,
       child: GestureDetector(
-        // Swipe down to dismiss, left/right to skip
-        onVerticalDragUpdate: (d) {
-          if (d.delta.dy > 0) {
-            setState(() => _dragOffset =
-                (_dragOffset + d.delta.dy).clamp(0, _dismissThreshold * 1.5));
-          }
+        onVerticalDragUpdate: (details) {
+          if (details.delta.dy <= 0) return;
+          setState(() {
+            _dragOffset = (_dragOffset + details.delta.dy)
+                .clamp(0, _dismissThreshold * 1.5);
+          });
         },
-        onVerticalDragEnd: (d) {
+        onVerticalDragEnd: (details) {
           if (_dragOffset >= _dismissThreshold ||
-              (d.primaryVelocity ?? 0) > 400) {
+              (details.primaryVelocity ?? 0) > 400) {
             _dismiss();
           } else {
-            // Snap back smoothly — reset drag offset so the mini player
-            // returns to its resting position without staying visually offset.
             setState(() => _dragOffset = 0);
           }
         },
-        onHorizontalDragEnd: (d) {
-          final v = d.primaryVelocity ?? 0;
-          if (v.abs() < 300) return;
+        onHorizontalDragEnd: (details) {
+          final velocity = details.primaryVelocity ?? 0;
+          if (velocity.abs() < 300) return;
           HapticFeedback.mediumImpact();
-          if (v < 0) {
-            // Swipe left → skip next
+          if (velocity < 0) {
             ref.read(audioPlayerProvider.notifier).skipNext();
           } else {
-            // Swipe right → skip previous
             ref.read(audioPlayerProvider.notifier).skipPrevious();
           }
         },
-        onTap: () {
-          HapticFeedback.selectionClick();
-          // Pass resumeOnly: true so AudioPlayerScreen does NOT restart the track
-          context.push('/player/audio', extra: {'item': displayItem, 'resumeOnly': true});
-        },
+        onTap: () => _openPlayer(displayItem),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 80),
           transform: Matrix4.translationValues(0, _dragOffset, 0),
+          margin: EdgeInsets.fromLTRB(12, 0, 12, 8 + bottomInset),
           child: Opacity(
-            // Fade from fully opaque down to 0 as the user drags to dismiss.
-            // Previously clamped at 0.3, which left the mini player partially
-            // visible even at full drag distance — now fades to transparent.
-            opacity: (1 - _dragOffset / (_dismissThreshold * 1.5)).clamp(0.0, 1.0),
-            child: Container(
-              // Add system bottom padding so the mini player sits above the
-              // navigation bar on gesture-navigation devices.
-              margin: EdgeInsets.fromLTRB(
-                12, 0, 12,
-                4 + MediaQuery.of(context).padding.bottom,
-              ),
-              foregroundDecoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border(
-                  top: BorderSide(
-                    color: AppColors.accent.withValues(alpha: 0.35),
-                    width: 1.5,
-                  ),
-                ),
-              ),
+            opacity: (1 - _dragOffset / (_dismissThreshold * 1.5))
+                .clamp(0.0, 1.0),
+            child: DecoratedBox(
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.surface,
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: AppColors.borderOf(context)),
+                color: const Color(0xFF15151C),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFF292933)),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.12),
-                    blurRadius: 20,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withValues(alpha: 0.40),
+                    blurRadius: 24,
+                    offset: const Offset(0, 10),
                   ),
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.4),
-                    blurRadius: 16,
-                    offset: const Offset(0, 8),
+                    color: AppColors.accent.withValues(alpha: 0.08),
+                    blurRadius: 28,
+                    spreadRadius: -8,
                   ),
                 ],
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // ── Main content row ──────────────────────────────
-                  SizedBox(
-                    height: 68,
-                    child: Row(
-                      children: [
-                        // Album art — resolves albumid: via MethodChannel
-                        ClipRRect(
-                          borderRadius: const BorderRadius.horizontal(
-                              left: Radius.circular(24)),
-                          child: AlbumArtThumb(
-                            albumArtPath: displayItem.albumArtPath,
-                            size: 68,
-                            borderRadius: 0,
-                          ),
-                        ),
-
-                        const SizedBox(width: 12),
-
-                        // Track info
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                displayItem.title,
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w700,
-                                  color: Theme.of(context).colorScheme.onSurface,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(19),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 72,
+                      child: Row(
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.all(8),
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(13),
+                              child: AlbumArtThumb(
+                                albumArtPath: displayItem.albumArtPath,
+                                size: 56,
+                                borderRadius: 0,
                               ),
-                              const SizedBox(height: 2),
-                              Text(
-                                displayItem.artist ?? 'Unknown Artist',
-                                style: TextStyle(
-                                    fontSize: 11,
-                                    color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55)),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          const SizedBox(width: 3),
+                          Expanded(
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 7),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    displayItem.title,
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFFF7F5FF),
+                                      fontSize: 13.5,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: -0.15,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    displayItem.artist ?? 'Unknown artist',
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                    style: const TextStyle(
+                                      color: Color(0xFF92909F),
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 2),
-                            ],
+                            ),
                           ),
-                        ),
-
-                        // Queue button
-                        GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            // Pass resumeOnly: true so AudioPlayerScreen does NOT restart the track
-                            context.push('/player/audio', extra: {'item': displayItem, 'resumeOnly': true});
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 4),
-                            child: Icon(Icons.queue_music_rounded,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), size: 18),
+                          IconButton(
+                            tooltip: 'Queue',
+                            visualDensity: VisualDensity.compact,
+                            onPressed: () => _openPlayer(displayItem),
+                            icon: const Icon(
+                              Icons.queue_music_rounded,
+                              color: Color(0xFF92909F),
+                              size: 19,
+                            ),
                           ),
-                        ),
-
-                        // TASK 2: Progress ring + play/pause — isolated widget
-                        const _PlayPauseRing(),
-
-                        // Close
-                        GestureDetector(
-                          onTap: _dismiss,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: Icon(Icons.close_rounded,
-                                color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.55), size: 18),
-                          ),
-                        ),
-                      ],
+                          const _PlayPauseButton(),
+                          const SizedBox(width: 4),
+                        ],
+                      ),
                     ),
-                  ),
-
-                  // TASK 5: Draggable seek bar
-                  const _MiniSeekBar(),
-                ],
+                    const _MiniSeekBar(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -269,54 +232,45 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
   }
 }
 
-// ── TASK 2: Play/pause ring — only rebuilds on isPlaying / position / duration ──
-
-class _PlayPauseRing extends ConsumerWidget {
-  const _PlayPauseRing();
+class _PlayPauseButton extends ConsumerWidget {
+  const _PlayPauseButton();
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final isPlaying = ref.watch(_miniIsPlayingProvider);
-    final position  = ref.watch(_miniPositionProvider);
-    final duration  = ref.watch(_miniDurationProvider);
 
-    final progress = duration.inMilliseconds > 0
-        ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
-        : 0.0;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8),
-      child: SizedBox(
-        width: 36,
-        height: 36,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            CircularProgressIndicator(
-              value: progress,
-              strokeWidth: 2.5,
-              backgroundColor: AppColors.borderOf(context),
-              valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
-            ),
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.mediumImpact();
-                ref.read(audioPlayerProvider.notifier).togglePlay();
-              },
-              child: Icon(
-                isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                color: AppColors.accent,
-                size: 20,
+    return Semantics(
+      button: true,
+      label: isPlaying ? 'Pause' : 'Play',
+      child: InkResponse(
+        radius: 25,
+        onTap: () {
+          HapticFeedback.mediumImpact();
+          ref.read(audioPlayerProvider.notifier).togglePlay();
+        },
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.accent,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: 0.22),
+                blurRadius: 16,
               ),
-            ),
-          ],
+            ],
+          ),
+          child: Icon(
+            isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+            color: Colors.white,
+            size: 25,
+          ),
         ),
       ),
     );
   }
 }
-
-// ── TASK 5: Draggable seek bar ──────────────────────────────────────
 
 class _MiniSeekBar extends ConsumerStatefulWidget {
   const _MiniSeekBar();
@@ -327,69 +281,77 @@ class _MiniSeekBar extends ConsumerStatefulWidget {
 
 class _MiniSeekBarState extends ConsumerState<_MiniSeekBar> {
   bool _isDragging = false;
-  double _dragProgress = 0.0;
+  double _dragProgress = 0;
 
   @override
   Widget build(BuildContext context) {
     final position = ref.watch(_miniPositionProvider);
     final duration = ref.watch(_miniDurationProvider);
-    final totalMs  = duration.inMilliseconds;
+    final totalMs = duration.inMilliseconds;
 
     final progress = _isDragging
         ? _dragProgress
-        : (totalMs > 0
+        : totalMs > 0
             ? (position.inMilliseconds / totalMs).clamp(0.0, 1.0)
-            : 0.0);
+            : 0.0;
 
-    return GestureDetector(
-      // Tap to seek
-      onTapDown: (details) {
-        HapticFeedback.selectionClick();
-        final box = context.findRenderObject() as RenderBox?;
-        if (box == null || totalMs <= 0) return;
-        final fraction =
-            (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
-        ref.read(audioPlayerProvider.notifier)
-            .seek(Duration(milliseconds: (fraction * totalMs).toInt()));
-      },
-      // TASK 5: Drag to seek
-      onHorizontalDragStart: (_) {
-        HapticFeedback.lightImpact();
-        setState(() {
-          _isDragging = true;
-          _dragProgress = progress;
-        });
-      },
-      onHorizontalDragUpdate: (details) {
-        final box = context.findRenderObject() as RenderBox?;
-        if (box == null) return;
-        final fraction =
-            (details.localPosition.dx / box.size.width).clamp(0.0, 1.0);
-        setState(() => _dragProgress = fraction);
-      },
-      onHorizontalDragEnd: (_) {
-        if (totalMs > 0) {
-          ref.read(audioPlayerProvider.notifier).seek(
-              Duration(milliseconds: (_dragProgress * totalMs).toInt()));
-        }
-        setState(() => _isDragging = false);
-      },
-      child: ClipRRect(
-        borderRadius: const BorderRadius.only(
-          bottomLeft: Radius.circular(24),
-          bottomRight: Radius.circular(24),
-        ),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 100),
-          height: _isDragging ? 4.0 : 2.5,
-          child: LinearProgressIndicator(
-            value: progress,
-            backgroundColor: AppColors.borderOf(context),
-            valueColor:
-                const AlwaysStoppedAnimation<Color>(AppColors.accent),
+    void updateFromDx(double dx, double width) {
+      if (totalMs <= 0 || width <= 0) return;
+      final fraction = (dx / width).clamp(0.0, 1.0);
+      setState(() => _dragProgress = fraction);
+    }
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (details) {
+            if (totalMs <= 0) return;
+            final fraction =
+                (details.localPosition.dx / constraints.maxWidth).clamp(0.0, 1.0);
+            ref.read(audioPlayerProvider.notifier).seek(
+                  Duration(milliseconds: (fraction * totalMs).round()),
+                );
+          },
+          onHorizontalDragStart: (details) {
+            HapticFeedback.selectionClick();
+            setState(() {
+              _isDragging = true;
+              _dragProgress = progress;
+            });
+            updateFromDx(details.localPosition.dx, constraints.maxWidth);
+          },
+          onHorizontalDragUpdate: (details) {
+            updateFromDx(details.localPosition.dx, constraints.maxWidth);
+          },
+          onHorizontalDragEnd: (_) {
+            if (totalMs > 0) {
+              ref.read(audioPlayerProvider.notifier).seek(
+                    Duration(milliseconds: (_dragProgress * totalMs).round()),
+                  );
+            }
+            setState(() => _isDragging = false);
+          },
+          child: SizedBox(
+            height: 10,
+            child: Align(
+              alignment: Alignment.bottomCenter,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 100),
+                height: _isDragging ? 4 : 3,
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: _isDragging ? 4 : 3,
+                  backgroundColor: const Color(0xFF292933),
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.accent,
+                  ),
+                ),
+              ),
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }
