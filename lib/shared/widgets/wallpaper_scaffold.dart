@@ -3,15 +3,9 @@
 // WallpaperScaffold — wraps Scaffold and applies the user's wallpaper (if set)
 // as the background via CustomThemeManager.
 //
-// Falls back to the theme's scaffoldBackgroundColor when no wallpaper is set.
-// The wallpaper image has a 55% dark overlay applied by CustomThemeManager so
-// text remains readable regardless of the image content.
-//
-// Usage:
-//   WallpaperScaffold(
-//     appBar: AppBar(...),
-//     body: MyContent(),
-//   )
+// Without a custom wallpaper OTYA uses a restrained ambient background instead
+// of a single flat colour. This keeps screens visually layered without turning
+// the UI into a collection of bright colour blocks.
 
 import 'package:flutter/material.dart';
 import '../../core/services/custom_theme_manager.dart';
@@ -42,41 +36,94 @@ class WallpaperScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Listen to CustomThemeManager so the scaffold rebuilds when the
-    // wallpaper changes. CustomThemeManager is a ChangeNotifier — wrap in
-    // AnimatedBuilder to subscribe without a ChangeNotifierProvider.
     return AnimatedBuilder(
       animation: CustomThemeManager.instance,
       builder: (context, _) {
         final wallpaper = CustomThemeManager.instance.wallpaperDecoration;
-        final effectiveBg = backgroundColor ??
-            Theme.of(context).scaffoldBackgroundColor;
+        final effectiveBg = backgroundColor ?? Theme.of(context).scaffoldBackgroundColor;
 
         if (wallpaper == null) {
-          // No wallpaper — plain Scaffold with theme background.
-          return Scaffold(
-            backgroundColor: effectiveBg,
-            appBar: appBar,
-            body: body,
-            bottomNavigationBar: bottomNavigationBar,
-            floatingActionButton: floatingActionButton,
-            floatingActionButtonLocation: floatingActionButtonLocation,
-            extendBodyBehindAppBar: extendBodyBehindAppBar,
-            extendBody: extendBody,
-            resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+          return Stack(
+            fit: StackFit.expand,
+            children: [
+              DecoratedBox(
+                decoration: BoxDecoration(
+                  color: effectiveBg,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color.alphaBlend(
+                        Theme.of(context).colorScheme.primary.withValues(alpha: 0.055),
+                        effectiveBg,
+                      ),
+                      effectiveBg,
+                      Color.alphaBlend(
+                        Theme.of(context).colorScheme.secondary.withValues(alpha: 0.04),
+                        effectiveBg,
+                      ),
+                    ],
+                    stops: const [0.0, 0.48, 1.0],
+                  ),
+                ),
+              ),
+              Positioned(
+                top: -120,
+                right: -100,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 290,
+                    height: 290,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.primary.withValues(alpha: 0.08),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: -150,
+                left: -110,
+                child: IgnorePointer(
+                  child: Container(
+                    width: 320,
+                    height: 320,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          Theme.of(context).colorScheme.secondary.withValues(alpha: 0.055),
+                          Colors.transparent,
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Scaffold(
+                backgroundColor: Colors.transparent,
+                appBar: appBar,
+                body: body,
+                bottomNavigationBar: bottomNavigationBar,
+                floatingActionButton: floatingActionButton,
+                floatingActionButtonLocation: floatingActionButtonLocation,
+                extendBodyBehindAppBar: extendBodyBehindAppBar,
+                extendBody: extendBody,
+                resizeToAvoidBottomInset: resizeToAvoidBottomInset,
+              ),
+            ],
           );
         }
 
-        // Wallpaper is set — use a transparent Scaffold over a full-screen
-        // wallpaper Container so the image shows through.
         return Stack(
           fit: StackFit.expand,
           children: [
-            // Wallpaper layer (behind everything)
-            Container(
-              decoration: BoxDecoration(image: wallpaper),
-            ),
-            // Scaffold with transparent background so the wallpaper shows
+            Container(decoration: BoxDecoration(image: wallpaper)),
             Scaffold(
               backgroundColor: Colors.transparent,
               appBar: appBar,
