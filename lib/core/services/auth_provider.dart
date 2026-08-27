@@ -1,7 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-// ── Auth state ────────────────────────────────────────────────────────────────
+import 'auth_service.dart';
 
 class AuthState {
   final String? userId;
@@ -25,29 +25,45 @@ class AuthState {
     String? photoUrl,
   }) =>
       AuthState(
-        userId:      userId      ?? this.userId,
+        userId: userId ?? this.userId,
         displayName: displayName ?? this.displayName,
-        email:       email       ?? this.email,
-        photoUrl:    photoUrl    ?? this.photoUrl,
+        email: email ?? this.email,
+        photoUrl: photoUrl ?? this.photoUrl,
       );
 }
 
-// ── Notifier (Riverpod 2) ─────────────────────────────────────────────────────
-
+/// UI auth state mirrors the real OTYA Auth session.
+///
+/// It must never manufacture a local "signed in" identity. A visible account
+/// is accepted only when AuthService has a valid/refreshed Bearer token and the
+/// requested user id matches the authenticated backend profile.
 class AuthNotifier extends Notifier<AuthState> {
   @override
   AuthState build() {
-    _load();
+    _loadValidatedSession();
     return const AuthState();
   }
 
-  Future<void> _load() async {
+  Future<void> _loadValidatedSession() async {
     final prefs = await SharedPreferences.getInstance();
+    final token = await AuthService.instance.getValidToken();
+    final authenticatedUserId = AuthService.instance.userId;
+    final storedUserId = prefs.getString('otya_user_id');
+
+    if (token == null ||
+        authenticatedUserId == null ||
+        storedUserId == null ||
+        storedUserId != authenticatedUserId) {
+      await _clearLocalState(prefs);
+      state = const AuthState();
+      return;
+    }
+
     state = AuthState(
-      userId:      prefs.getString('otya_user_id'),
+      userId: authenticatedUserId,
       displayName: prefs.getString('otya_user_name'),
-      email:       prefs.getString('otya_user_email'),
-      photoUrl:    prefs.getString('otya_user_avatar'),
+      email: prefs.getString('otya_user_email') ?? AuthService.instance.userEmail,
+      photoUrl: prefs.getString('otya_user_avatar'),
     );
   }
 
@@ -57,30 +73,50 @@ class AuthNotifier extends Notifier<AuthState> {
     String? email,
     String? photoUrl,
   }) async {
+    final token = await AuthService.instance.getValidToken();
+    final authenticatedUserId = AuthService.instance.userId;
+    if (token == null ||
+        authenticatedUserId == null ||
+        authenticatedUserId != userId) {
+      // Reject fake/local identities. The caller must complete the real auth
+      // flow first; this prevents Hub shortcuts from bypassing backend auth.
+      state = const AuthState();
+      return;
+    }
+
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('otya_user_id', userId);
+    await prefs.setString('otya_user_id', authenticatedUserId);
     await prefs.setString('otya_user_name', displayName);
-    if (email    != null) await prefs.setString('otya_user_email',  email);
-    if (photoUrl != null) await prefs.setString('otya_user_avatar', photoUrl);
+    final resolvedEmail = email ?? AuthService.instance.userEmail;
+    if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
+      await prefs.setString('otya_user_email', resolvedEmail);
+    }
+    if (photoUrl != null) {
+      await prefs.setString('otya_user_avatar', photoUrl);
+    }
+
     state = AuthState(
-      userId:      userId,
+      userId: authenticatedUserId,
       displayName: displayName,
-      email:       email,
-      photoUrl:    photoUrl,
+      email: resolvedEmail,
+      photoUrl: photoUrl,
     );
   }
 
   Future<void> signOut() async {
+    await AuthService.instance.logout();
     final prefs = await SharedPreferences.getInstance();
+    await _clearLocalState(prefs);
+    state = const AuthState();
+  }
+
+  Future<void> _clearLocalState(SharedPreferences prefs) async {
     await prefs.remove('otya_user_id');
     await prefs.remove('otya_user_name');
     await prefs.remove('otya_user_email');
     await prefs.remove('otya_user_avatar');
-    state = const AuthState();
   }
 }
-
-// ── Providers ─────────────────────────────────────────────────────────────────
 
 final authNotifierProvider =
     NotifierProvider<AuthNotifier, AuthState>(AuthNotifier.new);
