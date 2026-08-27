@@ -39,7 +39,7 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFF0F1117),
+    systemNavigationBarColor: Color(0xFF0A0A0F),
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
@@ -73,7 +73,7 @@ Future<void> main() async {
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
-        notificationColor: Color(0xFF00E5FF),
+        notificationColor: 0xFF8B5CF6,
         androidShowNotificationBadge: false,
         preloadArtwork: true,
       ),
@@ -169,7 +169,7 @@ void _showCrashOverlay(String title, String details) {
                 ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     ),
