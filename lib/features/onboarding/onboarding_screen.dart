@@ -13,10 +13,10 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
   int _page = 0;
   bool _busy = false;
   static const _screens = [
-    'assets/onboarding/welcome.png',
-    'assets/onboarding/download.png',
-    'assets/onboarding/video.png',
-    'assets/onboarding/organize.png',
+    'assets/onboarding/welcome.jpg',
+    'assets/onboarding/download.jpg',
+    'assets/onboarding/video.jpg',
+    'assets/onboarding/organize.jpg',
   ];
 
   Future<void> _finish() async {
