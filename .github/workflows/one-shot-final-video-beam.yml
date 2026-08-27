@@ -1,0 +1,147 @@
+name: Final video and Beam cleanup
+
+on:
+  push:
+    paths:
+      - .github/workflows/one-shot-final-video-beam.yml
+
+permissions:
+  contents: write
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply cleanup
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('lib/features/air_drop/presentation/air_drop_screen.dart')
+          s = p.read_text()
+          method = """  Future<void> shareApk() async {
+    state = state.copyWith(sendStep: _SendStep.serving, serverUrl: null);
+    _log('Preparing APK…');
+    try {
+      final url = await _sender.startServingApk();
+      if (url == null) { _log('APK not found.'); state = state.copyWith(sendStep: _SendStep.idle); return; }
+      state = state.copyWith(serverUrl: url);
+      _log('APK ready. Show QR.');
+    } catch (e) { _log('APK error: $e'); state = state.copyWith(sendStep: _SendStep.idle); }
+  }
+
+"""
+          s = s.replace(method, '')
+          button = """          // Share APK
+          _GlassButton(
+            icon: Icons.install_mobile_rounded,
+            label: 'Beam OTYA Player APK',
+            subtitle: 'Let friends install without internet',
+            color: AppColors.accentViolet,
+            onTap: () => n.shareApk(),
+          ),
+          const SizedBox(height: 8),
+"""
+          s = s.replace(button, '')
+          p.write_text(s)
+
+          p = Path('lib/features/video/presentation/video_tab_screen.dart')
+          s = p.read_text()
+          old_folder = """      body: GridView.builder(
+        padding: EdgeInsets.fromLTRB(16, 12, 16,
+            MediaQuery.of(context).padding.bottom + 120),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: MediaQuery.of(context).size.width > 600
+              ? 16 / 10.5
+              : 16 / 11,
+        ),
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return _VideoCard(
+            item: item,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref
+                  .read(queueProvider.notifier)
+                  .setQueue(items, startIndex: i);
+              context.push('/player/video', extra: item);
+            },
+          );
+        },
+      ),"""
+          new_folder = """      body: ListView.builder(
+        padding: EdgeInsets.fromLTRB(16, 12, 16,
+            MediaQuery.of(context).padding.bottom + 120),
+        itemExtent: 86,
+        itemCount: items.length,
+        itemBuilder: (context, i) {
+          final item = items[i];
+          return _VideoListItem(
+            item: item,
+            onTap: () {
+              HapticFeedback.lightImpact();
+              ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
+              context.push('/player/video', extra: item);
+            },
+          );
+        },
+      ),"""
+          s = s.replace(old_folder, new_folder)
+
+          old_search = """      child: GridView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 16 / 11,
+        ),
+        itemCount: results.length,
+        itemBuilder: (context, i) {
+          final item = results[i];
+          return _VideoCard(
+            item: item,
+            onTap: () {
+              ref
+                  .read(queueProvider.notifier)
+                  .setQueue(results, startIndex: i);
+              close(context, item);
+              context.push('/player/video', extra: item);
+            },
+          );
+        },
+      ),"""
+          new_search = """      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
+        itemExtent: 86,
+        itemCount: results.length,
+        itemBuilder: (context, i) {
+          final item = results[i];
+          return _VideoListItem(
+            item: item,
+            onTap: () {
+              ref.read(queueProvider.notifier).setQueue(results, startIndex: i);
+              close(context, item);
+              context.push('/player/video', extra: item);
+            },
+          );
+        },
+      ),"""
+          s = s.replace(old_search, new_search)
+          p.write_text(s)
+      - name: Commit cleanup
+        run: |
+          set -euo pipefail
+          git config user.name 'PeterSmart Link Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add lib/features/air_drop/presentation/air_drop_screen.dart lib/features/video/presentation/video_tab_screen.dart
+          if git diff --cached --quiet; then exit 0; fi
+          git commit -m 'Finish one-column videos and Beam cleanup'
+          git push
