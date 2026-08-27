@@ -68,8 +68,6 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build
-          # Analyzer errors remain fatal. Existing warnings and info-level lints
-          # stay visible and archived but do not block tests or APK verification.
           flutter analyze --no-fatal-warnings --no-fatal-infos 2>&1 | tee build/flutter-analyze.log
 
       - name: Upload analyzer report
@@ -90,6 +88,7 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -101,6 +100,9 @@ jobs:
           )
           if [ -n "${{ secrets.WORKER_URL }}" ]; then
             ARGS+=(--dart-define=WORKER_URL="${{ secrets.WORKER_URL }}")
+          fi
+          if [ -n "$GOOGLE_CLIENT_ID" ]; then
+            ARGS+=(--dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID")
           fi
           flutter build apk "${ARGS[@]}"
 
