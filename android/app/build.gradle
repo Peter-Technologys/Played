@@ -1,10 +1,8 @@
 plugins {
     id "com.android.application"
-    // org.jetbrains.kotlin.android is intentionally NOT applied here.
-    // Flutter's dev.flutter.flutter-gradle-plugin provides built-in Kotlin
-    // support since Flutter 3.19. Applying KGP manually causes:
-    //   WARNING: Your Android app project applies the Kotlin Gradle Plugin,
-    //   which will cause build failures in future versions of Flutter.
+    // Kotlin is required because MainActivity, WorkManager workers, receivers,
+    // and other Android host code are implemented in .kt files.
+    id "org.jetbrains.kotlin.android"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -19,6 +17,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    kotlinOptions {
+        jvmTarget = "17"
+    }
+
     sourceSets {
         main.java.srcDirs += "src/main/kotlin"
     }
@@ -31,15 +33,9 @@ android {
         versionName = flutter.versionName
         multiDexEnabled = true
 
-        // Broad locale support — covers all major markets
         resourceConfigurations += ["en", "fr", "es", "ar", "pt", "hi", "sw", "zh", "ru", "de", "tr", "id", "vi"]
-
-        // Support library vector drawables for all screen densities
         vectorDrawables.useSupportLibrary = true
     }
-
-    // No product flavors — single standard build for Google Play / sideload
-    // ABI splitting is handled by Flutter's --split-per-abi flag at build time.
 
     signingConfigs {
         release {
@@ -51,8 +47,6 @@ android {
                 keyAlias = System.getenv("KEY_ALIAS")
                 keyPassword = System.getenv("KEY_PASSWORD")
             } else {
-                // No keystore available (e.g. CI without secrets) — fall back
-                // to the debug signing config so the build still succeeds.
                 println("WARNING: Keystore not found at '$keystorePath' — using debug signing.")
                 storeFile = file("${System.getProperty('user.home')}/.android/debug.keystore")
                 storePassword = "android"
@@ -64,10 +58,6 @@ android {
 
     packagingOptions {
         jniLibs {
-            // media_kit loads libmpv.so at runtime via System.loadLibrary,
-            // so native libs must be extracted from the APK.
-            // AGP 8+ requires this to be set here instead of via
-            // android:extractNativeLibs="true" in AndroidManifest.xml.
             useLegacyPackaging = true
         }
     }
@@ -80,11 +70,6 @@ android {
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
         debug {
-            // Do NOT use applicationIdSuffix here.
-            // audio_service registers its foreground service under the base
-            // applicationId (com.otyaplayer.app). If the debug build uses a
-            // different package (com.otyaplayer.app.debug), Android cannot
-            // find the service declaration and playback silently fails.
             debuggable = true
         }
     }
@@ -100,8 +85,6 @@ dependencies {
     implementation("androidx.window:window-java:1.3.0")
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.4")
     implementation("androidx.annotation:annotation:1.7.1")
-    // WorkManager — required by UpdateCheckWorker
     implementation("androidx.work:work-runtime-ktx:2.9.1")
-    // Coroutines — required by CoroutineWorker in UpdateCheckWorker
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 }
