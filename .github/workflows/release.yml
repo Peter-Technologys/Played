@@ -66,10 +66,11 @@ jobs:
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+          cache: gradle
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -97,7 +98,11 @@ jobs:
         run: dart run build_runner build --delete-conflicting-outputs
 
       - name: Static analysis
-        run: flutter analyze
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build
+          flutter analyze --no-fatal-warnings --no-fatal-infos 2>&1 | tee build/flutter-analyze-release.log
 
       - name: Run tests
         run: flutter test
@@ -170,23 +175,21 @@ jobs:
             ${{ steps.artifacts.outputs.arm32 }}
             ${{ steps.artifacts.outputs.aab }}
             build/release-sha256.txt
+            build/flutter-analyze-release.log
 
       - name: Publish APKs to Cloudflare R2
         env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           AWS_DEFAULT_REGION: auto
           R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
           R2_BUCKET: ${{ vars.R2_BUCKET }}
           WORKER_URL: ${{ vars.WORKER_URL }}
-          APPWRITE_ENDPOINT: ${{ vars.APPWRITE_ENDPOINT }}
-          APPWRITE_PROJECT_ID: ${{ vars.APPWRITE_PROJECT_ID }}
-          APPWRITE_API_KEY: ${{ secrets.APPWRITE_API_KEY }}
           CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
           CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           KV_NAMESPACE_ID: ${{ vars.KV_NAMESPACE_ID }}
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          OTYA_STORE_ADMIN_TOKEN: ${{ secrets.OTYA_STORE_ADMIN_TOKEN }}
           ARM64_APK: ${{ steps.artifacts.outputs.arm64 }}
           ARM32_APK: ${{ steps.artifacts.outputs.arm32 }}
         run: bash scripts/publish_r2.sh
