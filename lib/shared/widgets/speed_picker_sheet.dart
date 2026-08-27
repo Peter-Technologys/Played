@@ -1,28 +1,25 @@
 // lib/shared/widgets/speed_picker_sheet.dart
 //
 // Shared bottom-sheet speed picker used by both the audio and video players.
-// Extracted to eliminate the duplicate speed-picker implementations that
-// previously existed in audio_player_screen.dart and video_player_screen.dart.
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../app/theme/app_colors.dart';
 
 /// Shows a bottom sheet that lets the user pick a playback speed.
-///
-/// [currentSpeed] — the currently active speed (highlighted in the grid).
-/// [onSpeedSelected] — called with the chosen speed when the user taps a chip.
-/// [speeds] — optional list of speed values; defaults to [0.5, 1.0, 1.25, 1.5, 2.0].
 Future<void> showSpeedPickerSheet({
   required BuildContext context,
   required double currentSpeed,
   required ValueChanged<double> onSpeedSelected,
-  List<double> speeds = const [0.5, 1.0, 1.25, 1.5, 2.0],
+  List<double> speeds = const [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0],
 }) {
+  final scheme = Theme.of(context).colorScheme;
   return showModalBottomSheet(
     context: context,
     useSafeArea: true,
-    backgroundColor: AppColors.surface,
+    isScrollControlled: true,
+    backgroundColor: scheme.surface.withValues(alpha: 0.96),
+    barrierColor: Colors.black.withValues(alpha: 0.42),
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
@@ -34,7 +31,7 @@ Future<void> showSpeedPickerSheet({
   );
 }
 
-/// The content widget for the speed picker bottom sheet.
+/// Content shared by audio and video playback.
 class SpeedPickerSheet extends StatelessWidget {
   final double currentSpeed;
   final ValueChanged<double> onSpeedSelected;
@@ -44,13 +41,17 @@ class SpeedPickerSheet extends StatelessWidget {
     super.key,
     required this.currentSpeed,
     required this.onSpeedSelected,
-    this.speeds = const [0.5, 1.0, 1.25, 1.5, 2.0],
+    this.speeds = const [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0],
   });
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final bottomInset = MediaQuery.viewPaddingOf(context).bottom;
+
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
+      padding: EdgeInsets.fromLTRB(20, 14, 20, 20 + bottomInset),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -60,18 +61,25 @@ class SpeedPickerSheet extends StatelessWidget {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: AppColors.border,
+                color: scheme.onSurface.withValues(alpha: 0.22),
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
           ),
           const SizedBox(height: 16),
-          const Text(
+          Text(
             'Playback Speed',
-            style: TextStyle(
-              fontSize: 16,
+            style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
+              color: scheme.onSurface,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            'Choose how fast your media plays',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: scheme.onSurface.withValues(alpha: 0.68),
               fontFamily: 'Inter',
             ),
           ),
@@ -79,38 +87,48 @@ class SpeedPickerSheet extends StatelessWidget {
           Wrap(
             spacing: 10,
             runSpacing: 10,
-            children: speeds.map((s) {
-              final isActive = currentSpeed == s;
-              return GestureDetector(
-                onTap: () {
-                  HapticFeedback.selectionClick();
-                  Navigator.of(context).pop();
-                  onSpeedSelected(s);
-                },
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 20,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    gradient: isActive
-                        ? const LinearGradient(
-                            colors: [AppColors.accent, AppColors.accentViolet],
-                          )
-                        : null,
-                    color: isActive ? null : AppColors.surfaceElevated,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: isActive ? Colors.transparent : AppColors.border,
+            children: speeds.map((speed) {
+              final isActive = (currentSpeed - speed).abs() < 0.001;
+              return Semantics(
+                button: true,
+                selected: isActive,
+                label: '${speed} times playback speed',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(12),
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    Navigator.of(context).pop();
+                    onSpeedSelected(speed);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 160),
+                    constraints: const BoxConstraints(minWidth: 64, minHeight: 44),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: isActive
+                          ? const LinearGradient(
+                              colors: [AppColors.accent, AppColors.accentViolet],
+                            )
+                          : null,
+                      color: isActive
+                          ? null
+                          : scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isActive
+                            ? Colors.transparent
+                            : scheme.outline.withValues(alpha: 0.32),
+                      ),
                     ),
-                  ),
-                  child: Text(
-                    '${s}x',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w700,
-                      color: isActive ? Colors.black : AppColors.textPrimary,
-                      fontFamily: 'Inter',
+                    child: Text(
+                      '${speed}x',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: isActive ? Colors.black : scheme.onSurface,
+                        fontFamily: 'Inter',
+                      ),
                     ),
                   ),
                 ),
