@@ -9,6 +9,10 @@ import 'backup_service.dart';
 /// OTYA never stores the Google OAuth access token on disk. The token is kept
 /// in memory only and is refreshed by Google Sign-In when needed. OTYA account
 /// tokens remain in Android Keystore via [AuthService].
+///
+/// Google identity and Drive recovery are deliberately separate actions:
+/// signing in must never silently create a backup. The user can choose Back up
+/// now or enable automatic backup from OTYA's backup settings.
 class GoogleAccountService {
   GoogleAccountService._();
   static final GoogleAccountService instance = GoogleAccountService._();
@@ -37,8 +41,9 @@ class GoogleAccountService {
   String? get email => _account?.email;
   bool get hasGoogleSession => _account != null;
 
-  /// Signs in to Google, authenticates the same identity with OTYA Auth, and
-  /// keeps a Drive access token in memory for private appDataFolder backups.
+  /// Signs in to Google and authenticates the same verified identity with OTYA
+  /// Auth. Drive permission is retained in memory for explicit backup/restore
+  /// actions, but this method does not upload any backup by itself.
   Future<AuthResult> signInAndAuthenticate() async {
     if (!isConfigured) {
       return const AuthResult(
@@ -67,21 +72,14 @@ class GoogleAccountService {
       if (result.ok) {
         _account = account;
         _driveAccessToken = accessToken;
-
-        // Create/update the user's private Drive backup immediately. A Drive
-        // outage must not prevent a successful OTYA sign-in, so this remains
-        // non-fatal and can be retried later by backupToDrive().
-        try {
-          final data = await BackupService.instance.buildBackupData();
-          await BackupService.instance.backup(data, accessToken);
-        } catch (e) {
-          debugPrint('[GoogleAccount] initial Drive backup skipped: $e');
-        }
       }
       return result;
     } catch (e) {
       debugPrint('[GoogleAccount] sign-in failed: $e');
-      return AuthResult(ok: false, error: 'Google Sign-In failed: $e');
+      return const AuthResult(
+        ok: false,
+        error: 'Google Sign-In could not be completed. Please try again.',
+      );
     }
   }
 
