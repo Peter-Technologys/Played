@@ -46,10 +46,10 @@ Future<void> main() async {
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
     debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
-    unawaited(CrashReporter.instance.report(
+    CrashReporter.instance.report(
       details.exception,
       details.stack ?? StackTrace.empty,
-    ));
+    );
     if (kDebugMode) {
       _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
     }
@@ -57,7 +57,7 @@ Future<void> main() async {
 
   PlatformDispatcher.instance.onError = (error, stack) {
     debugPrint('[PlatformError] $error\n$stack');
-    unawaited(CrashReporter.instance.report(error, stack));
+    CrashReporter.instance.report(error, stack);
     if (kDebugMode) {
       _showCrashOverlay('Platform Error', '$error\n\n$stack');
     }
@@ -81,7 +81,7 @@ Future<void> main() async {
     AudioHandlerSingleton.instance.handler = audioHandler;
   } catch (e, st) {
     debugPrint('[AudioService] init failed: $e\n$st');
-    unawaited(CrashReporter.instance.report(e, st));
+    CrashReporter.instance.report(e, st);
   }
 
   await runZonedGuarded(() async {
@@ -90,7 +90,7 @@ Future<void> main() async {
       databaseReady = await _initDatabase();
     } catch (e, st) {
       debugPrint('[Database] init failed: $e\n$st');
-      unawaited(CrashReporter.instance.report(e, st));
+      CrashReporter.instance.report(e, st);
     }
 
     AppSettings savedSettings;
@@ -98,8 +98,8 @@ Future<void> main() async {
       savedSettings = await AppSettings.load();
     } catch (e, st) {
       debugPrint('[Settings] load failed: $e\n$st');
-      unawaited(CrashReporter.instance.report(e, st));
-      savedSettings = AppSettings.defaults();
+      CrashReporter.instance.report(e, st);
+      savedSettings = const AppSettings();
     }
 
     runApp(
@@ -116,7 +116,7 @@ Future<void> main() async {
     unawaited(_initBackground(savedSettings, databaseReady));
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
-    unawaited(CrashReporter.instance.report(error, stack));
+    CrashReporter.instance.report(error, stack);
     if (kDebugMode) {
       _showCrashOverlay('Startup Crash', '$error\n\n$stack');
     }
@@ -182,7 +182,7 @@ Future<bool> _initDatabase() async {
     return true;
   } catch (e, st) {
     debugPrint('[OtyaDB] Init error: $e\n$st');
-    unawaited(CrashReporter.instance.report(e, st));
+    CrashReporter.instance.report(e, st);
     // Never destroy a user's database as automatic crash recovery.
     return false;
   }
@@ -234,7 +234,7 @@ Future<void> _safeBackground(
     await task();
   } catch (e, st) {
     debugPrint('[Background:$name] Error: $e\n$st');
-    unawaited(CrashReporter.instance.report(e, st));
+    CrashReporter.instance.report(e, st);
   }
 }
 
