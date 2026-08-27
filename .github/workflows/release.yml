@@ -107,13 +107,6 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Write google-services.json
-        shell: bash
-        run: |
-          set -euo pipefail
-          test -n '${{ vars.GOOGLE_SERVICES_JSON }}' || { echo "ERROR: GOOGLE_SERVICES_JSON is missing"; exit 1; }
-          printf '%s' '${{ vars.GOOGLE_SERVICES_JSON }}' > android/app/google-services.json
-
       - name: Decode release keystore
         shell: bash
         run: |
@@ -208,5 +201,4 @@ jobs:
 
       - name: Remove secret material
         if: always()
-        run: |
-          rm -f android/app/keystore.jks android/app/google-services.json
+        run: rm -f android/app/keystore.jks
