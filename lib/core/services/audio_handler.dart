@@ -7,19 +7,6 @@ import 'package:media_kit/media_kit.dart';
 import 'media_notification_service.dart';
 
 /// Bridges media_kit's [Player] to Android's MediaSession/foreground service.
-///
-/// Lifecycle:
-///   1. [AudioService.init] creates this handler once during startup.
-///   2. [AudioHandlerSingleton.instance.handler] holds the returned reference.
-///   3. When the audio player creates its [Player], it attaches it to this handler.
-///   4. When the player is disposed, it detaches it from this handler.
-///
-/// The handler manages the Android foreground service and system MediaSession
-/// for lock-screen controls, Bluetooth/headset buttons, and playback state.
-///
-/// This handler must not create its own media_kit [Player]. The application's
-/// playback coordinator owns the Player and this handler observes/controls
-/// that same instance.
 class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   Player? _player;
   StreamSubscription? _playingSub;
@@ -35,12 +22,11 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
     debugPrint('[OtyaAudioHandler] Player attached.');
   }
 
-/// Detaches the player from this handler.
-/// [disposePlayer] controls whether the underlying [Player] is also
-/// disposed. Pass `true` when the player is being permanently torn down
-/// (e.g. app exit), `false` when handing off to a new player instance.
-void detachPlayer({bool disposePlayer = false}) {
-  debugPrint('[OtyaAudioHandler] Detaching player');
+  /// Detaches the player from this handler.
+  /// [disposePlayer] controls whether the underlying [Player] is also
+  /// disposed. Pass true only when playback is intentionally terminated.
+  void detachPlayer({bool disposePlayer = false}) {
+    debugPrint('[OtyaAudioHandler] Detaching player');
     _cancelSubscriptions();
     final player = _player;
     _player = null;
@@ -58,9 +44,15 @@ void detachPlayer({bool disposePlayer = false}) {
   }
 
   void _subscribeToPlayer(Player player) {
-    _playingSub = player.stream.playing.listen((playing) => _updatePlaybackState(playing: playing));
-    _bufferingSub = player.stream.buffering.listen((buffering) => _updatePlaybackState(buffering: buffering));
-    _positionSub = player.stream.position.listen((position) => _updatePlaybackState(position: position));
+    _playingSub = player.stream.playing.listen(
+      (playing) => _updatePlaybackState(playing: playing),
+    );
+    _bufferingSub = player.stream.buffering.listen(
+      (buffering) => _updatePlaybackState(buffering: buffering),
+    );
+    _positionSub = player.stream.position.listen(
+      (position) => _updatePlaybackState(position: position),
+    );
     _durationSub = player.stream.duration.listen((duration) {
       final current = mediaItem.value;
       if (current != null && duration != Duration.zero) {
@@ -77,7 +69,11 @@ void detachPlayer({bool disposePlayer = false}) {
     _playingSub = _bufferingSub = _positionSub = _durationSub = null;
   }
 
-  void _updatePlaybackState({bool? playing, bool? buffering, Duration? position}) {
+  void _updatePlaybackState({
+    bool? playing,
+    bool? buffering,
+    Duration? position,
+  }) {
     final p = _player;
     if (p == null) return;
     final isPlaying = playing ?? p.state.playing;
@@ -88,6 +84,7 @@ void detachPlayer({bool disposePlayer = false}) {
         : isBuffering
             ? AudioProcessingState.buffering
             : AudioProcessingState.ready;
+
     playbackState.add(playbackState.value.copyWith(
       controls: [
         MediaControl.skipToPrevious,
@@ -109,7 +106,9 @@ void detachPlayer({bool disposePlayer = false}) {
   }
 
   @override
-  Future<void> updateMediaItem(MediaItem mediaItem) async => this.mediaItem.add(mediaItem);
+  Future<void> updateMediaItem(MediaItem mediaItem) async {
+    this.mediaItem.add(mediaItem);
+  }
 
   void updateMediaItemFromParts({
     required String id,
@@ -144,25 +143,22 @@ void detachPlayer({bool disposePlayer = false}) {
   Future<void> seek(Duration position) async => _player?.seek(position);
 
   @override
-  Future<void> skipToNext() async => MediaNotificationService.instance.onSkipNext?.call();
+  Future<void> skipToNext() async {
+    MediaNotificationService.instance.onSkipNext?.call();
+  }
 
   @override
-  Future<void> skipToPrevious() async => MediaNotificationService.instance.onSkipPrevious?.call();
+  Future<void> skipToPrevious() async {
+    MediaNotificationService.instance.onSkipPrevious?.call();
+  }
 
   @override
   Future<void> onTaskRemoved() async {
-    final player = _player;
-    _cancelSubscriptions();
-    _player = null;
-    if (player != null) {
-      try {
-        await player.stop();
-        player.dispose();
-      } catch (e) {
-        debugPrint('[OtyaAudioHandler] Player dispose error: $e');
-      }
-    }
-    await super.onTaskRemoved();
+    // Do not tear down playback when the user swipes OTYA out of Recents.
+    // Android's foreground media service owns the active session and should
+    // remain available from the lock screen, notification shade and Bluetooth.
+    // Playback is terminated only by an explicit stop/dismiss action.
+    debugPrint('[OtyaAudioHandler] App task removed; keeping media session alive.');
   }
 
   @override
