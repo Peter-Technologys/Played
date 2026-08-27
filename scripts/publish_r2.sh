@@ -69,13 +69,10 @@ upload_and_verify() {
   [ "$REMOTE_SIZE" = "$LOCAL_SIZE" ] || { echo "ERROR: Upload size mismatch for $DEST_KEY"; exit 1; }
 }
 
-# Versioned objects never change, so they can safely be cached forever.
 ARM64_VERSIONED="releases/v${VERSION}/OTYA-Player-v${VERSION}-arm64.apk"
 ARM32_VERSIONED="releases/v${VERSION}/OTYA-Player-v${VERSION}-arm32.apk"
 upload_and_verify "$ARM64_APK" "$ARM64_VERSIONED" "public, max-age=31536000, immutable"
 upload_and_verify "$ARM32_APK" "$ARM32_VERSIONED" "public, max-age=31536000, immutable"
-
-# Stable aliases are intentionally re-used on each release, so they MUST NOT be immutable.
 upload_and_verify "$ARM64_APK" "OtyaPlayer-arm64.apk" "public, max-age=300, must-revalidate"
 upload_and_verify "$ARM32_APK" "OtyaPlayer-arm32.apk" "public, max-age=300, must-revalidate"
 
@@ -90,10 +87,7 @@ data = {
     'date': date,
     'arm64': arm64_key,
     'arm32': arm32_key,
-    'latestAliases': {
-        'arm64': 'OtyaPlayer-arm64.apk',
-        'arm32': 'OtyaPlayer-arm32.apk',
-    },
+    'latestAliases': {'arm64': 'OtyaPlayer-arm64.apk', 'arm32': 'OtyaPlayer-arm32.apk'},
     'changelog': changelog,
     'minSdk': int(min_sdk),
     'targetSdk': int(target_sdk),
@@ -122,27 +116,32 @@ if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_API_TOKEN:-}" ] && [ -n "${KV_NAMES
     -H "Authorization: Bearer ${CF_API_TOKEN}" >/dev/null || true
 fi
 
+# Keep the release API synchronized with R2/KV. The backend contract is Bearer ADMIN_TOKEN.
 if [ -n "${WORKER_URL:-}" ] && [ -n "${OTYA_STORE_ADMIN_TOKEN:-}" ]; then
-  python3 - <<'PYEOF'
-import json, hmac, hashlib, time, urllib.request, urllib.error, os
+  HTTP=$(python3 - <<'PYEOF'
+import json, urllib.request, urllib.error, os
 worker_url = os.environ['WORKER_URL'].rstrip('/')
 secret = os.environ['OTYA_STORE_ADMIN_TOKEN']
 version = os.environ['VERSION']
 version_code = int(os.environ['VERSION_CODE'])
 with open(os.environ['CHANGELOG_FILE']) as f:
     changelog = f.read().strip() or 'Bug fixes and improvements'
-path = '/api/admin/release'
-timestamp = str(int(time.time()))
-sig = hmac.new(secret.encode(), f'POST:{path}:{timestamp}'.encode(), hashlib.sha256).hexdigest()
 payload = json.dumps({'tag':'v'+version,'version':version,'version_code':version_code,'changelog':changelog}).encode()
-req = urllib.request.Request(f'{worker_url}{path}', data=payload, method='POST', headers={
-    'Content-Type':'application/json','X-Otya-Timestamp':timestamp,'X-Otya-Signature':sig})
+req = urllib.request.Request(
+    f'{worker_url}/api/admin/release', data=payload, method='POST',
+    headers={'Content-Type':'application/json','Authorization':f'Bearer {secret}'})
 try:
     with urllib.request.urlopen(req, timeout=15) as resp:
-        print(f'Server notified OK ({resp.status})')
-except Exception as e:
-    print(f'WARNING: Server notify failed: {e}')
+        print(resp.status)
+except urllib.error.HTTPError as e:
+    print(e.code)
+except Exception:
+    print(0)
 PYEOF
+)
+  [[ "$HTTP" =~ ^2 ]] || { echo "ERROR: Server release notification failed HTTP $HTTP"; exit 1; }
+else
+  echo "INFO: release API notification skipped because WORKER_URL or OTYA_STORE_ADMIN_TOKEN is missing"
 fi
 
 if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_API_TOKEN:-}" ] && [ -n "${KV_NAMESPACE_ID:-}" ]; then
@@ -153,7 +152,6 @@ if [ -n "${CF_ACCOUNT_ID:-}" ] && [ -n "${CF_API_TOKEN:-}" ] && [ -n "${KV_NAMES
   [[ "$HTTP" =~ ^2 ]] || { echo "ERROR: KV LATEST_BUILD_INFO write failed HTTP $HTTP"; exit 1; }
 fi
 
-# Versioned release directories are intentionally retained. They are the immutable archive.
 echo "====================================================="
 echo " OTYA Player v$VERSION published"
 echo " Download: ${WORKER_URL:-https://petersmartlink.com}/download/otya-player"
