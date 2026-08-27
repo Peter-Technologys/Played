@@ -1,0 +1,72 @@
+name: One-shot biometric auth and translucent UI repair
+
+on:
+  push:
+    paths:
+      - .github/workflows/one-shot-biometric-auth-ui.yml
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Apply fixes
+        shell: python
+        run: |
+          from pathlib import Path
+
+          p = Path('android/app/src/main/kotlin/com/otyaplayer/app/MainActivity.kt')
+          s = p.read_text()
+          s = s.replace('import com.ryanheise.audioservice.AudioServiceActivity', 'import com.ryanheise.audioservice.AudioServiceFragmentActivity')
+          s = s.replace('class MainActivity : AudioServiceActivity() {', 'class MainActivity : AudioServiceFragmentActivity() {')
+          p.write_text(s)
+
+          p = Path('lib/core/services/auth_service.dart')
+          s = p.read_text()
+          old = "  Future<AuthResult> _handleAuthResponse(http.Response res) async {\n    try {\n      final data = jsonDecode(res.body) as Map<String, dynamic>;"
+          new = "  Future<AuthResult> _handleAuthResponse(http.Response res) async {\n    final raw = res.body.trim();\n    if (raw.isEmpty) {\n      return AuthResult(\n        ok: false,\n        error: 'Authentication service returned an empty response (HTTP ${res.statusCode}). Please try again.',\n      );\n    }\n    try {\n      final decoded = jsonDecode(raw);\n      if (decoded is! Map<String, dynamic>) {\n        return AuthResult(ok: false, error: 'Authentication service returned an invalid response (HTTP ${res.statusCode}).');\n      }\n      final data = decoded;"
+          if old not in s:
+            raise SystemExit('auth response marker not found')
+          s = s.replace(old, new)
+          s = s.replace("      return AuthResult(ok: false, error: 'Failed to parse response: $e');", "      debugPrint('[AuthService] Invalid auth response HTTP ${res.statusCode}: ${res.body}');\n      return AuthResult(ok: false, error: 'Authentication service response was invalid (HTTP ${res.statusCode}).');")
+          p.write_text(s)
+
+          p = Path('lib/app/theme/app_colors.dart')
+          s = p.read_text()
+          s = s.replace('static const Color surface          = Color(0xFF101014);', 'static const Color surface          = Color(0xB8101014);')
+          s = s.replace('static const Color surfaceElevated  = Color(0xFF16161D);', 'static const Color surfaceElevated  = Color(0xC716161D);')
+          s = s.replace('static const Color surfaceHighlight = Color(0xFF1D1D27);', 'static const Color surfaceHighlight = Color(0xD61D1D27);')
+          s = s.replace('static const Color border           = Color(0xFF2A2A35);', 'static const Color border           = Color(0x802A2A35);')
+          s = s.replace('static const Color borderSubtle     = Color(0xFF202029);', 'static const Color borderSubtle     = Color(0x66202029);')
+          p.write_text(s)
+
+          p = Path('lib/features/auth/auth_screen.dart')
+          s = p.read_text()
+          if "wallpaper_scaffold.dart" not in s:
+            s = s.replace("import '../../core/services/auth_provider.dart';", "import '../../core/services/auth_provider.dart';\nimport '../../shared/widgets/wallpaper_scaffold.dart';")
+          s = s.replace('    return Scaffold(\n      backgroundColor: AppColors.background,', '    return WallpaperScaffold(\n      backgroundColor: Colors.transparent,')
+          p.write_text(s)
+
+          p = Path('lib/features/vault/presentation/vault_lock_screen.dart')
+          s = p.read_text()
+          if "wallpaper_scaffold.dart" not in s:
+            s = s.replace("import '../../player/presentation/queue_screen.dart';", "import '../../player/presentation/queue_screen.dart';\nimport '../../../shared/widgets/wallpaper_scaffold.dart';")
+          s = s.replace('return Scaffold(\n      backgroundColor: AppColors.background,', 'return WallpaperScaffold(\n      backgroundColor: Colors.transparent,', 1)
+          p.write_text(s)
+      - name: Commit fixes
+        run: |
+          set -euo pipefail
+          git config user.name 'PeterSmart Link Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add android/app/src/main/kotlin/com/otyaplayer/app/MainActivity.kt \
+                  lib/core/services/auth_service.dart \
+                  lib/app/theme/app_colors.dart \
+                  lib/features/auth/auth_screen.dart \
+                  lib/features/vault/presentation/vault_lock_screen.dart
+          git commit -m 'Fix biometrics auth errors and use translucent image UI'
+          git push
