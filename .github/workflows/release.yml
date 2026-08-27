@@ -121,6 +121,7 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
         shell: bash
         run: |
           set -euo pipefail
@@ -128,12 +129,19 @@ jobs:
           test -n "$KEY_ALIAS" || { echo "ERROR: KEY_ALIAS is missing"; exit 1; }
           test -n "$KEY_PASSWORD" || { echo "ERROR: KEY_PASSWORD is missing"; exit 1; }
 
+          EXTRA_DEFINES=()
+          if [ -n "$GOOGLE_CLIENT_ID" ]; then
+            EXTRA_DEFINES+=(--dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID")
+          fi
+
           rm -rf build/app/outputs/flutter-apk build/app/outputs/bundle
           flutter build apk --release --split-per-abi \
             --target-platform android-arm,android-arm64 \
-            --split-debug-info=build/debug-info
+            --split-debug-info=build/debug-info \
+            "${EXTRA_DEFINES[@]}"
           flutter build appbundle --release \
-            --split-debug-info=build/debug-info
+            --split-debug-info=build/debug-info \
+            "${EXTRA_DEFINES[@]}"
 
       - name: Verify release outputs
         id: artifacts
