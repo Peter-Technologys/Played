@@ -29,24 +29,13 @@ class _MediaCardState extends State<MediaCard>
   late final Animation<double> _scale;
 
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
-
-  // ── LRU caches capped at 300 entries each ─────────────────────────────────
-  // LinkedHashMap with access-order tracking: oldest entry is first.
-  // When the cap is reached the oldest entry is evicted (one at a time).
   static const int _kCacheMax = 300;
+  static final LinkedHashMap<String, String?> _thumbCache = LinkedHashMap();
+  static final LinkedHashMap<String, String?> _artCache = LinkedHashMap();
 
-  static final LinkedHashMap<String, String?> _thumbCache =
-      LinkedHashMap<String, String?>();
-  static final LinkedHashMap<String, String?> _artCache =
-      LinkedHashMap<String, String?>();
-
-  /// Inserts [key]→[value] into [cache], evicting the oldest entry if the
-  /// cache has reached [_kCacheMax] entries.
   static void _cacheInsert(
       LinkedHashMap<String, String?> cache, String key, String? value) {
-    if (cache.length >= _kCacheMax) {
-      cache.remove(cache.keys.first);
-    }
+    if (cache.length >= _kCacheMax) cache.remove(cache.keys.first);
     cache[key] = value;
   }
 
@@ -57,22 +46,17 @@ class _MediaCardState extends State<MediaCard>
   @override
   void initState() {
     super.initState();
-    _press = AnimationController(
-        vsync: this, duration: const Duration(milliseconds: 120));
-    _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
-        CurvedAnimation(parent: _press, curve: Curves.easeOut));
+    _press = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
+    _scale = Tween<double>(begin: 1.0, end: 0.95)
+        .animate(CurvedAnimation(parent: _press, curve: Curves.easeOut));
 
-    // Fix #9: Check cache synchronously before going async — avoids an
-    // unnecessary setState() call when the result is already in memory.
     final item = widget.item;
     if (item.isVideo) {
-      // Cache key is filePath — item.id is Uri.encodeComponent(path) which
-      // is NOT the MediaStore integer _ID that getThumbnail() needs.
       final key = item.filePath;
       if (_thumbCache.containsKey(key)) {
         _thumbPath = _thumbCache[key];
         _loaded = true;
-        return; // no async needed
+        return;
       }
     } else {
       final raw = item.albumArtPath;
@@ -91,7 +75,6 @@ class _MediaCardState extends State<MediaCard>
         return;
       }
     }
-
     _loadArt();
   }
 
@@ -104,14 +87,14 @@ class _MediaCardState extends State<MediaCard>
   Future<void> _loadArt() async {
     final item = widget.item;
     if (item.isVideo) {
-      // Use filePath as both cache key and 'id' arg. Kotlin uses 'id' only
-      // as the on-disk cache filename; it uses 'path' with
-      // MediaMetadataRetriever which works with any file path.
       final key = item.filePath;
       try {
+        // MediaItem.id comes directly from MediaStore._ID. The native Android
+        // thumbnail API requires that numeric ID; the file path is only a
+        // stable cache key/fallback source and must never be passed as the ID.
         final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
           'path': item.filePath,
-          'id':   item.filePath,
+          'id': item.id,
         });
         _cacheInsert(_thumbCache, key, path);
         if (mounted) setState(() { _thumbPath = path; _loaded = true; });
@@ -120,7 +103,7 @@ class _MediaCardState extends State<MediaCard>
         if (mounted) setState(() => _loaded = true);
       }
     } else {
-      final raw = item.albumArtPath!; // non-albumid: paths handled in initState
+      final raw = item.albumArtPath!;
       try {
         final albumId = raw.substring('albumid:'.length);
         final path = await _channel.invokeMethod<String>('getAlbumArt', {'albumId': albumId});
@@ -136,8 +119,8 @@ class _MediaCardState extends State<MediaCard>
   @override
   Widget build(BuildContext context) {
     final isVideo = widget.item.isVideo;
-    final width   = widget.wide ? 160.0 : 120.0;
-    final accent  = isVideo ? AppColors.accent : AppColors.accentViolet;
+    final width = widget.wide ? 160.0 : 120.0;
+    final accent = AppColors.accentViolet;
 
     return GestureDetector(
       onTapDown: (_) => _press.forward(),
@@ -150,10 +133,7 @@ class _MediaCardState extends State<MediaCard>
           allItems,
           startIndex: startIndex < 0 ? 0 : startIndex,
         );
-        context.push(
-          isVideo ? '/player/video' : '/player/audio',
-          extra: widget.item,
-        );
+        context.push(isVideo ? '/player/video' : '/player/audio', extra: widget.item);
       },
       onTapCancel: () => _press.reverse(),
       child: ScaleTransition(
@@ -163,32 +143,24 @@ class _MediaCardState extends State<MediaCard>
           child: Container(
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              // Fix #18: use theme-aware surface colour
               color: AppColors.cardOf(context),
               border: Border.all(color: AppColors.borderOf(context)),
-              boxShadow: [
-                BoxShadow(
-                  color: accent.withValues(alpha: 0.08),
-                  blurRadius: 16,
-                  offset: const Offset(0, 6),
-                ),
-              ],
+              boxShadow: [BoxShadow(
+                color: accent.withValues(alpha: 0.08),
+                blurRadius: 16,
+                offset: const Offset(0, 6),
+              )],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ── Thumbnail / art area ──────────────────────────────────
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(
-                        top: Radius.circular(17)),
+                    borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
-                        // Real thumbnail, shimmer, or modern placeholder
                         _buildArtwork(isVideo, accent),
-
-                        // Bottom gradient scrim
                         const Positioned(
                           bottom: 0, left: 0, right: 0,
                           child: SizedBox(
@@ -204,30 +176,19 @@ class _MediaCardState extends State<MediaCard>
                             ),
                           ),
                         ),
-
-                        // Duration badge (bottom-right)
                         Positioned(
                           bottom: 6, right: 6,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.72),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(
-                              widget.item.formattedDuration,
-                              style: const TextStyle(
-                                fontSize: 9,
-                                color: Colors.white,
-                                fontWeight: FontWeight.w600,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
+                            child: Text(widget.item.formattedDuration,
+                              style: const TextStyle(fontSize: 9, color: Colors.white,
+                                fontWeight: FontWeight.w600, fontFamily: 'Inter')),
                           ),
                         ),
-
-                        // Fix #15: Play button only visible while pressed
                         AnimatedBuilder(
                           animation: _press,
                           builder: (_, __) {
@@ -238,15 +199,10 @@ class _MediaCardState extends State<MediaCard>
                                 opacity: opacity,
                                 child: Container(
                                   width: 40, height: 40,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: Colors.black.withValues(alpha: 0.55),
-                                  ),
-                                  child: const Icon(
-                                    Icons.play_arrow_rounded,
-                                    color: Colors.white,
-                                    size: 24,
-                                  ),
+                                  decoration: BoxDecoration(shape: BoxShape.circle,
+                                    color: Colors.black.withValues(alpha: 0.55)),
+                                  child: const Icon(Icons.play_arrow_rounded,
+                                    color: Colors.white, size: 24),
                                 ),
                               ),
                             );
@@ -256,59 +212,32 @@ class _MediaCardState extends State<MediaCard>
                     ),
                   ),
                 ),
-
-                // ── Title + type badge ────────────────────────────────────
                 Padding(
                   padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        widget.item.title,
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimaryOf(context),
-                          fontFamily: 'Inter',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text(widget.item.title,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimaryOf(context), fontFamily: 'Inter'),
+                        maxLines: 1, overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 3),
-                      Row(
-                        children: [
-                          Icon(Icons.schedule_rounded,
-                              size: 9, color: AppColors.textSecondary),
-                          const SizedBox(width: 3),
-                          Text(
-                            widget.item.formattedDuration,
-                            style: const TextStyle(
-                              fontSize: 9,
-                              color: AppColors.textSecondary,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                          const Spacer(),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 4, vertical: 1),
-                            decoration: BoxDecoration(
-                              color: accent.withValues(alpha: 0.12),
-                              borderRadius: BorderRadius.circular(3),
-                            ),
-                            child: Text(
-                              isVideo ? 'VIDEO' : 'AUDIO',
-                              style: TextStyle(
-                                fontSize: 7,
-                                fontWeight: FontWeight.w700,
-                                color: accent,
-                                letterSpacing: 0.5,
-                                fontFamily: 'Inter',
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                      Row(children: [
+                        const Icon(Icons.schedule_rounded, size: 9, color: AppColors.textSecondary),
+                        const SizedBox(width: 3),
+                        Text(widget.item.formattedDuration,
+                          style: const TextStyle(fontSize: 9, color: AppColors.textSecondary,
+                            fontFamily: 'Inter')),
+                        const Spacer(),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(color: accent.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(3)),
+                          child: Text(isVideo ? 'VIDEO' : 'AUDIO',
+                            style: TextStyle(fontSize: 7, fontWeight: FontWeight.w700,
+                              color: accent, letterSpacing: 0.5, fontFamily: 'Inter')),
+                        ),
+                      ]),
                     ],
                   ),
                 ),
@@ -321,74 +250,42 @@ class _MediaCardState extends State<MediaCard>
   }
 
   Widget _buildArtwork(bool isVideo, Color accent) {
-    // Fix #2: Show shimmer while loading
     if (!_loaded) {
       return _ShimmerPlaceholder(accent: accent)
           .animate(onPlay: (c) => c.repeat())
           .shimmer(duration: 1200.ms, color: accent.withValues(alpha: 0.15));
     }
-
     final path = isVideo ? _thumbPath : _artPath;
     if (path != null) {
-      // Fix #11: limit decoded image size to reduce memory pressure
       return RepaintBoundary(
-        child: Image.file(
-          File(path),
-          fit: BoxFit.cover,
-          cacheWidth: 240,
-          errorBuilder: (_, __, ___) => _modernPlaceholder(isVideo, accent),
-        ),
+        child: Image.file(File(path), fit: BoxFit.cover, cacheWidth: 240,
+          errorBuilder: (_, __, ___) => _modernPlaceholder(isVideo, accent)),
       );
     }
     return _modernPlaceholder(isVideo, accent);
   }
 
-  // Fix #16: Modern placeholder — blurred colour field + first letter
   Widget _modernPlaceholder(bool isVideo, Color accent) {
     final letter = widget.item.title.isNotEmpty
         ? widget.item.title[0].toUpperCase()
         : (isVideo ? 'V' : 'M');
     return ClipRect(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Blurred colour background
-          Container(
-            color: accent.withValues(alpha: 0.22),
-          ),
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-            child: Container(color: Colors.transparent),
-          ),
-          // Large first-letter centred
-          Center(
-            child: Text(
-              letter,
-              style: TextStyle(
-                fontSize: 52,
-                fontWeight: FontWeight.w900,
-                color: accent.withValues(alpha: 0.85),
-                fontFamily: 'Inter',
-                height: 1,
-              ),
-            ),
-          ),
-        ],
-      ),
+      child: Stack(fit: StackFit.expand, children: [
+        Container(color: accent.withValues(alpha: 0.22)),
+        BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+          child: Container(color: Colors.transparent)),
+        Center(child: Text(letter,
+          style: TextStyle(fontSize: 52, fontWeight: FontWeight.w900,
+            color: accent.withValues(alpha: 0.85), fontFamily: 'Inter', height: 1))),
+      ]),
     );
   }
 }
 
-/// Shimmer base widget — a solid coloured container that flutter_animate
-/// overlays with a shimmer effect.
 class _ShimmerPlaceholder extends StatelessWidget {
   final Color accent;
   const _ShimmerPlaceholder({required this.accent});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      color: AppColors.cardOf(context),
-    );
-  }
+  Widget build(BuildContext context) => Container(color: AppColors.cardOf(context));
 }
