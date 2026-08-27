@@ -1,7 +1,8 @@
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
+
+import 'http_client.dart';
 
 class OnlineTheme {
   const OnlineTheme({
@@ -64,25 +65,42 @@ class OnlineTheme {
     return !today.isBefore(startPreviousYear) && !today.isAfter(endThisYear);
   }
 
+  static String? _url(dynamic value) {
+    if (value is! String) return null;
+    final trimmed = value.trim();
+    if (trimmed.isEmpty) return null;
+    final uri = Uri.tryParse(trimmed);
+    if (uri == null || uri.scheme != 'https') return null;
+    return trimmed;
+  }
+
   factory OnlineTheme.fromJson(Map<String, dynamic> json) {
-    final rawPalette = json['palette'] as Map<String, dynamic>? ?? const {};
+    final id = json['id'];
+    final name = json['name'] ?? json['title'];
+    if (id is! String || id.trim().isEmpty || name is! String || name.trim().isEmpty) {
+      throw const FormatException('Invalid theme identity');
+    }
+
+    final rawPalette = json['palette'];
     final rawSeasonal = json['seasonal'];
+    final palette = rawPalette is Map
+        ? rawPalette.map((key, value) => MapEntry(key.toString(), value.toString()))
+        : <String, String>{};
+
     return OnlineTheme(
-      id: json['id'] as String,
-      name: json['name'] as String,
-      story: json['story'] as String? ?? '',
-      scene: json['scene'] as String? ?? 'mountain_lake',
+      id: id.trim(),
+      name: name.trim(),
+      story: json['story'] is String ? (json['story'] as String).trim() : '',
+      scene: json['scene'] is String ? (json['scene'] as String).trim() : 'mountain_lake',
       version: (json['version'] as num?)?.toInt() ?? 1,
-      overlay: (json['overlay'] as num?)?.toDouble() ?? 0.38,
-      palette: rawPalette.map((key, value) => MapEntry(key, value.toString())),
-      previewUrl: (json['previewUrl'] as String?)?.trim().isEmpty == false
-          ? (json['previewUrl'] as String).trim()
-          : null,
-      wallpaperUrl: (json['wallpaperUrl'] as String?)?.trim().isEmpty == false
-          ? (json['wallpaperUrl'] as String).trim()
-          : null,
-      seasonal: rawSeasonal is Map<String, dynamic>
-          ? Map<String, dynamic>.from(rawSeasonal)
+      overlay: ((json['overlay'] as num?)?.toDouble() ?? 0.38).clamp(0.0, 1.0),
+      palette: Map<String, String>.from(palette),
+      previewUrl: _url(json['previewUrl']),
+      // `imageUrl` is accepted as a backwards/portable alias for a full
+      // wallpaper image. This matches the backend's documented image contract.
+      wallpaperUrl: _url(json['wallpaperUrl']) ?? _url(json['imageUrl']),
+      seasonal: rawSeasonal is Map
+          ? Map<String, dynamic>.from(rawSeasonal.cast<String, dynamic>())
           : null,
     );
   }
@@ -108,23 +126,37 @@ class OnlineThemeService {
 
   static Future<List<OnlineTheme>> fetchCatalog() async {
     try {
-      final response = await http
-          .get(Uri.parse(_catalogUrl), headers: const {'Accept': 'application/json'})
+      final response = await AppHttpClient.instance.client
+          .get(
+            Uri.parse(_catalogUrl),
+            headers: const {'Accept': 'application/json'},
+          )
           .timeout(const Duration(seconds: 8));
 
       if (response.statusCode != 200 || response.body.trim().isEmpty) {
         throw const FormatException('Theme catalog unavailable');
       }
 
-      final decoded = jsonDecode(response.body) as Map<String, dynamic>;
-      final items = decoded['themes'] as List<dynamic>? ?? const [];
-      return items
-          .whereType<Map<String, dynamic>>()
-          .map(OnlineTheme.fromJson)
-          .toList(growable: false);
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        throw const FormatException('Invalid theme catalog');
+      }
+      final rawItems = decoded['themes'];
+      if (rawItems is! List) return const [];
+
+      final themes = <OnlineTheme>[];
+      for (final raw in rawItems) {
+        if (raw is! Map) continue;
+        try {
+          themes.add(OnlineTheme.fromJson(Map<String, dynamic>.from(raw)));
+        } catch (e) {
+          debugPrint('[OnlineThemeService] Ignoring invalid theme: $e');
+        }
+      }
+      return List<OnlineTheme>.unmodifiable(themes);
     } catch (e) {
       debugPrint('[OnlineThemeService] Catalog fetch failed: $e');
-      rethrow;
+      throw const FormatException('Story themes are unavailable right now');
     }
   }
 
