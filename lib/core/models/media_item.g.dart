@@ -26,13 +26,14 @@ class MediaItemAdapter extends TypeAdapter<MediaItem> {
       albumArtPath: fields[10] as String?,
       artist: fields[11] as String?,
       album: fields[12] as String?,
+      mediaStoreId: fields[13] as String?,
     );
   }
 
   @override
   void write(BinaryWriter writer, MediaItem obj) {
     writer
-      ..writeByte(13)
+      ..writeByte(14)
       ..writeByte(0)
       ..write(obj.id)
       ..writeByte(1)
@@ -58,7 +59,9 @@ class MediaItemAdapter extends TypeAdapter<MediaItem> {
       ..writeByte(11)
       ..write(obj.artist)
       ..writeByte(12)
-      ..write(obj.album);
+      ..write(obj.album)
+      ..writeByte(13)
+      ..write(obj.mediaStoreId);
   }
 
   @override
