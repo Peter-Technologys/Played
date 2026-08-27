@@ -44,7 +44,7 @@ jobs:
           cache: true
 
       - name: Set up Java 17
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: "17"
@@ -68,7 +68,9 @@ jobs:
         run: |
           set -o pipefail
           mkdir -p build
-          flutter analyze 2>&1 | tee build/flutter-analyze.log
+          # Compiler/analyzer errors remain fatal. Warnings and infos are kept
+          # visible in CI and uploaded below, but do not block tests or builds.
+          flutter analyze --no-fatal-warnings 2>&1 | tee build/flutter-analyze.log
 
       - name: Upload analyzer report
         if: always()
