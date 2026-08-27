@@ -1,0 +1,35 @@
+name: Thumbnail Pipeline Repair
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/fix_thumbnail_pipeline.py'
+      - '.github/workflows/thumbnail-repair.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Apply repair
+        run: python scripts/fix_thumbnail_pipeline.py
+      - name: Commit repaired sources
+        run: |
+          if git diff --quiet; then
+            echo 'No changes required'
+            exit 0
+          fi
+          git config user.name 'PeterSmart Link Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add lib/features/video/presentation/video_tab_screen.dart android/app/src/main/kotlin/com/otyaplayer/app/MainActivity.kt
+          git commit -m 'Fix video thumbnails across MediaStore and received files'
+          git push
