@@ -50,20 +50,6 @@ jobs:
           java-version: "17"
           cache: gradle
 
-      - name: Cache Android NDK
-        uses: actions/cache@v4
-        with:
-          path: /usr/local/lib/android/sdk/ndk
-          key: ndk-28.2.13676358
-
-      - name: Cache Pub
-        uses: actions/cache@v4
-        with:
-          path: ~/.pub-cache
-          key: pub-${{ runner.os }}-${{ hashFiles('pubspec.lock') }}
-          restore-keys: |
-            pub-${{ runner.os }}-
-
       - name: Decode release keystore when available
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -78,7 +64,20 @@ jobs:
         run: flutter pub get
 
       - name: Static analysis
-        run: flutter analyze
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p build
+          flutter analyze 2>&1 | tee build/flutter-analyze.log
+
+      - name: Upload analyzer report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: flutter-analyze-${{ github.sha }}
+          path: build/flutter-analyze.log
+          retention-days: 14
+          if-no-files-found: warn
 
       - name: Unit and widget tests
         run: flutter test --coverage
