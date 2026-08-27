@@ -5,8 +5,6 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/models/media_item.dart';
 
-// ── WhatsApp Trimmer Screen ─────────────────────────────────────
-
 enum TrimStatus { idle, trimming, done, error }
 
 final trimStatusProvider = StateProvider<TrimStatus>((_) => TrimStatus.idle);
@@ -20,215 +18,162 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final status   = ref.watch(trimStatusProvider);
+    final status = ref.watch(trimStatusProvider);
     final progress = ref.watch(trimProgressProvider);
-    final start    = ref.watch(trimStartProvider);
-    final end      = ref.watch(trimEndProvider);
+    final start = ref.watch(trimStartProvider);
+    final end = ref.watch(trimEndProvider);
     final duration = mediaItem.duration?.inSeconds.toDouble() ?? 60.0;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('WhatsApp Trimmer',
-            style: TextStyle(
-              fontFamily: 'SpaceGrotesk',
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontSize: 18,
-            )),
+        title: const Text('Trim clip'),
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.info_outline_rounded,
-                      color: AppColors.accent, size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      'Trims video to 30s and compresses under 16MB for WhatsApp Status.',
-                      style: TextStyle(
-                          fontSize: 12,
-                          color: AppColors.textSecondary,
-                          height: 1.4),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(18),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded, color: AppColors.accent, size: 20),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        'Create a 30-second clip and compress it for easy sharing.',
+                        style: TextStyle(fontSize: 12, color: AppColors.textSecondary, height: 1.4),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 28),
-            Text(mediaItem.title,
+              const SizedBox(height: 28),
+              Text(
+                mediaItem.title,
                 style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+                  fontSize: 17,
+                  fontWeight: FontWeight.w800,
                   color: AppColors.textPrimary,
-                  fontFamily: 'SpaceGrotesk',
+                  fontFamily: 'Inter',
                 ),
                 maxLines: 1,
-                overflow: TextOverflow.ellipsis),
-            const SizedBox(height: 4),
-            Text(mediaItem.formattedDuration,
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary)),
-            const SizedBox(height: 32),
-            _RangeLabel(
-              label: 'Start',
-              value: Duration(seconds: start.toInt()),
-            ),
-            Slider(
-              value: start,
-              min: 0,
-              max: (duration - 30).clamp(0, duration),
-              onChanged: (v) {
-                HapticFeedback.selectionClick();
-                ref.read(trimStartProvider.notifier).state = v;
-                ref.read(trimEndProvider.notifier).state =
-                    (v + 30).clamp(0, duration);
-              },
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.border),
+                overflow: TextOverflow.ellipsis,
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Clip: ${_fmt(Duration(seconds: start.toInt()))} → ${_fmt(Duration(seconds: end.toInt()))}',
-                    style: const TextStyle(
-                        fontSize: 13,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Inter'),
-                  ),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: const Text('30s',
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: AppColors.accent,
-                          fontWeight: FontWeight.w700,
+              const SizedBox(height: 4),
+              Text(mediaItem.formattedDuration,
+                  style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              const SizedBox(height: 32),
+              _RangeLabel(label: 'Start', value: Duration(seconds: start.toInt())),
+              Slider(
+                value: start,
+                min: 0,
+                max: (duration - 30).clamp(0, duration),
+                onChanged: (v) {
+                  HapticFeedback.selectionClick();
+                  ref.read(trimStartProvider.notifier).state = v;
+                  ref.read(trimEndProvider.notifier).state = (v + 30).clamp(0, duration);
+                },
+              ),
+              const SizedBox(height: 10),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        '${_fmt(Duration(seconds: start.toInt()))}  →  ${_fmt(Duration(seconds: end.toInt()))}',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w600,
                           fontFamily: 'Inter',
-                        )),
-                  ),
-                ],
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: .12),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Text(
+                        '30 sec',
+                        style: TextStyle(fontSize: 11, color: AppColors.accent, fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const Spacer(),
-            if (status == TrimStatus.trimming) ...
-              [
+              const Spacer(),
+              if (status == TrimStatus.trimming) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(8),
                   child: LinearProgressIndicator(
                     value: progress,
                     backgroundColor: AppColors.border,
                     valueColor: const AlwaysStoppedAnimation<Color>(AppColors.accent),
-                    minHeight: 6,
+                    minHeight: 5,
                   ),
                 ),
-                const SizedBox(height: 8),
-                const Text('Trimming & compressing...',
+                const SizedBox(height: 10),
+                const Text('Preparing your clip…',
                     style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
                 const SizedBox(height: 16),
               ],
-            if (status == TrimStatus.done)
-              Container(
-                padding: const EdgeInsets.all(14),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
+              if (status == TrimStatus.done)
+                _StatusCard(
+                  icon: Icons.check_circle_rounded,
+                  text: 'Clip saved to Downloads',
+                  color: AppColors.success,
                 ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.check_circle_rounded, color: AppColors.success, size: 20),
-                    SizedBox(width: 8),
-                    Text('Saved to Downloads!',
-                        style: TextStyle(
-                          color: AppColors.success,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'SpaceGrotesk',
-                        )),
-                  ],
+              if (status == TrimStatus.error)
+                _StatusCard(
+                  icon: Icons.error_outline_rounded,
+                  text: 'Could not create the clip. Try again.',
+                  color: AppColors.error,
                 ),
-              ),
-            const SizedBox(height: 16),
-            GestureDetector(
-              onTap: status == TrimStatus.trimming
-                  ? null
-                  : () async {
-                      HapticFeedback.mediumImpact();
-                      ref.read(trimStatusProvider.notifier).state = TrimStatus.trimming;
-                      ref.read(trimProgressProvider.notifier).state = 0;
-                      final result = await FfmpegService.instance.trimForWhatsApp(
-                        videoPath: mediaItem.filePath,
-                        startSec: start,
-                        endSec: end,
-                        onProgress: (p) =>
-                            ref.read(trimProgressProvider.notifier).state = p,
-                      );
-                      ref.read(trimStatusProvider.notifier).state =
-                          result != null ? TrimStatus.done : TrimStatus.error;
-                    },
-              child: Container(
+              const SizedBox(height: 16),
+              SizedBox(
                 width: double.infinity,
                 height: 56,
-                decoration: BoxDecoration(
-                  gradient: status != TrimStatus.trimming
-                      ? const LinearGradient(
-                          colors: [AppColors.accent, AppColors.accentViolet])
-                      : null,
-                  color: status == TrimStatus.trimming ? AppColors.surface : null,
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: status != TrimStatus.trimming
-                      ? [BoxShadow(
-                          color: AppColors.accent.withValues(alpha: 0.35),
-                          blurRadius: 16,
-                          offset: const Offset(0, 4))]
-                      : null,
-                ),
-                alignment: Alignment.center,
-                child: Text(
-                  status == TrimStatus.trimming
-                      ? 'Processing...'
-                      : '\uD83D\uDCF1  Trim for WhatsApp Status',
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
-                    color: status == TrimStatus.trimming
-                        ? AppColors.textSecondary
-                        : Colors.black,
-                    fontFamily: 'SpaceGrotesk',
-                  ),
+                child: FilledButton.icon(
+                  onPressed: status == TrimStatus.trimming
+                      ? null
+                      : () async {
+                          HapticFeedback.mediumImpact();
+                          ref.read(trimStatusProvider.notifier).state = TrimStatus.trimming;
+                          ref.read(trimProgressProvider.notifier).state = 0;
+                          final result = await FfmpegService.instance.trimForWhatsApp(
+                            videoPath: mediaItem.filePath,
+                            startSec: start,
+                            endSec: end,
+                            onProgress: (p) => ref.read(trimProgressProvider.notifier).state = p,
+                          );
+                          ref.read(trimStatusProvider.notifier).state =
+                              result != null ? TrimStatus.done : TrimStatus.error;
+                        },
+                  icon: Icon(status == TrimStatus.trimming
+                      ? Icons.hourglass_top_rounded
+                      : Icons.content_cut_rounded),
+                  label: Text(status == TrimStatus.trimming ? 'Processing…' : 'Create 30-second clip'),
                 ),
               ),
-            ),
-            const SizedBox(height: 16),
-          ],
+              const SizedBox(height: 16),
+            ],
+          ),
         ),
       ),
     );
@@ -239,6 +184,33 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
     final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return '$m:$s';
   }
+}
+
+class _StatusCard extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  final Color color;
+  const _StatusCard({required this.icon, required this.text, required this.color});
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: .08),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: color.withValues(alpha: .25)),
+        ),
+        child: Row(
+          children: [
+            Icon(icon, color: color, size: 20),
+            const SizedBox(width: 9),
+            Expanded(
+              child: Text(text,
+                  style: TextStyle(color: color, fontWeight: FontWeight.w700, fontFamily: 'Inter')),
+            ),
+          ],
+        ),
+      );
 }
 
 class _RangeLabel extends StatelessWidget {
@@ -256,16 +228,14 @@ class _RangeLabel extends StatelessWidget {
         Text(label,
             style: const TextStyle(
               fontSize: 12,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w700,
               color: AppColors.textSecondary,
-              letterSpacing: 0.8,
-              fontFamily: 'SpaceGrotesk',
+              letterSpacing: .6,
+              fontFamily: 'Inter',
             )),
         Text('$m:$s',
             style: const TextStyle(
-                fontSize: 12,
-                color: AppColors.accent,
-                fontWeight: FontWeight.w700)),
+                fontSize: 12, color: AppColors.accent, fontWeight: FontWeight.w800)),
       ],
     );
   }
