@@ -5,9 +5,8 @@ import '../../../core/permissions/permission_helper.dart';
 import '../../../core/services/notification_service.dart';
 import '../my_space/data/media_repository.dart';
 
-/// First-run setup: explain OTYA, request media access contextually, build the
-/// initial local library, explain Now Playing controls, then enter the app.
-/// Account sign-in is intentionally not required because OTYA is offline-first.
+/// First-run setup for the approved OTYA visual system.
+/// Permissions are requested only after OTYA explains why they are useful.
 class OnboardingOverlay extends StatefulWidget {
   final VoidCallback onDone;
   const OnboardingOverlay({super.key, required this.onDone});
@@ -37,10 +36,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
         _busy = false;
       });
       if (!granted) return;
-
-      // Warm the repository immediately after permission is granted. This means
-      // the first Library frame can use real media instead of showing an empty
-      // screen while its first scan starts later.
       await _scanInitialLibrary();
       if (!mounted) return;
     }
@@ -53,7 +48,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
         _notificationsGranted = granted;
         _busy = false;
       });
-      // Recommended rather than blocking: playback still works if declined.
     }
 
     if (_page < 3) {
@@ -77,8 +71,7 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
         _scanComplete = true;
       });
     } catch (_) {
-      // Do not trap a user in onboarding if a manufacturer-specific MediaStore
-      // implementation fails. The normal Library refresh can retry afterwards.
+      // The normal Library refresh can retry manufacturer-specific failures.
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -105,61 +98,59 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
   Widget build(BuildContext context) {
     final readyBody = _scanComplete
         ? (_mediaCount == 0
-            ? 'Setup is complete. No media is indexed yet; OTYA will keep watching for new songs and videos.'
-            : 'OTYA found $_mediaCount media item${_mediaCount == 1 ? '' : 's'} and your library is ready.')
-        : 'Your library will finish scanning in the background. Artwork and thumbnails appear as OTYA discovers your media.';
+            ? 'Setup is complete. OTYA will keep watching for music and videos as they appear on this phone.'
+            : 'OTYA found $_mediaCount media item${_mediaCount == 1 ? '' : 's'}. Your library is ready.')
+        : 'Your library can continue scanning in the background while OTYA prepares artwork and thumbnails.';
 
     final pages = <_SetupPage>[
       const _SetupPage(
-        icon: Icons.play_circle_fill_rounded,
-        eyebrow: 'OTYA PLAYER',
-        title: 'Your media, ready when you are',
-        body: 'Play music and video offline, keep your queue and resume where you stopped — without making an account first.',
+        icon: Icons.play_arrow_rounded,
+        eyebrow: 'WELCOME TO OTYA',
+        title: 'Your media.\nYour way.',
+        body: 'A fast, private player for the music and video already on your phone — built around playback, not clutter.',
         bullets: [
-          'Music + video in one library',
+          'Music and video in one library',
           'Offline-first playback',
-          'Your files stay on your device',
+          'No account required to start',
         ],
       ),
       _SetupPage(
         icon: Icons.video_library_rounded,
-        eyebrow: 'MEDIA ACCESS',
-        title: _mediaGranted ? 'Media access is ready' : 'Let OTYA find your media',
+        eyebrow: 'YOUR LIBRARY',
+        title: _mediaGranted ? 'Library access ready' : 'Find what is already yours',
         body: _mediaGranted
             ? (_scanComplete
-                ? 'Your first library scan is complete. OTYA will continue noticing new media automatically.'
-                : 'OTYA can now build your library and show artwork, thumbnails, albums and folders.')
-            : 'Allow access so OTYA can discover songs and videos already on this phone. OTYA does not upload your local files.',
+                ? 'Your first scan is complete. OTYA will continue noticing new media automatically.'
+                : 'OTYA can now build your library with artwork, thumbnails, albums and folders.')
+            : 'Allow media access so OTYA can discover local songs and videos. Your media files are not uploaded just to play them.',
         bullets: const [
-          'Discover music and videos',
-          'Build thumbnails and album art',
-          'Notice new files automatically',
+          'Real album artwork',
+          'Video thumbnails',
+          'Automatic library updates',
         ],
         success: _mediaGranted,
       ),
       _SetupPage(
         icon: Icons.notifications_active_rounded,
         eyebrow: 'NOW PLAYING',
-        title: _notificationsGranted
-            ? 'Playback controls are enabled'
-            : 'Control music outside OTYA',
-        body: 'Notifications let Android show Now Playing controls while the screen is locked or you are using another app.',
+        title: _notificationsGranted ? 'System controls ready' : 'Keep control everywhere',
+        body: 'Enable playback notifications so Android can show OTYA controls on the lock screen and while you use other apps.',
         bullets: const [
-          'Lock-screen play / pause',
+          'Lock-screen play and pause',
           'Previous and next track',
-          'Background playback controls',
+          'Headset and background controls',
         ],
         success: _notificationsGranted,
       ),
       _SetupPage(
         icon: Icons.auto_awesome_rounded,
         eyebrow: 'READY',
-        title: 'Make OTYA yours',
+        title: 'Press play.',
         body: readyBody,
         bullets: const [
-          'Search everything quickly',
-          'Continue listening from your queue',
-          'Change appearance later in Settings',
+          'Search your library quickly',
+          'Resume from your queue',
+          'Explore tools only when you need them',
         ],
         success: _scanComplete,
       ),
@@ -167,94 +158,120 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
 
     return Material(
       color: AppColors.background,
-      child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
-              child: Row(
-                children: [
-                  const Text(
-                    'OTYA',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: 2,
+      child: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: RadialGradient(
+            center: Alignment(0.7, -0.85),
+            radius: 1.15,
+            colors: [Color(0x188B5CF6), AppColors.background],
+          ),
+        ),
+        child: SafeArea(
+          child: Column(
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 18, 24, 0),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.surfaceElevated,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: const Icon(Icons.play_arrow_rounded,
+                          color: AppColors.accent, size: 22),
                     ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    'by PeterSmart Link',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: .55),
-                      fontSize: 12,
+                    const SizedBox(width: 11),
+                    const Text(
+                      'OTYA',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 1.8,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView(
-                controller: _controller,
-                physics: const NeverScrollableScrollPhysics(),
-                onPageChanged: (value) => setState(() => _page = value),
-                children: pages,
-              ),
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: List.generate(
-                4,
-                (i) => AnimatedContainer(
-                  duration: const Duration(milliseconds: 220),
-                  width: i == _page ? 24 : 7,
-                  height: 7,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
-                  decoration: BoxDecoration(
-                    color: i == _page
-                        ? AppColors.accent
-                        : Colors.white.withValues(alpha: .16),
-                    borderRadius: BorderRadius.circular(99),
-                  ),
+                    const Spacer(),
+                    Text(
+                      '${_page + 1} / 4',
+                      style: const TextStyle(
+                        color: AppColors.textMuted,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-            const SizedBox(height: 22),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: FilledButton(
-                  onPressed: _busy ? null : _next,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(18),
-                    ),
-                  ),
-                  child: _busy
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : Text(
-                          _buttonLabel,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
+              Expanded(
+                child: PageView(
+                  controller: _controller,
+                  physics: const NeverScrollableScrollPhysics(),
+                  onPageChanged: (value) => setState(() => _page = value),
+                  children: pages,
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: List.generate(
+                    4,
+                    (i) => Expanded(
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 220),
+                        height: 3,
+                        margin: EdgeInsets.only(right: i == 3 ? 0 : 6),
+                        decoration: BoxDecoration(
+                          color: i <= _page
+                              ? AppColors.accent
+                              : AppColors.borderSubtle,
+                          borderRadius: BorderRadius.circular(99),
                         ),
+                      ),
+                    ),
+                  ),
                 ),
               ),
-            ),
-          ],
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(24, 0, 24, 28),
+                child: SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: FilledButton(
+                    onPressed: _busy ? null : _next,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      disabledBackgroundColor: AppColors.surfaceHighlight,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
+                    child: _busy
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Text(
+                            _buttonLabel,
+                            style: const TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                  ),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -288,25 +305,36 @@ class _SetupPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => SingleChildScrollView(
-        padding: const EdgeInsets.fromLTRB(28, 52, 28, 28),
+        padding: const EdgeInsets.fromLTRB(28, 50, 28, 28),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Container(
-              width: 76,
-              height: 76,
+              width: 82,
+              height: 82,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: .055),
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.white.withValues(alpha: .08)),
+                color: AppColors.surfaceElevated,
+                borderRadius: BorderRadius.circular(26),
+                border: Border.all(
+                  color: success
+                      ? AppColors.success.withValues(alpha: .35)
+                      : AppColors.accent.withValues(alpha: .28),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: (success ? AppColors.success : AppColors.accent)
+                        .withValues(alpha: .10),
+                    blurRadius: 30,
+                  ),
+                ],
               ),
               child: Icon(
                 success ? Icons.check_rounded : icon,
                 color: success ? AppColors.success : AppColors.accent,
-                size: 36,
+                size: 38,
               ),
             ),
-            const SizedBox(height: 34),
+            const SizedBox(height: 36),
             Text(
               eyebrow,
               style: const TextStyle(
@@ -316,58 +344,70 @@ class _SetupPage extends StatelessWidget {
                 letterSpacing: 2.2,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 11),
             Text(
               title,
               style: const TextStyle(
-                color: Colors.white,
-                fontSize: 31,
-                height: 1.08,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -.8,
+                color: AppColors.textPrimary,
+                fontSize: 34,
+                height: 1.03,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -1.2,
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 18),
             Text(
               body,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: .62),
+              style: const TextStyle(
+                color: AppColors.textSecondary,
                 fontSize: 15,
                 height: 1.55,
               ),
             ),
             const SizedBox(height: 30),
-            ...bullets.map(
-              (text) => Padding(
-                padding: const EdgeInsets.only(bottom: 14),
-                child: Row(
-                  children: [
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: Colors.white.withValues(alpha: .055),
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check_rounded,
-                        size: 15,
-                        color: Colors.white70,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        text,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500,
+            Container(
+              padding: const EdgeInsets.fromLTRB(18, 18, 18, 4),
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: .82),
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: AppColors.borderSubtle),
+              ),
+              child: Column(
+                children: bullets
+                    .map(
+                      (text) => Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Row(
+                          children: [
+                            Container(
+                              width: 28,
+                              height: 28,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: .10),
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.check_rounded,
+                                size: 15,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Text(
+                                text,
+                                style: const TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ),
-                  ],
-                ),
+                    )
+                    .toList(),
               ),
             ),
           ],
