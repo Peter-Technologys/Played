@@ -9,15 +9,17 @@ import '../models/playlist.dart';
 import '../utils/connectivity_utils.dart';
 import 'app_sync_service.dart';
 import 'auth_service.dart';
+import 'google_account_service.dart';
 import 'http_client.dart';
 import 'remote_control_service.dart';
 
 /// Cloud sync client for playlists, history and Pro status.
 ///
 /// Local media remains authoritative and network failures are non-fatal.
-/// Every protected request uses the short-lived JWT issued by OTYA Auth;
-/// user ownership is taken from the authenticated profile, never a caller-
-/// supplied arbitrary identifier.
+/// Protected backend requests use the short-lived JWT issued by OTYA Auth.
+/// The public Profile backup/restore compatibility methods delegate to the
+/// user's private Google Drive App Data Folder so the UI and real behavior
+/// match; lower-level backend sync methods remain available to app sync jobs.
 class CloudflareService {
   CloudflareService._();
   static final CloudflareService instance = CloudflareService._();
@@ -56,8 +58,8 @@ class CloudflareService {
     }
   }
 
-  /// Flushes an offline backup without calling backupAll(), avoiding recursive
-  /// backupPlaylists -> flush -> backupAll -> backupPlaylists recursion.
+  /// Flushes the existing backend-sync queue. This remains separate from Drive
+  /// recovery because Google Drive consent must never be requested silently.
   Future<void> _flushPendingBackup() async {
     if (_backupInProgress) return;
     try {
@@ -126,43 +128,15 @@ class CloudflareService {
     return synced == playlists.length;
   }
 
+  /// Profile compatibility method: restore from the private Drive App Folder.
+  /// Returns the number of playlists restored, or -1 for a recoverable failure.
   Future<int> restorePlaylists(String userId) async {
     final auth = await _authContext();
     if (auth == null) return -1;
-    final resolvedUserId = auth.userId;
     try {
-      final res = await _client.get(
-        Uri.parse('${Environment.apiPlaylistsUrl}?user_id=${Uri.encodeQueryComponent(resolvedUserId)}'),
-        headers: _headers(auth.token),
-      ).timeout(_timeout);
-      if (res.statusCode != 200) return -1;
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
-      final list = (data['playlists'] as List<dynamic>?) ?? [];
-      var restored = 0;
-      for (final raw in list) {
-        final map = raw as Map<String, dynamic>;
-        final id = map['id']?.toString();
-        if (id == null) continue;
-        final mediaRaw = map['media_ids']?.toString() ?? '[]';
-        List<String> mediaIds;
-        try {
-          mediaIds = List<String>.from(jsonDecode(mediaRaw) as List);
-        } catch (_) {
-          mediaIds = const [];
-        }
-        final playlist = Playlist(
-          id: id.replaceFirst('${resolvedUserId}_', ''),
-          name: map['name']?.toString() ?? 'Playlist',
-          mediaIds: mediaIds,
-          createdAt: DateTime.tryParse(map['created_at']?.toString() ?? '') ?? DateTime.now(),
-          updatedAt: DateTime.now(),
-        );
-        await OtyaDatabase.instance.savePlaylist(playlist);
-        restored++;
-      }
-      return restored;
+      return await GoogleAccountService.instance.restoreFromDrive();
     } catch (e) {
-      debugPrint('[Cloudflare] restorePlaylists failed: $e');
+      debugPrint('[Cloudflare] Drive restore failed: ${e.runtimeType}');
       return -1;
     }
   }
@@ -264,19 +238,20 @@ class CloudflareService {
     return false;
   }
 
+  /// Profile compatibility method: write the versioned recovery snapshot to
+  /// the signed-in user's private Google Drive App Data Folder. Drive consent
+  /// is requested only because this method is called from the explicit backup
+  /// action; no automatic/background path calls it.
   Future<bool> backupAll(String userId) async {
     final auth = await _authContext();
-    if (auth == null) return false;
-    if (!await isOnline() || _backupInProgress) {
-      await _queuePendingBackup(auth.userId);
-      return false;
-    }
+    if (auth == null || !await isOnline()) return false;
+    if (_backupInProgress) return false;
     _backupInProgress = true;
     try {
-      return await _backupData(auth.userId);
+      await GoogleAccountService.instance.backupToDrive();
+      return true;
     } catch (e) {
-      debugPrint('[Cloudflare] backupAll failed: $e');
-      await _queuePendingBackup(auth.userId);
+      debugPrint('[Cloudflare] Drive backup failed: ${e.runtimeType}');
       return false;
     } finally {
       _backupInProgress = false;
