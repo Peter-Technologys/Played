@@ -11,6 +11,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/services/custom_theme_manager.dart';
+import 'otya_mountain_background.dart';
 
 class WallpaperScaffold extends StatelessWidget {
   final Widget body;
@@ -44,7 +45,6 @@ class WallpaperScaffold extends StatelessWidget {
         final manager = CustomThemeManager.instance;
         final wallpaperPath = manager.wallpaperPath;
         final hasWallpaper = wallpaperPath != null && File(wallpaperPath).existsSync();
-        final effectiveBg = backgroundColor ?? Theme.of(context).scaffoldBackgroundColor;
 
         return Stack(
           fit: StackFit.expand,
@@ -56,7 +56,7 @@ class WallpaperScaffold extends StatelessWidget {
                 blur: manager.artBlur,
               )
             else
-              _OtyaAmbientBackground(background: effectiveBg),
+              const OtyaMountainBackground(),
             Scaffold(
               backgroundColor: Colors.transparent,
               appBar: appBar,
@@ -106,8 +106,6 @@ class _ImageThemeBackground extends StatelessWidget {
       fit: StackFit.expand,
       children: [
         ColoredBox(color: const Color(0xFF08080B), child: image),
-        // The image is intentionally visible. These layers are only for text
-        // contrast, not to hide the selected artwork.
         ColoredBox(color: Colors.black.withValues(alpha: dimAmount.clamp(0.18, 0.70))),
         const DecoratedBox(
           decoration: BoxDecoration(
@@ -136,75 +134,6 @@ class _ImageThemeBackground extends StatelessWidget {
                   colors: [
                     AppColors.accent.withValues(alpha: 0.20),
                     AppColors.accent.withValues(alpha: 0.045),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _OtyaAmbientBackground extends StatelessWidget {
-  const _OtyaAmbientBackground({required this.background});
-
-  final Color background;
-
-  @override
-  Widget build(BuildContext context) {
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: background,
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Color(0xFF100C18),
-                Color(0xFF08080B),
-                Color(0xFF0B0910),
-              ],
-              stops: [0.0, 0.52, 1.0],
-            ),
-          ),
-        ),
-        Positioned(
-          top: -110,
-          right: -90,
-          child: IgnorePointer(
-            child: Container(
-              width: 310,
-              height: 310,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    AppColors.accent.withValues(alpha: 0.22),
-                    AppColors.accent.withValues(alpha: 0.05),
-                    Colors.transparent,
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: -170,
-          left: -130,
-          child: IgnorePointer(
-            child: Container(
-              width: 360,
-              height: 360,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    const Color(0xFF5B21B6).withValues(alpha: 0.13),
                     Colors.transparent,
                   ],
                 ),
