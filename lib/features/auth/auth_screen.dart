@@ -9,6 +9,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/auth_provider.dart';
+import '../../shared/widgets/wallpaper_scaffold.dart';
 
 class AuthScreen extends ConsumerStatefulWidget {
   const AuthScreen({super.key});
@@ -35,8 +36,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return WallpaperScaffold(
+      backgroundColor: Colors.transparent,
       body: SafeArea(
         child: Column(
           children: [

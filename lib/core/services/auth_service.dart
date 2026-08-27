@@ -379,8 +379,19 @@ class AuthService {
   }
 
   Future<AuthResult> _handleAuthResponse(http.Response res) async {
+    final raw = res.body.trim();
+    if (raw.isEmpty) {
+      return AuthResult(
+        ok: false,
+        error: 'Authentication service returned an empty response (HTTP ${res.statusCode}). Please try again.',
+      );
+    }
     try {
-      final data = jsonDecode(res.body) as Map<String, dynamic>;
+      final decoded = jsonDecode(raw);
+      if (decoded is! Map<String, dynamic>) {
+        return AuthResult(ok: false, error: 'Authentication service returned an invalid response (HTTP ${res.statusCode}).');
+      }
+      final data = decoded;
       if (res.statusCode >= 200 && res.statusCode < 300 && data['ok'] == true) {
         final accessToken = data['access_token'] as String?;
         final refreshToken = data['refresh_token'] as String?;
@@ -391,7 +402,8 @@ class AuthService {
       }
       return AuthResult(ok: false, error: data['error'] as String? ?? 'Unknown error');
     } catch (e) {
-      return AuthResult(ok: false, error: 'Failed to parse response: $e');
+      debugPrint('[AuthService] Invalid auth response HTTP ${res.statusCode}: ${res.body}');
+      return AuthResult(ok: false, error: 'Authentication service response was invalid (HTTP ${res.statusCode}).');
     }
   }
 }

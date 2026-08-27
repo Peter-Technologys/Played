@@ -9,6 +9,7 @@ import '../../../core/services/vault_service.dart';
 import '../../../core/models/vault_item.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 // ── PIN helpers ────────────────────────────────────────────────────
 //

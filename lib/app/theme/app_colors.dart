@@ -7,11 +7,11 @@ import 'package:flutter/material.dart';
 /// Semantic green/amber/red are reserved for status only.
 abstract class AppColors {
   static const Color background       = Color(0xFF08080B);
-  static const Color surface          = Color(0xFF101014);
-  static const Color surfaceElevated  = Color(0xFF16161D);
-  static const Color surfaceHighlight = Color(0xFF1D1D27);
-  static const Color border           = Color(0xFF2A2A35);
-  static const Color borderSubtle     = Color(0xFF202029);
+  static const Color surface          = Color(0xB8101014);
+  static const Color surfaceElevated  = Color(0xC716161D);
+  static const Color surfaceHighlight = Color(0xD61D1D27);
+  static const Color border           = Color(0x802A2A35);
+  static const Color borderSubtle     = Color(0x66202029);
 
   // Compatibility aliases deliberately remain in one purple family so older
   // screens cannot drift back into cyan/pink/rainbow decorative styling.

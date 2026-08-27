@@ -22,7 +22,7 @@ import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.util.Size
-import com.ryanheise.audioservice.AudioServiceActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodChannel
@@ -35,7 +35,7 @@ import java.io.File
 import java.io.FileOutputStream
 import java.nio.ByteBuffer
 
-class MainActivity : AudioServiceActivity() {
+class MainActivity : AudioServiceFragmentActivity() {
 
     companion object {
         // Tracks the last time a one-shot update check was triggered from onResume()
