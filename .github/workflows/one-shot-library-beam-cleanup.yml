@@ -1,4 +1,5 @@
 name: One-shot library and Beam cleanup
+# Triggered after creation so GitHub Actions can execute the migration.
 
 on:
   push:
@@ -21,7 +22,6 @@ jobs:
         run: |
           from pathlib import Path
 
-          # --- Video Library: one canonical list view ---
           p = Path('lib/features/video/presentation/video_tab_screen.dart')
           s = p.read_text()
           s = s.replace(
@@ -48,10 +48,8 @@ jobs:
           s = s.replace(toggle, "")
           p.write_text(s)
 
-          # --- Beam: preserve names, shrink scanner, remove legacy gradients ---
           p = Path('lib/features/air_drop/presentation/air_drop_screen.dart')
           s = p.read_text()
-
           old_name = """      final fileName = url.split('/').last.contains('.')
           ? url.split('/').last
           : 'received_${DateTime.now().millisecondsSinceEpoch}.mp4';
@@ -71,7 +69,6 @@ jobs:
               raise SystemExit('Beam filename block not found')
           s = s.replace(old_name, new_name)
 
-          # Reject non-local QR destinations before any download request.
           marker = """  Future<void> onQrScanned(String url) async {
     if (state.receiveStep == _ReceiveStep.downloading) return;
 """
@@ -162,7 +159,6 @@ jobs:
           if scanner_old not in s:
               raise SystemExit('Beam scanner block not found')
           s = s.replace(scanner_old, scanner_new)
-
           s = s.replace(
               "indicator: BoxDecoration(\n                    gradient: AppColors.accentGradient,\n                    borderRadius: BorderRadius.circular(12)),",
               "indicator: BoxDecoration(\n                    color: AppColors.accent,\n                    borderRadius: BorderRadius.circular(12)),")
@@ -175,7 +171,6 @@ jobs:
           s = s.replace("const Text('Added to your media library.',", "const Text('Saved on this device.',")
           p.write_text(s)
 
-          # --- Remove obsolete getotya default from router ---
           p = Path('lib/app/router.dart')
           s = p.read_text()
           s = s.replace(
