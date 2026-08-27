@@ -6,9 +6,9 @@
 
 **Private. Powerful. Offline-first media.**
 
-OTYA Player is the official Android media experience of the OTYA System by PeterSmartLink.
+Private production source repository for OTYA Player by PeterSmartLink.
 
-[Website](https://petersmartlink.com) · [Download](https://petersmartlink.com/download/otya-player) · [Latest Release](https://github.com/PeterSmartLink/OtyaPlayer/releases/latest) · [Security](SECURITY.md)
+[Website](https://petersmartlink.com) · [Download](https://petersmartlink.com/download/otya-player) · [Security](SECURITY.md)
 
 ![Version](https://img.shields.io/badge/OTYA-1.6.0-6C5CE7)
 ![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)
@@ -19,18 +19,20 @@ OTYA Player is the official Android media experience of the OTYA System by Peter
 
 ---
 
-## Welcome to OTYA
+## Repository purpose
 
-This repository page is the official GitHub home for OTYA Player releases, product information, security notices and public documentation.
+This is the private production source repository for OTYA Player. It is intended for authorized development, CI/CD, security review and release engineering only.
 
-OTYA Player is designed around local-first playback: your music and videos remain usable without a network connection, while account, recovery, updates and optional online services connect securely to the OTYA backend when needed.
+Public product information, downloads, support notices and customer documentation should be published through the official OTYA/PeterSmartLink website rather than exposing internal source or infrastructure details from this repository.
 
-## What OTYA Player includes
+## OTYA Player
+
+OTYA Player is designed around local-first playback: music and videos remain usable without a network connection, while account, recovery, updates and optional online services connect securely to the OTYA backend when needed.
 
 | Experience | Highlights |
 |---|---|
 | **My Space** | Unified songs, videos and folder library with search, sorting, recent media and pinned folders |
-| **Audio Player** | Queue, shuffle, repeat, speed control, 5-band EQ, lyrics, sleep timer and background playback |
+| **Audio Player** | Queue, shuffle, repeat, speed control, EQ, lyrics, sleep timer and background playback |
 | **Video Player** | Hardware-accelerated playback, subtitles, PiP, aspect controls, battery saver and gestures |
 | **Beam** | Local Wi-Fi / hotspot file transfer designed to work without mobile data |
 | **Safe** | Private media protection with device authentication, biometric unlock and PIN fallback |
@@ -40,31 +42,29 @@ OTYA Player is designed around local-first playback: your music and videos remai
 | **Google & Drive** | Google identity sign-in and explicit opt-in private recovery backup |
 | **Updates** | Secure version checks and signed Android release delivery |
 
-## Privacy-first design
+## Privacy and security principles
 
-OTYA Player is built so core local playback does not depend on an online account or a permanently available backend. Google Drive recovery is optional and user-initiated. The OTYA recovery snapshot is designed for application recovery data rather than uploading a user's raw media library or Safe media.
+- Core local playback must not depend on a permanently available backend.
+- Production secrets must never be committed or bundled into Flutter.
+- Google Drive recovery is explicit and user-initiated.
+- Recovery data must not upload a user's raw media library or Safe/private media.
+- Production releases must be signed and fail closed when signing credentials are missing.
+- Security reports must use the private process documented in [SECURITY.md](SECURITY.md).
 
-## OTYA 1.6.0
+## Release line
 
-**OTYA Player 1.6.0 is the first official release of the current OTYA generation.**
+OTYA Player `1.6.0+10` is the first official release line of the current OTYA generation.
 
-The new generation uses a fresh production account/session model and does not migrate legacy application user data. Users of this generation should create or sign in to a current OTYA account.
+The current generation uses a fresh production account/session model and does not migrate legacy application user data. Release builds are produced by GitHub Actions, verified with checksums, and distributed through the official OTYA release infrastructure.
 
-Release builds are produced by the protected GitHub Actions pipeline, verified with checksums, and distributed through the OTYA release infrastructure.
+## Public access
 
-## Download
+Official public surfaces:
 
-Use the official OTYA download page:
+- Website: **https://petersmartlink.com**
+- Download: **https://petersmartlink.com/download/otya-player**
 
-**https://petersmartlink.com/download/otya-player**
-
-Do not trust APKs redistributed by unknown third parties. Official release files should correspond to OTYA-published version and checksum information.
-
-## Support and security
-
-For normal product support, downloads and service information, visit **https://petersmartlink.com**.
-
-Security vulnerabilities should not be posted publicly. Follow the private reporting process in [SECURITY.md](SECURITY.md).
+Do not publish source archives, internal deployment instructions, backend credentials, signing material, private endpoints or infrastructure inventories as customer documentation.
 
 ## Source and licensing
 
@@ -78,6 +78,6 @@ Historical copies previously distributed under another license remain governed b
 
 **OTYA System · PeterSmartLink**
 
-Built for reliable everyday media playback.
+Private production source. Public information lives on the official website.
 
 </div>
