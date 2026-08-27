@@ -29,7 +29,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
     _checkOnboarding();
-    CustomThemeManager.instance.load();
+    _loadVisualTheme();
     _applyOverlayStyle(isDark: true);
     ThemeProvider.instance.initTheme();
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -46,6 +46,13 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         } catch (_) {}
       });
     });
+  }
+
+  Future<void> _loadVisualTheme() async {
+    await CustomThemeManager.instance.load();
+    // Non-blocking in spirit: this method catches network failures internally,
+    // so offline startup and local playback are never held hostage by themes.
+    await CustomThemeManager.instance.refreshSeasonalTheme();
   }
 
   void _applyOverlayStyle({required bool isDark}) {
