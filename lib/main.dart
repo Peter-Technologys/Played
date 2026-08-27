@@ -70,8 +70,8 @@ Future<void> main() async {
       config: const AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player — Now Playing',
-        androidNotificationOngoing: false,
-        androidStopForegroundOnPause: true,
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
         notificationColor: Color(0xFF00E5FF),
         androidShowNotificationBadge: false,
@@ -169,7 +169,7 @@ void _showCrashOverlay(String title, String details) {
                 ),
               ],
             ),
-          ),
+          ],
         ),
       ),
     ),
@@ -183,7 +183,6 @@ Future<bool> _initDatabase() async {
   } catch (e, st) {
     debugPrint('[OtyaDB] Init error: $e\n$st');
     CrashReporter.instance.report(e, st);
-    // Never destroy a user's database as automatic crash recovery.
     return false;
   }
 }
@@ -254,6 +253,4 @@ Future<void> _initNotifications() async {
   );
 }
 
-// CloudflareService has no init — it is stateless HTTP. Accessed via singleton.
-// ignore: unused_element
 CloudflareService get _cf => CloudflareService.instance;
