@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'online_theme_service.dart';
@@ -77,6 +78,31 @@ class CustomThemeManager extends ChangeNotifier {
     _artOpacity = theme.overlay.clamp(0.18, 0.70);
     _artBlur = 0;
     _wallpaperPath = null;
+
+    final imageUrl = theme.wallpaperUrl;
+    if (imageUrl != null) {
+      final uri = Uri.tryParse(imageUrl);
+      if (uri != null && uri.scheme == 'https') {
+        try {
+          final response = await http.get(uri).timeout(const Duration(seconds: 12));
+          final type = response.headers['content-type'] ?? '';
+          if (response.statusCode == 200 &&
+              response.bodyBytes.isNotEmpty &&
+              response.bodyBytes.length <= 6 * 1024 * 1024 &&
+              type.toLowerCase().startsWith('image/')) {
+            final dir = await getApplicationDocumentsDirectory();
+            final dest = Directory('${dir.path}/themes/${theme.id}');
+            await dest.create(recursive: true);
+            final out = File('${dest.path}/background.jpg');
+            await out.writeAsBytes(response.bodyBytes, flush: true);
+            _wallpaperPath = out.path;
+          }
+        } catch (e) {
+          debugPrint('[ThemeManager] Image theme download skipped: $e');
+        }
+      }
+    }
+
     await _persist();
     notifyListeners();
   }

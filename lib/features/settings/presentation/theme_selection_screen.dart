@@ -174,14 +174,25 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
           else if (_catalogError != null)
             _CatalogError(message: _catalogError!, onRetry: _loadCatalog)
           else
-            ..._themes.map((theme) => Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
-                  child: _StoryThemeCard(
-                    theme: theme,
-                    active: activeId == theme.id,
-                    onInstall: () => _install(theme),
-                  ),
-                )),
+            GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 2,
+                crossAxisSpacing: 10,
+                mainAxisSpacing: 10,
+                childAspectRatio: 0.76,
+              ),
+              itemCount: _themes.length,
+              itemBuilder: (context, index) {
+                final theme = _themes[index];
+                return _StoryThemeCard(
+                  theme: theme,
+                  active: activeId == theme.id,
+                  onInstall: () => _install(theme),
+                );
+              },
+            ),
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.all(16),
@@ -199,7 +210,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
                   child: Text(
                     'Story themes are downloaded as tiny visual recipes. After installation they render on-device and work offline. Your own photo never leaves your phone.',
                     style: TextStyle(
-                      fontSize: 12,
+                      fontSize: 10,
                       height: 1.45,
                       color: AppColors.textSecondary,
                     ),
@@ -232,7 +243,7 @@ class _PhotoThemeCard extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       child: Container(
-        height: 220,
+        height: 180,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(22),
           border: Border.all(
@@ -329,7 +340,6 @@ class _StoryThemeCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 250,
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(22),
         border: Border.all(
@@ -342,9 +352,18 @@ class _StoryThemeCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: [
-            StoryThemeBackground(theme: theme.toJson()),
+            if ((theme.previewUrl ?? theme.wallpaperUrl) != null)
+              Image.network(
+                (theme.previewUrl ?? theme.wallpaperUrl)!,
+                fit: BoxFit.cover,
+                filterQuality: FilterQuality.medium,
+                errorBuilder: (_, __, ___) =>
+                    StoryThemeBackground(theme: theme.toJson()),
+              )
+            else
+              StoryThemeBackground(theme: theme.toJson()),
             Padding(
-              padding: const EdgeInsets.all(18),
+              padding: const EdgeInsets.all(12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -352,7 +371,7 @@ class _StoryThemeCard extends StatelessWidget {
                   Text(
                     theme.name,
                     style: const TextStyle(
-                      fontSize: 21,
+                      fontSize: 15,
                       fontWeight: FontWeight.w800,
                       color: Colors.white,
                     ),
@@ -360,7 +379,7 @@ class _StoryThemeCard extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text(
                     theme.story,
-                    maxLines: 3,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontSize: 12,
@@ -368,7 +387,7 @@ class _StoryThemeCard extends StatelessWidget {
                       color: Color(0xFFD3D0DC),
                     ),
                   ),
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
                   Align(
                     alignment: Alignment.centerRight,
                     child: FilledButton.icon(

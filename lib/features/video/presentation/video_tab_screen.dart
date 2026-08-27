@@ -14,6 +14,7 @@ import '../../player/presentation/queue_screen.dart';
 import '../../playlists/playlist_screen.dart' show playlistsProvider;
 import '../../../shared/widgets/playlists_view.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -64,8 +65,7 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_videoFilterProvider);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       body: SafeArea(
         child: Column(
           children: [

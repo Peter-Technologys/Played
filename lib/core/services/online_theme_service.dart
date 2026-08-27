@@ -12,6 +12,8 @@ class OnlineTheme {
     required this.version,
     required this.overlay,
     required this.palette,
+    this.previewUrl,
+    this.wallpaperUrl,
     this.seasonal,
   });
 
@@ -22,6 +24,8 @@ class OnlineTheme {
   final int version;
   final double overlay;
   final Map<String, String> palette;
+  final String? previewUrl;
+  final String? wallpaperUrl;
   final Map<String, dynamic>? seasonal;
 
   bool get isSeasonal => seasonal != null;
@@ -71,6 +75,12 @@ class OnlineTheme {
       version: (json['version'] as num?)?.toInt() ?? 1,
       overlay: (json['overlay'] as num?)?.toDouble() ?? 0.38,
       palette: rawPalette.map((key, value) => MapEntry(key, value.toString())),
+      previewUrl: (json['previewUrl'] as String?)?.trim().isEmpty == false
+          ? (json['previewUrl'] as String).trim()
+          : null,
+      wallpaperUrl: (json['wallpaperUrl'] as String?)?.trim().isEmpty == false
+          ? (json['wallpaperUrl'] as String).trim()
+          : null,
       seasonal: rawSeasonal is Map<String, dynamic>
           ? Map<String, dynamic>.from(rawSeasonal)
           : null,
@@ -85,6 +95,8 @@ class OnlineTheme {
         'version': version,
         'overlay': overlay,
         'palette': palette,
+        if (previewUrl != null) 'previewUrl': previewUrl,
+        if (wallpaperUrl != null) 'wallpaperUrl': wallpaperUrl,
         if (seasonal != null) 'seasonal': seasonal,
       };
 }

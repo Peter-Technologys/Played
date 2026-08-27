@@ -114,7 +114,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     final displayName = ref.watch(displayNameProvider);
     final photoUrl = ref.watch(photoUrlProvider);
     final tools = _tools(ref);
-    final featured = tools.take(4).toList();
+    final featured = tools.take(9).toList();
 
     return WallpaperScaffold(
       body: SafeArea(
@@ -186,24 +186,13 @@ class MySpaceHubScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: Text(
-                        'Quick actions',
-                        style: TextStyle(
-                          fontSize: 17,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimaryOf(context),
-                        ),
-                      ),
-                    ),
-                    TextButton.icon(
-                      onPressed: () => _showAllTools(context, tools),
-                      icon: const Icon(Icons.grid_view_rounded, size: 17),
-                      label: const Text('All tools'),
-                    ),
-                  ],
+                child: Text(
+                  'Tools',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimaryOf(context),
+                  ),
                 ),
               ),
             ),
@@ -212,10 +201,10 @@ class MySpaceHubScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 1.7,
+                  crossAxisCount: 3,
+                  crossAxisSpacing: 10,
+                  mainAxisSpacing: 10,
+                  childAspectRatio: 0.92,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _FeatureToolCard(tool: featured[index]),

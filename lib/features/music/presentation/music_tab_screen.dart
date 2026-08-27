@@ -15,6 +15,7 @@ import '../../playlists/playlist_screen.dart' show playlistsProvider;
 import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/playlists_view.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 // ── Filter pill state ─────────────────────────────────────────────────────
 
@@ -92,8 +93,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_musicFilterProvider);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       body: SafeArea(
         child: Stack(
           children: [
