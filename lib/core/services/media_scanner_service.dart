@@ -1,10 +1,7 @@
-import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:math' show min;
 import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/media_item.dart';
 import '../permissions/permission_helper.dart';
 
@@ -68,35 +65,6 @@ class MediaScannerService {
   MediaScannerService._();
   static final MediaScannerService instance = MediaScannerService._();
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
-  static const _kScanCacheKey = 'otya_scan_mtime_cache';
-  Map<String, int>? _mtimeCache;
-
-  Future<Map<String, int>> _loadMtimeCache() async {
-    if (_mtimeCache != null) return _mtimeCache!;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final raw = prefs.getString(_kScanCacheKey);
-      if (raw == null || raw.isEmpty) {
-        _mtimeCache = {};
-        return _mtimeCache!;
-      }
-      final decoded = jsonDecode(raw) as Map<String, dynamic>;
-      _mtimeCache = decoded.map((k, v) => MapEntry(k, v as int));
-    } catch (_) {
-      _mtimeCache = {};
-    }
-    return _mtimeCache!;
-  }
-
-  Future<void> _saveMtimeCache() async {
-    if (_mtimeCache == null) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_kScanCacheKey, jsonEncode(_mtimeCache));
-    } catch (e) {
-      debugPrint('[Scanner] Failed to save mtime cache: $e');
-    }
-  }
 
   static const List<String> _receiveDirs = [
     '/storage/emulated/0/Download',
@@ -195,8 +163,6 @@ class MediaScannerService {
 
   Future<List<MediaItem>> _scanSingleDir(String dirPath, Set<String> alreadySeen) async {
     final results = <MediaItem>[];
-    final cache = await _loadMtimeCache();
-    bool cacheUpdated = false;
     try {
       await for (final entity in Directory(dirPath).list(recursive: false, followLinks: false)) {
         if (entity is! File) continue;
@@ -209,11 +175,6 @@ class MediaScannerService {
         try {
           final stat = await entity.stat();
           if (stat.size < 10 * 1024) continue;
-          final mtimeMs = stat.modified.millisecondsSinceEpoch;
-          final cachedMtime = cache[path];
-          if (cachedMtime != null && cachedMtime == mtimeMs) continue;
-          cache[path] = mtimeMs;
-          cacheUpdated = true;
           alreadySeen.add(path);
           final fileName = path.split('/').last;
           results.add(MediaItem(
@@ -228,7 +189,6 @@ class MediaScannerService {
         } catch (_) {}
       }
     } catch (_) {}
-    if (cacheUpdated) unawaited(_saveMtimeCache());
     return results;
   }
 
