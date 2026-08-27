@@ -21,11 +21,6 @@ concurrency:
 permissions:
   contents: read
 
-env:
-  # Advanced Security features are not available on the current private-repo plan.
-  # Change this to 'true' only after GitHub Advanced Security/code scanning is enabled.
-  GHAS_ENABLED: 'false'
-
 jobs:
   baseline-security:
     name: Private repository security baseline
@@ -63,7 +58,7 @@ jobs:
 
   dependency-review:
     name: Dependency review (GHAS)
-    if: github.event_name == 'pull_request' && env.GHAS_ENABLED == 'true'
+    if: github.event_name == 'pull_request' && vars.GHAS_ENABLED == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -77,7 +72,7 @@ jobs:
 
   codeql:
     name: CodeQL (Java/Kotlin, GHAS)
-    if: github.event_name != 'pull_request' && env.GHAS_ENABLED == 'true'
+    if: github.event_name != 'pull_request' && vars.GHAS_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 45
     permissions:
