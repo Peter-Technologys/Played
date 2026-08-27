@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible OTYA Player problem
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for helping improve OTYA Player. Do not include passwords, API keys, tokens, or private user data.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the problem and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Open...
+        2. Tap...
+        3. Observe...
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: OTYA version
+      placeholder: e.g. 1.6.0+10
+  - type: input
+    id: device
+    attributes:
+      label: Device and Android version
+      placeholder: e.g. Samsung A06, Android 15
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Remove secrets, tokens, email addresses, phone numbers, and other private data before pasting logs.
+      render: shell
