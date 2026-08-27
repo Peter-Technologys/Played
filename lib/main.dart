@@ -66,13 +66,13 @@ Future<void> main() async {
   try {
     final audioHandler = await AudioService.init(
       builder: () => OtyaAudioHandler(),
-      config: const AudioServiceConfig(
+      config: AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
         androidNotificationChannelName: 'OTYA Player — Now Playing',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
-        notificationColor: Color(0xFF8B5CF6),
+        notificationColor: const Color(0xFF8B5CF6),
         androidShowNotificationBadge: false,
         preloadArtwork: true,
       ),
