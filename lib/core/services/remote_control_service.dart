@@ -2,9 +2,10 @@ import 'dart:convert';
 import 'dart:math';
 
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import 'http_client.dart';
 
 class RemoteControlService extends ChangeNotifier {
   RemoteControlService._();
@@ -46,13 +47,15 @@ class RemoteControlService extends ChangeNotifier {
   Future<bool> refreshFromServer() async {
     try {
       final timeoutSeconds = _int(runtime['apiTimeoutSeconds'], 8).clamp(4, 30);
-      final response = await http.get(
-        Uri.parse(_url),
-        headers: const {
-          'Accept': 'application/json',
-          'Accept-Encoding': 'gzip, deflate',
-        },
-      ).timeout(Duration(seconds: timeoutSeconds));
+      final response = await AppHttpClient.instance.client
+          .get(
+            Uri.parse(_url),
+            headers: const {
+              'Accept': 'application/json',
+              'Accept-Encoding': 'gzip, deflate',
+            },
+          )
+          .timeout(Duration(seconds: timeoutSeconds));
       if (response.statusCode != 200 || response.body.trim().isEmpty) return false;
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) return false;
