@@ -88,13 +88,16 @@ class _MediaCardState extends State<MediaCard>
     final item = widget.item;
     if (item.isVideo) {
       final key = item.filePath;
+      final mediaStoreId = item.mediaStoreId;
+      if (mediaStoreId == null || mediaStoreId.isEmpty) {
+        _cacheInsert(_thumbCache, key, null);
+        if (mounted) setState(() => _loaded = true);
+        return;
+      }
       try {
-        // MediaItem.id comes directly from MediaStore._ID. The native Android
-        // thumbnail API requires that numeric ID; the file path is only a
-        // stable cache key/fallback source and must never be passed as the ID.
         final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
           'path': item.filePath,
-          'id': item.id,
+          'id': mediaStoreId,
         });
         _cacheInsert(_thumbCache, key, path);
         if (mounted) setState(() { _thumbPath = path; _loaded = true; });
