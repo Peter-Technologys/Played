@@ -22,9 +22,6 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
     debugPrint('[OtyaAudioHandler] Player attached.');
   }
 
-  /// Detaches the player from this handler.
-  /// [disposePlayer] controls whether the underlying [Player] is also
-  /// disposed. Pass true only when playback is intentionally terminated.
   void detachPlayer({bool disposePlayer = false}) {
     debugPrint('[OtyaAudioHandler] Detaching player');
     _cancelSubscriptions();
@@ -88,7 +85,9 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
     playbackState.add(playbackState.value.copyWith(
       controls: [
         MediaControl.skipToPrevious,
+        MediaControl.rewind,
         isPlaying ? MediaControl.pause : MediaControl.play,
+        MediaControl.fastForward,
         MediaControl.skipToNext,
       ],
       systemActions: const {
@@ -96,12 +95,13 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
         MediaAction.seekForward,
         MediaAction.seekBackward,
       },
-      androidCompactActionIndices: const [0, 1, 2],
+      androidCompactActionIndices: const [0, 2, 4],
       processingState: processingState,
       playing: isPlaying,
       updatePosition: pos,
       bufferedPosition: p.state.buffer,
       speed: p.state.rate,
+      queueIndex: null,
     ));
   }
 
@@ -121,6 +121,7 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
       id: id,
       title: title,
       artist: artist,
+      album: 'OTYA Player',
       artUri: artUri,
       duration: duration ?? _player?.state.duration,
     ));
@@ -143,6 +144,23 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> seek(Duration position) async => _player?.seek(position);
 
   @override
+  Future<void> rewind() async {
+    final p = _player;
+    if (p == null) return;
+    final target = p.state.position - const Duration(seconds: 10);
+    await p.seek(target.isNegative ? Duration.zero : target);
+  }
+
+  @override
+  Future<void> fastForward() async {
+    final p = _player;
+    if (p == null) return;
+    final target = p.state.position + const Duration(seconds: 10);
+    final duration = p.state.duration;
+    await p.seek(duration > Duration.zero && target > duration ? duration : target);
+  }
+
+  @override
   Future<void> skipToNext() async {
     MediaNotificationService.instance.onSkipNext?.call();
   }
@@ -154,10 +172,6 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
 
   @override
   Future<void> onTaskRemoved() async {
-    // Do not tear down playback when the user swipes OTYA out of Recents.
-    // Android's foreground media service owns the active session and should
-    // remain available from the lock screen, notification shade and Bluetooth.
-    // Playback is terminated only by an explicit stop/dismiss action.
     debugPrint('[OtyaAudioHandler] App task removed; keeping media session alive.');
   }
 
@@ -168,8 +182,6 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 }
 
-/// Holds the audio handler and safely bridges the startup race where a media
-/// player is created before AudioService.init() has completed.
 class AudioHandlerSingleton {
   AudioHandlerSingleton._();
   static final AudioHandlerSingleton instance = AudioHandlerSingleton._();
