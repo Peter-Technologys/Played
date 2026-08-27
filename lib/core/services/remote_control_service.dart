@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -11,11 +12,13 @@ class RemoteControlService extends ChangeNotifier {
 
   static const _url = 'https://petersmartlink.com/api/app-config';
   static const _cacheKey = 'otya_remote_control_cache_v1';
+  static const _bucketSeedKey = 'otya_remote_bucket_seed_v1';
   static const _seenAnnouncementPrefix = 'otya_remote_announcement_seen_';
 
   Map<String, dynamic> _config = const {};
   bool _loaded = false;
   bool _onlineFresh = false;
+  String _bucketSeed = 'otya-default';
 
   bool get loaded => _loaded;
   bool get onlineFresh => _onlineFresh;
@@ -23,6 +26,11 @@ class RemoteControlService extends ChangeNotifier {
 
   Future<void> init({bool refresh = true}) async {
     final prefs = await SharedPreferences.getInstance();
+    _bucketSeed = prefs.getString(_bucketSeedKey) ?? _newBucketSeed();
+    if (!prefs.containsKey(_bucketSeedKey)) {
+      await prefs.setString(_bucketSeedKey, _bucketSeed);
+    }
+
     final cached = prefs.getString(_cacheKey);
     if (cached != null) {
       try {
@@ -37,10 +45,14 @@ class RemoteControlService extends ChangeNotifier {
 
   Future<bool> refreshFromServer() async {
     try {
+      final timeoutSeconds = _int(runtime['apiTimeoutSeconds'], 8).clamp(4, 30);
       final response = await http.get(
         Uri.parse(_url),
-        headers: const {'Accept': 'application/json'},
-      ).timeout(const Duration(seconds: 8));
+        headers: const {
+          'Accept': 'application/json',
+          'Accept-Encoding': 'gzip, deflate',
+        },
+      ).timeout(Duration(seconds: timeoutSeconds));
       if (response.statusCode != 200 || response.body.trim().isEmpty) return false;
       final decoded = jsonDecode(response.body);
       if (decoded is! Map<String, dynamic>) return false;
@@ -65,8 +77,7 @@ class RemoteControlService extends ChangeNotifier {
     return fallback;
   }
 
-  Map<String, dynamic> get maintenance =>
-      _map(_config['maintenance']);
+  Map<String, dynamic> get maintenance => _map(_config['maintenance']);
 
   bool get maintenanceEnabled => maintenance['enabled'] == true;
   bool get allowOfflinePlayback => maintenance['allowOfflinePlayback'] != false;
@@ -78,7 +89,8 @@ class RemoteControlService extends ChangeNotifier {
   Map<String, dynamic> get ai => _map(_config['ai']);
   Map<String, dynamic> get search => _map(_config['search']);
   Map<String, dynamic> get runtime => _map(_config['runtime']);
-  List<dynamic> get campaigns => _config['campaigns'] is List ? _config['campaigns'] as List : const [];
+  List<dynamic> get campaigns =>
+      _config['campaigns'] is List ? _config['campaigns'] as List : const [];
 
   Future<RemoteVersionState> versionState() async {
     final versions = _map(_config['versions']);
@@ -118,11 +130,20 @@ class RemoteControlService extends ChangeNotifier {
     final exp = experiments[key] as Map;
     if (exp['enabled'] == false) return false;
     final percent = _int(exp['rolloutPercent'], 100).clamp(0, 100);
+    if (percent <= 0) return false;
     if (percent >= 100) return true;
-    final seed = '${exp['salt'] ?? key}:$key';
+    final seed = '${exp['salt'] ?? key}:$key:$_bucketSeed';
     var hash = 0;
-    for (final c in seed.codeUnits) hash = ((hash * 31) + c) & 0x7fffffff;
+    for (final c in seed.codeUnits) {
+      hash = ((hash * 31) + c) & 0x7fffffff;
+    }
     return hash % 100 < percent;
+  }
+
+  static String _newBucketSeed() {
+    final random = Random.secure();
+    final bytes = List<int>.generate(16, (_) => random.nextInt(256));
+    return bytes.map((b) => b.toRadixString(16).padLeft(2, '0')).join();
   }
 
   static Map<String, dynamic> _map(dynamic value) {
@@ -131,7 +152,8 @@ class RemoteControlService extends ChangeNotifier {
     return const {};
   }
 
-  static int _int(dynamic value, int fallback) => value is num ? value.toInt() : int.tryParse('$value') ?? fallback;
+  static int _int(dynamic value, int fallback) =>
+      value is num ? value.toInt() : int.tryParse('$value') ?? fallback;
 }
 
 class RemoteVersionState {
