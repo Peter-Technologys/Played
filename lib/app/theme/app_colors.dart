@@ -2,11 +2,12 @@ import 'package:flutter/material.dart';
 
 /// PeterSmart Link / OTYA master visual system.
 ///
-/// The approved product concept uses near-black foundations, layered charcoal
-/// surfaces and one purple brand family. Media artwork supplies the rich colour.
+/// The approved product concept uses a translucent near-black foundation,
+/// layered charcoal glass surfaces and one purple brand family. The user's
+/// selected image theme supplies the visual artwork behind the interface.
 /// Semantic green/amber/red are reserved for status only.
 abstract class AppColors {
-  static const Color background       = Color(0xFF08080B);
+  static const Color background       = Color(0xB308080B);
   static const Color surface          = Color(0xB8101014);
   static const Color surfaceElevated  = Color(0xC716161D);
   static const Color surfaceHighlight = Color(0xD61D1D27);
@@ -36,7 +37,7 @@ abstract class AppColors {
     end: Alignment.bottomRight,
   );
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF111116), Color(0xFF181820)],
+    colors: [Color(0xC7111116), Color(0xD2181820)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
