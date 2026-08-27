@@ -67,6 +67,16 @@ class GoogleAccountService {
       if (result.ok) {
         _account = account;
         _driveAccessToken = accessToken;
+
+        // Create/update the user's private Drive backup immediately. A Drive
+        // outage must not prevent a successful OTYA sign-in, so this remains
+        // non-fatal and can be retried later by backupToDrive().
+        try {
+          final data = await BackupService.instance.buildBackupData();
+          await BackupService.instance.backup(data, accessToken);
+        } catch (e) {
+          debugPrint('[GoogleAccount] initial Drive backup skipped: $e');
+        }
       }
       return result;
     } catch (e) {
