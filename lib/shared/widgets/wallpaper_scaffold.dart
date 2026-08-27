@@ -12,6 +12,7 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/custom_theme_manager.dart';
 import 'otya_mountain_background.dart';
+import 'story_theme_background.dart';
 
 class WallpaperScaffold extends StatelessWidget {
   final Widget body;
@@ -45,6 +46,7 @@ class WallpaperScaffold extends StatelessWidget {
         final manager = CustomThemeManager.instance;
         final wallpaperPath = manager.wallpaperPath;
         final hasWallpaper = wallpaperPath != null && File(wallpaperPath).existsSync();
+        final storyTheme = manager.storyTheme;
 
         return Stack(
           fit: StackFit.expand,
@@ -55,6 +57,8 @@ class WallpaperScaffold extends StatelessWidget {
                 dimAmount: manager.artOpacity,
                 blur: manager.artBlur,
               )
+            else if (storyTheme != null)
+              StoryThemeBackground(theme: storyTheme)
             else
               const OtyaMountainBackground(),
             Scaffold(
