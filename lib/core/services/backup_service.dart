@@ -17,8 +17,6 @@ class BackupService {
   BackupService._();
   static final BackupService instance = BackupService._();
 
-  // Delegate to the app-wide singleton HTTP client — avoids duplicate
-  // persistent connections and lets AppHttpClient manage the lifecycle.
   http.Client get _client => AppHttpClient.instance.client;
   static const Duration _timeout = Duration(seconds: 30);
 
@@ -29,9 +27,7 @@ class BackupService {
         final error = decoded['error'];
         if (error is String && error.trim().isNotEmpty) return error;
       }
-    } catch (_) {
-      // Never expose FormatException/HTML edge responses to the user.
-    }
+    } catch (_) {}
     return '$fallback (${res.statusCode})';
   }
 
@@ -39,9 +35,7 @@ class BackupService {
     try {
       final decoded = jsonDecode(res.body);
       if (decoded is Map<String, dynamic>) return decoded;
-    } catch (_) {
-      // Converted below to a stable application error.
-    }
+    } catch (_) {}
     throw Exception(fallback);
   }
 
@@ -113,7 +107,7 @@ class BackupService {
     };
   }
 
-  Future<void> restoreFromData(Map<String, dynamic> data) async {
+  Future<int> restoreFromData(Map<String, dynamic> data) async {
     final schemaVersion = data['schema_version'] ?? data['version'];
     if (schemaVersion is! int || schemaVersion != _kBackupSchemaVersion) {
       throw Exception('This backup version is not supported by this OTYA build.');
@@ -124,10 +118,9 @@ class BackupService {
       throw Exception('The Drive backup is damaged or incomplete.');
     }
 
-    // Restore playlists. Backups intentionally contain metadata/app state only;
-    // local music/video files and private Safe media are never uploaded here.
     final playlists = rawPlaylists as List<dynamic>? ?? const [];
     debugPrint('[BackupService] Restoring ${playlists.length} playlists');
+    var restored = 0;
 
     for (final raw in playlists) {
       if (raw is! Map<String, dynamic>) continue;
@@ -144,6 +137,8 @@ class BackupService {
         updatedAt: DateTime.tryParse(raw['updatedAt'] as String? ?? '') ?? now,
       );
       await OtyaDatabase.instance.savePlaylist(playlist);
+      restored++;
     }
+    return restored;
   }
 }
