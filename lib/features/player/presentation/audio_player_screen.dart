@@ -705,7 +705,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       ref.read(audioPlayerProvider.notifier).skipBack();
                     },
                   ),
-      // Gradient play button (doubles as retry button when load timed out)
+                  // Primary play button (also retries a timed-out load)
                   GestureDetector(
                     onTap: () {
                       if (_showRetry) {
@@ -722,19 +722,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       width: playBtnSize, height: playBtnSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        gradient: const LinearGradient(
-                          colors: [AppColors.accent, AppColors.accentViolet],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
+                        color: AppColors.accent,
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.45),
-                            blurRadius: 28, spreadRadius: 4,
-                          ),
-                          BoxShadow(
-                            color: AppColors.accentViolet.withValues(alpha: 0.25),
-                            blurRadius: 60, spreadRadius: 8,
+                            color: AppColors.accent.withValues(alpha: 0.24),
+                            blurRadius: 18,
+                            spreadRadius: 1,
+                            offset: const Offset(0, 8),
                           ),
                         ],
                       ),
@@ -742,17 +736,17 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                           ? const Padding(
                               padding: EdgeInsets.all(20),
                               child: CircularProgressIndicator(
-                                  color: Colors.black, strokeWidth: 2))
+                                  color: Colors.white, strokeWidth: 2))
                           : _showRetry
                               ? const Padding(
                                   padding: EdgeInsets.all(14),
                                   child: Icon(Icons.refresh_rounded,
-                                      color: Colors.black, size: 30))
+                                      color: Colors.white, size: 30))
                               : Icon(
                                   ps.isPlaying
                                       ? Icons.pause_rounded
                                       : Icons.play_arrow_rounded,
-                                  color: Colors.black, size: 38,
+                                  color: Colors.white, size: 38,
                                 ),
                     ),
                   ),
