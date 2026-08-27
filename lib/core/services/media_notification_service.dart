@@ -6,6 +6,7 @@ import 'package:path_provider/path_provider.dart';
 
 import 'album_art_service.dart';
 import 'audio_handler.dart';
+import 'notification_service.dart';
 import 'shared_notification_plugin.dart';
 
 /// Owns system Now Playing metadata for notification shade, lock screen,
@@ -15,6 +16,7 @@ class MediaNotificationService {
   static final MediaNotificationService instance = MediaNotificationService._();
 
   bool _initialized = false;
+  bool _permissionChecked = false;
   String? _lastArtworkKey;
   Uri? _lastArtworkUri;
 
@@ -26,6 +28,17 @@ class MediaNotificationService {
     await initSharedNotificationsPlugin();
     _initialized = true;
     debugPrint('[MediaNotificationService] Initialized.');
+  }
+
+  Future<void> _ensureNotificationPermission() async {
+    if (_permissionChecked) return;
+    _permissionChecked = true;
+    try {
+      final granted = await NotificationService.instance.requestPermission();
+      debugPrint('[MediaNotificationService] Notification permission: $granted');
+    } catch (e) {
+      debugPrint('[MediaNotificationService] Permission request skipped: $e');
+    }
   }
 
   Future<Directory> _artworkDir() async {
@@ -71,13 +84,16 @@ class MediaNotificationService {
     String? albumArtPath,
   }) async {
     if (!_initialized) await init();
+    await _ensureNotificationPermission();
     final artUri = await _stableArtUri(albumArtPath, id);
-    AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
+    final handler = AudioHandlerSingleton.instance.handler;
+    handler?.updateMediaItemFromParts(
       id: id,
       title: title,
       artist: artist,
       artUri: artUri,
     );
+    await updatePlayState(isPlaying);
   }
 
   Future<void> showWithBitmap({
@@ -88,6 +104,7 @@ class MediaNotificationService {
     required Uint8List albumArtBytes,
   }) async {
     if (!_initialized) await init();
+    await _ensureNotificationPermission();
     Uri? artUri;
     try {
       final dir = await _artworkDir();
@@ -99,19 +116,43 @@ class MediaNotificationService {
     } catch (e) {
       debugPrint('[MediaNotification] bitmap cache failed: $e');
     }
-    AudioHandlerSingleton.instance.handler?.updateMediaItemFromParts(
+    final handler = AudioHandlerSingleton.instance.handler;
+    handler?.updateMediaItemFromParts(
       id: id,
       title: title,
       artist: artist,
       artUri: artUri,
     );
+    await updatePlayState(isPlaying);
   }
 
-  Future<void> updatePlayState(bool isPlaying) async {}
+  Future<void> updatePlayState(bool isPlaying) async {
+    final handler = AudioHandlerSingleton.instance.handler;
+    if (handler == null) return;
+    final current = handler.playbackState.value;
+    handler.playbackState.add(current.copyWith(
+      playing: isPlaying,
+      controls: [
+        MediaControl.skipToPrevious,
+        MediaControl.rewind,
+        isPlaying ? MediaControl.pause : MediaControl.play,
+        MediaControl.fastForward,
+        MediaControl.skipToNext,
+      ],
+      androidCompactActionIndices: const [0, 2, 4],
+    ));
+  }
 
   Future<void> dismiss() async {
     _lastArtworkKey = null;
     _lastArtworkUri = null;
-    AudioHandlerSingleton.instance.handler?.mediaItem.add(null);
+    final handler = AudioHandlerSingleton.instance.handler;
+    handler?.mediaItem.add(null);
+    if (handler != null) {
+      handler.playbackState.add(handler.playbackState.value.copyWith(
+        playing: false,
+        controls: const [],
+      ));
+    }
   }
 }
