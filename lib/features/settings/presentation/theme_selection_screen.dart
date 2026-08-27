@@ -382,7 +382,7 @@ class _StoryThemeCard extends StatelessWidget {
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 12,
+                      fontSize: 10.5,
                       height: 1.4,
                       color: Color(0xFFD3D0DC),
                     ),
