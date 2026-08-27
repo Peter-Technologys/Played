@@ -44,6 +44,12 @@ class MediaItem extends HiveObject {
   @HiveField(12)
   final String? album;
 
+  /// Android MediaStore numeric _ID when this item came from MediaStore.
+  /// Kept separate from [id], which remains path-based and stable across
+  /// rescans for playlists/history. Android thumbnail APIs require this ID.
+  @HiveField(13)
+  final String? mediaStoreId;
+
   MediaItem({
     required this.id,
     required this.title,
@@ -58,12 +64,11 @@ class MediaItem extends HiveObject {
     this.albumArtPath,
     this.artist,
     this.album,
+    this.mediaStoreId,
   });
 
-  /// Returns the underlying [File] object for this media item.
   File get file => File(filePath);
 
-  /// Returns a copy of this item with the given fields replaced.
   MediaItem copyWith({
     String? id,
     String? title,
@@ -78,6 +83,7 @@ class MediaItem extends HiveObject {
     String? albumArtPath,
     String? artist,
     String? album,
+    String? mediaStoreId,
   }) {
     return MediaItem(
       id: id ?? this.id,
@@ -93,6 +99,7 @@ class MediaItem extends HiveObject {
       albumArtPath: albumArtPath ?? this.albumArtPath,
       artist: artist ?? this.artist,
       album: album ?? this.album,
+      mediaStoreId: mediaStoreId ?? this.mediaStoreId,
     );
   }
 
