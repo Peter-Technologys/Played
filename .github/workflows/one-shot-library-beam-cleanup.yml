@@ -1,0 +1,197 @@
+name: One-shot library and Beam cleanup
+
+on:
+  push:
+    paths:
+      - '.github/workflows/one-shot-library-beam-cleanup.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Remove video grid toggle and harden Beam UI
+        shell: python
+        run: |
+          from pathlib import Path
+
+          # --- Video Library: one canonical list view ---
+          p = Path('lib/features/video/presentation/video_tab_screen.dart')
+          s = p.read_text()
+          s = s.replace(
+              "// ── List / Grid toggle — true = list view (default), false = grid view ────\n\nfinal _videoListViewProvider = StateProvider<bool>((_) => true);\n\n",
+              "")
+          s = s.replace(
+              "        final isListView = ref.watch(_videoListViewProvider);\n        return _VideoGrid(items: videos, isListView: isListView);",
+              "        return _VideoGrid(items: videos, isListView: true);")
+          toggle = """          const SizedBox(width: 6),
+          // List / Grid toggle
+          _IconBtn(
+            icon: ref.watch(_videoListViewProvider)
+                ? Icons.grid_view_rounded
+                : Icons.view_list_rounded,
+            onTap: () {
+              HapticFeedback.selectionClick();
+              ref.read(_videoListViewProvider.notifier).state =
+                  !ref.read(_videoListViewProvider);
+            },
+          ),
+"""
+          if toggle not in s:
+              raise SystemExit('video list/grid toggle block not found')
+          s = s.replace(toggle, "")
+          p.write_text(s)
+
+          # --- Beam: preserve names, shrink scanner, remove legacy gradients ---
+          p = Path('lib/features/air_drop/presentation/air_drop_screen.dart')
+          s = p.read_text()
+
+          old_name = """      final fileName = url.split('/').last.contains('.')
+          ? url.split('/').last
+          : 'received_${DateTime.now().millisecondsSinceEpoch}.mp4';
+"""
+          new_name = """      final transferUri = Uri.parse(url);
+      final advertisedName = transferUri.queryParameters['name'];
+      final cleanedName = advertisedName
+          ?.replaceAll('\\\\', '/')
+          .split('/')
+          .last
+          .trim();
+      final fileName = (cleanedName != null && cleanedName.isNotEmpty)
+          ? cleanedName
+          : 'received_${DateTime.now().millisecondsSinceEpoch}.bin';
+"""
+          if old_name not in s:
+              raise SystemExit('Beam filename block not found')
+          s = s.replace(old_name, new_name)
+
+          # Reject non-local QR destinations before any download request.
+          marker = """  Future<void> onQrScanned(String url) async {
+    if (state.receiveStep == _ReceiveStep.downloading) return;
+"""
+          replacement = """  Future<void> onQrScanned(String url) async {
+    if (state.receiveStep == _ReceiveStep.downloading) return;
+    final uri = Uri.tryParse(url);
+    final host = uri?.host ?? '';
+    if (uri == null || uri.scheme != 'http' || !_isPrivateHost(host)) {
+      state = state.copyWith(
+        receiveStep: _ReceiveStep.error,
+        errorMessage: 'Beam only accepts links from a nearby device on your local Wi-Fi or hotspot.',
+      );
+      _log('Rejected non-local Beam link.');
+      return;
+    }
+"""
+          if marker not in s:
+              raise SystemExit('Beam onQrScanned marker not found')
+          s = s.replace(marker, replacement)
+
+          dispose_marker = """  void cancelDownload() { _receiver.cancel(); resetReceive(); _log('Cancelled.'); }
+
+  @override
+"""
+          helper = """  void cancelDownload() { _receiver.cancel(); resetReceive(); _log('Cancelled.'); }
+
+  bool _isPrivateHost(String host) {
+    final parts = host.split('.');
+    if (parts.length != 4) return false;
+    final nums = parts.map(int.tryParse).toList();
+    if (nums.any((n) => n == null)) return false;
+    final a = nums[0]!;
+    final b = nums[1]!;
+    return a == 10 ||
+        (a == 192 && b == 168) ||
+        (a == 172 && b >= 16 && b <= 31);
+  }
+
+  @override
+"""
+          if dispose_marker not in s:
+              raise SystemExit('Beam helper insertion marker not found')
+          s = s.replace(dispose_marker, helper)
+
+          scanner_old = """        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: MobileScanner(
+              controller: scanCtrl,
+              onDetect: (BarcodeCapture capture) {
+                if (scanned) return;
+                final barcode = capture.barcodes.firstOrNull;
+                final url = barcode?.displayValue ?? barcode?.rawValue;
+                if (url != null && url.startsWith('http')) {
+                  scanned = true;
+                  HapticFeedback.mediumImpact();
+                  n.onQrScanned(url);
+                }
+              },
+            ),
+          ),
+        ),
+"""
+          scanner_new = """        Center(
+          child: SizedBox(
+            width: 260,
+            height: 260,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: MobileScanner(
+                controller: scanCtrl,
+                fit: BoxFit.cover,
+                onDetect: (BarcodeCapture capture) {
+                  if (scanned) return;
+                  final barcode = capture.barcodes.firstOrNull;
+                  final url = barcode?.displayValue ?? barcode?.rawValue;
+                  if (url != null && url.startsWith('http://')) {
+                    scanned = true;
+                    HapticFeedback.mediumImpact();
+                    n.onQrScanned(url);
+                  }
+                },
+              ),
+            ),
+          ),
+        ),
+"""
+          if scanner_old not in s:
+              raise SystemExit('Beam scanner block not found')
+          s = s.replace(scanner_old, scanner_new)
+
+          s = s.replace(
+              "indicator: BoxDecoration(\n                    gradient: AppColors.accentGradient,\n                    borderRadius: BorderRadius.circular(12)),",
+              "indicator: BoxDecoration(\n                    color: AppColors.accent,\n                    borderRadius: BorderRadius.circular(12)),")
+          s = s.replace('labelColor: Colors.black,', 'labelColor: Colors.white,')
+          s = s.replace("tabs: const [Tab(text: '📤  Beam'), Tab(text: '📥  Catch')],",
+                        "tabs: const [Tab(text: 'Send'), Tab(text: 'Receive')],")
+          s = s.replace("Text('🎥 ${state.selectedItem!.title}  •  ${state.selectedItem!.formattedSize}',",
+                        "Text('${state.selectedItem!.title}  •  ${state.selectedItem!.formattedSize}',")
+          s = s.replace("const Text('File received! ✔',", "const Text('File received',")
+          s = s.replace("const Text('Added to your media library.',", "const Text('Saved on this device.',")
+          p.write_text(s)
+
+          # --- Remove obsolete getotya default from router ---
+          p = Path('lib/app/router.dart')
+          s = p.read_text()
+          s = s.replace(
+              "url: args['url'] as String? ?? 'https://getotya.petersmartlink.com',",
+              "url: args['url'] as String? ?? 'https://petersmartlink.com/otya-player',")
+          p.write_text(s)
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'PeterSmart Link Automation'
+          git config user.email 'actions@users.noreply.github.com'
+          git add lib/features/video/presentation/video_tab_screen.dart \
+                  lib/features/air_drop/presentation/air_drop_screen.dart \
+                  lib/app/router.dart
+          git commit -m 'Simplify video library and repair OTYA Beam transfer'
+          git push
