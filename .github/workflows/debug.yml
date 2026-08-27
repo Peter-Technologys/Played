@@ -1,13 +1,6 @@
 # OTYA Player — Signed Release APK Build
-#
-# Builds a signed release APK on every push to main and on every pull request.
-# APKs are split by ABI (arm64 + arm32) and uploaded as GitHub Actions artifacts.
-# No R2 upload — use the Release workflow (push a v* tag) for that.
-#
-# Required GitHub Secrets:
-#   KEYSTORE_BASE64, STORE_PASSWORD, KEY_ALIAS, KEY_PASSWORD
-# Required GitHub Variables:
-#   GOOGLE_SERVICES_JSON
+# Builds signed release APKs on every push to main and on every pull request.
+# Each ABI is built separately to avoid Flutter split-APK output detection failures.
 
 name: Debug APK
 
@@ -106,7 +99,10 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Build release APK
+      - name: Analyze Dart code
+        run: flutter analyze --no-fatal-infos --no-fatal-warnings
+
+      - name: Build arm64 APK
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -116,55 +112,56 @@ jobs:
           DD_WORKER_URL: ${{ secrets.WORKER_URL }}
         run: |
           set -e
-
-          # Do not pass an explicit --target-platform list here. Flutter's
-          # split-per-ABI builder determines the supported ABIs itself; the
-          # explicit list can leave Gradle's output in a location Flutter's
-          # post-build check does not recognise.
-          flutter build apk --release --split-per-abi --verbose \
+          rm -rf build/app/outputs/flutter-apk
+          flutter build apk --release --target-platform android-arm64 \
             --dart-define=OTYA_SECRET="$DD_SECRET" \
             --dart-define=SELF_UPDATE=true \
             --dart-define=WORKER_URL="$DD_WORKER_URL"
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
 
-          echo "=== APKs produced by Flutter ==="
-          find build/app/outputs/flutter-apk -type f -name "*.apk" -print
+      - name: Build arm32 APK
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          DD_SECRET: ${{ secrets.OTYA_SECRET }}
+          DD_WORKER_URL: ${{ secrets.WORKER_URL }}
+        run: |
+          set -e
+          rm -rf build/app/outputs/flutter-apk
+          flutter build apk --release --target-platform android-arm \
+            --dart-define=OTYA_SECRET="$DD_SECRET" \
+            --dart-define=SELF_UPDATE=true \
+            --dart-define=WORKER_URL="$DD_WORKER_URL"
+          test -s build/app/outputs/flutter-apk/app-release.apk
+          cp build/app/outputs/flutter-apk/app-release.apk /tmp/app-armeabi-v7a-release.apk
 
-          ARM64="build/app/outputs/flutter-apk/app-arm64-v8a-release.apk"
-          ARM32="build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk"
+      - name: Restore APK output directory
+        run: |
+          mkdir -p build/app/outputs/flutter-apk
+          cp /tmp/app-armeabi-v7a-release.apk build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
 
-          if [ ! -f "$ARM64" ] || [ ! -f "$ARM32" ]; then
-            echo "ERROR: Flutter completed but expected split APKs are missing."
-            echo "=== All APKs under build ==="
-            find build -type f -name "*.apk" -print || true
-            echo "=== All APKs under android/app/build ==="
-            find android/app/build -type f -name "*.apk" -print || true
-            exit 1
-          fi
-
-          echo "Both ABI APKs were successfully produced."
+      - name: Verify APKs and record checksums
+        run: |
+          for APK in \
+            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
+            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
+            test -f "$APK" || { echo "ERROR: $APK not found"; exit 1; }
+            SIZE=$(stat -c%s "$APK")
+            test "$SIZE" -gt 5000000 || { echo "ERROR: $APK too small ($SIZE bytes)"; exit 1; }
+            SHA=$(sha256sum "$APK" | cut -d' ' -f1)
+            echo "OK: $APK | $SIZE bytes | sha256=$SHA"
+          done
 
       - name: Diagnose APK outputs
         if: always()
         run: |
-          echo "=== Flutter APK output ==="
-          ls -la build/app/outputs/flutter-apk/ 2>/dev/null || echo "(directory not found)"
-          echo "=== All APKs under build/ ==="
-          find build -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
-          echo "=== All APKs under android/app/build/ ==="
-          find android/app/build/outputs -type f -name "*.apk" -print 2>/dev/null || echo "(none)"
-
-      - name: Verify APKs and record checksums
-        run: |
-          echo "Commit: $(git rev-parse HEAD)"
-          for APK in \
-            build/app/outputs/flutter-apk/app-arm64-v8a-release.apk \
-            build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
-            if [ ! -f "$APK" ]; then echo "ERROR: $APK not found"; exit 1; fi
-            SIZE=$(stat -c%s "$APK")
-            if [ "$SIZE" -lt 5000000 ]; then echo "ERROR: $APK too small ($SIZE bytes)"; exit 1; fi
-            SHA=$(sha256sum "$APK" | cut -d' ' -f1)
-            echo "OK: $APK | $SIZE bytes | sha256=$SHA"
-          done
+          echo "=== APKs under build/ ==="
+          find build -type f -name "*.apk" -print 2>/dev/null || true
+          echo "=== APKs under android/app/build/ ==="
+          find android/app/build -type f -name "*.apk" -print 2>/dev/null || true
 
       - name: Remove secrets
         if: always()
@@ -186,6 +183,3 @@ jobs:
           echo "### Release APK Built" >> $GITHUB_STEP_SUMMARY
           echo "**Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
           echo "**Branch:** ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          ARM64=$(du -sh build/app/outputs/flutter-apk/app-arm64-v8a-release.apk | cut -f1)
-          ARM32=$(du -sh build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk | cut -f1)
-          echo "**arm64:** $ARM64 | **arm32:** $ARM32" >> $GITHUB_STEP_SUMMARY
