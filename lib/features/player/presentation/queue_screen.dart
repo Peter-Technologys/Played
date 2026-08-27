@@ -5,8 +5,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/smart_shuffle_service.dart';
-
-// ── Queue Provider ───────────────────────────────────────────────────
+import '../../../shared/widgets/album_art_thumb.dart';
 
 class QueueState {
   final List<MediaItem> items;
@@ -17,16 +16,17 @@ class QueueState {
     this.currentIndex = 0,
     this.shuffle = false,
   });
+
   QueueState copyWith({
     List<MediaItem>? items,
     int? currentIndex,
     bool? shuffle,
-  }) =>
-      QueueState(
+  }) => QueueState(
         items: items ?? this.items,
         currentIndex: currentIndex ?? this.currentIndex,
         shuffle: shuffle ?? this.shuffle,
       );
+
   MediaItem? get current =>
       items.isEmpty ? null : items[currentIndex.clamp(0, items.length - 1)];
 }
@@ -58,20 +58,18 @@ class QueueNotifier extends StateNotifier<QueueState> {
     if (state.items.isEmpty) return;
     final int nextIndex;
     if (state.shuffle) {
-      // Build stats from recently played history for weighted shuffle.
       final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 9999);
       final statsMap = <String, TrackStats>{
         for (final item in history)
           item.id: TrackStats(
-            playCount:    1,
+            playCount: 1,
             lastPlayedMs: item.lastPlayedAt?.millisecondsSinceEpoch ?? 0,
-            rating:       0,
-            skipCount:    0,
+            rating: 0,
+            skipCount: 0,
           ),
       };
       final ids = state.items.map((i) => i.id).toList();
       final shuffled = SmartShuffleService.instance.smartShuffle(ids, statsMap);
-      // Find the first shuffled ID that is not the current track.
       final currentId = state.items[state.currentIndex].id;
       final nextId = shuffled.firstWhere(
         (id) => id != currentId,
@@ -99,8 +97,6 @@ class QueueNotifier extends StateNotifier<QueueState> {
 final queueProvider =
     StateNotifierProvider<QueueNotifier, QueueState>((_) => QueueNotifier());
 
-// ── Queue Screen ───────────────────────────────────────────────────
-
 class QueueScreen extends ConsumerWidget {
   const QueueScreen({super.key});
 
@@ -108,192 +104,332 @@ class QueueScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final queue = ref.watch(queueProvider);
     final cs = Theme.of(context).colorScheme;
+    final height = MediaQuery.of(context).size.width > 600
+        ? MediaQuery.of(context).size.height * 0.64
+        : MediaQuery.of(context).size.height * 0.82;
 
     return Container(
-      height: MediaQuery.of(context).size.width > 600
-          ? MediaQuery.of(context).size.height * 0.6
-          : MediaQuery.of(context).size.height * 0.8,
+      height: height,
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        border: Border(
+          top: BorderSide(color: AppColors.accent.withValues(alpha: 0.22)),
+        ),
       ),
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.borderOf(context),
-                borderRadius: BorderRadius.circular(2),
-              ),
+          const SizedBox(height: 10),
+          Container(
+            width: 38,
+            height: 4,
+            decoration: BoxDecoration(
+              color: cs.onSurface.withValues(alpha: 0.16),
+              borderRadius: BorderRadius.circular(999),
             ),
           ),
-          const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
             child: Row(
               children: [
-                Text('Up Next',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.w700,
-                      color: cs.onSurface,
-                      fontFamily: 'Inter',
-                    )),
-                const SizedBox(width: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(6),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        'QUEUE',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 1.8,
+                          color: AppColors.accent,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      Text(
+                        queue.items.isEmpty
+                            ? 'Nothing up next'
+                            : '${queue.items.length} ${queue.items.length == 1 ? 'track' : 'tracks'} up next',
+                        style: TextStyle(
+                          fontSize: 19,
+                          fontWeight: FontWeight.w800,
+                          color: cs.onSurface,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
                   ),
-                  child: Text('${queue.items.length}',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.w700,
-                        fontFamily: 'Inter',
-                      )),
                 ),
-                const Spacer(),
-                GestureDetector(
+                _HeaderAction(
+                  icon: Icons.shuffle_rounded,
+                  active: queue.shuffle,
+                  tooltip: 'Shuffle',
                   onTap: () {
                     HapticFeedback.selectionClick();
                     ref.read(queueProvider.notifier).toggleShuffle();
                   },
-                  child: Icon(
-                    Icons.shuffle_rounded,
-                    color: queue.shuffle ? AppColors.accent : cs.onSurface.withValues(alpha: 0.45),
-                    size: 22,
-                  ),
                 ),
-                const SizedBox(width: 16),
-                GestureDetector(
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    ref.read(queueProvider.notifier).clear();
-                  },
-                  child: Text('Clear All',
-                      style: TextStyle(
-                          fontSize: 13,
-                          color: cs.onSurface.withValues(alpha: 0.55),
-                          fontFamily: 'Inter')),
+                const SizedBox(width: 8),
+                _HeaderAction(
+                  icon: Icons.delete_sweep_outlined,
+                  tooltip: 'Clear queue',
+                  onTap: queue.items.isEmpty
+                      ? null
+                      : () {
+                          HapticFeedback.mediumImpact();
+                          ref.read(queueProvider.notifier).clear();
+                        },
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          const Divider(height: 1),
+          Divider(height: 1, color: AppColors.borderOf(context)),
           Expanded(
             child: queue.items.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Container(
-                          width: 72,
-                          height: 72,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent.withValues(alpha: 0.08),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.queue_music_rounded,
-                              color: AppColors.accent, size: 36),
-                        ),
-                        const SizedBox(height: 16),
-                        Text(
-                          'Queue is empty',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: cs.onSurface,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Play a song or video to start a queue.',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: cs.onSurface.withValues(alpha: 0.55),
-                            fontFamily: 'Inter',
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ],
-                    ),
-                  )
+                ? _EmptyQueue(colorScheme: cs)
                 : ReorderableListView.builder(
-                    padding: EdgeInsets.fromLTRB(0, 8, 0,
-                        MediaQuery.of(context).padding.bottom + 90),
+                    padding: EdgeInsets.fromLTRB(
+                      12,
+                      10,
+                      12,
+                      MediaQuery.of(context).padding.bottom + 24,
+                    ),
                     itemCount: queue.items.length,
                     onReorder: (oldIndex, newIndex) {
                       HapticFeedback.mediumImpact();
                       final adjusted =
                           newIndex > oldIndex ? newIndex - 1 : newIndex;
-                      ref
-                          .read(queueProvider.notifier)
-                          .reorder(oldIndex, adjusted);
+                      ref.read(queueProvider.notifier).reorder(oldIndex, adjusted);
                     },
+                    proxyDecorator: (child, index, animation) => Material(
+                      color: Colors.transparent,
+                      elevation: 0,
+                      child: ScaleTransition(
+                        scale: Tween(begin: 1.0, end: 1.02).animate(animation),
+                        child: child,
+                      ),
+                    ),
                     itemBuilder: (context, i) {
                       final item = queue.items[i];
                       final isCurrent = i == queue.currentIndex;
-                      return ListTile(
-                        key: ValueKey(item.id + i.toString()),
-                        leading: Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
+                      return Container(
+                        key: ValueKey('${item.id}-$i'),
+                        margin: const EdgeInsets.only(bottom: 6),
+                        decoration: BoxDecoration(
+                          color: isCurrent
+                              ? AppColors.accent.withValues(alpha: 0.10)
+                              : Colors.transparent,
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(
                             color: isCurrent
-                                ? AppColors.accent.withValues(alpha: 0.15)
-                                : AppColors.borderOf(context),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Icon(
-                            isCurrent
-                                ? Icons.equalizer_rounded
-                                : (item.isVideo
-                                    ? Icons.videocam_rounded
-                                    : Icons.music_note_rounded),
-                            color: isCurrent
-                                ? AppColors.accent
-                                : cs.onSurface.withValues(alpha: 0.45),
-                            size: 18,
+                                ? AppColors.accent.withValues(alpha: 0.28)
+                                : Colors.transparent,
                           ),
                         ),
-                        title: Text(item.title,
+                        child: ListTile(
+                          minTileHeight: 66,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          leading: Stack(
+                            alignment: Alignment.bottomRight,
+                            children: [
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: AlbumArtThumb(
+                                  albumArtPath: item.albumArtPath,
+                                  size: 48,
+                                  borderRadius: 12,
+                                ),
+                              ),
+                              if (isCurrent)
+                                Container(
+                                  width: 19,
+                                  height: 19,
+                                  decoration: const BoxDecoration(
+                                    color: AppColors.accent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.graphic_eq_rounded,
+                                    color: Colors.black,
+                                    size: 12,
+                                  ),
+                                ),
+                            ],
+                          ),
+                          title: Text(
+                            item.title,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight: isCurrent
-                                  ? FontWeight.w700
-                                  : FontWeight.w500,
+                              fontWeight:
+                                  isCurrent ? FontWeight.w700 : FontWeight.w600,
                               color: isCurrent ? AppColors.accent : cs.onSurface,
                               fontFamily: 'Inter',
                             ),
                             maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                        subtitle: Text(
-                          item.artist ?? item.formattedDuration,
-                          style: TextStyle(
-                              fontSize: 11,
-                              color: cs.onSurface.withValues(alpha: 0.55)),
-                        ),
-                        trailing: GestureDetector(
-                          onTap: () {
-                            HapticFeedback.lightImpact();
-                            ref.read(queueProvider.notifier).removeAt(i);
-                          },
-                          child: Icon(
-                              Icons.remove_circle_outline_rounded,
-                              color: cs.onSurface.withValues(alpha: 0.45),
-                              size: 20),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Padding(
+                            padding: const EdgeInsets.only(top: 3),
+                            child: Text(
+                              item.artist ?? item.formattedDuration,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: cs.onSurface.withValues(alpha: 0.50),
+                                fontFamily: 'Inter',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          trailing: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (isCurrent)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 10),
+                                  child: Text(
+                                    'PLAYING',
+                                    style: TextStyle(
+                                      fontSize: 8,
+                                      letterSpacing: 1.1,
+                                      fontWeight: FontWeight.w800,
+                                      color: AppColors.accent,
+                                      fontFamily: 'Inter',
+                                    ),
+                                  ),
+                                ),
+                              IconButton(
+                                tooltip: 'Remove',
+                                visualDensity: VisualDensity.compact,
+                                icon: Icon(
+                                  Icons.close_rounded,
+                                  color: cs.onSurface.withValues(alpha: 0.42),
+                                  size: 19,
+                                ),
+                                onPressed: () {
+                                  HapticFeedback.lightImpact();
+                                  ref.read(queueProvider.notifier).removeAt(i);
+                                },
+                              ),
+                              Icon(
+                                Icons.drag_handle_rounded,
+                                color: cs.onSurface.withValues(alpha: 0.28),
+                                size: 18,
+                              ),
+                            ],
+                          ),
                         ),
                       );
                     },
                   ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _HeaderAction extends StatelessWidget {
+  final IconData icon;
+  final VoidCallback? onTap;
+  final bool active;
+  final String tooltip;
+
+  const _HeaderAction({
+    required this.icon,
+    required this.tooltip,
+    this.onTap,
+    this.active = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(13),
+        onTap: onTap,
+        child: Container(
+          width: 42,
+          height: 42,
+          decoration: BoxDecoration(
+            color: active
+                ? AppColors.accent.withValues(alpha: 0.13)
+                : cs.onSurface.withValues(alpha: 0.035),
+            borderRadius: BorderRadius.circular(13),
+            border: Border.all(
+              color: active
+                  ? AppColors.accent.withValues(alpha: 0.25)
+                  : AppColors.borderOf(context),
+            ),
+          ),
+          child: Icon(
+            icon,
+            color: active
+                ? AppColors.accent
+                : cs.onSurface.withValues(alpha: onTap == null ? 0.22 : 0.58),
+            size: 20,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _EmptyQueue extends StatelessWidget {
+  final ColorScheme colorScheme;
+  const _EmptyQueue({required this.colorScheme});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 74,
+              height: 74,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.09),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.accent.withValues(alpha: 0.16),
+                ),
+              ),
+              child: const Icon(
+                Icons.queue_music_rounded,
+                color: AppColors.accent,
+                size: 34,
+              ),
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'Your queue is empty',
+              style: TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
+                fontFamily: 'Inter',
+              ),
+            ),
+            const SizedBox(height: 7),
+            Text(
+              'Choose music or video from your library and OTYA will build the queue here.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                height: 1.5,
+                fontSize: 12,
+                color: colorScheme.onSurface.withValues(alpha: 0.50),
+                fontFamily: 'Inter',
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
