@@ -465,7 +465,7 @@ class _VideoListItemState extends State<_VideoListItem> {
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
-        'id': widget.item.id,
+        'id': widget.item.mediaStoreId ?? widget.item.id,
       });
       _VideoCardState._thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
@@ -480,7 +480,7 @@ class _VideoListItemState extends State<_VideoListItem> {
           try {
             final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
               'path': widget.item.filePath,
-              'id': widget.item.id,
+              'id': widget.item.mediaStoreId ?? widget.item.id,
             });
             _VideoCardState._thumbCacheSet(key, path);
             if (!_disposed && mounted && path != null) {
@@ -777,7 +777,7 @@ class _VideoCardState extends State<_VideoCard> {
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
-        'id': widget.item.id,
+        'id': widget.item.mediaStoreId ?? widget.item.id,
       });
       _thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {
@@ -802,7 +802,7 @@ class _VideoCardState extends State<_VideoCard> {
     try {
       final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
         'path': widget.item.filePath,
-        'id': widget.item.id,
+        'id': widget.item.mediaStoreId ?? widget.item.id,
       });
       _thumbCacheSet(key, path);
       if (!_disposed && mounted && path != null) {

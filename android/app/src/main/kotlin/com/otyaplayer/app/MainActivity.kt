@@ -600,24 +600,49 @@ class MainActivity : AudioServiceFragmentActivity() {
     // ── Video thumbnail ──────────────────────────────────────────────────
 
     private fun getVideoThumbnail(videoPath: String, videoId: String): String? {
-        return try {
-            val thumbDir  = File(cacheDir, "video_thumbs").also { it.mkdirs() }
-            val thumbFile = File(thumbDir, "$videoId.jpg")
-            if (thumbFile.exists()) return thumbFile.absolutePath
-            val bitmap: Bitmap? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                val uri = ContentUris.withAppendedId(
-                    MediaStore.Video.Media.EXTERNAL_CONTENT_URI,
-                    videoId.toLongOrNull() ?: return null)
-                contentResolver.loadThumbnail(uri, Size(320, 180), null)
-            } else {
-                @Suppress("DEPRECATION")
-                MediaStore.Video.Thumbnails.getThumbnail(
-                    contentResolver, videoId.toLongOrNull() ?: return null,
-                    MediaStore.Video.Thumbnails.MINI_KIND, null)
+        val cacheKey = (videoId.ifBlank { videoPath }).hashCode().toUInt().toString(16)
+        val thumbDir = File(cacheDir, "video_thumbs").also { it.mkdirs() }
+        val thumbFile = File(thumbDir, "$cacheKey.jpg")
+        if (thumbFile.exists() && thumbFile.length() > 0L) return thumbFile.absolutePath
+
+        var bitmap: Bitmap? = null
+        val numericId = videoId.toLongOrNull()
+        if (numericId != null) {
+            bitmap = try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    val uri = ContentUris.withAppendedId(
+                        MediaStore.Video.Media.EXTERNAL_CONTENT_URI, numericId)
+                    contentResolver.loadThumbnail(uri, Size(320, 180), null)
+                } else {
+                    @Suppress("DEPRECATION")
+                    MediaStore.Video.Thumbnails.getThumbnail(
+                        contentResolver, numericId,
+                        MediaStore.Video.Thumbnails.MINI_KIND, null)
+                }
+            } catch (_: Exception) { null }
+        }
+
+        if (bitmap == null && videoPath.isNotBlank()) {
+            val retriever = MediaMetadataRetriever()
+            try {
+                retriever.setDataSource(videoPath)
+                bitmap = retriever.getFrameAtTime(
+                    1_000_000L,
+                    MediaMetadataRetriever.OPTION_CLOSEST_SYNC,
+                ) ?: retriever.frameAtTime
+            } catch (_: Exception) {
+                bitmap = null
+            } finally {
+                try { retriever.release() } catch (_: Exception) {}
             }
+        }
+
+        return try {
             bitmap?.let {
-                FileOutputStream(thumbFile).use { out -> it.compress(Bitmap.CompressFormat.JPEG, 80, out) }
-                thumbFile.absolutePath
+                FileOutputStream(thumbFile).use { out ->
+                    it.compress(Bitmap.CompressFormat.JPEG, 82, out)
+                }
+                if (thumbFile.length() > 0L) thumbFile.absolutePath else null
             }
         } catch (_: Exception) { null }
     }
