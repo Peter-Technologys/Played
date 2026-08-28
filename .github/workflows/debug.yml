@@ -93,15 +93,11 @@ jobs:
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
           WORKER_URL: ${{ secrets.WORKER_URL }}
         shell: bash
         run: |
           set -euo pipefail
-          if [ -z "$GOOGLE_CLIENT_ID" ]; then
-            echo '::error::GOOGLE_CLIENT_ID repository/environment variable is required for production APKs.'
-            exit 1
-          fi
+          GOOGLE_CLIENT_ID='82776565585-77b1t8epvmn3mpdvstdg1rtprlju4suv.apps.googleusercontent.com'
           BASE_URL="${WORKER_URL:-https://petersmartlink.com}"
           ARGS=(
             --release
