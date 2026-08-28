@@ -24,16 +24,20 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _termsAccepted = false;
   bool _privacyAccepted = false;
   bool _marketingConsent = false;
+  bool _twoFactorRequired = false;
+  bool _useRecoveryCode = false;
   String? _error;
   final _name = TextEditingController();
   final _email = TextEditingController();
   final _password = TextEditingController();
+  final _twoFactor = TextEditingController();
 
   @override
   void dispose() {
     _name.dispose();
     _email.dispose();
     _password.dispose();
+    _twoFactor.dispose();
     super.dispose();
   }
 
@@ -89,6 +93,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       return;
     }
     if (_register && !_validateRegistrationConsent()) return;
+    if (_twoFactorRequired && _twoFactor.text.trim().isEmpty) {
+      setState(() => _error = _useRecoveryCode
+          ? 'Enter one of your OTYA recovery codes.'
+          : 'Enter the 6-digit code from your authenticator app.');
+      return;
+    }
 
     setState(() {
       _loading = true;
@@ -103,8 +113,28 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             privacyAccepted: _privacyAccepted,
             marketingConsent: _marketingConsent,
           )
-        : await AuthService.instance.login(email, _password.text);
-    if (mounted) setState(() => _loading = false);
+        : await AuthService.instance.login(
+            email,
+            _password.text,
+            totpCode: _twoFactorRequired && !_useRecoveryCode
+                ? _twoFactor.text.trim()
+                : null,
+            recoveryCode: _twoFactorRequired && _useRecoveryCode
+                ? _twoFactor.text.trim()
+                : null,
+          );
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (!_register && (result.twoFactorRequired || result.twoFactorInvalid)) {
+      setState(() {
+        _twoFactorRequired = true;
+        _error = result.error ?? 'Two-step verification is required.';
+        if (result.twoFactorInvalid) _twoFactor.clear();
+      });
+      return;
+    }
+
     await _finish(result, saveMarketingConsent: _register);
   }
 
@@ -122,6 +152,16 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     );
     if (mounted) setState(() => _loading = false);
     await _finish(result, saveMarketingConsent: _register);
+  }
+
+  void _switchMode(bool register) {
+    setState(() {
+      _register = register;
+      _error = null;
+      _twoFactorRequired = false;
+      _useRecoveryCode = false;
+      _twoFactor.clear();
+    });
   }
 
   @override
@@ -147,66 +187,117 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
-                'One account for sync, verification and Google Drive backup.',
+              Text(
+                _twoFactorRequired
+                    ? 'Confirm this sign-in with your OTYA two-step verification.'
+                    : 'One account for OTYA products, sync, verification and recovery.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 28),
-              SizedBox(
-                height: 52,
-                child: OutlinedButton.icon(
-                  onPressed: _loading ? null : _google,
-                  icon: const Icon(Icons.account_circle_rounded),
-                  label: const Text('Continue with Google'),
+              if (!_twoFactorRequired) ...[
+                SizedBox(
+                  height: 52,
+                  child: OutlinedButton.icon(
+                    onPressed: _loading ? null : _google,
+                    icon: const Icon(Icons.account_circle_rounded),
+                    label: const Text('Continue with Google'),
+                  ),
                 ),
-              ),
-              const SizedBox(height: 18),
-              Row(children: const [
-                Expanded(child: Divider(color: AppColors.border)),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('OR', style: TextStyle(color: AppColors.textSecondary)),
+                const SizedBox(height: 18),
+                const Row(children: [
+                  Expanded(child: Divider(color: AppColors.border)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text('OR', style: TextStyle(color: AppColors.textSecondary)),
+                  ),
+                  Expanded(child: Divider(color: AppColors.border)),
+                ]),
+                const SizedBox(height: 18),
+                SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, label: Text('Login')),
+                    ButtonSegment(value: true, label: Text('Register')),
+                  ],
+                  selected: {_register},
+                  onSelectionChanged: _loading
+                      ? null
+                      : (value) => _switchMode(value.first),
                 ),
-                Expanded(child: Divider(color: AppColors.border)),
-              ]),
-              const SizedBox(height: 18),
-              SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, label: Text('Login')),
-                  ButtonSegment(value: true, label: Text('Register')),
-                ],
-                selected: {_register},
-                onSelectionChanged: _loading
-                    ? null
-                    : (value) => setState(() {
-                          _register = value.first;
-                          _error = null;
-                        }),
-              ),
-              const SizedBox(height: 18),
+                const SizedBox(height: 18),
+              ],
               if (_register) ...[
                 _field(_name, 'Name', Icons.person_outline_rounded),
                 const SizedBox(height: 12),
               ],
-              _field(_email, 'Email', Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress),
+              _field(
+                _email,
+                'Email',
+                Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+                enabled: !_twoFactorRequired,
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _password,
                 obscureText: _obscure,
+                enabled: !_twoFactorRequired,
                 decoration: InputDecoration(
                   labelText: 'Password',
                   prefixIcon: const Icon(Icons.lock_outline_rounded),
                   suffixIcon: IconButton(
-                    onPressed: () => setState(() => _obscure = !_obscure),
+                    onPressed: _twoFactorRequired
+                        ? null
+                        : () => setState(() => _obscure = !_obscure),
                     icon: Icon(_obscure
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined),
                   ),
                 ),
               ),
-              if (!_register)
+              if (_twoFactorRequired) ...[
+                const SizedBox(height: 14),
+                TextField(
+                  controller: _twoFactor,
+                  autofocus: true,
+                  keyboardType: _useRecoveryCode
+                      ? TextInputType.text
+                      : TextInputType.number,
+                  textInputAction: TextInputAction.done,
+                  maxLength: _useRecoveryCode ? 14 : 6,
+                  decoration: InputDecoration(
+                    labelText: _useRecoveryCode
+                        ? 'Recovery code'
+                        : 'Authenticator code',
+                    helperText: _useRecoveryCode
+                        ? 'Use one unused recovery code from your OTYA account.'
+                        : 'Enter the 6-digit code from your authenticator app.',
+                    prefixIcon: Icon(_useRecoveryCode
+                        ? Icons.vpn_key_outlined
+                        : Icons.security_rounded),
+                    counterText: '',
+                  ),
+                  onSubmitted: (_) {
+                    if (!_loading) _submit();
+                  },
+                ),
+                Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton(
+                    onPressed: _loading
+                        ? null
+                        : () => setState(() {
+                              _useRecoveryCode = !_useRecoveryCode;
+                              _twoFactor.clear();
+                              _error = null;
+                            }),
+                    child: Text(_useRecoveryCode
+                        ? 'Use authenticator code instead'
+                        : 'Use a recovery code instead'),
+                  ),
+                ),
+              ],
+              if (!_register && !_twoFactorRequired)
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
@@ -245,9 +336,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ],
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.error)),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.error),
+                ),
               ],
               const SizedBox(height: 18),
               SizedBox(
@@ -260,14 +353,31 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                           height: 22,
                           child: CircularProgressIndicator(strokeWidth: 2),
                         )
-                      : Text(_register ? 'Create OTYA Account' : 'Login'),
+                      : Text(_twoFactorRequired
+                          ? 'Verify and sign in'
+                          : (_register ? 'Create OTYA Account' : 'Login')),
                 ),
               ),
+              if (_twoFactorRequired) ...[
+                const SizedBox(height: 8),
+                TextButton(
+                  onPressed: _loading
+                      ? null
+                      : () => setState(() {
+                            _twoFactorRequired = false;
+                            _twoFactor.clear();
+                            _error = null;
+                          }),
+                  child: const Text('Use another account'),
+                ),
+              ],
               const SizedBox(height: 16),
-              const Text(
-                'Google and email/password both connect to your OTYA account.',
+              Text(
+                _twoFactorRequired
+                    ? 'OTYA never asks you to share authenticator or recovery codes outside the official sign-in flow.'
+                    : 'Google and email/password both connect to your OTYA account.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
             ],
           ),
@@ -302,10 +412,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     String label,
     IconData icon, {
     TextInputType? keyboardType,
+    bool enabled = true,
   }) {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
+      enabled: enabled,
       decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
     );
   }
