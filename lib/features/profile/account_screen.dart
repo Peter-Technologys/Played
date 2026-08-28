@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/consent_service.dart';
 import '../../core/services/google_account_service.dart';
 import '../../shared/widgets/wallpaper_scaffold.dart';
 
@@ -17,6 +18,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   UserProfile? _profile;
+  ConsentState? _consent;
   bool _loading = true;
   bool _busy = false;
   String? _message;
@@ -27,9 +29,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _refresh() async {
     final loggedIn = await AuthService.instance.checkIsLoggedIn();
     UserProfile? profile;
-    if (loggedIn) profile = await AuthService.instance.getProfile();
+    ConsentState? consent;
+    if (loggedIn) {
+      profile = await AuthService.instance.getProfile();
+      if (profile != null) consent = await ConsentService.instance.getConsent();
+    }
     if (!mounted) return;
-    setState(() { _profile = profile; _loading = false; });
+    setState(() { _profile = profile; _consent = consent; _loading = false; });
     if (widget.focusVerification && profile != null && !profile.isVerified) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _verifyEmail());
     }
@@ -96,6 +102,36 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     await _refresh();
   }
 
+  Future<void> _setMarketing(bool enabled) async {
+    if (_busy) return;
+    setState(() { _busy = true; _message = null; });
+    final ok = await ConsentService.instance.setMarketingConsent(enabled);
+    if (!mounted) return;
+    setState(() { _busy = false; _message = ok ? 'Communication preference updated.' : 'Could not update communication preference.'; });
+    if (ok) await _refresh();
+  }
+
+  Future<void> _acceptCurrentLegal() async {
+    if (_busy) return;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Accept current OTYA policies?'),
+        content: const Text('Confirm only after reviewing the current Terms of Service and Privacy Policy from the links on this page.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('I accept')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    setState(() { _busy = true; _message = null; });
+    final ok = await ConsentService.instance.acceptCurrentLegal();
+    if (!mounted) return;
+    setState(() { _busy = false; _message = ok ? 'Current Terms and Privacy Policy accepted.' : 'Could not update legal acceptance.'; });
+    if (ok) await _refresh();
+  }
+
   Future<void> _backupDrive() async => _runDrive(() => GoogleAccountService.instance.backupToDrive(), 'Backup saved to Google Drive.');
   Future<void> _restoreDrive() async {
     if (_busy) return;
@@ -122,6 +158,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     final profile = _profile;
+    final consent = _consent;
     return WallpaperScaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.arrow_back_rounded), onPressed: () => context.canPop() ? context.pop() : context.go('/myspace')),
@@ -133,6 +170,24 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const SizedBox(height: 20), const _Header('Account security'),
         if (!profile.isVerified) _tile(Icons.verified_outlined, 'Verify email', 'Confirm your OTYA account email', _verifyEmail),
         _tile(Icons.account_circle_rounded, GoogleAccountService.instance.hasGoogleSession ? 'Google connected' : 'Connect Google', GoogleAccountService.instance.hasGoogleSession ? 'Google identity is connected to this OTYA account' : 'Use Google with this same OTYA account', _connectGoogle),
+        const SizedBox(height: 20), const _Header('Privacy & communication'),
+        _tile(Icons.description_outlined, 'Terms of Service', 'Review the current OTYA Terms', () => context.push('/webview', extra: {'url': 'https://petersmartlink.com/terms', 'title': 'Terms of Service'})),
+        _tile(Icons.privacy_tip_outlined, 'Privacy Policy', 'Review how OTYA handles your data', () => context.push('/privacy')),
+        if (consent != null && !consent.legalCurrent)
+          _tile(Icons.fact_check_outlined, 'Accept current policies', 'Required when OTYA legal versions change', _acceptCurrentLegal),
+        if (consent != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SwitchListTile(
+              value: consent.marketingConsent,
+              onChanged: _busy ? null : _setMarketing,
+              tileColor: AppColors.surface.withValues(alpha: .86),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16), side: const BorderSide(color: AppColors.border)),
+              secondary: const Icon(Icons.campaign_outlined, color: AppColors.accent),
+              title: const Text('OTYA news & promotions'),
+              subtitle: const Text('Optional. Security, account and legal notices are not affected.'),
+            ),
+          ),
         const SizedBox(height: 20), const _Header('Backup & sync'),
         _tile(Icons.cloud_upload_rounded, 'Back up to Google Drive', 'Private app backup', _backupDrive),
         _tile(Icons.cloud_download_rounded, 'Restore from Google Drive', 'Restore your OTYA backup', _restoreDrive),
