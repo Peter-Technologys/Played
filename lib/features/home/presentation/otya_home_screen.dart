@@ -162,7 +162,7 @@ class _SectionTitle extends StatelessWidget {
               child: Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w650,
+                      fontWeight: FontWeight.w600,
                       letterSpacing: -.25,
                     ),
               ),
