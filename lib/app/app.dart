@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/services/custom_theme_manager.dart';
+import '../core/services/notification_service.dart';
 import '../core/services/remote_control_service.dart';
 import '../core/widgets/announcement_dialog.dart';
 import '../core/widgets/remote_control_gate.dart';
@@ -79,7 +80,55 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('onboarding_done', true);
     } catch (_) {}
-    if (mounted) setState(() => _onboardingDone = true);
+    if (!mounted) return;
+    setState(() => _onboardingDone = true);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _offerNotificationPermission();
+    });
+  }
+
+  Future<void> _offerNotificationPermission() async {
+    final enable = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (dialogContext) => AlertDialog(
+        icon: Container(
+          width: 58,
+          height: 58,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF11D7FF), Color(0xFF7544FF), Color(0xFFFF2CAA)],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.accent.withValues(alpha: .25),
+                blurRadius: 20,
+              ),
+            ],
+          ),
+          child: const Icon(Icons.notifications_active_rounded,
+              color: Colors.white, size: 29),
+        ),
+        title: const Text('Stay in the loop'),
+        content: const Text(
+          'Allow notifications for Now Playing controls, completed downloads, important account alerts and new OTYA updates. You can change this later in Android settings.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Not now'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Enable notifications'),
+          ),
+        ],
+      ),
+    );
+    if (enable == true) {
+      await NotificationService.instance.requestPermission();
+    }
   }
 
   ThemeMode _materialThemeMode(AppThemeMode mode) => switch (mode) {
@@ -92,7 +141,8 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     if (mode == AppThemeMode.amoled) {
       return AppTheme.dark.copyWith(
         scaffoldBackgroundColor: Colors.black,
-        appBarTheme: AppTheme.dark.appBarTheme.copyWith(backgroundColor: Colors.black),
+        appBarTheme:
+            AppTheme.dark.appBarTheme.copyWith(backgroundColor: Colors.black),
       );
     }
     return AppTheme.dark;
@@ -165,8 +215,8 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       ]),
       builder: (context, _) {
         final themeManager = CustomThemeManager.instance;
-        final hasArtwork = themeManager.hasImageWallpaper ||
-            themeManager.storyTheme != null;
+        final hasArtwork =
+            themeManager.hasImageWallpaper || themeManager.storyTheme != null;
 
         final baseLight = AppTheme.light;
         final baseDark = _darkTheme(settings.themeMode);
@@ -202,7 +252,8 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               statusBarColor: Colors.transparent,
               statusBarIconBrightness:
                   isDark ? Brightness.light : Brightness.dark,
-              systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
+              systemNavigationBarColor:
+                  Theme.of(context).scaffoldBackgroundColor,
               systemNavigationBarIconBrightness:
                   isDark ? Brightness.light : Brightness.dark,
             );
@@ -221,9 +272,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               child: MediaQuery(
                 data: MediaQuery.of(context).copyWith(
                   textScaler: MediaQuery.of(context).textScaler.clamp(
-                    minScaleFactor: 0.85,
-                    maxScaleFactor: 1.2,
-                  ),
+                        minScaleFactor: 0.85,
+                        maxScaleFactor: 1.2,
+                      ),
                 ),
                 child: RemoteControlGate(
                   child: Stack(
