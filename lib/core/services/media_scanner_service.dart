@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
 import '../models/media_item.dart';
 import '../permissions/permission_helper.dart';
+import 'new_media_tracker.dart';
 
 Future<List<MediaItem>> _filesystemScanIsolate(List<String> roots) async {
   final results = <MediaItem>[];
@@ -214,6 +215,11 @@ class MediaScannerService {
     return results;
   }
 
+  Future<List<MediaItem>> _finalize(List<MediaItem> items) async {
+    await NewMediaTracker.instance.reconcile(items);
+    return items;
+  }
+
   Future<List<MediaItem>> scanAll() async {
     final hasPermission = await PermissionHelper.hasMediaPermissions();
     if (!hasPermission) {
@@ -231,12 +237,12 @@ class MediaScannerService {
     for (final item in [...storeItems, ...dirItems]) {
       if (seen.add(item.filePath)) merged.add(item);
     }
-    if (merged.isNotEmpty) return merged;
+    if (merged.isNotEmpty) return _finalize(merged);
     try {
-      return await _filesystemScan();
+      return _finalize(await _filesystemScan());
     } catch (e) {
       debugPrint('[Scanner] Filesystem fallback failed: $e');
-      return [];
+      return _finalize(const <MediaItem>[]);
     }
   }
 
