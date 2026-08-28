@@ -57,7 +57,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return;
     }
 
-    final controller = TextEditingController();
+    final controllers = List.generate(5, (_) => TextEditingController());
+    final focusNodes = List.generate(5, (_) => FocusNode());
     final code = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
@@ -67,28 +68,76 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text('A verification code was sent to ${_profile?.email ?? AuthService.instance.userEmail ?? 'your email'}.'),
-            const SizedBox(height: 16),
-            TextField(
-              controller: controller,
-              textCapitalization: TextCapitalization.characters,
-              textAlign: TextAlign.center,
-              decoration: const InputDecoration(
-                labelText: 'Verification code',
-                hintText: 'A1234',
-              ),
+            const SizedBox(height: 8),
+            const Text(
+              'Enter each character in its own box.',
+              style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            ),
+            const SizedBox(height: 18),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: List.generate(5, (index) {
+                return SizedBox(
+                  width: 48,
+                  child: TextField(
+                    controller: controllers[index],
+                    focusNode: focusNodes[index],
+                    maxLength: 1,
+                    textAlign: TextAlign.center,
+                    textCapitalization: TextCapitalization.characters,
+                    autocorrect: false,
+                    enableSuggestions: false,
+                    keyboardType: index == 0 ? TextInputType.text : TextInputType.number,
+                    style: const TextStyle(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                      letterSpacing: 0,
+                    ),
+                    decoration: InputDecoration(
+                      counterText: '',
+                      hintText: index == 0 ? 'A' : '0',
+                      contentPadding: const EdgeInsets.symmetric(vertical: 14),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onChanged: (value) {
+                      if (value.length > 1) {
+                        controllers[index].text = value.characters.last.toUpperCase();
+                        controllers[index].selection = const TextSelection.collapsed(offset: 1);
+                      }
+                      if (value.isNotEmpty && index < 4) {
+                        focusNodes[index + 1].requestFocus();
+                      } else if (value.isEmpty && index > 0) {
+                        focusNodes[index - 1].requestFocus();
+                      }
+                    },
+                  ),
+                );
+              }),
             ),
           ],
         ),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
           FilledButton(
-            onPressed: () => Navigator.pop(context, controller.text.trim()),
+            onPressed: () {
+              final value = controllers.map((c) => c.text.trim().toUpperCase()).join();
+              if (RegExp(r'^[A-Z][0-9]{4}$').hasMatch(value)) {
+                Navigator.pop(context, value);
+              }
+            },
             child: const Text('Verify'),
           ),
         ],
       ),
     );
-    controller.dispose();
+    for (final controller in controllers) {
+      controller.dispose();
+    }
+    for (final node in focusNodes) {
+      node.dispose();
+    }
     if (code == null || code.isEmpty) return;
 
     setState(() => _busy = true);
