@@ -31,7 +31,7 @@ import '../features/profile/profile_screen.dart'
     show ProfileScreen, WhatsNewScreen;
 import '../features/settings/presentation/about_screen.dart';
 import '../features/settings/presentation/privacy_policy_screen.dart';
-import '../features/settings/presentation/settings_detail_screen.dart';
+import '../features/settings/presentation/settings_with_ai_screen.dart';
 import '../features/settings/presentation/storage_analyzer_screen.dart';
 import '../features/settings/presentation/theme_selection_screen.dart';
 import '../features/tools/whatsapp_trimmer_screen.dart';
@@ -130,14 +130,6 @@ class AppRouter {
             ),
           ),
           GoRoute(
-            path: '/ai',
-            pageBuilder: (context, state) => _fadePage(
-              context: context,
-              state: state,
-              child: const OtyaAiScreen(),
-            ),
-          ),
-          GoRoute(
             path: '/downloads',
             pageBuilder: (context, state) => _fadePage(
               context: context,
@@ -154,6 +146,14 @@ class AppRouter {
             ),
           ),
         ],
+      ),
+      GoRoute(
+        path: '/ai',
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const OtyaAiScreen(),
+        ),
       ),
       GoRoute(
         path: '/auth',
@@ -197,7 +197,7 @@ class AppRouter {
         pageBuilder: (c, s) => _fadePage(
           context: c,
           state: s,
-          child: const SettingsDetailScreen(),
+          child: const SettingsWithAiScreen(),
         ),
       ),
       GoRoute(
@@ -507,7 +507,7 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  static const _routes = ['/', '/music', '/ai', '/myspace'];
+  static const _routes = ['/', '/music', '/library', '/myspace'];
 
   @override
   void initState() {
@@ -526,10 +526,9 @@ class _MainShellState extends ConsumerState<_MainShell> {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     final currentIndex = location.startsWith('/music') ||
-            location.startsWith('/library') ||
             location.startsWith('/downloads')
         ? 1
-        : location.startsWith('/ai')
+        : location.startsWith('/library')
             ? 2
             : location.startsWith('/myspace')
                 ? 3
@@ -588,15 +587,15 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   Expanded(
                     child: _NavItem(
                       icon: Icons.library_music_rounded,
-                      label: 'Library',
+                      label: 'Music',
                       isActive: currentIndex == 1,
                       onTap: () => _onTap(1),
                     ),
                   ),
                   Expanded(
                     child: _NavItem(
-                      icon: Icons.auto_awesome_rounded,
-                      label: 'AI',
+                      icon: Icons.video_library_rounded,
+                      label: 'Video',
                       isActive: currentIndex == 2,
                       onTap: () => _onTap(2),
                     ),
