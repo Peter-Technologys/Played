@@ -71,18 +71,25 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
       final token = await AuthService.instance.getValidToken();
       if (token == null) return;
       final uri = _chatUri.replace(queryParameters: {'conversation_id': id});
-      final res = await _client.get(uri, headers: {'Authorization': 'Bearer $token'}).timeout(const Duration(seconds: 20));
+      final res = await _client
+          .get(uri, headers: {'Authorization': 'Bearer $token'})
+          .timeout(const Duration(seconds: 20));
       if (res.statusCode != 200) return;
       final data = jsonDecode(res.body);
-      final rows = data is Map<String, dynamic> ? data['conversation']?['messages'] : null;
+      if (data is! Map<String, dynamic>) return;
+      final conversation = data['conversation'];
+      if (conversation is! Map) return;
+      final rows = conversation['messages'];
       if (rows is! List || !mounted) return;
       setState(() {
         _messages
           ..clear()
-          ..addAll(rows.whereType<Map>().map((row) => _AiMessage(
-                user: row['role'] == 'user',
-                text: '${row['content'] ?? ''}',
-              )).where((m) => m.text.isNotEmpty));
+          ..addAll(
+            rows.whereType<Map>().map((row) => _AiMessage(
+                  user: row['role'] == 'user',
+                  text: '${row['content'] ?? ''}',
+                )).where((message) => message.text.isNotEmpty),
+          );
       });
       _jumpToEnd();
     } catch (_) {}
@@ -108,7 +115,10 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
         if (!tokenPresent)
           'history': _messages
               .take(_messages.length - 1)
-              .map((m) => {'role': m.user ? 'user' : 'assistant', 'content': m.text})
+              .map((message) => {
+                    'role': message.user ? 'user' : 'assistant',
+                    'content': message.text,
+                  })
               .toList(),
       };
       final res = await _client
@@ -116,10 +126,15 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
           .timeout(const Duration(seconds: 30));
       final data = jsonDecode(res.body);
       if (res.statusCode < 200 || res.statusCode >= 300) {
-        throw Exception(data is Map ? (data['error'] ?? 'OTYA AI is unavailable') : 'OTYA AI is unavailable');
+        throw Exception(
+          data is Map
+              ? (data['error'] ?? 'OTYA AI is unavailable')
+              : 'OTYA AI is unavailable',
+        );
       }
       final answer = data is Map ? '${data['answer'] ?? ''}' : '';
-      final conversationId = data is Map ? data['conversation_id'] as String? : null;
+      final conversationId =
+          data is Map ? data['conversation_id'] as String? : null;
       if (conversationId != null && tokenPresent) {
         _conversationId = conversationId;
         final prefs = await SharedPreferences.getInstance();
@@ -128,11 +143,15 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
       if (!mounted) return;
       setState(() {
         _signedIn = tokenPresent;
-        _messages.add(_AiMessage(user: false, text: answer.isEmpty ? 'I could not answer that.' : answer));
+        _messages.add(_AiMessage(
+          user: false,
+          text: answer.isEmpty ? 'I could not answer that.' : answer,
+        ));
       });
-    } catch (e) {
+    } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Could not reach OTYA AI. Check your connection and try again.');
+      setState(() => _error =
+          'Could not reach OTYA AI. Check your connection and try again.');
     } finally {
       if (mounted) setState(() => _busy = false);
       _jumpToEnd();
@@ -177,9 +196,16 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
       appBar: AppBar(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
-        title: const Text('OTYA AI', style: TextStyle(fontWeight: FontWeight.w800)),
+        title: const Text(
+          'OTYA AI',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
-          IconButton(onPressed: _newChat, tooltip: 'New chat', icon: const Icon(Icons.add_comment_rounded)),
+          IconButton(
+            onPressed: _newChat,
+            tooltip: 'New chat',
+            icon: const Icon(Icons.add_comment_rounded),
+          ),
         ],
       ),
       body: SafeArea(
@@ -197,16 +223,30 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
               ),
               child: Row(
                 children: [
-                  Icon(_signedIn ? Icons.cloud_done_rounded : Icons.history_toggle_off_rounded, size: 18, color: AppColors.accent),
+                  Icon(
+                    _signedIn
+                        ? Icons.cloud_done_rounded
+                        : Icons.history_toggle_off_rounded,
+                    size: 18,
+                    color: AppColors.accent,
+                  ),
                   const SizedBox(width: 9),
                   Expanded(
                     child: Text(
-                      _signedIn ? 'Signed in · this chat can be saved to your OTYA account.' : 'Guest mode · this chat is temporary.',
-                      style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary),
+                      _signedIn
+                          ? 'Signed in · this chat can be saved to your OTYA account.'
+                          : 'Guest mode · this chat is temporary.',
+                      style: const TextStyle(
+                        fontSize: 12.5,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
                   if (!_signedIn)
-                    TextButton(onPressed: () => context.push('/auth'), child: const Text('Sign in')),
+                    TextButton(
+                      onPressed: () => context.push('/auth'),
+                      child: const Text('Sign in'),
+                    ),
                 ],
               ),
             ),
@@ -226,25 +266,48 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
                             alignment: Alignment.centerLeft,
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8),
-                              child: Text('OTYA AI is thinking…', style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                              child: Text(
+                                'OTYA AI is thinking…',
+                                style: TextStyle(
+                                  color: AppColors.textSecondary,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
                           );
                         }
-                        final m = _messages[index];
+                        final message = _messages[index];
                         return Align(
-                          alignment: m.user ? Alignment.centerRight : Alignment.centerLeft,
+                          alignment: message.user
+                              ? Alignment.centerRight
+                              : Alignment.centerLeft,
                           child: Container(
                             constraints: const BoxConstraints(maxWidth: 560),
                             margin: const EdgeInsets.only(bottom: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 12),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 15,
+                              vertical: 12,
+                            ),
                             decoration: BoxDecoration(
-                              color: m.user
-                                  ? AppColors.accent.withValues(alpha: dark ? 0.24 : 0.14)
+                              color: message.user
+                                  ? AppColors.accent.withValues(
+                                      alpha: dark ? 0.24 : 0.14,
+                                    )
                                   : AppColors.cardOf(context),
                               borderRadius: BorderRadius.circular(18),
-                              border: Border.all(color: m.user ? AppColors.accent.withValues(alpha: 0.22) : AppColors.borderOf(context)),
+                              border: Border.all(
+                                color: message.user
+                                    ? AppColors.accent.withValues(alpha: 0.22)
+                                    : AppColors.borderOf(context),
+                              ),
                             ),
-                            child: Text(m.text, style: TextStyle(color: AppColors.textPrimaryOf(context), height: 1.35)),
+                            child: Text(
+                              message.text,
+                              style: TextStyle(
+                                color: AppColors.textPrimaryOf(context),
+                                height: 1.35,
+                              ),
+                            ),
                           ),
                         );
                       },
@@ -252,11 +315,20 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
             ),
             if (_error != null)
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                child: Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 12),
+                ),
               ),
             Padding(
-              padding: EdgeInsets.fromLTRB(14, 8, 14, 10 + MediaQuery.paddingOf(context).bottom),
+              padding: EdgeInsets.fromLTRB(
+                14,
+                8,
+                14,
+                10 + MediaQuery.paddingOf(context).bottom,
+              ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -270,9 +342,20 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
                         hintText: 'Message OTYA AI…',
                         filled: true,
                         fillColor: AppColors.cardOf(context),
-                        border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: AppColors.borderOf(context))),
-                        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: AppColors.borderOf(context))),
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOf(context)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(20),
+                          borderSide:
+                              BorderSide(color: AppColors.borderOf(context)),
+                        ),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 13,
+                        ),
                       ),
                       onSubmitted: (_) => _send(),
                     ),
@@ -280,7 +363,10 @@ class _OtyaAiScreenState extends State<OtyaAiScreen> {
                   const SizedBox(width: 8),
                   IconButton.filled(
                     onPressed: _busy ? null : _send,
-                    style: IconButton.styleFrom(backgroundColor: AppColors.accent, foregroundColor: Colors.white),
+                    style: IconButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                    ),
                     icon: const Icon(Icons.arrow_upward_rounded),
                   ),
                 ],
@@ -314,19 +400,42 @@ class _EmptyState extends StatelessWidget {
             Container(
               width: 64,
               height: 64,
-              decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.14), borderRadius: BorderRadius.circular(20)),
-              child: const Icon(Icons.auto_awesome_rounded, color: AppColors.accent, size: 30),
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(
+                Icons.auto_awesome_rounded,
+                color: AppColors.accent,
+                size: 30,
+              ),
             ),
             const SizedBox(height: 18),
-            Text('How can I help?', style: TextStyle(fontSize: 27, fontWeight: FontWeight.w900, color: AppColors.textPrimaryOf(context))),
+            Text(
+              'How can I help?',
+              style: TextStyle(
+                fontSize: 27,
+                fontWeight: FontWeight.w900,
+                color: AppColors.textPrimaryOf(context),
+              ),
+            ),
             const SizedBox(height: 8),
-            const Text('Ask general questions or get help with OTYA Player.', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)),
+            const Text(
+              'Ask general questions or get help with OTYA Player.',
+              textAlign: TextAlign.center,
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 24),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               alignment: WrapAlignment.center,
-              children: prompts.map((p) => ActionChip(label: Text(p), onPressed: () => onPrompt(p))).toList(),
+              children: prompts
+                  .map((prompt) => ActionChip(
+                        label: Text(prompt),
+                        onPressed: () => onPrompt(prompt),
+                      ))
+                  .toList(),
             ),
           ],
         ),
