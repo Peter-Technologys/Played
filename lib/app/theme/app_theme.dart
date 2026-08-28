@@ -61,7 +61,7 @@ class AppTheme {
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
           color: states.contains(WidgetState.selected) ? onSurface : secondaryText,
-          fontWeight: states.contains(WidgetState.selected) ? FontWeight.w650 : FontWeight.w500,
+          fontWeight: states.contains(WidgetState.selected) ? FontWeight.w600 : FontWeight.w500,
           fontSize: 10.5,
           fontFamily: 'Inter',
         )),
@@ -78,7 +78,7 @@ class AppTheme {
         unselectedItemColor: secondaryText,
         type: BottomNavigationBarType.fixed,
         elevation: 0,
-        selectedLabelStyle: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w650),
+        selectedLabelStyle: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w600),
         unselectedLabelStyle: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w500),
       ),
       sliderTheme: SliderThemeData(
@@ -95,7 +95,7 @@ class AppTheme {
         minTileHeight: 54,
         contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         iconColor: secondaryText,
-        titleTextStyle: TextStyle(color: onSurface, fontSize: 14, fontWeight: FontWeight.w550, fontFamily: 'Inter'),
+        titleTextStyle: TextStyle(color: onSurface, fontSize: 14, fontWeight: FontWeight.w600, fontFamily: 'Inter'),
         subtitleTextStyle: TextStyle(color: secondaryText, fontSize: 12, fontFamily: 'Inter'),
       ),
       snackBarTheme: SnackBarThemeData(
@@ -146,7 +146,7 @@ class AppTheme {
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           minimumSize: const Size(0, 44),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w650, fontFamily: 'Inter', fontSize: 13.5),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter', fontSize: 13.5),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -156,7 +156,7 @@ class AppTheme {
           elevation: 0,
           padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radius)),
-          textStyle: const TextStyle(fontWeight: FontWeight.w650, fontFamily: 'Inter', fontSize: 13.5),
+          textStyle: const TextStyle(fontWeight: FontWeight.w600, fontFamily: 'Inter', fontSize: 13.5),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
