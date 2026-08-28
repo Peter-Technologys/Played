@@ -14,38 +14,37 @@ class SettingsWithAiScreen extends StatelessWidget {
       children: [
         const SettingsDetailScreen(),
         Positioned(
-          right: 16,
-          bottom: MediaQuery.paddingOf(context).bottom + 18,
+          right: 14,
+          bottom: MediaQuery.paddingOf(context).bottom + 14,
           child: SafeArea(
             top: false,
             child: Material(
-              color: Colors.transparent,
+              color: Theme.of(context).colorScheme.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: BorderSide(color: AppColors.borderOf(context)),
+              ),
               child: InkWell(
-                borderRadius: BorderRadius.circular(18),
+                borderRadius: BorderRadius.circular(12),
                 onTap: () => context.push('/ai'),
-                child: Ink(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      colors: [Color(0xFF11D7FF), Color(0xFF7544FF), Color(0xFFFF2CAA)],
-                    ),
-                    borderRadius: BorderRadius.circular(18),
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accent.withValues(alpha: .22),
-                        blurRadius: 18,
-                        offset: const Offset(0, 6),
-                      ),
-                    ],
-                  ),
-                  child: const Row(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+                  child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Icon(Icons.auto_awesome_rounded, color: Colors.white, size: 18),
-                      SizedBox(width: 7),
+                      const Icon(
+                        Icons.auto_awesome_outlined,
+                        color: AppColors.accent,
+                        size: 17,
+                      ),
+                      const SizedBox(width: 7),
                       Text(
-                        'Ask OTYA',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+                        'OTYA AI',
+                        style: TextStyle(
+                          color: Theme.of(context).colorScheme.onSurface,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
