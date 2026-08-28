@@ -86,7 +86,9 @@ class _AboutScreenState extends State<AboutScreen> {
           _SectionHeader(label: 'Links'),
           const SizedBox(height: 10),
           _GroupCard(children: [
-            _NavTile(icon: Icons.language_rounded, label: 'OTYA System', subtitle: 'Official OTYA System website', color: AppColors.accent, onTap: () => context.push('/webview', extra: {'url': 'https://petersmartlink.com', 'title': 'OTYA System'})),
+            _NavTile(icon: Icons.language_rounded, label: 'OTYA', subtitle: 'Official OTYA website', color: AppColors.accent, onTap: () => context.push('/webview', extra: {'url': 'https://petersmartlink.com', 'title': 'OTYA'})),
+            _Divider(),
+            _NavTile(icon: Icons.description_outlined, label: 'Documents', subtitle: 'Terms, privacy, support and account documents', color: AppColors.accentViolet, onTap: () => context.push('/webview', extra: {'url': 'https://petersmartlink.com/documents', 'title': 'OTYA Documents'})),
             _Divider(),
             _NavTile(icon: Icons.system_update_outlined, label: 'Check Updates', subtitle: 'Tap to check for a new version', color: AppColors.accent, onTap: () => _checkForUpdates(context)),
             _Divider(),
@@ -107,7 +109,7 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 32),
           Center(child: Text(_version.isEmpty ? 'OTYA Player' : 'OTYA Player v$_version', style: const TextStyle(fontSize: 12, color: AppColors.textMuted, fontFamily: 'Inter'))),
           const SizedBox(height: 4),
-          const Center(child: Text('Part of OTYA System · © 2026', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Inter'))),
+          const Center(child: Text('Part of OTYA · © 2026', style: TextStyle(fontSize: 11, color: AppColors.textMuted, fontFamily: 'Inter'))),
         ],
       ),
     );
@@ -142,7 +144,7 @@ class _AboutScreenState extends State<AboutScreen> {
   Future<void> _shareApp(BuildContext context) async {
     try {
       final info = await PackageInfo.fromPlatform();
-      await Share.share('Download OTYA Player v${info.version}, part of OTYA System — a premium offline media player for Android:\nhttps://petersmartlink.com/download/otya-player', subject: 'OTYA Player · OTYA System');
+      await Share.share('Download OTYA Player v${info.version} — a premium offline media player from OTYA for Android:\nhttps://petersmartlink.com/download/otya-player', subject: 'OTYA Player');
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not share: $e'), backgroundColor: AppColors.error));
     }
@@ -165,7 +167,7 @@ class _AppCard extends StatelessWidget {
         const SizedBox(height: 16),
         const Text('OTYA Player', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: AppColors.textPrimary, fontFamily: 'Inter', letterSpacing: -0.3)),
         const SizedBox(height: 6),
-        const Text('An OTYA System media experience.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Inter')),
+        const Text('A media experience from OTYA.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary, fontFamily: 'Inter')),
         const SizedBox(height: 8),
         Container(padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5), decoration: BoxDecoration(color: AppColors.accent.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20), border: Border.all(color: AppColors.accent.withValues(alpha: 0.3))), child: Text(version.isEmpty ? 'Loading...' : 'Version $version (build $buildNumber)', style: const TextStyle(fontSize: 12, color: AppColors.accent, fontFamily: 'Inter', fontWeight: FontWeight.w600))),
         const SizedBox(height: 8),
@@ -173,7 +175,7 @@ class _AppCard extends StatelessWidget {
         const SizedBox(height: 20),
         const Divider(color: AppColors.border, height: 1),
         const SizedBox(height: 20),
-        const Text('OTYA Player is part of the OTYA System. Play, organise, and share local audio and video with a private, reliable experience.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.6, fontFamily: 'Inter')),
+        const Text('OTYA Player is part of OTYA. Play, organise, and share local audio and video with a private, reliable experience.', textAlign: TextAlign.center, style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.6, fontFamily: 'Inter')),
       ]),
     ),
   );
