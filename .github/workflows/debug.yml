@@ -94,12 +94,23 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          WORKER_URL: ${{ secrets.WORKER_URL }}
         shell: bash
         run: |
           set -euo pipefail
-          ARGS=(--release --split-per-abi --target-platform android-arm,android-arm64 --dart-define=SELF_UPDATE=false)
-          if [ -n "${{ secrets.WORKER_URL }}" ]; then ARGS+=(--dart-define=WORKER_URL="${{ secrets.WORKER_URL }}"); fi
-          if [ -n "$GOOGLE_CLIENT_ID" ]; then ARGS+=(--dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID"); fi
+          if [ -z "$GOOGLE_CLIENT_ID" ]; then
+            echo '::error::GOOGLE_CLIENT_ID repository/environment variable is required for production APKs.'
+            exit 1
+          fi
+          BASE_URL="${WORKER_URL:-https://petersmartlink.com}"
+          ARGS=(
+            --release
+            --split-per-abi
+            --target-platform android-arm,android-arm64
+            --dart-define=SELF_UPDATE=true
+            --dart-define=WORKER_URL="$BASE_URL"
+            --dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID"
+          )
           flutter build apk "${ARGS[@]}"
       - name: Verify APKs and record checksums
         shell: bash
