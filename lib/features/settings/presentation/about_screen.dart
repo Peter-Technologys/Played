@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../app/theme/app_colors.dart';
+import '../../../core/config/environment.dart';
 import '../../../core/services/update_service.dart';
 import '../../../core/widgets/rate_us_sheet.dart';
 import '../../../core/widgets/update_dialog.dart';
@@ -86,9 +87,9 @@ class _AboutScreenState extends State<AboutScreen> {
           _SectionHeader(label: 'Links'),
           const SizedBox(height: 10),
           _GroupCard(children: [
-            _NavTile(icon: Icons.language_rounded, label: 'OTYA', subtitle: 'Official OTYA website', color: AppColors.accent, onTap: () => context.push('/webview', extra: {'url': 'https://petersmartlink.com', 'title': 'OTYA'})),
+            _NavTile(icon: Icons.language_rounded, label: 'OTYA', subtitle: 'Official OTYA website', color: AppColors.accent, onTap: () => context.push('/webview', extra: {'url': Environment.websiteUrl, 'title': 'OTYA'})),
             _Divider(),
-            _NavTile(icon: Icons.description_outlined, label: 'Documents', subtitle: 'Terms, privacy, support and account documents', color: AppColors.accentViolet, onTap: () => context.push('/webview', extra: {'url': 'https://petersmartlink.com/documents', 'title': 'OTYA Documents'})),
+            _NavTile(icon: Icons.description_outlined, label: 'OTYA Docs', subtitle: 'Account, privacy, security, support and product docs', color: AppColors.accentViolet, onTap: () => context.push('/webview', extra: {'url': Environment.docsUrl, 'title': 'OTYA Docs'})),
             _Divider(),
             _NavTile(icon: Icons.system_update_outlined, label: 'Check Updates', subtitle: 'Tap to check for a new version', color: AppColors.accent, onTap: () => _checkForUpdates(context)),
             _Divider(),
@@ -144,7 +145,7 @@ class _AboutScreenState extends State<AboutScreen> {
   Future<void> _shareApp(BuildContext context) async {
     try {
       final info = await PackageInfo.fromPlatform();
-      await Share.share('Download OTYA Player v${info.version} — a premium offline media player from OTYA for Android:\nhttps://petersmartlink.com/download/otya-player', subject: 'OTYA Player');
+      await Share.share('Download OTYA Player v${info.version} — a premium offline media player from OTYA for Android:\n${Environment.downloadPageUrl}', subject: 'OTYA Player');
     } catch (e) {
       if (context.mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Could not share: $e'), backgroundColor: AppColors.error));
     }
