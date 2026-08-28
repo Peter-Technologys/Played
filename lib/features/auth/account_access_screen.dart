@@ -6,6 +6,7 @@ import '../../app/theme/app_colors.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/consent_service.dart';
+import '../../core/services/fcm_service.dart';
 import '../../core/services/google_account_service.dart';
 import '../../shared/widgets/wallpaper_scaffold.dart';
 
@@ -58,6 +59,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       email: user.email,
       photoUrl: user.avatarUrl,
     );
+    // Relink the already-issued FCM token to the newly authenticated OTYA
+    // account. Failure is intentionally non-fatal for sign-in and playback.
+    await FcmService.instance.syncRegistration();
     if (saveMarketingConsent) {
       await ConsentService.instance.setMarketingConsent(_marketingConsent);
     }

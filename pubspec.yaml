@@ -59,8 +59,11 @@ dependencies:
   permission_handler: ^11.3.1
   image_picker: ^1.1.2
 
-  # Notifications
+  # Notifications. Cloudflare owns notification logic; Firebase Messaging is
+  # only the Android push transport used when the app is backgrounded/closed.
   flutter_local_notifications: ^18.0.1
+  firebase_core: ^3.15.2
+  firebase_messaging: ^15.2.10
 
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.4
