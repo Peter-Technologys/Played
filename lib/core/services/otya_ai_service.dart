@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -163,8 +164,9 @@ class OtyaAiService {
     final prefs = await SharedPreferences.getInstance();
     final existing = prefs.getString(_guestKey);
     if (existing != null && existing.length >= 16) return existing;
-    final now = DateTime.now().microsecondsSinceEpoch.toRadixString(36);
-    final generated = '$now-${UniqueKey().hashCode.abs().toRadixString(36)}-${DateTime.now().millisecondsSinceEpoch.toRadixString(36)}';
+    final random = Random.secure();
+    final bytes = List<int>.generate(24, (_) => random.nextInt(256));
+    final generated = base64UrlEncode(bytes).replaceAll('=', '');
     await prefs.setString(_guestKey, generated);
     return generated;
   }
