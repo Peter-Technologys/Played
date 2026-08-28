@@ -34,6 +34,7 @@ const _secureStorage = FlutterSecureStorage(
 class AuthResult {
   final bool ok;
   final String? error;
+  final String? errorCode;
   final String? accessToken;
   final String? refreshToken;
   final UserProfile? user;
@@ -41,10 +42,14 @@ class AuthResult {
   const AuthResult({
     required this.ok,
     this.error,
+    this.errorCode,
     this.accessToken,
     this.refreshToken,
     this.user,
   });
+
+  bool get twoFactorRequired => errorCode == 'TWO_FACTOR_REQUIRED';
+  bool get twoFactorInvalid => errorCode == 'TWO_FACTOR_INVALID';
 }
 
 class UserProfile {
@@ -242,12 +247,24 @@ class AuthService {
     }
   }
 
-  Future<AuthResult> login(String email, String password) async {
+  Future<AuthResult> login(
+    String email,
+    String password, {
+    String? totpCode,
+    String? recoveryCode,
+  }) async {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/login'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          if (totpCode != null && totpCode.trim().isNotEmpty)
+            'totp_code': totpCode.trim(),
+          if (recoveryCode != null && recoveryCode.trim().isNotEmpty)
+            'recovery_code': recoveryCode.trim(),
+        }),
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
@@ -456,11 +473,13 @@ class AuthService {
         );
       }
       final error = data['error'];
+      final code = data['code'];
       return AuthResult(
         ok: false,
         error: error is String && error.trim().isNotEmpty
             ? error
             : 'Authentication failed. Please try again.',
+        errorCode: code is String ? code : null,
       );
     } catch (e) {
       // Do not log the body here: an upstream/misconfigured endpoint could
