@@ -122,14 +122,27 @@ jobs:
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
           GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          FIREBASE_APP_ID: ${{ vars.FIREBASE_APP_ID }}
+          FIREBASE_MESSAGING_SENDER_ID: ${{ vars.FIREBASE_MESSAGING_SENDER_ID }}
+          FIREBASE_PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
         shell: bash
         run: |
           set -euo pipefail
           test -n "$STORE_PASSWORD" || { echo "ERROR: STORE_PASSWORD is missing"; exit 1; }
           test -n "$KEY_ALIAS" || { echo "ERROR: KEY_ALIAS is missing"; exit 1; }
           test -n "$KEY_PASSWORD" || { echo "ERROR: KEY_PASSWORD is missing"; exit 1; }
+          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY GitHub variable is missing"; exit 1; }
+          test -n "$FIREBASE_APP_ID" || { echo "ERROR: FIREBASE_APP_ID GitHub variable is missing"; exit 1; }
+          test -n "$FIREBASE_MESSAGING_SENDER_ID" || { echo "ERROR: FIREBASE_MESSAGING_SENDER_ID GitHub variable is missing"; exit 1; }
+          test -n "$FIREBASE_PROJECT_ID" || { echo "ERROR: FIREBASE_PROJECT_ID GitHub variable is missing"; exit 1; }
 
-          EXTRA_DEFINES=()
+          EXTRA_DEFINES=(
+            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
+            --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID"
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"
+            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+          )
           if [ -n "$GOOGLE_CLIENT_ID" ]; then
             EXTRA_DEFINES+=(--dart-define=GOOGLE_CLIENT_ID="$GOOGLE_CLIENT_ID")
           fi
