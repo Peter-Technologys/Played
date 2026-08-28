@@ -1,7 +1,7 @@
 name: otya_player
 description: OTYA Player — the official media experience of the OTYA System, built for private, reliable playback and media management.
 publish_to: 'none'
-version: 1.6.0+10
+version: 1.7.0+11
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -48,8 +48,6 @@ dependencies:
   shimmer: ^3.0.0
 
   # Google account + private Google Drive App Folder backup.
-  # v6 is intentionally used with the current Flutter/Dart toolchain and can
-  # be configured using --dart-define=GOOGLE_CLIENT_ID without Firebase.
   google_sign_in: ^6.2.1
 
   # Device info — used for ABI detection + update checker
@@ -86,13 +84,9 @@ dependencies:
   open_filex: ^4.7.0
 
   # Background audio — keeps media_kit Player alive when app is backgrounded.
-  # Provides Android foreground service + system MediaSession (lock-screen
-  # controls, Bluetooth headset buttons, notification media controls).
   audio_service: ^0.18.15
 
   # In-app WebView
-  # Pinned to the last versions known to support the Dart 3.8.x SDK used by
-  # Flutter 3.32.x in CI. Newer webview_flutter_android releases require Dart 3.9+.
   webview_flutter: 4.9.0
   webview_flutter_android: 3.16.9
 
@@ -105,7 +99,6 @@ dev_dependencies:
   json_serializable: ^6.8.0
   riverpod_generator: ^2.4.0
   flutter_lints: ^5.0.0
-
 
 flutter:
   uses-material-design: true
