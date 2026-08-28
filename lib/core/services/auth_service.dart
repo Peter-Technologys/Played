@@ -19,13 +19,13 @@ import 'http_client.dart';
 
 String get _kAuthBase => '${Environment.workerUrl}/auth';
 
-const _kSecureAccessToken  = 'otya_access_token';
+const _kSecureAccessToken = 'otya_access_token';
 const _kSecureRefreshToken = 'otya_refresh_token';
-const _kUserId         = 'otya_user_id';
-const _kUserEmail      = 'otya_user_email';
-const _kUserName       = 'otya_user_name';
-const _kUserAvatar     = 'otya_user_avatar';
-const _kIsVerified     = 'otya_is_verified';
+const _kUserId = 'otya_user_id';
+const _kUserEmail = 'otya_user_email';
+const _kUserName = 'otya_user_name';
+const _kUserAvatar = 'otya_user_avatar';
+const _kIsVerified = 'otya_is_verified';
 
 const _secureStorage = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -47,6 +47,18 @@ class AuthResult {
   });
 }
 
+class VerificationSendResult {
+  final bool ok;
+  final String message;
+  final int? statusCode;
+
+  const VerificationSendResult({
+    required this.ok,
+    required this.message,
+    this.statusCode,
+  });
+}
+
 class UserProfile {
   final String id;
   final String email;
@@ -63,10 +75,10 @@ class UserProfile {
   });
 
   factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        id:         json['id'] as String,
-        email:      json['email'] as String,
-        name:       json['name'] as String?,
-        avatarUrl:  json['avatar_url'] as String?,
+        id: json['id'] as String,
+        email: json['email'] as String,
+        name: json['name'] as String?,
+        avatarUrl: json['avatar_url'] as String?,
         isVerified: (json['is_verified'] as int? ?? 0) == 1,
       );
 }
@@ -77,7 +89,9 @@ Map<String, dynamic>? _decodeJwtPayload(String token) {
     if (parts.length != 3) return null;
     var payload = parts[1];
     while (payload.length % 4 != 0) payload += '=';
-    final decoded = base64Url.decode(payload.replaceAll('-', '+').replaceAll('_', '/'));
+    final decoded = base64Url.decode(
+      payload.replaceAll('-', '+').replaceAll('_', '/'),
+    );
     return jsonDecode(utf8.decode(decoded)) as Map<String, dynamic>;
   } catch (_) {
     return null;
@@ -131,11 +145,17 @@ class AuthService {
   }) async {
     if (accessToken != null) {
       _accessToken = accessToken;
-      await _secureStorage.write(key: _kSecureAccessToken, value: accessToken);
+      await _secureStorage.write(
+        key: _kSecureAccessToken,
+        value: accessToken,
+      );
     }
     if (refreshToken != null) {
       _refreshToken = refreshToken;
-      await _secureStorage.write(key: _kSecureRefreshToken, value: refreshToken);
+      await _secureStorage.write(
+        key: _kSecureRefreshToken,
+        value: refreshToken,
+      );
     }
     if (user != null) {
       _userId = user.id;
@@ -147,7 +167,9 @@ class AuthService {
       await prefs.setString(_kUserId, user.id);
       await prefs.setString(_kUserEmail, user.email);
       if (user.name != null) await prefs.setString(_kUserName, user.name!);
-      if (user.avatarUrl != null) await prefs.setString(_kUserAvatar, user.avatarUrl!);
+      if (user.avatarUrl != null) {
+        await prefs.setString(_kUserAvatar, user.avatarUrl!);
+      }
       await prefs.setBool(_kIsVerified, user.isVerified);
     }
   }
@@ -198,7 +220,10 @@ class AuthService {
           final newToken = decoded['access_token'] as String?;
           if (newToken != null && newToken.isNotEmpty) {
             _accessToken = newToken;
-            await _secureStorage.write(key: _kSecureAccessToken, value: newToken);
+            await _secureStorage.write(
+              key: _kSecureAccessToken,
+              value: newToken,
+            );
             return newToken;
           }
         }
@@ -209,12 +234,26 @@ class AuthService {
     return null;
   }
 
-  Future<AuthResult> register(String email, String password, String? name) async {
+  Future<AuthResult> register(
+    String email,
+    String password,
+    String? name, {
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    bool marketingConsent = false,
+  }) async {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password, if (name != null) 'name': name}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          if (name != null) 'name': name,
+          'terms_accepted': termsAccepted,
+          'privacy_accepted': privacyAccepted,
+          'marketing_consent': marketingConsent,
+        }),
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
@@ -237,12 +276,18 @@ class AuthService {
     }
   }
 
-  Future<AuthResult> loginWithGoogle(String idToken, String driveAccessToken) async {
+  Future<AuthResult> loginWithGoogle(
+    String idToken,
+    String driveAccessToken,
+  ) async {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/google'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'id_token': idToken, 'drive_access_token': driveAccessToken}),
+        body: jsonEncode({
+          'id_token': idToken,
+          'drive_access_token': driveAccessToken,
+        }),
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
@@ -277,10 +322,13 @@ class AuthService {
       ).timeout(_timeout);
       if (res.statusCode != 200) return null;
       final decoded = jsonDecode(res.body);
-      if (decoded is! Map<String, dynamic> || decoded['user'] is! Map<String, dynamic>) {
+      if (decoded is! Map<String, dynamic> ||
+          decoded['user'] is! Map<String, dynamic>) {
         return null;
       }
-      final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
+      final user = UserProfile.fromJson(
+        decoded['user'] as Map<String, dynamic>,
+      );
       await _persist(user: user);
       return user;
     } catch (e) {
@@ -298,13 +346,19 @@ class AuthService {
       if (avatarUrl != null) body['avatar_url'] = avatarUrl;
       final res = await _client.patch(
         Uri.parse('$_kAuthBase/me'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode(body),
       ).timeout(_timeout);
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic> && decoded['user'] is Map<String, dynamic>) {
-          final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
+        if (decoded is Map<String, dynamic> &&
+            decoded['user'] is Map<String, dynamic>) {
+          final user = UserProfile.fromJson(
+            decoded['user'] as Map<String, dynamic>,
+          );
           await _persist(user: user);
         }
       }
@@ -313,19 +367,63 @@ class AuthService {
     }
   }
 
-  Future<bool> sendVerificationOtp() async {
+  Future<VerificationSendResult> sendVerificationOtpDetailed() async {
     final token = await getValidToken();
-    if (token == null) return false;
+    if (token == null) {
+      return const VerificationSendResult(
+        ok: false,
+        message: 'Your session expired. Sign in again before requesting a code.',
+        statusCode: 401,
+      );
+    }
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/send-verification'),
         headers: {'Authorization': 'Bearer $token'},
       ).timeout(_timeout);
-      return res.statusCode >= 200 && res.statusCode < 300;
+
+      if (res.statusCode >= 200 && res.statusCode < 300) {
+        return VerificationSendResult(
+          ok: true,
+          message: 'Verification code sent to ${userEmail ?? 'your email'}.',
+          statusCode: res.statusCode,
+        );
+      }
+
+      String? serverMessage;
+      try {
+        final decoded = jsonDecode(res.body);
+        if (decoded is Map<String, dynamic>) {
+          final value = decoded['error'] ?? decoded['message'];
+          if (value is String && value.trim().isNotEmpty) {
+            serverMessage = value.trim();
+          }
+        }
+      } catch (_) {}
+
+      final message = switch (res.statusCode) {
+        401 => 'Your session expired. Sign in again and request a new code.',
+        429 => 'Too many verification requests. Wait a little before trying again.',
+        502 || 503 => 'OTYA email delivery is temporarily unavailable. Please try again shortly.',
+        _ => serverMessage ?? 'Could not send the verification code. Please try again.',
+      };
+
+      return VerificationSendResult(
+        ok: false,
+        message: message,
+        statusCode: res.statusCode,
+      );
     } catch (e) {
       debugPrint('[AuthService] sendVerificationOtp failed: ${e.runtimeType}');
-      return false;
+      return const VerificationSendResult(
+        ok: false,
+        message: _networkError,
+      );
     }
+  }
+
+  Future<bool> sendVerificationOtp() async {
+    return (await sendVerificationOtpDetailed()).ok;
   }
 
   Future<bool> verifyOtp(String otp) async {
@@ -334,7 +432,10 @@ class AuthService {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/verify-email'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer $token',
+        },
         body: jsonEncode({'otp': otp}),
       ).timeout(_timeout);
       if (res.statusCode == 200) {
@@ -364,12 +465,20 @@ class AuthService {
     }
   }
 
-  Future<bool> resetPassword(String email, String otp, String newPassword) async {
+  Future<bool> resetPassword(
+    String email,
+    String otp,
+    String newPassword,
+  ) async {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/reset-password'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'otp': otp, 'new_password': newPassword}),
+        body: jsonEncode({
+          'email': email,
+          'otp': otp,
+          'new_password': newPassword,
+        }),
       ).timeout(_timeout);
       return res.statusCode == 200;
     } catch (e) {
@@ -397,7 +506,8 @@ class AuthService {
     if (raw.isEmpty) {
       return AuthResult(
         ok: false,
-        error: 'Authentication service returned an empty response (HTTP ${res.statusCode}). Please try again.',
+        error:
+            'Authentication service returned an empty response (HTTP ${res.statusCode}). Please try again.',
       );
     }
     try {
@@ -405,16 +515,23 @@ class AuthService {
       if (decoded is! Map<String, dynamic>) {
         return AuthResult(
           ok: false,
-          error: 'Authentication service returned an invalid response (HTTP ${res.statusCode}).',
+          error:
+              'Authentication service returned an invalid response (HTTP ${res.statusCode}).',
         );
       }
       final data = decoded;
-      if (res.statusCode >= 200 && res.statusCode < 300 && data['ok'] == true) {
+      if (res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          data['ok'] == true) {
         final accessToken = data['access_token'] as String?;
         final refreshToken = data['refresh_token'] as String?;
         final userJson = data['user'] as Map<String, dynamic>?;
         final user = userJson != null ? UserProfile.fromJson(userJson) : null;
-        await _persist(accessToken: accessToken, refreshToken: refreshToken, user: user);
+        await _persist(
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+          user: user,
+        );
         return AuthResult(
           ok: true,
           accessToken: accessToken,
@@ -437,7 +554,8 @@ class AuthService {
       );
       return AuthResult(
         ok: false,
-        error: 'Authentication service response was invalid (HTTP ${res.statusCode}).',
+        error:
+            'Authentication service response was invalid (HTTP ${res.statusCode}).',
       );
     }
   }
