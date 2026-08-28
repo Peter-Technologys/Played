@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
 import 'auth_service.dart';
@@ -58,7 +59,10 @@ class GoogleAccountService {
       final auth = await account.authentication;
       final idToken = auth.idToken;
       if (idToken == null || idToken.isEmpty) {
-        return const AuthResult(ok: false, error: 'Google did not return an ID token.');
+        return const AuthResult(
+          ok: false,
+          error: 'Google could not verify this app installation. Please update OTYA and try again.',
+        );
       }
 
       final result = await AuthService.instance.loginWithGoogle(
@@ -73,13 +77,40 @@ class GoogleAccountService {
         _driveAccessToken = null;
       }
       return result;
-    } catch (e) {
-      debugPrint('[GoogleAccount] sign-in failed: ${e.runtimeType}');
+    } on PlatformException catch (error) {
+      debugPrint(
+        '[GoogleAccount] sign-in platform failure: code=${error.code}, '
+        'detailsType=${error.details.runtimeType}',
+      );
+      return AuthResult(ok: false, error: _friendlyPlatformError(error));
+    } catch (error) {
+      debugPrint('[GoogleAccount] sign-in failed: ${error.runtimeType}');
       return const AuthResult(
         ok: false,
-        error: 'Google Sign-In could not be completed. Please try again.',
+        error: 'Google Sign-In could not be completed. Check your connection and try again.',
       );
     }
+  }
+
+  String _friendlyPlatformError(PlatformException error) {
+    final code = error.code.toLowerCase();
+    final details = '${error.message ?? ''} ${error.details ?? ''}'.toLowerCase();
+
+    if (code.contains('network') || details.contains('network')) {
+      return 'Google Sign-In needs an internet connection. Check your connection and try again.';
+    }
+    if (code.contains('cancel')) {
+      return 'Google Sign-In was cancelled.';
+    }
+    if (details.contains('10') ||
+        details.contains('developer_error') ||
+        details.contains('developer error')) {
+      return 'Google Sign-In is not configured for this signed OTYA build yet. Please update the app or contact support.';
+    }
+    if (code.contains('sign_in_failed')) {
+      return 'Google could not verify this OTYA installation. Please update the app and try again.';
+    }
+    return 'Google Sign-In could not be completed. Please try again.';
   }
 
   Future<bool> restoreSession() async {
@@ -90,8 +121,8 @@ class GoogleAccountService {
       _account = account;
       _driveAccessToken = null;
       return true;
-    } catch (e) {
-      debugPrint('[GoogleAccount] silent restore failed: ${e.runtimeType}');
+    } catch (error) {
+      debugPrint('[GoogleAccount] silent restore failed: ${error.runtimeType}');
       return false;
     }
   }
@@ -114,8 +145,8 @@ class GoogleAccountService {
       if (token != null && token.isNotEmpty) {
         _driveAccessToken = token;
       }
-    } catch (e) {
-      debugPrint('[GoogleAccount] Drive permission/token refresh failed: ${e.runtimeType}');
+    } catch (error) {
+      debugPrint('[GoogleAccount] Drive permission/token refresh failed: ${error.runtimeType}');
       return null;
     }
     return _driveAccessToken;
@@ -147,8 +178,8 @@ class GoogleAccountService {
     _account = null;
     try {
       await _google.signOut();
-    } catch (e) {
-      debugPrint('[GoogleAccount] sign-out failed: ${e.runtimeType}');
+    } catch (error) {
+      debugPrint('[GoogleAccount] sign-out failed: ${error.runtimeType}');
     }
   }
 }

@@ -7,6 +7,7 @@ import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/consent_service.dart';
 import '../../core/services/google_account_service.dart';
+import '../../core/services/verification_service.dart';
 import '../../shared/widgets/wallpaper_scaffold.dart';
 
 class ProfileScreen extends ConsumerStatefulWidget {
@@ -44,10 +45,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Future<void> _verifyEmail() async {
     if (_busy) return;
     setState(() { _busy = true; _message = null; });
-    final sent = await AuthService.instance.sendVerificationOtp();
+    final delivery = await VerificationService.instance.sendCode();
     if (!mounted) return;
     setState(() => _busy = false);
-    if (!sent) { setState(() => _message = 'Could not send the verification code. Try again.'); return; }
+    if (!delivery.ok) {
+      setState(() => _message = delivery.message);
+      return;
+    }
+
     final controllers = List.generate(5, (_) => TextEditingController());
     final focusNodes = List.generate(5, (_) => FocusNode());
     final code = await showDialog<String>(
@@ -55,7 +60,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (context) => AlertDialog(
         title: const Text('Verify email'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('Code sent to ${_profile?.email ?? AuthService.instance.userEmail ?? 'your email'}.'),
+          Text(delivery.message),
           const SizedBox(height: 18),
           Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: List.generate(5, (index) => SizedBox(
             width: 48,
