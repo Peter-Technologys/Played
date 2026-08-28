@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
+import '../../core/services/consent_service.dart';
 import '../../core/services/google_account_service.dart';
 import '../../shared/widgets/wallpaper_scaffold.dart';
 
@@ -19,6 +20,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _register = false;
   bool _loading = false;
   bool _obscure = true;
+  bool _termsAccepted = false;
+  bool _privacyAccepted = false;
+  bool _marketingConsent = false;
   String? _error;
   final _name = TextEditingController();
   final _email = TextEditingController();
@@ -32,7 +36,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _finish(AuthResult result) async {
+  Future<void> _finish(AuthResult result, {bool saveMarketingConsent = false}) async {
     final user = result.user;
     if (!result.ok || user == null) {
       if (mounted) setState(() => _error = result.error ?? 'Could not sign in.');
@@ -44,6 +48,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       email: user.email,
       photoUrl: user.avatarUrl,
     );
+    if (saveMarketingConsent) {
+      await ConsentService.instance.setMarketingConsent(_marketingConsent);
+    }
     if (!mounted) return;
     context.go('/profile');
   }
@@ -58,6 +65,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       setState(() => _error = 'Password must be at least 8 characters.');
       return;
     }
+    if (_register && (!_termsAccepted || !_privacyAccepted)) {
+      setState(() => _error = 'Accept the Terms of Service and Privacy Policy to create your OTYA account.');
+      return;
+    }
+
     setState(() {
       _loading = true;
       _error = null;
@@ -70,7 +82,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           )
         : await AuthService.instance.login(email, _password.text);
     if (mounted) setState(() => _loading = false);
-    await _finish(result);
+    await _finish(result, saveMarketingConsent: _register);
   }
 
   Future<void> _google() async {
@@ -169,12 +181,39 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _loading
-                        ? null
-                        : () => context.push('/auth/forgot-password'),
+                    onPressed: _loading ? null : () => context.push('/auth/forgot-password'),
                     child: const Text('Forgot password?'),
                   ),
                 ),
+              if (_register) ...[
+                const SizedBox(height: 14),
+                _consentRow(
+                  value: _termsAccepted,
+                  onChanged: (v) => setState(() => _termsAccepted = v ?? false),
+                  label: 'I accept the Terms of Service',
+                  onOpen: () => context.push('/webview', extra: {
+                    'url': 'https://petersmartlink.com/terms',
+                    'title': 'Terms of Service',
+                  }),
+                ),
+                _consentRow(
+                  value: _privacyAccepted,
+                  onChanged: (v) => setState(() => _privacyAccepted = v ?? false),
+                  label: 'I accept the Privacy Policy',
+                  onOpen: () => context.push('/privacy'),
+                ),
+                CheckboxListTile(
+                  value: _marketingConsent,
+                  onChanged: (v) => setState(() => _marketingConsent = v ?? false),
+                  controlAffinity: ListTileControlAffinity.leading,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Send me OTYA news, product announcements and promotions'),
+                  subtitle: const Text(
+                    'Optional. You can turn this off later. Security, account and legal notices are still sent when needed.',
+                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                  ),
+                ),
+              ],
               if (_error != null) ...[
                 const SizedBox(height: 8),
                 Text(_error!,
@@ -205,6 +244,27 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  Widget _consentRow({
+    required bool value,
+    required ValueChanged<bool?> onChanged,
+    required String label,
+    required VoidCallback onOpen,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
+      children: [
+        Checkbox(value: value, onChanged: onChanged),
+        Expanded(
+          child: TextButton(
+            onPressed: onOpen,
+            style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+            child: Text(label),
+          ),
+        ),
+      ],
     );
   }
 
