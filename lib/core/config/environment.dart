@@ -8,7 +8,7 @@ abstract class Environment {
     defaultValue: 'https://petersmartlink.com',
   );
 
-  static const String systemName  = 'OTYA System';
+  static const String umbrellaName = 'OTYA';
   static const String productName = 'OTYA Player';
 
   static const String apiSyncUrl      = '$workerUrl/api/sync';
@@ -31,6 +31,7 @@ abstract class Environment {
   static const String appPackageId = 'com.otyaplayer.app';
   static const String supportEmail = 'support@petersmartlink.com';
   static const String websiteUrl   = workerUrl;
+  static const String documentsUrl = '$workerUrl/documents';
   static const String downloadPageUrl = '$workerUrl/download/otya-player';
 
   /// Self-installing APK updates are opt-in. Keep disabled by default so a
