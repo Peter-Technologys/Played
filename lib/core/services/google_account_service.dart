@@ -37,7 +37,11 @@ class GoogleAccountService {
   String? get email => _account?.email;
   bool get hasGoogleSession => _account != null;
 
-  Future<AuthResult> signInAndAuthenticate() async {
+  Future<AuthResult> signInAndAuthenticate({
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    bool marketingConsent = false,
+  }) async {
     if (!isConfigured) {
       return const AuthResult(
         ok: false,
@@ -57,7 +61,13 @@ class GoogleAccountService {
         return const AuthResult(ok: false, error: 'Google did not return an ID token.');
       }
 
-      final result = await AuthService.instance.loginWithGoogle(idToken, '');
+      final result = await AuthService.instance.loginWithGoogle(
+        idToken,
+        '',
+        termsAccepted: termsAccepted,
+        privacyAccepted: privacyAccepted,
+        marketingConsent: marketingConsent,
+      );
       if (result.ok) {
         _account = account;
         _driveAccessToken = null;

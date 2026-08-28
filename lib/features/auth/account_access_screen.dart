@@ -39,7 +39,17 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   Future<void> _finish(AuthResult result, {bool saveMarketingConsent = false}) async {
     final user = result.user;
     if (!result.ok || user == null) {
-      if (mounted) setState(() => _error = result.error ?? 'Could not sign in.');
+      if (mounted) {
+        final message = result.error ?? 'Could not sign in.';
+        setState(() {
+          _error = message;
+          if (message.contains('Terms of Service') ||
+              message.contains('Privacy Policy') ||
+              message.contains('create your OTYA account')) {
+            _register = true;
+          }
+        });
+      }
       return;
     }
     await ref.read(authNotifierProvider.notifier).signIn(
@@ -55,6 +65,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     context.go('/profile');
   }
 
+  bool _validateRegistrationConsent() {
+    if (!_termsAccepted || !_privacyAccepted) {
+      setState(() => _error =
+          'Accept the Terms of Service and Privacy Policy to create your OTYA account.');
+      return false;
+    }
+    return true;
+  }
+
   Future<void> _submit() async {
     final email = _email.text.trim();
     if (email.isEmpty || !_email.text.contains('@')) {
@@ -65,10 +84,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       setState(() => _error = 'Password must be at least 8 characters.');
       return;
     }
-    if (_register && (!_termsAccepted || !_privacyAccepted)) {
-      setState(() => _error = 'Accept the Terms of Service and Privacy Policy to create your OTYA account.');
-      return;
-    }
+    if (_register && !_validateRegistrationConsent()) return;
 
     setState(() {
       _loading = true;
@@ -79,6 +95,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             email,
             _password.text,
             _name.text.trim().isEmpty ? null : _name.text.trim(),
+            termsAccepted: _termsAccepted,
+            privacyAccepted: _privacyAccepted,
+            marketingConsent: _marketingConsent,
           )
         : await AuthService.instance.login(email, _password.text);
     if (mounted) setState(() => _loading = false);
@@ -86,13 +105,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   }
 
   Future<void> _google() async {
+    if (_register && !_validateRegistrationConsent()) return;
+
     setState(() {
       _loading = true;
       _error = null;
     });
-    final result = await GoogleAccountService.instance.signInAndAuthenticate();
+    final result = await GoogleAccountService.instance.signInAndAuthenticate(
+      termsAccepted: _register && _termsAccepted,
+      privacyAccepted: _register && _privacyAccepted,
+      marketingConsent: _register && _marketingConsent,
+    );
     if (mounted) setState(() => _loading = false);
-    await _finish(result);
+    await _finish(result, saveMarketingConsent: _register);
   }
 
   @override

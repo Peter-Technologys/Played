@@ -96,6 +96,9 @@ class AuthService {
   AuthService._();
   static final AuthService instance = AuthService._();
 
+  static const termsVersion = '2026-08-28';
+  static const privacyVersion = '2026-08-28';
+
   http.Client get _client => AppHttpClient.instance.client;
   static const Duration _timeout = Duration(seconds: 15);
 
@@ -209,12 +212,28 @@ class AuthService {
     return null;
   }
 
-  Future<AuthResult> register(String email, String password, String? name) async {
+  Future<AuthResult> register(
+    String email,
+    String password,
+    String? name, {
+    required bool termsAccepted,
+    required bool privacyAccepted,
+    bool marketingConsent = false,
+  }) async {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/register'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password, if (name != null) 'name': name}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          if (name != null) 'name': name,
+          'terms_accepted': termsAccepted,
+          'terms_version': termsVersion,
+          'privacy_accepted': privacyAccepted,
+          'privacy_version': privacyVersion,
+          'marketing_consent': marketingConsent,
+        }),
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
@@ -237,12 +256,26 @@ class AuthService {
     }
   }
 
-  Future<AuthResult> loginWithGoogle(String idToken, String driveAccessToken) async {
+  Future<AuthResult> loginWithGoogle(
+    String idToken,
+    String driveAccessToken, {
+    bool termsAccepted = false,
+    bool privacyAccepted = false,
+    bool marketingConsent = false,
+  }) async {
     try {
       final res = await _client.post(
         Uri.parse('$_kAuthBase/google'),
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'id_token': idToken, 'drive_access_token': driveAccessToken}),
+        body: jsonEncode({
+          'id_token': idToken,
+          'drive_access_token': driveAccessToken,
+          'terms_accepted': termsAccepted,
+          'terms_version': termsVersion,
+          'privacy_accepted': privacyAccepted,
+          'privacy_version': privacyVersion,
+          'marketing_consent': marketingConsent,
+        }),
       ).timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
