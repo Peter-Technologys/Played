@@ -36,10 +36,15 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     super.dispose();
   }
 
-  Future<void> _finish(AuthResult result, {bool saveMarketingConsent = false}) async {
+  Future<void> _finish(
+    AuthResult result, {
+    bool saveMarketingConsent = false,
+  }) async {
     final user = result.user;
     if (!result.ok || user == null) {
-      if (mounted) setState(() => _error = result.error ?? 'Could not sign in.');
+      if (mounted) {
+        setState(() => _error = result.error ?? 'Could not sign in.');
+      }
       return;
     }
     await ref.read(authNotifierProvider.notifier).signIn(
@@ -57,7 +62,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
 
   Future<void> _submit() async {
     final email = _email.text.trim();
-    if (email.isEmpty || !_email.text.contains('@')) {
+    if (email.isEmpty || !email.contains('@')) {
       setState(() => _error = 'Enter a valid email address.');
       return;
     }
@@ -66,7 +71,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       return;
     }
     if (_register && (!_termsAccepted || !_privacyAccepted)) {
-      setState(() => _error = 'Accept the Terms of Service and Privacy Policy to create your OTYA account.');
+      setState(
+        () => _error =
+            'Accept the Terms of Service and Privacy Policy to create your OTYA account.',
+      );
       return;
     }
 
@@ -79,6 +87,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
             email,
             _password.text,
             _name.text.trim().isEmpty ? null : _name.text.trim(),
+            termsAccepted: _termsAccepted,
+            privacyAccepted: _privacyAccepted,
+            marketingConsent: _marketingConsent,
           )
         : await AuthService.instance.login(email, _password.text);
     if (mounted) setState(() => _loading = false);
@@ -121,7 +132,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const Text(
                 'One account for sync, verification and Google Drive backup.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontSize: 13,
+                ),
               ),
               const SizedBox(height: 28),
               SizedBox(
@@ -133,14 +147,19 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 ),
               ),
               const SizedBox(height: 18),
-              Row(children: const [
-                Expanded(child: Divider(color: AppColors.border)),
-                Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 12),
-                  child: Text('OR', style: TextStyle(color: AppColors.textSecondary)),
-                ),
-                Expanded(child: Divider(color: AppColors.border)),
-              ]),
+              const Row(
+                children: [
+                  Expanded(child: Divider(color: AppColors.border)),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      'OR',
+                      style: TextStyle(color: AppColors.textSecondary),
+                    ),
+                  ),
+                  Expanded(child: Divider(color: AppColors.border)),
+                ],
+              ),
               const SizedBox(height: 18),
               SegmentedButton<bool>(
                 segments: const [
@@ -160,8 +179,12 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 _field(_name, 'Name', Icons.person_outline_rounded),
                 const SizedBox(height: 12),
               ],
-              _field(_email, 'Email', Icons.email_outlined,
-                  keyboardType: TextInputType.emailAddress),
+              _field(
+                _email,
+                'Email',
+                Icons.email_outlined,
+                keyboardType: TextInputType.emailAddress,
+              ),
               const SizedBox(height: 12),
               TextField(
                 controller: _password,
@@ -171,9 +194,11 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   prefixIcon: const Icon(Icons.lock_outline_rounded),
                   suffixIcon: IconButton(
                     onPressed: () => setState(() => _obscure = !_obscure),
-                    icon: Icon(_obscure
-                        ? Icons.visibility_outlined
-                        : Icons.visibility_off_outlined),
+                    icon: Icon(
+                      _obscure
+                          ? Icons.visibility_outlined
+                          : Icons.visibility_off_outlined,
+                    ),
                   ),
                 ),
               ),
@@ -181,7 +206,9 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: _loading ? null : () => context.push('/auth/forgot-password'),
+                    onPressed: _loading
+                        ? null
+                        : () => context.push('/auth/forgot-password'),
                     child: const Text('Forgot password?'),
                   ),
                 ),
@@ -189,36 +216,49 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                 const SizedBox(height: 14),
                 _consentRow(
                   value: _termsAccepted,
-                  onChanged: (v) => setState(() => _termsAccepted = v ?? false),
+                  onChanged: (v) =>
+                      setState(() => _termsAccepted = v ?? false),
                   label: 'I accept the Terms of Service',
-                  onOpen: () => context.push('/webview', extra: {
-                    'url': 'https://petersmartlink.com/terms',
-                    'title': 'Terms of Service',
-                  }),
+                  onOpen: () => context.push(
+                    '/webview',
+                    extra: {
+                      'url': 'https://petersmartlink.com/terms',
+                      'title': 'Terms of Service',
+                    },
+                  ),
                 ),
                 _consentRow(
                   value: _privacyAccepted,
-                  onChanged: (v) => setState(() => _privacyAccepted = v ?? false),
+                  onChanged: (v) =>
+                      setState(() => _privacyAccepted = v ?? false),
                   label: 'I accept the Privacy Policy',
                   onOpen: () => context.push('/privacy'),
                 ),
                 CheckboxListTile(
                   value: _marketingConsent,
-                  onChanged: (v) => setState(() => _marketingConsent = v ?? false),
+                  onChanged: (v) =>
+                      setState(() => _marketingConsent = v ?? false),
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Send me OTYA news, product announcements and promotions'),
+                  title: const Text(
+                    'Send me OTYA news, product announcements and promotions',
+                  ),
                   subtitle: const Text(
                     'Optional. You can turn this off later. Security, account and legal notices are still sent when needed.',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 11,
+                    ),
                   ),
                 ),
               ],
               if (_error != null) ...[
                 const SizedBox(height: 8),
-                Text(_error!,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.error)),
+                Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: AppColors.error),
+                ),
               ],
               const SizedBox(height: 18),
               SizedBox(
@@ -238,7 +278,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const Text(
                 'Google and email/password both connect to your OTYA account.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: AppColors.textMuted, fontSize: 11),
+                style: TextStyle(
+                  color: AppColors.textMuted,
+                  fontSize: 11,
+                ),
               ),
             ],
           ),
@@ -277,7 +320,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     return TextField(
       controller: controller,
       keyboardType: keyboardType,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+      ),
     );
   }
 }
