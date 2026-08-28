@@ -11,6 +11,7 @@ import '../core/widgets/update_dialog.dart';
 import '../core/services/remote_control_service.dart';
 import '../shared/widgets/new_media_banner.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
+import '../features/ai/otya_ai_screen.dart';
 import '../features/player/presentation/video_player_screen.dart';
 import '../features/player/presentation/audio_player_screen.dart';
 import '../features/player/presentation/car_mode_screen.dart';
@@ -35,8 +36,6 @@ import '../features/auth/forgot_password_screen.dart';
 import '../features/auth/verify_email_screen.dart';
 import '../features/webview/otya_webview_screen.dart';
 
-// ── Shared fade transition (200 ms) used for shell/tab routes ─────────────
-
 CustomTransitionPage<void> _fadePage({
   required BuildContext context,
   required GoRouterState state,
@@ -50,8 +49,6 @@ CustomTransitionPage<void> _fadePage({
       transitionsBuilder: (_, animation, __, child) =>
           FadeTransition(opacity: animation, child: child),
     );
-
-// ── Slide-up transition (300 ms) used for full-screen player routes ───────
 
 CustomTransitionPage<void> _slideUpPage({
   required BuildContext context,
@@ -73,8 +70,6 @@ CustomTransitionPage<void> _slideUpPage({
     );
 
 class AppRouter {
-  /// Shared navigator key — exposed so [FcmService] can obtain a [BuildContext]
-  /// for showing in-app SnackBars from foreground FCM messages.
   static final GlobalKey<NavigatorState> navigatorKey =
       GlobalKey<NavigatorState>();
 
@@ -105,19 +100,21 @@ class AppRouter {
           child: _MainShell(child: child),
         ),
         routes: [
-          // Tab 0 — Video Library
           GoRoute(
             path: '/',
             pageBuilder: (context, state) => _fadePage(
               context: context, state: state, child: const VideoTabScreen()),
           ),
-          // Tab 1 — Music Library
           GoRoute(
             path: '/music',
             pageBuilder: (context, state) => _fadePage(
               context: context, state: state, child: const MusicTabScreen()),
           ),
-          // Tab 2 — My Space hub (account + tools + quick links + settings)
+          GoRoute(
+            path: '/ai',
+            pageBuilder: (context, state) => _fadePage(
+              context: context, state: state, child: const OtyaAiScreen()),
+          ),
           GoRoute(
             path: '/myspace',
             pageBuilder: (context, state) => _fadePage(
@@ -125,7 +122,6 @@ class AppRouter {
           ),
         ],
       ),
-      // Auth routes
       GoRoute(
         path: '/auth',
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AuthScreen()),
@@ -138,7 +134,6 @@ class AppRouter {
         path: '/auth/verify-email',
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const VerifyEmailScreen()),
       ),
-      // AirDrop remains as a push route (not a shell tab)
       GoRoute(
         path: '/airdrop',
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AirDropScreen()),
@@ -151,7 +146,6 @@ class AppRouter {
         path: '/settings',
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const SettingsDetailScreen()),
       ),
-      // TASK 10: /settings-detail removed — was a duplicate of /settings.
       GoRoute(
         path: '/about',
         pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AboutScreen()),
@@ -250,7 +244,6 @@ class AppRouter {
           ),
         ),
       ),
-      // TASK 4: slide-up transition for full-screen player routes
       GoRoute(
         path: '/player/video',
         pageBuilder: (c, s) {
@@ -398,17 +391,11 @@ class AppRouter {
   );
 }
 
-// ── Global Search Delegate ────────────────────────────────────────────
-
-/// A [SearchDelegate] that searches across both videos and music from
-/// [mediaLibraryProvider] and presents results in two labelled sections.
 class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
   final List<MediaItem> _allItems;
 
   _GlobalSearchDelegate(this._allItems)
       : super(searchFieldLabel: 'Search everything…');
-
-  // ── Helpers ──────────────────────────────────────────────────────────
 
   List<MediaItem> get _videos => _allItems.where((i) => i.isVideo).toList();
   List<MediaItem> get _music  => _allItems.where((i) => !i.isVideo).toList();
@@ -423,8 +410,6 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
           (i.album?.toLowerCase().contains(q) ?? false);
     }).toList();
   }
-
-  // ── AppBar actions ───────────────────────────────────────────────────
 
   @override
   List<Widget> buildActions(BuildContext context) => [
@@ -445,8 +430,6 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
         tooltip: 'Back',
         onPressed: () => close(context, null),
       );
-
-  // ── Results & suggestions share the same layout ──────────────────────
 
   @override
   Widget buildResults(BuildContext context) => _buildResultsView(context);
@@ -516,14 +499,11 @@ class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
             ),
           ),
         ],
-        // Bottom padding so the last item isn't hidden behind the nav bar
         const SliverToBoxAdapter(child: SizedBox(height: 24)),
       ],
     );
   }
 }
-
-// ── Section header sliver ─────────────────────────────────────────────
 
 class _SectionHeader extends StatelessWidget {
   final IconData icon;
@@ -571,8 +551,6 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-// ── Individual result tile ────────────────────────────────────────────
-
 class _MediaResultTile extends StatelessWidget {
   final MediaItem item;
   final VoidCallback onTap;
@@ -617,8 +595,6 @@ class _MediaResultTile extends StatelessWidget {
   }
 }
 
-// ── Main Shell ────────────────────────────────────────────────────────
-
 class _MainShell extends ConsumerStatefulWidget {
   final Widget child;
   const _MainShell({required this.child});
@@ -628,18 +604,11 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  static const _routes = ['/', '/music', '/myspace'];
-
-  // TASK 1: Removed IndexedStack + _pages list.
-  // Tab state is preserved by AutomaticKeepAliveClientMixin on each tab screen.
-  // widget.child from ShellRoute is the single source of truth.
+  static const _routes = ['/', '/music', '/ai', '/myspace'];
 
   @override
   void initState() {
     super.initState();
-    // Show the in-app update dialog once on shell mount (after first frame).
-    // AnnouncementDialog is already wired in app.dart with a 2-second delay;
-    // UpdateDialog runs here so both are available on every app start.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) UpdateDialog.checkAndShow(context);
     });
@@ -652,26 +621,22 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    // Only watch mediaLibraryProvider here — mini player is wrapped in its
-    // own Consumer below so only it rebuilds on miniPlayerItemProvider changes.
-    final allItems = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
+    ref.watch(mediaLibraryProvider).valueOrNull ?? [];
 
-    // Derive the active tab index from the current route location so that
-    // deep links and programmatic navigation keep the nav bar in sync.
     final location = GoRouterState.of(context).matchedLocation;
     final currentIndex = location.startsWith('/music')
         ? 1
-        : location.startsWith('/myspace')
+        : location.startsWith('/ai')
             ? 2
-            : 0;
+            : location.startsWith('/myspace')
+                ? 3
+                : 0;
 
     return Scaffold(
       body: widget.child,
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Mini-player wrapped in Consumer so only it rebuilds when the
-          // current track changes — the rest of the shell is unaffected.
           Consumer(
             builder: (context, ref, _) {
               final hasMini = ref.watch(miniPlayerItemProvider) != null;
@@ -680,62 +645,65 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   : const SizedBox.shrink();
             },
           ),
-          // TASK 11: AdBannerSlot already returns SizedBox.shrink() when ads
-          // are disabled — no visual gap. No additional guard needed.
           Container(
-              margin: EdgeInsets.fromLTRB(12, 0, 12, MediaQuery.of(context).padding.bottom + 6),
-              decoration: BoxDecoration(
+            margin: EdgeInsets.fromLTRB(
+                12, 0, 12, MediaQuery.of(context).padding.bottom + 6),
+            decoration: BoxDecoration(
+              color: Theme.of(context).brightness == Brightness.dark
+                  ? const Color(0xFF1B1E2B)
+                  : Colors.white,
+              borderRadius: BorderRadius.circular(28),
+              border: Border.all(
                 color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF1B1E2B)
-                    : Colors.white,
-                borderRadius: BorderRadius.circular(28),
-                border: Border.all(
-                  color: Theme.of(context).brightness == Brightness.dark
-                      ? const Color(0xFF2A2F45)
-                      : const Color(0xFFE5E7EB),
+                    ? const Color(0xFF2A2F45)
+                    : const Color(0xFFE5E7EB),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accent.withValues(alpha: 0.10),
+                  blurRadius: 24,
+                  offset: const Offset(0, 4),
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.10),
-                    blurRadius: 24,
-                    offset: const Offset(0, 4),
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _NavItem(
+                    icon: Icons.play_circle_rounded,
+                    label: 'Watch',
+                    isActive: currentIndex == 0,
+                    onTap: () => _onTap(0),
+                  ),
+                  _NavItem(
+                    icon: Icons.music_note_rounded,
+                    label: 'Listen',
+                    isActive: currentIndex == 1,
+                    onTap: () => _onTap(1),
+                  ),
+                  _NavItem(
+                    icon: Icons.auto_awesome_rounded,
+                    label: 'AI',
+                    isActive: currentIndex == 2,
+                    onTap: () => _onTap(2),
+                  ),
+                  _NavItem(
+                    icon: Icons.person_rounded,
+                    label: 'My Space',
+                    isActive: currentIndex == 3,
+                    onTap: () => _onTap(3),
                   ),
                 ],
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _NavItem(
-                      icon: Icons.play_circle_rounded,
-                      label: 'Watch',
-                      isActive: currentIndex == 0,
-                      onTap: () => _onTap(0),
-                    ),
-                    _NavItem(
-                      icon: Icons.music_note_rounded,
-                      label: 'Listen',
-                      isActive: currentIndex == 1,
-                      onTap: () => _onTap(1),
-                    ),
-                    _NavItem(
-                      icon: Icons.person_rounded,
-                      label: 'Hub',
-                      isActive: currentIndex == 2,
-                      onTap: () => _onTap(2),
-                    ),
-                  ],
-                ),
-              ),
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-// ── Nav Item ──────────────────────────────────────────────────────────
 
 class _NavItem extends StatelessWidget {
   final IconData icon;
@@ -756,7 +724,7 @@ class _NavItem extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
           gradient: isActive
               ? const LinearGradient(
@@ -785,14 +753,16 @@ class _NavItem extends StatelessWidget {
               child: Icon(
                 icon,
                 color: isActive ? Colors.black : AppColors.textSecondary,
-                size: 22,
+                size: 21,
               ),
             ),
             const SizedBox(height: 3),
             Text(
               label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: TextStyle(
-                fontSize: 10,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 color: isActive ? Colors.black : AppColors.textSecondary,
                 fontFamily: 'Inter',
@@ -805,8 +775,6 @@ class _NavItem extends StatelessWidget {
   }
 }
 
-// ── Stats Screen ──────────────────────────────────────────────────────
-
 class _StatsScreen extends StatelessWidget {
   const _StatsScreen();
   @override
@@ -817,10 +785,16 @@ class _StatsScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded, color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(Icons.arrow_back_ios_new_rounded,
+              color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('My Stats', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
+        title: Text('My Stats',
+            style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Theme.of(context).colorScheme.onSurface,
+                fontFamily: 'Inter')),
       ),
       body: const SingleChildScrollView(
         padding: EdgeInsets.symmetric(vertical: 16),
