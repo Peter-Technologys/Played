@@ -2,39 +2,44 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../features/my_space/presentation/my_space_hub_screen.dart';
-import '../features/my_space/presentation/usage_stats_dashboard.dart';
-import '../features/my_space/presentation/folder_browser_screen.dart' show FolderBrowserScreen, FolderDetailScreen;
-import '../features/my_space/presentation/playback_history_screen.dart';
-import '../features/my_space/presentation/providers/my_space_provider.dart';
-import '../core/widgets/update_dialog.dart';
+
+import '../app/theme/app_colors.dart';
+import '../core/models/media_item.dart';
 import '../core/services/remote_control_service.dart';
-import '../shared/widgets/new_media_banner.dart';
-import '../features/air_drop/presentation/air_drop_screen.dart';
+import '../core/widgets/update_dialog.dart';
 import '../features/ai/otya_ai_screen.dart';
-import '../features/player/presentation/video_player_screen.dart';
+import '../features/air_drop/presentation/air_drop_screen.dart';
+import '../features/auth/auth_screen.dart';
+import '../features/auth/forgot_password_screen.dart';
+import '../features/auth/verify_email_screen.dart';
+import '../features/downloads/presentation/downloads_screen.dart';
+import '../features/home/presentation/otya_home_screen.dart';
+import '../features/music/presentation/music_tab_screen.dart';
+import '../features/my_space/presentation/folder_browser_screen.dart'
+    show FolderBrowserScreen, FolderDetailScreen;
+import '../features/my_space/presentation/my_space_hub_screen.dart';
+import '../features/my_space/presentation/playback_history_screen.dart';
+import '../features/my_space/presentation/usage_stats_dashboard.dart';
 import '../features/player/presentation/audio_player_screen.dart';
 import '../features/player/presentation/car_mode_screen.dart';
 import '../features/player/presentation/equalizer_screen.dart';
 import '../features/player/presentation/mini_player.dart';
-import '../features/profile/profile_screen.dart' show ProfileScreen, WhatsNewScreen;
-import '../features/vault/presentation/vault_lock_screen.dart';
-import '../features/tools/whatsapp_trimmer_screen.dart';
-import '../features/playlists/playlist_screen.dart' show PlaylistsScreen, PlaylistDetailScreenById;
-import '../features/settings/presentation/settings_detail_screen.dart';
+import '../features/player/presentation/video_player_screen.dart';
+import '../features/playlists/playlist_screen.dart'
+    show PlaylistDetailScreenById, PlaylistsScreen;
+import '../features/profile/profile_screen.dart'
+    show ProfileScreen, WhatsNewScreen;
 import '../features/settings/presentation/about_screen.dart';
-import '../features/settings/presentation/theme_selection_screen.dart';
 import '../features/settings/presentation/privacy_policy_screen.dart';
+import '../features/settings/presentation/settings_detail_screen.dart';
 import '../features/settings/presentation/storage_analyzer_screen.dart';
-import '../features/video/presentation/video_tab_screen.dart' show VideoTabScreen, VideoFolderDetailPage;
-import '../features/music/presentation/music_tab_screen.dart';
-import '../core/models/media_item.dart';
-import '../app/theme/app_colors.dart';
-import '../shared/widgets/pro_gate.dart';
-import '../features/auth/auth_screen.dart';
-import '../features/auth/forgot_password_screen.dart';
-import '../features/auth/verify_email_screen.dart';
+import '../features/settings/presentation/theme_selection_screen.dart';
+import '../features/tools/whatsapp_trimmer_screen.dart';
+import '../features/vault/presentation/vault_lock_screen.dart';
+import '../features/video/presentation/video_tab_screen.dart'
+    show VideoFolderDetailPage, VideoTabScreen;
 import '../features/webview/otya_webview_screen.dart';
+import '../shared/widgets/pro_gate.dart';
 
 CustomTransitionPage<void> _fadePage({
   required BuildContext context,
@@ -103,60 +108,121 @@ class AppRouter {
           GoRoute(
             path: '/',
             pageBuilder: (context, state) => _fadePage(
-              context: context, state: state, child: const VideoTabScreen()),
+              context: context,
+              state: state,
+              child: const OtyaHomeScreen(),
+            ),
           ),
           GoRoute(
             path: '/music',
             pageBuilder: (context, state) => _fadePage(
-              context: context, state: state, child: const MusicTabScreen()),
+              context: context,
+              state: state,
+              child: const MusicTabScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/library',
+            pageBuilder: (context, state) => _fadePage(
+              context: context,
+              state: state,
+              child: const VideoTabScreen(),
+            ),
           ),
           GoRoute(
             path: '/ai',
             pageBuilder: (context, state) => _fadePage(
-              context: context, state: state, child: const OtyaAiScreen()),
+              context: context,
+              state: state,
+              child: const OtyaAiScreen(),
+            ),
+          ),
+          GoRoute(
+            path: '/downloads',
+            pageBuilder: (context, state) => _fadePage(
+              context: context,
+              state: state,
+              child: const DownloadsScreen(),
+            ),
           ),
           GoRoute(
             path: '/myspace',
             pageBuilder: (context, state) => _fadePage(
-              context: context, state: state, child: const MySpaceHubScreen()),
+              context: context,
+              state: state,
+              child: const MySpaceHubScreen(),
+            ),
           ),
         ],
       ),
       GoRoute(
         path: '/auth',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AuthScreen()),
+        pageBuilder: (c, s) =>
+            _fadePage(context: c, state: s, child: const AuthScreen()),
       ),
       GoRoute(
         path: '/auth/forgot-password',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ForgotPasswordScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const ForgotPasswordScreen(),
+        ),
       ),
       GoRoute(
         path: '/auth/verify-email',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const VerifyEmailScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const VerifyEmailScreen(),
+        ),
       ),
       GoRoute(
         path: '/airdrop',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AirDropScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const AirDropScreen(),
+        ),
       ),
       GoRoute(
         path: '/profile',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ProfileScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const ProfileScreen(),
+        ),
       ),
       GoRoute(
         path: '/settings',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const SettingsDetailScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const SettingsDetailScreen(),
+        ),
       ),
       GoRoute(
         path: '/about',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const AboutScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const AboutScreen(),
+        ),
       ),
       GoRoute(
         path: '/theme',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const ThemeSelectionScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const ThemeSelectionScreen(),
+        ),
       ),
       GoRoute(
         path: '/tools/folders',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const FolderBrowserScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const FolderBrowserScreen(),
+        ),
       ),
       GoRoute(
         path: '/tools/folder-detail',
@@ -175,31 +241,53 @@ class AppRouter {
       ),
       GoRoute(
         path: '/history',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const PlaybackHistoryScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const PlaybackHistoryScreen(),
+        ),
       ),
       GoRoute(
         path: '/playlists',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const PlaylistsScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const PlaylistsScreen(),
+        ),
       ),
       GoRoute(
         path: '/playlist/:id',
         pageBuilder: (c, s) => _fadePage(
           context: c,
           state: s,
-          child: PlaylistDetailScreenById(playlistId: s.pathParameters['id']!),
+          child: PlaylistDetailScreenById(
+            playlistId: s.pathParameters['id']!,
+          ),
         ),
       ),
       GoRoute(
         path: '/vault',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const VaultLockScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const VaultLockScreen(),
+        ),
       ),
       GoRoute(
         path: '/privacy',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const PrivacyPolicyScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const PrivacyPolicyScreen(),
+        ),
       ),
       GoRoute(
         path: '/whats-new',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const WhatsNewScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const WhatsNewScreen(),
+        ),
       ),
       GoRoute(
         path: '/video/folder',
@@ -226,11 +314,19 @@ class AppRouter {
       ),
       GoRoute(
         path: '/settings/storage',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const StorageAnalyzerScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const StorageAnalyzerScreen(),
+        ),
       ),
       GoRoute(
         path: '/stats',
-        pageBuilder: (c, s) => _fadePage(context: c, state: s, child: const _StatsScreen()),
+        pageBuilder: (c, s) => _fadePage(
+          context: c,
+          state: s,
+          child: const _StatsScreen(),
+        ),
       ),
       GoRoute(
         path: '/player/equalizer',
@@ -249,9 +345,15 @@ class AppRouter {
         pageBuilder: (c, s) {
           final item = s.extra;
           if (item is! MediaItem) {
-            return _fadePage(context: c, state: s, child: const SizedBox.shrink());
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const SizedBox.shrink(),
+            );
           }
-          return _slideUpPage(context: c, state: s,
+          return _slideUpPage(
+            context: c,
+            state: s,
             child: VideoPlayerScreen(mediaItem: item),
           );
         },
@@ -362,7 +464,8 @@ class AppRouter {
             context: c,
             state: s,
             child: OtyaWebViewScreen(
-              url: args['url'] as String? ?? 'https://petersmartlink.com/otya-player',
+              url: args['url'] as String? ??
+                  'https://petersmartlink.com/otya-player',
               title: args['title'] as String?,
             ),
           );
@@ -373,7 +476,11 @@ class AppRouter {
         pageBuilder: (c, s) {
           final item = s.extra;
           if (item is! MediaItem) {
-            return _fadePage(context: c, state: s, child: const SizedBox.shrink());
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const SizedBox.shrink(),
+            );
           }
           return _fadePage(
             context: c,
@@ -391,210 +498,6 @@ class AppRouter {
   );
 }
 
-class _GlobalSearchDelegate extends SearchDelegate<MediaItem?> {
-  final List<MediaItem> _allItems;
-
-  _GlobalSearchDelegate(this._allItems)
-      : super(searchFieldLabel: 'Search everything…');
-
-  List<MediaItem> get _videos => _allItems.where((i) => i.isVideo).toList();
-  List<MediaItem> get _music  => _allItems.where((i) => !i.isVideo).toList();
-
-  List<MediaItem> _filter(List<MediaItem> items) {
-    final q = query.trim().toLowerCase();
-    if (q.isEmpty) return items;
-    return items.where((i) {
-      return i.title.toLowerCase().contains(q) ||
-          i.fileName.toLowerCase().contains(q) ||
-          (i.artist?.toLowerCase().contains(q) ?? false) ||
-          (i.album?.toLowerCase().contains(q) ?? false);
-    }).toList();
-  }
-
-  @override
-  List<Widget> buildActions(BuildContext context) => [
-        if (query.isNotEmpty)
-          IconButton(
-            icon: const Icon(Icons.clear),
-            tooltip: 'Clear',
-            onPressed: () {
-              query = '';
-              showSuggestions(context);
-            },
-          ),
-      ];
-
-  @override
-  Widget buildLeading(BuildContext context) => IconButton(
-        icon: const Icon(Icons.arrow_back),
-        tooltip: 'Back',
-        onPressed: () => close(context, null),
-      );
-
-  @override
-  Widget buildResults(BuildContext context) => _buildResultsView(context);
-
-  @override
-  Widget buildSuggestions(BuildContext context) => _buildResultsView(context);
-
-  Widget _buildResultsView(BuildContext context) {
-    final filteredVideos = _filter(_videos);
-    final filteredMusic  = _filter(_music);
-
-    if (filteredVideos.isEmpty && filteredMusic.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.search_off_rounded,
-                size: 56,
-                color: AppColors.textSecondary.withValues(alpha: 0.5)),
-            const SizedBox(height: 12),
-            Text(
-              query.isEmpty ? 'Type to search…' : 'Nothing found for "$query"',
-              style: const TextStyle(color: AppColors.textSecondary),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return CustomScrollView(
-      slivers: [
-        if (filteredVideos.isNotEmpty) ...[
-          _SectionHeader(
-            icon: Icons.play_circle_rounded,
-            label: 'Videos',
-            count: filteredVideos.length,
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (ctx, i) => _MediaResultTile(
-                item: filteredVideos[i],
-                onTap: () {
-                  close(context, filteredVideos[i]);
-                  GoRouter.of(context).push('/player/video', extra: filteredVideos[i]);
-                },
-              ),
-              childCount: filteredVideos.length,
-            ),
-          ),
-        ],
-        if (filteredMusic.isNotEmpty) ...[
-          _SectionHeader(
-            icon: Icons.music_note_rounded,
-            label: 'Music',
-            count: filteredMusic.length,
-          ),
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (ctx, i) => _MediaResultTile(
-                item: filteredMusic[i],
-                onTap: () {
-                  close(context, filteredMusic[i]);
-                  GoRouter.of(context).push('/player/audio', extra: filteredMusic[i]);
-                },
-              ),
-              childCount: filteredMusic.length,
-            ),
-          ),
-        ],
-        const SliverToBoxAdapter(child: SizedBox(height: 24)),
-      ],
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final int count;
-
-  const _SectionHeader({
-    required this.icon,
-    required this.label,
-    required this.count,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return SliverToBoxAdapter(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-        child: Row(
-          children: [
-            Icon(icon, size: 18, color: AppColors.accent),
-            const SizedBox(width: 6),
-            Text(
-              label.toUpperCase(),
-              style: const TextStyle(
-                fontSize: 11,
-                fontWeight: FontWeight.w800,
-                color: AppColors.accent,
-                letterSpacing: 1.2,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(width: 6),
-            Text(
-              '($count)',
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _MediaResultTile extends StatelessWidget {
-  final MediaItem item;
-  final VoidCallback onTap;
-
-  const _MediaResultTile({required this.item, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: CircleAvatar(
-        backgroundColor: item.isVideo
-            ? AppColors.accent.withValues(alpha: 0.15)
-            : AppColors.accentViolet.withValues(alpha: 0.15),
-        child: Icon(
-          item.isVideo ? Icons.play_circle_outline_rounded : Icons.music_note_rounded,
-          color: item.isVideo ? AppColors.accent : AppColors.accentViolet,
-          size: 20,
-        ),
-      ),
-      title: Text(
-        item.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontFamily: 'Inter', fontWeight: FontWeight.w600),
-      ),
-      subtitle: Text(
-        [
-          if (item.artist != null) item.artist!,
-          item.formattedDuration,
-          item.formattedSize,
-        ].join(' · '),
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(
-          fontSize: 12,
-          color: AppColors.textSecondary,
-          fontFamily: 'Inter',
-        ),
-      ),
-      onTap: onTap,
-    );
-  }
-}
-
 class _MainShell extends ConsumerStatefulWidget {
   final Widget child;
   const _MainShell({required this.child});
@@ -604,7 +507,7 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  static const _routes = ['/', '/music', '/ai', '/myspace'];
+  static const _routes = ['/', '/music', '/ai', '/downloads', '/myspace'];
 
   @override
   void initState() {
@@ -621,16 +524,17 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(mediaLibraryProvider).valueOrNull ?? [];
-
     final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = location.startsWith('/music')
+    final currentIndex = location.startsWith('/music') ||
+            location.startsWith('/library')
         ? 1
         : location.startsWith('/ai')
             ? 2
-            : location.startsWith('/myspace')
+            : location.startsWith('/downloads')
                 ? 3
-                : 0;
+                : location.startsWith('/myspace')
+                    ? 4
+                    : 0;
 
     return Scaffold(
       body: widget.child,
@@ -647,53 +551,72 @@ class _MainShellState extends ConsumerState<_MainShell> {
           ),
           Container(
             margin: EdgeInsets.fromLTRB(
-                12, 0, 12, MediaQuery.of(context).padding.bottom + 6),
+              10,
+              0,
+              10,
+              MediaQuery.of(context).padding.bottom + 5,
+            ),
             decoration: BoxDecoration(
               color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF1B1E2B)
-                  : Colors.white,
-              borderRadius: BorderRadius.circular(28),
+                  ? const Color(0xFF10111D).withValues(alpha: .97)
+                  : Colors.white.withValues(alpha: .97),
+              borderRadius: BorderRadius.circular(26),
               border: Border.all(
                 color: Theme.of(context).brightness == Brightness.dark
-                    ? const Color(0xFF2A2F45)
+                    ? const Color(0xFF24273B)
                     : const Color(0xFFE5E7EB),
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.10),
-                  blurRadius: 24,
-                  offset: const Offset(0, 4),
+                  color: AppColors.accent.withValues(alpha: .12),
+                  blurRadius: 26,
+                  offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3, vertical: 6),
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
               child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
                 children: [
-                  _NavItem(
-                    icon: Icons.play_circle_rounded,
-                    label: 'Watch',
-                    isActive: currentIndex == 0,
-                    onTap: () => _onTap(0),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.home_rounded,
+                      label: 'Home',
+                      isActive: currentIndex == 0,
+                      onTap: () => _onTap(0),
+                    ),
                   ),
-                  _NavItem(
-                    icon: Icons.music_note_rounded,
-                    label: 'Listen',
-                    isActive: currentIndex == 1,
-                    onTap: () => _onTap(1),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.library_music_rounded,
+                      label: 'Library',
+                      isActive: currentIndex == 1,
+                      onTap: () => _onTap(1),
+                    ),
                   ),
-                  _NavItem(
-                    icon: Icons.auto_awesome_rounded,
-                    label: 'AI',
-                    isActive: currentIndex == 2,
-                    onTap: () => _onTap(2),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.auto_awesome_rounded,
+                      label: 'AI',
+                      isActive: currentIndex == 2,
+                      onTap: () => _onTap(2),
+                    ),
                   ),
-                  _NavItem(
-                    icon: Icons.person_rounded,
-                    label: 'My Space',
-                    isActive: currentIndex == 3,
-                    onTap: () => _onTap(3),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.download_rounded,
+                      label: 'Downloads',
+                      isActive: currentIndex == 3,
+                      onTap: () => _onTap(3),
+                    ),
+                  ),
+                  Expanded(
+                    child: _NavItem(
+                      icon: Icons.person_rounded,
+                      label: 'My Space',
+                      isActive: currentIndex == 4,
+                      onTap: () => _onTap(4),
+                    ),
                   ),
                 ],
               ),
@@ -710,6 +633,7 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+
   const _NavItem({
     required this.icon,
     required this.label,
@@ -722,38 +646,35 @@ class _NavItem extends StatelessWidget {
     return GestureDetector(
       onTap: onTap,
       behavior: HitTestBehavior.opaque,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: isActive
-              ? const LinearGradient(
-                  colors: [AppColors.accent, AppColors.accentViolet],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                )
-              : null,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: isActive
-              ? [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.30),
-                    blurRadius: 12,
-                    spreadRadius: 0,
-                  ),
-                ]
-              : null,
-        ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            AnimatedScale(
-              scale: isActive ? 1.1 : 1.0,
-              duration: const Duration(milliseconds: 200),
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 190),
+              width: 38,
+              height: 30,
+              decoration: BoxDecoration(
+                gradient: isActive
+                    ? const LinearGradient(
+                        colors: [Color(0xFF11D7FF), Color(0xFF7544FF), Color(0xFFFF2CAA)],
+                      )
+                    : null,
+                borderRadius: BorderRadius.circular(15),
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: AppColors.accent.withValues(alpha: .24),
+                          blurRadius: 12,
+                        ),
+                      ]
+                    : null,
+              ),
               child: Icon(
                 icon,
-                color: isActive ? Colors.black : AppColors.textSecondary,
-                size: 21,
+                color: isActive ? Colors.white : AppColors.textSecondary,
+                size: 20,
               ),
             ),
             const SizedBox(height: 3),
@@ -761,10 +682,13 @@ class _NavItem extends StatelessWidget {
               label,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.center,
               style: TextStyle(
-                fontSize: 9.5,
-                fontWeight: FontWeight.w700,
-                color: isActive ? Colors.black : AppColors.textSecondary,
+                fontSize: 8.5,
+                fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                color: isActive
+                    ? Theme.of(context).colorScheme.onSurface
+                    : AppColors.textSecondary,
                 fontFamily: 'Inter',
               ),
             ),
@@ -777,6 +701,7 @@ class _NavItem extends StatelessWidget {
 
 class _StatsScreen extends StatelessWidget {
   const _StatsScreen();
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -785,16 +710,22 @@ class _StatsScreen extends StatelessWidget {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: Theme.of(context).colorScheme.onSurface, size: 20),
+          icon: Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Theme.of(context).colorScheme.onSurface,
+            size: 20,
+          ),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('My Stats',
-            style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontFamily: 'Inter')),
+        title: Text(
+          'My Stats',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w700,
+            color: Theme.of(context).colorScheme.onSurface,
+            fontFamily: 'Inter',
+          ),
+        ),
       ),
       body: const SingleChildScrollView(
         padding: EdgeInsets.symmetric(vertical: 16),
