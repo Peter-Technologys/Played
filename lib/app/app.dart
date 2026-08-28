@@ -33,7 +33,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     _checkOnboarding();
     _loadVisualTheme();
     RemoteControlService.instance.init();
-    _applyOverlayStyle();
     SchedulerBinding.instance.addPostFrameCallback((_) {
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
@@ -53,15 +52,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   Future<void> _loadVisualTheme() async {
     await CustomThemeManager.instance.load();
     await CustomThemeManager.instance.refreshSeasonalTheme();
-  }
-
-  void _applyOverlayStyle() {
-    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
-      statusBarIconBrightness: Brightness.light,
-      systemNavigationBarColor: Color(0xFF0F1117),
-      systemNavigationBarIconBrightness: Brightness.light,
-    ));
   }
 
   Future<void> _checkOnboarding() async {
@@ -92,16 +82,35 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     if (mounted) setState(() => _onboardingDone = true);
   }
 
+  ThemeMode _materialThemeMode(AppThemeMode mode) => switch (mode) {
+        AppThemeMode.light => ThemeMode.light,
+        AppThemeMode.system => ThemeMode.system,
+        AppThemeMode.dark || AppThemeMode.amoled => ThemeMode.dark,
+      };
+
+  ThemeData _darkTheme(AppThemeMode mode) {
+    if (mode == AppThemeMode.amoled) {
+      return AppTheme.dark.copyWith(
+        scaffoldBackgroundColor: Colors.black,
+        appBarTheme: AppTheme.dark.appBarTheme.copyWith(backgroundColor: Colors.black),
+      );
+    }
+    return AppTheme.dark;
+  }
+
   @override
   Widget build(BuildContext context) {
     final locale = ref.watch(localeProvider);
+    final settings = ref.watch(settingsProvider);
 
     if (_checking) {
+      final startupTheme = settings.themeMode == AppThemeMode.light
+          ? AppTheme.light
+          : _darkTheme(settings.themeMode);
       return MaterialApp(
         debugShowCheckedModeBanner: false,
-        theme: AppTheme.dark,
+        theme: startupTheme,
         home: Scaffold(
-          backgroundColor: const Color(0xFF0F111A),
           body: Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -158,16 +167,22 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         final themeManager = CustomThemeManager.instance;
         final hasArtwork = themeManager.hasImageWallpaper ||
             themeManager.storyTheme != null;
-        final activeTheme = hasArtwork
-            ? AppTheme.dark.copyWith(scaffoldBackgroundColor: Colors.transparent)
-            : AppTheme.dark;
+
+        final baseLight = AppTheme.light;
+        final baseDark = _darkTheme(settings.themeMode);
+        final lightTheme = hasArtwork
+            ? baseLight.copyWith(scaffoldBackgroundColor: Colors.transparent)
+            : baseLight;
+        final darkTheme = hasArtwork
+            ? baseDark.copyWith(scaffoldBackgroundColor: Colors.transparent)
+            : baseDark;
 
         return MaterialApp.router(
           title: 'OTYA Player',
           debugShowCheckedModeBanner: false,
-          theme: activeTheme,
-          darkTheme: activeTheme,
-          themeMode: ThemeMode.dark,
+          theme: lightTheme,
+          darkTheme: darkTheme,
+          themeMode: _materialThemeMode(settings.themeMode),
           locale: locale,
           supportedLocales: const [
             Locale('en'),
@@ -182,8 +197,17 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           ],
           routerConfig: AppRouter.router,
           builder: (context, child) {
-            Widget wrappedChild = child ?? const SizedBox.shrink();
+            final isDark = Theme.of(context).brightness == Brightness.dark;
+            final overlay = SystemUiOverlayStyle(
+              statusBarColor: Colors.transparent,
+              statusBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
+              systemNavigationBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+            );
 
+            Widget wrappedChild = child ?? const SizedBox.shrink();
             final wallpaperDecoration = themeManager.wallpaperDecoration;
             if (wallpaperDecoration != null) {
               wrappedChild = Container(
@@ -192,20 +216,23 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               );
             }
 
-            return MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: MediaQuery.of(context).textScaler.clamp(
-                  minScaleFactor: 0.85,
-                  maxScaleFactor: 1.2,
+            return AnnotatedRegion<SystemUiOverlayStyle>(
+              value: overlay,
+              child: MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: MediaQuery.of(context).textScaler.clamp(
+                    minScaleFactor: 0.85,
+                    maxScaleFactor: 1.2,
+                  ),
                 ),
-              ),
-              child: RemoteControlGate(
-                child: Stack(
-                  children: [
-                    wrappedChild,
-                    if (!_onboardingDone)
-                      OnboardingOverlay(onDone: _completeOnboarding),
-                  ],
+                child: RemoteControlGate(
+                  child: Stack(
+                    children: [
+                      wrappedChild,
+                      if (!_onboardingDone)
+                        OnboardingOverlay(onDone: _completeOnboarding),
+                    ],
+                  ),
                 ),
               ),
             );
