@@ -507,7 +507,7 @@ class _MainShell extends ConsumerStatefulWidget {
 }
 
 class _MainShellState extends ConsumerState<_MainShell> {
-  static const _routes = ['/', '/music', '/ai', '/downloads', '/myspace'];
+  static const _routes = ['/', '/music', '/ai', '/myspace'];
 
   @override
   void initState() {
@@ -526,15 +526,14 @@ class _MainShellState extends ConsumerState<_MainShell> {
   Widget build(BuildContext context) {
     final location = GoRouterState.of(context).matchedLocation;
     final currentIndex = location.startsWith('/music') ||
-            location.startsWith('/library')
+            location.startsWith('/library') ||
+            location.startsWith('/downloads')
         ? 1
         : location.startsWith('/ai')
             ? 2
-            : location.startsWith('/downloads')
+            : location.startsWith('/myspace')
                 ? 3
-                : location.startsWith('/myspace')
-                    ? 4
-                    : 0;
+                : 0;
 
     return Scaffold(
       body: widget.child,
@@ -575,7 +574,7 @@ class _MainShellState extends ConsumerState<_MainShell> {
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 5),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
               child: Row(
                 children: [
                   Expanded(
@@ -604,18 +603,10 @@ class _MainShellState extends ConsumerState<_MainShell> {
                   ),
                   Expanded(
                     child: _NavItem(
-                      icon: Icons.download_rounded,
-                      label: 'Downloads',
-                      isActive: currentIndex == 3,
-                      onTap: () => _onTap(3),
-                    ),
-                  ),
-                  Expanded(
-                    child: _NavItem(
                       icon: Icons.person_rounded,
                       label: 'My Space',
-                      isActive: currentIndex == 4,
-                      onTap: () => _onTap(4),
+                      isActive: currentIndex == 3,
+                      onTap: () => _onTap(3),
                     ),
                   ),
                 ],
@@ -658,7 +649,11 @@ class _NavItem extends StatelessWidget {
               decoration: BoxDecoration(
                 gradient: isActive
                     ? const LinearGradient(
-                        colors: [Color(0xFF11D7FF), Color(0xFF7544FF), Color(0xFFFF2CAA)],
+                        colors: [
+                          Color(0xFF11D7FF),
+                          Color(0xFF7544FF),
+                          Color(0xFFFF2CAA),
+                        ],
                       )
                     : null,
                 borderRadius: BorderRadius.circular(15),
