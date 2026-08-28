@@ -9,8 +9,7 @@ import '../../../core/services/update_service.dart';
 import '../../../core/widgets/rate_us_sheet.dart';
 import '../../../core/widgets/update_dialog.dart';
 
-/// Standalone About screen — reached via /about route.
-/// Shows OTYA Player identity, OTYA System affiliation, version and support links.
+/// Help & About screen — support stays useful even when AI is unavailable.
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
@@ -48,13 +47,41 @@ class _AboutScreenState extends State<AboutScreen> {
               color: Theme.of(context).colorScheme.onSurface, size: 20),
           onPressed: () => Navigator.of(context).pop(),
         ),
-        title: Text('About', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
+        title: Text('Help & About', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Theme.of(context).colorScheme.onSurface, fontFamily: 'Inter')),
       ),
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
         children: [
           const SizedBox(height: 8),
           _AppCard(version: _version, buildNumber: _build),
+          const SizedBox(height: 24),
+          _SectionHeader(label: 'Support'),
+          const SizedBox(height: 10),
+          _GroupCard(children: [
+            _NavTile(
+              icon: Icons.auto_awesome_rounded,
+              label: 'Ask OTYA AI',
+              subtitle: 'Optional AI help for OTYA or general questions',
+              color: AppColors.accentViolet,
+              onTap: () => context.push('/ai'),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.bug_report_outlined,
+              label: 'Report a problem',
+              subtitle: 'Email OTYA Support with a problem report',
+              color: AppColors.accentAmber,
+              onTap: () => _launchEmail(context, subject: 'OTYA Player Problem Report'),
+            ),
+            _Divider(),
+            _NavTile(
+              icon: Icons.email_outlined,
+              label: 'OTYA Support',
+              subtitle: 'support@petersmartlink.com',
+              color: AppColors.accent,
+              onTap: () => _launchEmail(context),
+            ),
+          ]),
           const SizedBox(height: 24),
           _SectionHeader(label: 'Links'),
           const SizedBox(height: 10),
@@ -64,8 +91,6 @@ class _AboutScreenState extends State<AboutScreen> {
             _NavTile(icon: Icons.system_update_outlined, label: 'Check Updates', subtitle: 'Tap to check for a new version', color: AppColors.accent, onTap: () => _checkForUpdates(context)),
             _Divider(),
             _NavTile(icon: Icons.new_releases_outlined, label: 'Updates', subtitle: 'See what changed in this version', color: AppColors.accentViolet, onTap: () => context.push('/whats-new')),
-            _Divider(),
-            _NavTile(icon: Icons.email_outlined, label: 'OTYA Support', subtitle: 'support@petersmartlink.com', color: AppColors.accent, onTap: () => _launchEmail(context)),
             _Divider(),
             _NavTile(icon: Icons.share_rounded, label: 'Share OTYA Player', subtitle: 'Send OTYA Player to a friend', color: AppColors.accentGreen, onTap: () => _shareApp(context)),
             _Divider(),
@@ -107,8 +132,8 @@ class _AboutScreenState extends State<AboutScreen> {
     }
   }
 
-  Future<void> _launchEmail(BuildContext context) async {
-    final uri = Uri(scheme: 'mailto', path: 'support@petersmartlink.com', queryParameters: {'subject': 'OTYA Player Support'});
+  Future<void> _launchEmail(BuildContext context, {String subject = 'OTYA Player Support'}) async {
+    final uri = Uri(scheme: 'mailto', path: 'support@petersmartlink.com', queryParameters: {'subject': subject});
     if (!await launchUrl(uri) && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not open email app.'), backgroundColor: AppColors.error));
     }
