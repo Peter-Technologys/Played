@@ -28,75 +28,75 @@ class _ToolEntry {
   });
 }
 
-/// OTYA Hub: useful tools without the old rainbow-card clutter.
+/// OTYA Hub is a launcher. Feature controls live on their owning screens.
 class MySpaceHubScreen extends ConsumerWidget {
   const MySpaceHubScreen({super.key});
 
-  List<_ToolEntry> _tools(WidgetRef ref) {
+  List<_ToolEntry> _tools() {
     final remote = RemoteControlService.instance;
     return [
-        _ToolEntry(
-          icon: Icons.folder_rounded,
-          label: 'Files',
-          subtitle: 'Browse your media',
-          onTapBuilder: (context) => () => context.push('/tools/folders'),
-        ),
-        if (remote.featureEnabled('beam'))
+      _ToolEntry(
+        icon: Icons.folder_rounded,
+        label: 'Files',
+        subtitle: 'Browse your media',
+        onTapBuilder: (context) => () => context.push('/tools/folders'),
+      ),
+      if (remote.featureEnabled('beam'))
         _ToolEntry(
           icon: Icons.wifi_tethering_rounded,
           label: 'Beam',
           subtitle: 'Send files nearby',
           onTapBuilder: (context) => () => context.push('/airdrop'),
         ),
-        if (remote.featureEnabled('safe'))
+      if (remote.featureEnabled('safe'))
         _ToolEntry(
           icon: Icons.lock_rounded,
           label: 'Safe',
           subtitle: 'Private media vault',
           onTapBuilder: (context) => () => context.push('/vault'),
         ),
-        _ToolEntry(
-          icon: Icons.history_rounded,
-          label: 'History',
-          subtitle: 'Recently played',
-          onTapBuilder: (context) => () => context.push('/history'),
-        ),
-        if (remote.featureEnabled('equalizer'))
+      _ToolEntry(
+        icon: Icons.history_rounded,
+        label: 'History',
+        subtitle: 'Recently played',
+        onTapBuilder: (context) => () => context.push('/history'),
+      ),
+      if (remote.featureEnabled('equalizer'))
         _ToolEntry(
           icon: Icons.graphic_eq_rounded,
           label: 'Sound',
           subtitle: 'Equalizer & tuning',
           onTapBuilder: (context) => () => context.push('/player/equalizer'),
         ),
-        _ToolEntry(
-          icon: Icons.bar_chart_rounded,
-          label: 'Insights',
-          subtitle: 'Your listening stats',
-          onTapBuilder: (context) => () => context.push('/stats'),
-        ),
-        _ToolEntry(
-          icon: Icons.audiotrack_rounded,
-          label: 'Ripper',
-          subtitle: 'Extract audio from video',
-          onTapBuilder: (context) => () => _showRipperHelp(context),
-        ),
-        _ToolEntry(
-          icon: Icons.cleaning_services_rounded,
-          label: 'Clean',
-          subtitle: 'Clear OTYA cache',
-          onTapBuilder: (context) => () => _cleanCache(context),
-        ),
-        _ToolEntry(
-          icon: Icons.palette_rounded,
-          label: 'Appearance',
-          subtitle: 'Theme and look',
-          onTapBuilder: (context) => () => context.push('/theme'),
-        ),
-        if (remote.featureEnabled('whatsappTrimmer'))
+      _ToolEntry(
+        icon: Icons.bar_chart_rounded,
+        label: 'Insights',
+        subtitle: 'Listening stats',
+        onTapBuilder: (context) => () => context.push('/stats'),
+      ),
+      _ToolEntry(
+        icon: Icons.audiotrack_rounded,
+        label: 'Ripper',
+        subtitle: 'Extract audio',
+        onTapBuilder: (context) => () => _showRipperHelp(context),
+      ),
+      _ToolEntry(
+        icon: Icons.cleaning_services_rounded,
+        label: 'Clean',
+        subtitle: 'Clear OTYA cache',
+        onTapBuilder: (context) => () => _cleanCache(context),
+      ),
+      _ToolEntry(
+        icon: Icons.palette_rounded,
+        label: 'Appearance',
+        subtitle: 'Theme and look',
+        onTapBuilder: (context) => () => context.push('/theme'),
+      ),
+      if (remote.featureEnabled('whatsappTrimmer'))
         _ToolEntry(
           icon: Icons.content_cut_rounded,
           label: 'Trim',
-          subtitle: 'Prepare clips to share',
+          subtitle: 'Prepare a clip',
           onTapBuilder: (context) => () {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(
@@ -105,7 +105,7 @@ class MySpaceHubScreen extends ConsumerWidget {
             );
           },
         ),
-      ];
+    ];
   }
 
   @override
@@ -113,8 +113,8 @@ class MySpaceHubScreen extends ConsumerWidget {
     final signedIn = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final photoUrl = ref.watch(photoUrlProvider);
-    final tools = _tools(ref);
-    final featured = tools.take(9).toList();
+    final tools = _tools();
+    final featured = tools.take(9).toList(growable: false);
 
     return WallpaperScaffold(
       body: SafeArea(
@@ -145,7 +145,8 @@ class MySpaceHubScreen extends ConsumerWidget {
                           Text(
                             signedIn
                                 ? 'Good to see you, ${_firstName(displayName)}.'
-                                : 'Tools when you need them. Nothing in the way.',
+                                : 'Your media tools, all in one place.',
+                            maxLines: 2,
                             style: const TextStyle(
                               color: AppColors.textSecondary,
                               fontSize: 13,
@@ -157,12 +158,19 @@ class MySpaceHubScreen extends ConsumerWidget {
                     ),
                     _HeaderButton(
                       icon: Icons.search_rounded,
-                      onTap: () => _showAllTools(context, tools, searchFirst: true),
+                      onTap: () => _showAllTools(
+                        context,
+                        tools,
+                        searchFirst: true,
+                      ),
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
                       onTap: () => context.push('/profile'),
-                      child: _Avatar(photoUrl: photoUrl, displayName: displayName),
+                      child: _Avatar(
+                        photoUrl: photoUrl,
+                        displayName: displayName,
+                      ),
                     ),
                   ],
                 ),
@@ -186,17 +194,27 @@ class MySpaceHubScreen extends ConsumerWidget {
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
-                child: Text(
-                  'Tools',
-                  style: TextStyle(
-                    fontSize: 17,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.textPrimaryOf(context),
-                  ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        'Tools',
+                        style: TextStyle(
+                          fontSize: 17,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.textPrimaryOf(context),
+                        ),
+                      ),
+                    ),
+                    TextButton(
+                      onPressed: () => _showAllTools(context, tools),
+                      child: const Text('All tools'),
+                    ),
+                  ],
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            const SliverToBoxAdapter(child: SizedBox(height: 6)),
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               sliver: SliverGrid(
@@ -204,7 +222,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   crossAxisCount: 3,
                   crossAxisSpacing: 10,
                   mainAxisSpacing: 10,
-                  childAspectRatio: 0.92,
+                  childAspectRatio: 0.84,
                 ),
                 delegate: SliverChildBuilderDelegate(
                   (context, index) => _FeatureToolCard(tool: featured[index]),
@@ -247,14 +265,14 @@ class MySpaceHubScreen extends ConsumerWidget {
                     _ManagementRow(
                       icon: Icons.person_rounded,
                       title: 'Account',
-                      subtitle: 'Profile, sync and updates',
+                      subtitle: 'Profile, sync and verification',
                       onTap: () => context.push('/profile'),
                     ),
                     Divider(height: 1, color: AppColors.borderOf(context)),
                     _ManagementRow(
                       icon: Icons.support_agent_rounded,
                       title: 'Help & feedback',
-                      subtitle: 'Get support or report a problem',
+                      subtitle: 'Support and app information',
                       onTap: () => context.push('/about'),
                     ),
                   ],
@@ -262,7 +280,9 @@ class MySpaceHubScreen extends ConsumerWidget {
               ),
             ),
             SliverToBoxAdapter(
-              child: SizedBox(height: MediaQuery.of(context).padding.bottom + 130),
+              child: SizedBox(
+                height: MediaQuery.of(context).padding.bottom + 130,
+              ),
             ),
           ],
         ),
@@ -295,12 +315,20 @@ class MySpaceHubScreen extends ConsumerWidget {
           final query = controller.text.trim().toLowerCase();
           final visible = query.isEmpty
               ? tools
-              : tools.where((tool) =>
-                    tool.label.toLowerCase().contains(query) ||
-                    tool.subtitle.toLowerCase().contains(query)).toList();
+              : tools
+                  .where(
+                    (tool) =>
+                        tool.label.toLowerCase().contains(query) ||
+                        tool.subtitle.toLowerCase().contains(query),
+                  )
+                  .toList();
           return Padding(
             padding: EdgeInsets.fromLTRB(
-              18, 10, 18, MediaQuery.of(context).viewInsets.bottom + 22),
+              18,
+              10,
+              18,
+              MediaQuery.of(context).viewInsets.bottom + 22,
+            ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -352,7 +380,8 @@ class MySpaceHubScreen extends ConsumerWidget {
                   child: GridView.builder(
                     shrinkWrap: true,
                     padding: const EdgeInsets.only(bottom: 12),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
                       crossAxisCount: 2,
                       crossAxisSpacing: 10,
                       mainAxisSpacing: 10,
@@ -393,14 +422,22 @@ class MySpaceHubScreen extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Extract audio', style: TextStyle(
-              fontSize: 20, fontWeight: FontWeight.w800,
-              color: AppColors.textPrimaryOf(context))),
+            Text(
+              'Extract audio',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w800,
+                color: AppColors.textPrimaryOf(context),
+              ),
+            ),
             const SizedBox(height: 10),
             const Text(
-              'Open a video, tap ⋮, then choose Extract Audio. OTYA saves the audio as an M4A file and adds it back to your media library.',
-              style: TextStyle(fontSize: 13, height: 1.5,
-                color: AppColors.textSecondary),
+              'Open a video, tap ⋮, then choose Extract Audio. OTYA saves the audio and adds it back to your media library.',
+              style: TextStyle(
+                fontSize: 13,
+                height: 1.5,
+                color: AppColors.textSecondary,
+              ),
             ),
             const SizedBox(height: 18),
             SizedBox(
@@ -418,7 +455,9 @@ class MySpaceHubScreen extends ConsumerWidget {
 
   static Future<void> _cleanCache(BuildContext context) async {
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Cleaning OTYA cache…')));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Cleaning OTYA cache…')),
+    );
     try {
       await OtyaDatabase.instance.clearAllSeekPositions();
       final tmp = await getTemporaryDirectory();
@@ -427,10 +466,14 @@ class MySpaceHubScreen extends ConsumerWidget {
         if (await dir.exists()) await dir.delete(recursive: true);
       }
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(const SnackBar(content: Text('OTYA cache cleared.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('OTYA cache cleared.')),
+      );
     } catch (_) {
       messenger.hideCurrentSnackBar();
-      messenger.showSnackBar(const SnackBar(content: Text('Could not clear all cache files.')));
+      messenger.showSnackBar(
+        const SnackBar(content: Text('Could not clear all cache files.')),
+      );
     }
   }
 
@@ -438,7 +481,9 @@ class MySpaceHubScreen extends ConsumerWidget {
     final userId = ref.read(authNotifierProvider).userId ?? '';
     if (userId.isEmpty) return;
     final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('Syncing your OTYA data…')));
+    messenger.showSnackBar(
+      const SnackBar(content: Text('Syncing your OTYA data…')),
+    );
     final ok = await CloudflareService.instance.backupAll(userId);
     messenger.hideCurrentSnackBar();
     if (!context.mounted) return;
@@ -489,7 +534,9 @@ class _Avatar extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: AppColors.surfaceElevated,
-        border: Border.all(color: AppColors.accent.withValues(alpha: .35)),
+        border: Border.all(
+          color: AppColors.accent.withValues(alpha: .35),
+        ),
       ),
       clipBehavior: Clip.antiAlias,
       child: photoUrl != null && photoUrl!.isNotEmpty
@@ -509,9 +556,15 @@ class _Initial extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Center(
-        child: Text(initial, style: const TextStyle(
-          color: AppColors.accent, fontSize: 17,
-          fontWeight: FontWeight.w900, fontFamily: 'Inter')),
+        child: Text(
+          initial,
+          style: const TextStyle(
+            color: AppColors.accent,
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'Inter',
+          ),
+        ),
       );
 }
 
@@ -520,6 +573,7 @@ class _AccountBanner extends StatelessWidget {
   final String? displayName;
   final VoidCallback onPrimary;
   final VoidCallback onProfile;
+
   const _AccountBanner({
     required this.signedIn,
     this.displayName,
@@ -533,9 +587,15 @@ class _AccountBanner extends StatelessWidget {
         decoration: BoxDecoration(
           color: AppColors.cardOf(context),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(color: AppColors.accent.withValues(alpha: .22)),
-          boxShadow: [BoxShadow(
-            color: AppColors.accent.withValues(alpha: .06), blurRadius: 24)],
+          border: Border.all(
+            color: AppColors.accent.withValues(alpha: .22),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.accent.withValues(alpha: .06),
+              blurRadius: 24,
+            ),
+          ],
         ),
         child: Row(
           children: [
@@ -547,7 +607,9 @@ class _AccountBanner extends StatelessWidget {
                 borderRadius: BorderRadius.circular(15),
               ),
               child: Icon(
-                signedIn ? Icons.cloud_done_rounded : Icons.person_add_alt_1_rounded,
+                signedIn
+                    ? Icons.cloud_done_rounded
+                    : Icons.person_add_alt_1_rounded,
                 color: AppColors.accent,
               ),
             ),
@@ -557,25 +619,38 @@ class _AccountBanner extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    signedIn ? (displayName ?? 'OTYA account') : 'Make OTYA yours',
-                    style: TextStyle(fontSize: 15, fontWeight: FontWeight.w800,
-                      color: AppColors.textPrimaryOf(context)),
+                    signedIn
+                        ? (displayName ?? 'OTYA account')
+                        : 'Make OTYA yours',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.textPrimaryOf(context),
+                    ),
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    signedIn ? 'Your data is ready to sync.' : 'Set a name and personalise your Hub.',
-                    style: const TextStyle(fontSize: 11.5,
-                      color: AppColors.textSecondary),
+                    signedIn
+                        ? 'Your data is ready to sync.'
+                        : 'Sign in for sync and backup.',
+                    maxLines: 2,
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textSecondary,
+                    ),
                   ),
                 ],
               ),
             ),
+            const SizedBox(width: 8),
             FilledButton.tonal(
               onPressed: onPrimary,
               child: Text(signedIn ? 'Sync' : 'Start'),
             ),
             IconButton(
-              tooltip: 'Profile',
+              tooltip: 'Account',
               onPressed: onProfile,
               icon: const Icon(Icons.chevron_right_rounded),
             ),
@@ -591,49 +666,61 @@ class _FeatureToolCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Material(
         color: AppColors.cardOf(context),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         child: InkWell(
-          borderRadius: BorderRadius.circular(20),
+          borderRadius: BorderRadius.circular(18),
           onTap: () {
             HapticFeedback.selectionClick();
             tool.onTapBuilder(context)();
           },
           child: Container(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(8, 13, 8, 10),
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(20),
+              borderRadius: BorderRadius.circular(18),
               border: Border.all(color: AppColors.borderOf(context)),
             ),
-            child: Row(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Container(
-                  width: 46,
-                  height: 46,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: AppColors.accent.withValues(alpha: .11),
-                    borderRadius: BorderRadius.circular(15),
+                    borderRadius: BorderRadius.circular(14),
                     border: Border.all(
-                      color: AppColors.accent.withValues(alpha: .18)),
+                      color: AppColors.accent.withValues(alpha: .18),
+                    ),
                   ),
-                  child: Icon(tool.icon, color: AppColors.accent, size: 23),
+                  child: Icon(
+                    tool.icon,
+                    color: AppColors.accent,
+                    size: 23,
+                  ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(tool.label, maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: AppColors.textPrimaryOf(context))),
-                      const SizedBox(height: 3),
-                      Text(tool.subtitle, maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(fontSize: 10.5,
-                          color: AppColors.textSecondary)),
-                    ],
+                const SizedBox(height: 10),
+                Text(
+                  tool.label,
+                  maxLines: 2,
+                  overflow: TextOverflow.fade,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    height: 1.08,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimaryOf(context),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  tool.subtitle,
+                  maxLines: 2,
+                  overflow: TextOverflow.fade,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 9.5,
+                    height: 1.1,
+                    color: AppColors.textSecondary,
                   ),
                 ),
               ],
@@ -666,14 +753,23 @@ class _CompactToolCard extends StatelessWidget {
                     color: AppColors.accent.withValues(alpha: .10),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(tool.icon, color: AppColors.accent, size: 19),
+                  child: Icon(
+                    tool.icon,
+                    color: AppColors.accent,
+                    size: 19,
+                  ),
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text(tool.label, maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimaryOf(context))),
+                  child: Text(
+                    tool.label,
+                    maxLines: 2,
+                    overflow: TextOverflow.fade,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimaryOf(context),
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -687,6 +783,7 @@ class _ManagementRow extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+
   const _ManagementRow({
     required this.icon,
     required this.title,
@@ -706,10 +803,22 @@ class _ManagementRow extends StatelessWidget {
           ),
           child: Icon(icon, color: AppColors.accent, size: 20),
         ),
-        title: Text(title, style: TextStyle(fontSize: 14,
-          fontWeight: FontWeight.w700, color: AppColors.textPrimaryOf(context))),
-        subtitle: Text(subtitle, style: const TextStyle(
-          fontSize: 11, color: AppColors.textSecondary)),
+        title: Text(
+          title,
+          style: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimaryOf(context),
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          maxLines: 2,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondary,
+          ),
+        ),
         trailing: const Icon(Icons.chevron_right_rounded, size: 20),
       );
 }
