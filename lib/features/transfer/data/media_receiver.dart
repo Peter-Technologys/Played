@@ -23,6 +23,12 @@ class MediaReceiver {
   }) async {
     _cancelled = false;
     final uri = Uri.parse(url);
+    if (!_isAllowedTransferUri(uri)) {
+      throw const FormatException(
+        'OTYA Transfer only accepts authenticated private local-network links.',
+      );
+    }
+
     final client = HttpClient()
       ..connectionTimeout = const Duration(seconds: 10)
       ..idleTimeout = const Duration(minutes: 10);
@@ -107,6 +113,26 @@ class MediaReceiver {
     } finally {
       client.close(force: true);
     }
+  }
+
+  bool _isAllowedTransferUri(Uri uri) {
+    if (uri.scheme != 'http' || uri.path != '/media' || uri.userInfo.isNotEmpty) {
+      return false;
+    }
+    final token = uri.queryParameters['t'] ?? '';
+    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(token)) return false;
+
+    final parts = uri.host.split('.');
+    if (parts.length != 4) return false;
+    final octets = parts.map(int.tryParse).toList(growable: false);
+    if (octets.any((value) => value == null || value! < 0 || value > 255)) {
+      return false;
+    }
+    final a = octets[0]!;
+    final b = octets[1]!;
+    return a == 10 ||
+        (a == 172 && b >= 16 && b <= 31) ||
+        (a == 192 && b == 168);
   }
 
   String _fingerprint(Uri uri) {
