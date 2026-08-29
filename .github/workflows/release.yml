@@ -126,7 +126,7 @@ jobs:
           printf '%s' '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/app/keystore.jks
           test -s android/app/keystore.jks || { echo "ERROR: Release keystore is empty"; exit 1; }
 
-      - name: Build signed APKs and app bundle
+      - name: Build signed direct-download APKs
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -145,8 +145,7 @@ jobs:
           FIREBASE_APP_ID='1:82776565585:android:085cf9b4eecb76e9535570'
           FIREBASE_MESSAGING_SENDER_ID='82776565585'
           FIREBASE_PROJECT_ID='otya-player'
-          EXTRA_DEFINES=(
-            --dart-define=SELF_UPDATE=true
+          COMMON_DEFINES=(
             --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
             --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
             --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID"
@@ -158,10 +157,31 @@ jobs:
           flutter build apk --release --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --split-debug-info=build/debug-info \
-            "${EXTRA_DEFINES[@]}"
+            --dart-define=SELF_UPDATE=true \
+            "${COMMON_DEFINES[@]}"
+
+      - name: Build signed Google Play app bundle
+        env:
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          GOOGLE_WEB_CLIENT_ID='82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'
+          FIREBASE_APP_ID='1:82776565585:android:085cf9b4eecb76e9535570'
+          FIREBASE_MESSAGING_SENDER_ID='82776565585'
+          FIREBASE_PROJECT_ID='otya-player'
           flutter build appbundle --release \
             --split-debug-info=build/debug-info \
-            "${EXTRA_DEFINES[@]}"
+            --dart-define=SELF_UPDATE=false \
+            --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" \
+            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
+            --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID" \
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
+            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
 
       - name: Verify release outputs
         id: artifacts
