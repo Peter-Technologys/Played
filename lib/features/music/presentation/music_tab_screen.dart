@@ -9,6 +9,7 @@ import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/otya_logo.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
+import '../online/online_music_screen.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
@@ -236,6 +237,16 @@ class _Header extends StatelessWidget {
                   Text('$songCount local song${songCount == 1 ? '' : 's'}', style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
                 ],
               ),
+            ),
+            IconButton(
+              tooltip: 'Online Music',
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                Navigator.of(context).push(
+                  MaterialPageRoute<void>(builder: (_) => const OnlineMusicScreen()),
+                );
+              },
+              icon: const Icon(Icons.public_rounded),
             ),
             IconButton(
               tooltip: 'Search OTYA',
