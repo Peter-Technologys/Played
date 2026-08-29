@@ -1,29 +1,12 @@
-// lib/core/services/auto_eq_service.dart
-//
-// AutoEqService — detects genre/mood from filename keywords and returns a
-// 5-band EQ preset. Pure Dart, no external AI SDK.
-//
-// Bands (dB, range -12 to +12):
-//   bass    ~60–250 Hz
-//   lowMid  ~250–500 Hz
-//   mid     ~500–2000 Hz
-//   highMid ~2000–6000 Hz
-//   treble  ~6000–16000 Hz
-
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 
-/// A 5-band EQ preset with values in dB (-12 to +12).
+/// Legacy filename-based EQ suggestion model.
+///
+/// OTYA v1 no longer applies these guesses automatically: doing so could
+/// override the user's saved Sound Tuner preference, and the old implementation
+/// targeted Android's deprecated global audio session. The detector is retained
+/// temporarily for compatibility/possible future UI suggestions only.
 class EqPreset {
-  final double bass;
-  final double lowMid;
-  final double mid;
-  final double highMid;
-  final double treble;
-
-  /// Human-readable name for this preset (e.g. "Hip-Hop", "Classical").
-  final String name;
-
   const EqPreset({
     required this.name,
     required this.bass,
@@ -33,194 +16,140 @@ class EqPreset {
     required this.treble,
   });
 
-  /// Flat / neutral preset — no EQ applied.
-  static const EqPreset flat = EqPreset(
-    name:    'Flat',
-    bass:    0,
-    lowMid:  0,
-    mid:     0,
-    highMid: 0,
-    treble:  0,
-  );
+  final String name;
+  final double bass;
+  final double lowMid;
+  final double mid;
+  final double highMid;
+  final double treble;
 
-  @override
-  String toString() =>
-      'EqPreset($name: bass=$bass, lowMid=$lowMid, mid=$mid, highMid=$highMid, treble=$treble)';
+  static const flat = EqPreset(
+    name: 'Flat',
+    bass: 0,
+    lowMid: 0,
+    mid: 0,
+    highMid: 0,
+    treble: 0,
+  );
 }
 
-/// Detects an EQ preset from a filename using keyword matching.
 class AutoEqService {
   AutoEqService._();
   static final AutoEqService instance = AutoEqService._();
 
-  // ── EQ channel ────────────────────────────────────────────────────────────
-  // Kept here so the channel is only invoked from one place (testable, not
-  // duplicated inline in AudioPlayerNotifier.load()).
-  static const _eqChannel = MethodChannel('com.otyaplayer.app/equalizer');
-
-  // ── Keyword → preset mapping ──────────────────────────────────────────────
-  // Each entry is a list of keywords; the first match wins.
-  // Keywords are matched case-insensitively against the normalised filename.
-
-  static const List<_KeywordPreset> _rules = [
+  static const _rules = <_KeywordPreset>[
     _KeywordPreset(
-      keywords: ['bass', 'bassline', 'sub', 'dubstep', 'trap', 'drill'],
+      keywords: ['bass', 'bassline', 'dubstep', 'trap', 'drill'],
       preset: EqPreset(
-        name:    'Bass Boost',
-        bass:    8.0,
-        lowMid:  3.0,
-        mid:     -1.0,
-        highMid: -2.0,
-        treble:  -1.0,
+        name: 'Bass Boost',
+        bass: 6,
+        lowMid: 4,
+        mid: 1,
+        highMid: -1,
+        treble: -2,
       ),
     ),
     _KeywordPreset(
-      keywords: ['acoustic', 'unplugged', 'folk', 'singer', 'songwriter'],
+      keywords: ['classical', 'orchestra', 'symphony', 'concerto', 'sonata'],
       preset: EqPreset(
-        name:    'Acoustic',
-        bass:    2.0,
-        lowMid:  1.0,
-        mid:     3.0,
-        highMid: 4.0,
-        treble:  3.0,
+        name: 'Classical',
+        bass: 3,
+        lowMid: 1,
+        mid: -1,
+        highMid: 2,
+        treble: 4,
       ),
     ),
     _KeywordPreset(
-      keywords: ['classical', 'orchestra', 'symphony', 'concerto', 'sonata', 'opera', 'piano'],
+      keywords: ['hiphop', 'hip hop', 'hip-hop', 'rap', 'rnb', 'r&b'],
       preset: EqPreset(
-        name:    'Classical',
-        bass:    3.0,
-        lowMid:  0.0,
-        mid:     -1.0,
-        highMid: 2.0,
-        treble:  4.0,
+        name: 'Hip-Hop',
+        bass: 6,
+        lowMid: 4,
+        mid: 0,
+        highMid: 2,
+        treble: 1,
       ),
     ),
     _KeywordPreset(
-      keywords: ['hiphop', 'hip_hop', 'hip-hop', 'rap', 'rnb', 'r&b', 'soul'],
+      keywords: ['jazz', 'blues', 'swing', 'bebop'],
       preset: EqPreset(
-        name:    'Hip-Hop',
-        bass:    6.0,
-        lowMid:  4.0,
-        mid:     -1.0,
-        highMid: 1.0,
-        treble:  2.0,
+        name: 'Jazz',
+        bass: 3,
+        lowMid: 2,
+        mid: 0,
+        highMid: 2,
+        treble: 3,
       ),
     ),
     _KeywordPreset(
-      keywords: ['jazz', 'blues', 'swing', 'bebop', 'bossa'],
+      keywords: ['rock', 'metal', 'punk', 'grunge', 'guitar'],
       preset: EqPreset(
-        name:    'Jazz',
-        bass:    2.0,
-        lowMid:  3.0,
-        mid:     1.0,
-        highMid: 3.0,
-        treble:  4.0,
+        name: 'Rock',
+        bass: 4,
+        lowMid: 2,
+        mid: -1,
+        highMid: 2,
+        treble: 4,
       ),
     ),
     _KeywordPreset(
-      keywords: ['rock', 'metal', 'punk', 'grunge', 'alternative', 'indie', 'guitar'],
+      keywords: ['pop', 'dance', 'edm', 'house', 'techno'],
       preset: EqPreset(
-        name:    'Rock',
-        bass:    5.0,
-        lowMid:  2.0,
-        mid:     -1.0,
-        highMid: 3.0,
-        treble:  4.0,
+        name: 'Pop',
+        bass: 1,
+        lowMid: 1,
+        mid: 0,
+        highMid: 2,
+        treble: 3,
       ),
     ),
     _KeywordPreset(
-      keywords: ['pop', 'dance', 'edm', 'electro', 'house', 'techno', 'club'],
+      keywords: ['lofi', 'lo-fi', 'chill', 'ambient', 'sleep'],
       preset: EqPreset(
-        name:    'Pop / Dance',
-        bass:    4.0,
-        lowMid:  1.0,
-        mid:     0.0,
-        highMid: 3.0,
-        treble:  4.0,
+        name: 'Night',
+        bass: -3,
+        lowMid: -2,
+        mid: 0,
+        highMid: -2,
+        treble: -4,
       ),
     ),
     _KeywordPreset(
-      keywords: ['lofi', 'lo-fi', 'lo_fi', 'chill', 'ambient', 'sleep', 'relax'],
+      keywords: ['afrobeat', 'afro', 'afropop', 'highlife'],
       preset: EqPreset(
-        name:    'Lo-Fi / Chill',
-        bass:    3.0,
-        lowMid:  2.0,
-        mid:     -2.0,
-        highMid: -3.0,
-        treble:  -4.0,
-      ),
-    ),
-    _KeywordPreset(
-      keywords: ['gospel', 'worship', 'praise', 'hymn', 'choir'],
-      preset: EqPreset(
-        name:    'Gospel',
-        bass:    3.0,
-        lowMid:  2.0,
-        mid:     3.0,
-        highMid: 4.0,
-        treble:  3.0,
-      ),
-    ),
-    _KeywordPreset(
-      keywords: ['afrobeat', 'afro', 'afropop', 'highlife', 'afroswing'],
-      preset: EqPreset(
-        name:    'Afrobeats',
-        bass:    5.0,
-        lowMid:  3.0,
-        mid:     1.0,
-        highMid: 2.0,
-        treble:  2.0,
+        name: 'Afrobeats',
+        bass: 5,
+        lowMid: 3,
+        mid: 1,
+        highMid: 2,
+        treble: 2,
       ),
     ),
   ];
 
-  // ── Public API ────────────────────────────────────────────────────────────
-
-  /// Applies [preset] to the native equalizer via the MethodChannel.
-  ///
-  /// No-op when [preset] is [EqPreset.flat] (all bands at 0 dB).
-  /// Errors are caught and logged — never thrown to the caller.
-  Future<void> applyPreset(EqPreset preset) async {
-    if (preset.name == 'Flat') return;
-    try {
-      await _eqChannel.invokeMethod<void>('setBands', {
-        'gains': [
-          preset.bass,
-          preset.lowMid,
-          preset.mid,
-          preset.highMid,
-          preset.treble,
-        ],
-      });
-    } catch (e) {
-      // EQ channel errors are non-fatal — playback continues without EQ.
-      debugPrint('[AutoEQ] applyPreset failed (non-fatal): $e');
-    }
-  }
-
-  /// Detects an [EqPreset] from [filename] by matching genre/mood keywords.
-  /// Returns [EqPreset.flat] when no keyword matches.
   EqPreset detectPreset(String filename) {
-    // Normalise: lowercase, replace separators with spaces.
-    final normalised = filename
+    final normalized = filename
         .toLowerCase()
         .replaceAll(RegExp(r'[_\-.]'), ' ');
-
     for (final rule in _rules) {
-      for (final kw in rule.keywords) {
-        if (normalised.contains(kw)) {
-          return rule.preset;
-        }
-      }
+      if (rule.keywords.any(normalized.contains)) return rule.preset;
     }
-
     return EqPreset.flat;
+  }
+
+  /// Compatibility no-op for older AudioPlayer call sites.
+  ///
+  /// Manual Sound Tuner preferences are now the only persistent EQ authority.
+  Future<void> applyPreset(EqPreset preset) async {
+    debugPrint(
+      '[AutoEQ] Suggested ${preset.name}; automatic application is disabled in OTYA v1.',
+    );
   }
 }
 
 class _KeywordPreset {
+  const _KeywordPreset({required this.keywords, required this.preset});
   final List<String> keywords;
   final EqPreset preset;
-  const _KeywordPreset({required this.keywords, required this.preset});
 }
