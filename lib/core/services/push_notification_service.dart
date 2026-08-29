@@ -9,12 +9,10 @@ import 'shared_notification_plugin.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 // PushNotificationService
 //
-// Manages the four FCM-related Android notification channels:
-//
-//   otya_updates           — New version available (High importance, sound)
-//   otya_download_progress — Download progress bar (Low, silent, ongoing)
-//   otya_download_done     — Download complete (High, tap to install)
-//   otya_announcements     — General announcements (Default importance)
+// Manages OTYA update and announcement notifications. Update notifications
+// start one verified download flow; once Android's installer is launched the
+// progress notification is dismissed instead of presenting a second action
+// that would download the same APK again.
 // ─────────────────────────────────────────────────────────────────────────────
 class PushNotificationService {
   PushNotificationService._();
@@ -22,20 +20,16 @@ class PushNotificationService {
 
   static const _chUpdates = 'otya_updates';
   static const _chProgress = 'otya_download_progress';
-  static const _chDone = 'otya_download_done';
   static const _chAnnounce = 'otya_announcements';
 
   static const int idUpdate = 2000;
   static const int idProgress = 2001;
-  static const int idDone = 2002;
   static const int idAnnounce = 2003;
 
   static const _prefixDownload = 'download:';
   static const _prefixUrl = 'url:';
 
   bool _initialized = false;
-  String? _pendingDownloadUrl;
-  String? _pendingDownloadVersion;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -119,7 +113,7 @@ class PushNotificationService {
             dismissDownload();
           },
         )
-        .then((_) => showDownloadComplete())
+        .then((_) => dismissDownload())
         .ignore();
   }
 
@@ -129,8 +123,6 @@ class PushNotificationService {
     required String downloadUrl,
   }) async {
     if (!_initialized) await init();
-    _pendingDownloadUrl = downloadUrl;
-    _pendingDownloadVersion = version;
 
     final androidDetails = AndroidNotificationDetails(
       _chUpdates,
@@ -142,7 +134,7 @@ class PushNotificationService {
       styleInformation: BigTextStyleInformation(
         releaseNotes,
         contentTitle: 'OTYA $version is available',
-        summaryText: 'Tap to download',
+        summaryText: 'Tap to download and install',
       ),
     );
 
@@ -173,42 +165,16 @@ class PushNotificationService {
       onlyAlertOnce: true,
       showProgress: true,
       maxProgress: 100,
-      progress: percent,
+      progress: percent.clamp(0, 100),
       icon: '@drawable/ic_notification',
     );
 
     await sharedNotificationsPlugin.show(
       idProgress,
       'Downloading OTYA…',
-      '$percent%',
+      '${percent.clamp(0, 100)}%',
       NotificationDetails(android: androidDetails),
     );
-  }
-
-  Future<void> showDownloadComplete() async {
-    if (!_initialized) await init();
-    await dismissDownload();
-
-    final url = _pendingDownloadUrl ?? '';
-    final version = _pendingDownloadVersion ?? 'latest';
-
-    final androidDetails = AndroidNotificationDetails(
-      _chDone,
-      'OTYA — Download complete',
-      channelDescription: 'Notifies when an OTYA update is ready to install',
-      importance: Importance.high,
-      priority: Priority.high,
-      icon: '@drawable/ic_notification',
-    );
-
-    await sharedNotificationsPlugin.show(
-      idDone,
-      'Download complete',
-      'Tap to install OTYA $version',
-      NotificationDetails(android: androidDetails),
-      payload: '$_prefixDownload$url|$version',
-    );
-    debugPrint('[PushNotif] showDownloadComplete');
   }
 
   /// Shows a general announcement notification.
