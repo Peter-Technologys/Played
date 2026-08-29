@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../core/services/audio_session_service.dart';
 
 /// Follow the OS setting automatically with [system].
@@ -116,11 +117,10 @@ class AppSettings {
   static Future<AppSettings> load() async {
     final p = await _getPrefs();
     return AppSettings(
-      // Existing users keep their saved choice. A fresh install follows the
-      // device automatically instead of forcing OTYA into dark mode.
       themeMode: AppThemeMode.values[
-          (p.getInt(_kTheme) ?? AppThemeMode.system.index)
-              .clamp(0, AppThemeMode.values.length - 1)],
+        (p.getInt(_kTheme) ?? AppThemeMode.system.index)
+            .clamp(0, AppThemeMode.values.length - 1),
+      ],
       autoResume: p.getBool(_kAutoResume) ?? true,
       defaultBatterySaver: p.getBool(_kBatterySaver) ?? false,
       shuffle: p.getBool(_kShuffle) ?? false,
@@ -163,7 +163,7 @@ class AppSettings {
 }
 
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  SettingsNotifier(AppSettings initial) : super(initial);
+  SettingsNotifier(super.initial);
 
   Future<void> _update(AppSettings s) async {
     state = s;
@@ -190,6 +190,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     _update(state.copyWith(pauseDuringCalls: v));
     AudioSessionService.instance.setPauseDuringCalls(v).ignore();
   }
+
   void setAutoLoadSubtitles(bool v) =>
       _update(state.copyWith(autoLoadSubtitles: v));
   void setSearchHistory(bool v) =>
