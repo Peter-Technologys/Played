@@ -38,6 +38,8 @@ jobs:
       - name: Commit generated assets
         shell: bash
         run: |
+          set -euo pipefail
+          BRANCH="design/otya-brand-assets-20260829"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add \
@@ -53,7 +55,11 @@ jobs:
             store_assets
           if git diff --cached --quiet; then
             echo "No generated changes to commit."
-          else
-            git commit -m "brand: generate complete OTYA icon and drawable pack"
-            git push origin HEAD:design/otya-brand-assets-20260829
+            exit 0
+          fi
+          git commit -m "brand: generate complete OTYA icon and drawable pack"
+          if ! git push origin "HEAD:${BRANCH}"; then
+            echo "Remote branch moved; rebasing generated commit and retrying."
+            git pull --rebase origin "${BRANCH}"
+            git push origin "HEAD:${BRANCH}"
           fi
