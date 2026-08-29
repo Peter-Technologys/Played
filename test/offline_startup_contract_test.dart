@@ -26,6 +26,8 @@ void main() {
     expect(beforeFirstFrame, isNot(contains('UpdateService.instance')));
     expect(beforeFirstFrame, isNot(contains('AuthService.instance')));
     expect(beforeFirstFrame, isNot(contains('http.')));
+    expect(beforeFirstFrame, isNot(contains('OnlineMusicService')));
+    expect(beforeFirstFrame, isNot(contains('JAMENDO')));
   });
 
   test('OTYA startup keeps local playback independent of Firebase config', () {
@@ -37,5 +39,31 @@ void main() {
       contains('Disabled: Firebase build configuration is incomplete'),
     );
     expect(source, contains('non-fatal'));
+  });
+
+  test('global search remains local-first when online music is unavailable', () {
+    final source =
+        File('lib/features/search/smart_search_sheet.dart').readAsStringSync();
+
+    expect(source, contains('_mediaMatches(library)'));
+    expect(source, contains('_groupMatches(library)'));
+    expect(source, contains('_playlistMatches(playlists)'));
+    expect(source, contains("Timer(const Duration(milliseconds: 380)"));
+    expect(source, contains('OnlineMusicService.instance'));
+    expect(source, contains('Connectivity().checkConnectivity()'));
+    expect(source, contains("_onlineTracks = const []"));
+    expect(
+      source,
+      contains('Local songs, videos, albums, artists, folders and playlists appear instantly.'),
+    );
+  });
+
+  test('online music failures do not replace local search with an error state', () {
+    final source =
+        File('lib/features/search/smart_search_sheet.dart').readAsStringSync();
+
+    expect(source, isNot(contains("_onlineError")));
+    expect(source, contains('catch (_)'));
+    expect(source, contains('_onlineLoading = false'));
   });
 }
