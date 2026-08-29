@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
 /// Canonical in-app OTYA brand lockup.
-/// The same artwork is used for launcher generation and visible product branding.
+///
+/// The mark is drawn in Flutter so visible product branding never falls back
+/// to an old launcher bitmap. Android launcher/adaptive assets are generated
+/// separately from the approved master artwork.
 class OtyaLogo extends StatelessWidget {
   const OtyaLogo({
     super.key,
@@ -22,22 +25,13 @@ class OtyaLogo extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final mark = ClipRRect(
-      borderRadius: BorderRadius.circular(fontSize * .32),
-      child: Image.asset(
-        'assets/icons/play_store_512.png',
-        width: fontSize * 1.18,
-        height: fontSize * 1.18,
-        fit: BoxFit.cover,
-        filterQuality: FilterQuality.medium,
-      ),
-    );
+    final mark = OtyaMark(size: fontSize * 1.18);
     if (iconOnly) return mark;
 
     return Container(
       padding: padding,
       decoration: BoxDecoration(
-        color: AppColors.cardOf(context),
+        color: AppColors.cardOf(context).withValues(alpha: .82),
         borderRadius: BorderRadius.circular(borderRadius),
         border: Border.all(color: AppColors.borderOf(context)),
       ),
@@ -58,6 +52,58 @@ class OtyaLogo extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+/// OTYA's master in-app symbol: one continuous O / portal loop.
+class OtyaMark extends StatelessWidget {
+  const OtyaMark({super.key, this.size = 52});
+
+  final double size;
+
+  @override
+  Widget build(BuildContext context) {
+    final stroke = size * .18;
+    return Semantics(
+      label: 'OTYA',
+      image: true,
+      child: SizedBox.square(
+        dimension: size,
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: const SweepGradient(
+              colors: [
+                Color(0xFF00C8FF),
+                Color(0xFF315CFF),
+                Color(0xFF8A2BFF),
+                Color(0xFFFF1BCB),
+                Color(0xFFFF7A18),
+                Color(0xFFFFD11A),
+                Color(0xFF00C8FF),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF7C3CFF).withValues(alpha: .28),
+                blurRadius: size * .28,
+                spreadRadius: size * .015,
+              ),
+            ],
+          ),
+          child: Center(
+            child: Container(
+              width: size - stroke * 2,
+              height: size - stroke * 2,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Theme.of(context).scaffoldBackgroundColor,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }
