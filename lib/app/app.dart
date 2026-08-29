@@ -227,22 +227,17 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               );
             }
 
+            // Respect the user's platform text scale exactly. OTYA layouts must
+            // adapt to accessibility settings rather than silently clamping
+            // large text to a smaller value.
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: overlay,
-              child: MediaQuery(
-                data: MediaQuery.of(context).copyWith(
-                  textScaler: MediaQuery.of(context).textScaler.clamp(
-                        minScaleFactor: 0.85,
-                        maxScaleFactor: 1.2,
-                      ),
-                ),
-                child: RemoteControlGate(
-                  child: Stack(
-                    children: [
-                      wrappedChild,
-                      if (!_onboardingDone) OnboardingOverlay(onDone: _completeOnboarding),
-                    ],
-                  ),
+              child: RemoteControlGate(
+                child: Stack(
+                  children: [
+                    wrappedChild,
+                    if (!_onboardingDone) OnboardingOverlay(onDone: _completeOnboarding),
+                  ],
                 ),
               ),
             );
