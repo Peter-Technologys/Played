@@ -30,6 +30,27 @@ void main() {
     expect(beforeFirstFrame, isNot(contains('JAMENDO')));
   });
 
+  test('startup hydrates App Lock before revealing router content', () {
+    final source = File('lib/app/app.dart').readAsStringSync();
+    final hydrate = source.indexOf(
+      'ref.read(settingsProvider.notifier).hydrate(savedSettings)',
+    );
+    final reveal = source.indexOf('_checking = false', hydrate);
+
+    expect(hydrate, greaterThanOrEqualTo(0));
+    expect(reveal, greaterThan(hydrate));
+    expect(source, contains('_hydrateStartupPrivacyAndOnboarding()'));
+  });
+
+  test('media-session playback does not request ordinary notification consent', () {
+    final source = File(
+      'lib/core/services/media_notification_service.dart',
+    ).readAsStringSync();
+
+    expect(source, isNot(contains('NotificationService.instance.requestPermission')));
+    expect(source, isNot(contains('existsSync()')));
+  });
+
   test('OTYA startup keeps local playback independent of Firebase config', () {
     final source = File('lib/core/services/fcm_service.dart').readAsStringSync();
 
