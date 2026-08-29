@@ -52,7 +52,6 @@ jobs:
 
   verify-main-apk:
     name: Build and verify release APKs
-    if: github.event_name != 'pull_request'
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 35
