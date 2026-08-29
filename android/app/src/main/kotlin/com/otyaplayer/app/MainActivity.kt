@@ -2,8 +2,10 @@ package com.otyaplayer.app
 
 import android.Manifest
 import android.app.PictureInPictureParams
+import android.content.ClipData
 import android.content.ContentUris
 import android.content.ContentValues
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.database.ContentObserver
 import android.graphics.Bitmap
@@ -22,7 +24,9 @@ import android.provider.Settings
 import android.util.Log
 import android.util.Rational
 import android.util.Size
+import android.webkit.MimeTypeMap
 import androidx.core.content.ContextCompat
+import androidx.core.content.FileProvider
 import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.EventChannel
@@ -44,8 +48,8 @@ import java.nio.ByteBuffer
  * OTYA's Android bridge.
  *
  * Native Android owns only platform capabilities that Flutter cannot provide
- * reliably itself: MediaStore, PiP, telephony observation, device brightness /
- * volume, lightweight local media muxing and the Android equalizer bridge.
+ * reliably itself: MediaStore, PiP, device integration, large-file sharing,
+ * lightweight local media muxing and the Android equalizer bridge.
  * Playback, updates, navigation and product state remain owned by Flutter.
  */
 class MainActivity : AudioServiceFragmentActivity() {
@@ -60,6 +64,7 @@ class MainActivity : AudioServiceFragmentActivity() {
     private val deviceIdChannel = "com.otyaplayer.app/device_id"
     private val brightnessChannel = "com.otyaplayer.app/brightness"
     private val volumeChannel = "com.otyaplayer.app/volume"
+    private val shareChannel = "com.otyaplayer.app/share"
 
     private val ioScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private var mediaJob: Job? = null
@@ -90,6 +95,7 @@ class MainActivity : AudioServiceFragmentActivity() {
         configureDeviceId(flutterEngine)
         configureBrightness(flutterEngine)
         configureVolume(flutterEngine)
+        configureSharing(flutterEngine)
     }
 
     private fun createAudioNotificationChannel() {
@@ -347,6 +353,49 @@ class MainActivity : AudioServiceFragmentActivity() {
                     else -> result.notImplemented()
                 }
             }
+    }
+
+    private fun configureSharing(flutterEngine: FlutterEngine) {
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, shareChannel)
+            .setMethodCallHandler { call, result ->
+                if (call.method != "shareFile") {
+                    result.notImplemented()
+                    return@setMethodCallHandler
+                }
+                val path = call.argument<String>("path") ?: ""
+                val text = call.argument<String>("text")
+                try {
+                    shareFile(path, text)
+                    result.success(null)
+                } catch (error: Exception) {
+                    Log.e("NativeShare", "Share failed: ${error.message}")
+                    result.error("SHARE_FAILED", "OTYA could not share that file", null)
+                }
+            }
+    }
+
+    private fun shareFile(path: String, text: String?) {
+        val file = File(path)
+        require(path.isNotBlank() && file.exists() && file.isFile) {
+            "Share source does not exist"
+        }
+
+        val uri = FileProvider.getUriForFile(
+            this,
+            "$packageName.share",
+            file,
+        )
+        val mime = MimeTypeMap.getSingleton()
+            .getMimeTypeFromExtension(file.extension.lowercase()) ?: "*/*"
+
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = mime
+            putExtra(Intent.EXTRA_STREAM, uri)
+            if (!text.isNullOrBlank()) putExtra(Intent.EXTRA_TEXT, text)
+            clipData = ClipData.newRawUri(file.name, uri)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+        }
+        startActivity(Intent.createChooser(intent, "Share with"))
     }
 
     private fun registerMediaObserver() {
