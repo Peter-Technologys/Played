@@ -13,6 +13,7 @@ import 'core/services/connectivity_service.dart';
 import 'core/services/crash_reporter.dart';
 import 'core/services/device_service.dart';
 import 'core/services/fcm_service.dart';
+import 'core/services/firebase_platform_service.dart';
 import 'core/services/media_notification_service.dart';
 import 'core/services/notification_service.dart';
 import 'core/services/phone_state_service.dart';
@@ -219,6 +220,14 @@ Future<void> _initBackground(
       savedSettings.pauseDuringCalls,
     ),
   ));
+
+  // Firebase is optional and starts only after OTYA is already usable. App
+  // Check/Analytics/Performance policy comes from Cloudflare app config. FCM
+  // then reuses the same initialized Firebase app.
+  await _safeBackground(
+    'Firebase platform',
+    FirebasePlatformService.instance.initOptionalServices,
+  );
   unawaited(_safeBackground('FCM', FcmService.instance.init));
   unawaited(_safeBackground('crash reporter', CrashReporter.instance.init));
 }
