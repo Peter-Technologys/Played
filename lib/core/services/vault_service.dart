@@ -70,6 +70,10 @@ class VaultService {
     );
   }
 
+  @visibleForTesting
+  static Future<String> findAvailableRestorePathForTest(String originalPath) =>
+      _availableRestorePath(originalPath);
+
   Future<Directory> get _vaultDir async {
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/.vault');
