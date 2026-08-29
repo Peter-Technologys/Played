@@ -70,10 +70,16 @@ class _OtyaBrandMarkState extends State<OtyaBrandMark>
     );
 
     if (widget.state == OtyaBrandState.offline) {
-      logo = Opacity(opacity: .56, child: ColorFiltered(
-        colorFilter: const ColorFilter.mode(Color(0xFF8B8FA4), BlendMode.saturation),
-        child: logo,
-      ));
+      logo = Opacity(
+        opacity: .56,
+        child: ColorFiltered(
+          colorFilter: const ColorFilter.mode(
+            Color(0xFF8B8FA4),
+            BlendMode.saturation,
+          ),
+          child: logo,
+        ),
+      );
     }
 
     if (!shouldAnimate) return logo;
@@ -91,6 +97,12 @@ class _OtyaBrandMarkState extends State<OtyaBrandMark>
           OtyaBrandState.success => .38,
           _ => .18,
         };
+        final glowColor = Color.lerp(
+          const Color(0xFF146BFF),
+          const Color(0xFFE81CFF),
+          (math.sin(t * math.pi * 2) + 1) / 2,
+        )!;
+
         return Transform.scale(
           scale: pulse,
           child: Stack(
@@ -103,12 +115,7 @@ class _OtyaBrandMarkState extends State<OtyaBrandMark>
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Color.lerp(
-                            const Color(0xFF146BFF),
-                            const Color(0xFFE81CFF),
-                            (math.sin(t * math.pi * 2) + 1) / 2,
-                          )!
-                          .withValues(alpha: intensity),
+                      color: glowColor.withOpacity(intensity),
                       blurRadius: widget.size * .34,
                       spreadRadius: widget.size * .03,
                     ),
