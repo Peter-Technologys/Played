@@ -27,11 +27,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Notifications, direct APK updates and call interruption. -->
+    <!-- Notifications and direct APK updates. Call/audio interruptions are
+         handled through Android audio focus; OTYA does not read phone state. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
-    <uses-permission android:name="android.permission.READ_PHONE_STATE" />
 
     <queries>
         <intent>
