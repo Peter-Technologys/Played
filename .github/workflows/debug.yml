@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -48,7 +48,7 @@ jobs:
       - name: Generate OTYA launcher icons
         run: dart run flutter_launcher_icons
       - name: Static analysis
-        run: flutter analyze --no-fatal-warnings --no-fatal-infos
+        run: flutter analyze
       - name: Unit and widget tests
         run: flutter test
 
@@ -63,7 +63,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /usr/local/share/swift || true
           sudo apt-get clean -y || true
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -90,7 +90,7 @@ jobs:
           else
             echo "OTYA_ALLOW_DEBUG_SIGNING=true" >> "$GITHUB_ENV"
             echo "OTYA_SIGNING_MODE=ci-debug" >> "$GITHUB_ENV"
-            echo "WARNING: No production keystore secret is available. This CI artifact will be debug-signed and MUST NOT be published."
+            echo "NOTICE: No production keystore secret is available. This CI artifact is debug-signed and must not be published."
           fi
       - name: Flutter pub get
         run: flutter pub get
@@ -129,7 +129,7 @@ jobs:
             )
             echo "Firebase client configuration enabled for verified OTYA project."
           else
-            echo "WARNING: FIREBASE_API_KEY is missing; APK will build with remote Firebase services disabled."
+            echo "NOTICE: FIREBASE_API_KEY is missing; APK will build with remote Firebase services disabled."
           fi
           flutter build apk "${ARGS[@]}"
       - name: Verify APKs, size budget and checksums
