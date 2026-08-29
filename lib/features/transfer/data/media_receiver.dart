@@ -125,7 +125,7 @@ class MediaReceiver {
     final parts = uri.host.split('.');
     if (parts.length != 4) return false;
     final octets = parts.map(int.tryParse).toList(growable: false);
-    if (octets.any((value) => value == null || value! < 0 || value > 255)) {
+    if (octets.any((value) => value == null || value < 0 || value > 255)) {
       return false;
     }
     final a = octets[0]!;
