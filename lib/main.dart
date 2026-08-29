@@ -20,7 +20,6 @@ import 'core/services/pip_service.dart';
 import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
 import 'core/services/storage_folder_service.dart';
-import 'core/services/update_notification_service.dart';
 import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
 
@@ -68,7 +67,7 @@ Future<void> main() async {
       builder: () => OtyaAudioHandler(),
       config: AudioServiceConfig(
         androidNotificationChannelId: 'com.otyaplayer.app.audio',
-        androidNotificationChannelName: 'OTYA Player — Now Playing',
+        androidNotificationChannelName: 'OTYA — Now Playing',
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: false,
         androidNotificationIcon: 'drawable/ic_notification',
@@ -237,10 +236,9 @@ Future<void> _safeBackground(
 }
 
 Future<void> _initNotifications() async {
-  await _safeBackground('notification service', NotificationService.instance.init);
   await _safeBackground(
-    'update notifications',
-    UpdateNotificationService.instance.init,
+    'notification service',
+    NotificationService.instance.init,
   );
   await _safeBackground(
     'media notifications',
