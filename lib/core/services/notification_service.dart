@@ -1,7 +1,7 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import 'shared_notification_plugin.dart';
 
 /// Manages OTYA local notifications.
@@ -31,10 +31,13 @@ class NotificationService {
   }
 
   /// Public entry-point called by [sharedNotificationRouter].
-  void handleTap(NotificationResponse response) => _onNotificationResponse(response);
+  void handleTap(NotificationResponse response) =>
+      _onNotificationResponse(response);
 
   void _onNotificationResponse(NotificationResponse response) {
-    debugPrint('[Notifications] Tapped: id=${response.id} payload=${response.payload}');
+    debugPrint(
+      '[Notifications] Tapped: id=${response.id} payload=${response.payload}',
+    );
     final payload = response.payload;
     if (payload != null && payload.isNotEmpty) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openPayload(payload));
