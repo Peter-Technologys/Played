@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
@@ -44,6 +45,7 @@ class FirebasePlatformService {
 
   bool _firebaseReady = false;
   bool _appCheckReady = false;
+  bool _remoteListenerAttached = false;
 
   bool get configured => OtyaFirebaseConfig.configured;
   bool get ready => _firebaseReady;
@@ -65,7 +67,19 @@ class FirebasePlatformService {
 
   Future<void> initOptionalServices() async {
     if (!await ensureInitialized()) return;
+    if (!_remoteListenerAttached) {
+      RemoteControlService.instance.addListener(_remotePolicyChanged);
+      _remoteListenerAttached = true;
+    }
+    await _applyPolicy();
+  }
 
+  void _remotePolicyChanged() {
+    unawaited(_applyPolicy());
+  }
+
+  Future<void> _applyPolicy() async {
+    if (!await ensureInitialized()) return;
     final remote = RemoteControlService.instance;
     final appCheckEnabled = remote.featureEnabled(
       'firebaseAppCheck',
@@ -80,7 +94,7 @@ class FirebasePlatformService {
       fallback: true,
     );
 
-    if (appCheckEnabled) {
+    if (appCheckEnabled && !_appCheckReady) {
       try {
         await FirebaseAppCheck.instance.activate(
           androidProvider:
@@ -111,11 +125,10 @@ class FirebasePlatformService {
   /// Null means attestation is unavailable; callers must follow the server's
   /// current enforcement policy rather than crashing or blocking local media.
   Future<String?> appCheckToken({bool forceRefresh = false}) async {
-    if (!_appCheckReady &&
-        !RemoteControlService.instance.featureEnabled(
-          'firebaseAppCheck',
-          fallback: true,
-        )) {
+    if (!RemoteControlService.instance.featureEnabled(
+      'firebaseAppCheck',
+      fallback: true,
+    )) {
       return null;
     }
     if (!await ensureInitialized()) return null;
