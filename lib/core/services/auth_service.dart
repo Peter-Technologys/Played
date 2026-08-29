@@ -10,22 +10,24 @@
 // Auto-refreshes token when expired (checks exp from JWT payload).
 
 import 'dart:convert';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../config/environment.dart';
 import 'http_client.dart';
 
 String get _kAuthBase => '${Environment.workerUrl}/auth';
 
-const _kSecureAccessToken  = 'otya_access_token';
+const _kSecureAccessToken = 'otya_access_token';
 const _kSecureRefreshToken = 'otya_refresh_token';
-const _kUserId         = 'otya_user_id';
-const _kUserEmail      = 'otya_user_email';
-const _kUserName       = 'otya_user_name';
-const _kUserAvatar     = 'otya_user_avatar';
-const _kIsVerified     = 'otya_is_verified';
+const _kUserId = 'otya_user_id';
+const _kUserEmail = 'otya_user_email';
+const _kUserName = 'otya_user_name';
+const _kUserAvatar = 'otya_user_avatar';
+const _kIsVerified = 'otya_is_verified';
 
 const _secureStorage = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
@@ -67,13 +69,16 @@ class UserProfile {
     required this.isVerified,
   });
 
-  factory UserProfile.fromJson(Map<String, dynamic> json) => UserProfile(
-        id:         json['id'] as String,
-        email:      json['email'] as String,
-        name:       json['name'] as String?,
-        avatarUrl:  json['avatar_url'] as String?,
-        isVerified: (json['is_verified'] as int? ?? 0) == 1,
-      );
+  factory UserProfile.fromJson(Map<String, dynamic> json) {
+    final verified = json['is_verified'];
+    return UserProfile(
+      id: json['id'] as String,
+      email: json['email'] as String,
+      name: json['name'] as String?,
+      avatarUrl: json['avatar_url'] as String?,
+      isVerified: verified == true || verified == 1,
+    );
+  }
 }
 
 Map<String, dynamic>? _decodeJwtPayload(String token) {
@@ -81,8 +86,12 @@ Map<String, dynamic>? _decodeJwtPayload(String token) {
     final parts = token.split('.');
     if (parts.length != 3) return null;
     var payload = parts[1];
-    while (payload.length % 4 != 0) payload += '=';
-    final decoded = base64Url.decode(payload.replaceAll('-', '+').replaceAll('_', '/'));
+    while (payload.length % 4 != 0) {
+      payload += '=';
+    }
+    final decoded = base64Url.decode(
+      payload.replaceAll('-', '+').replaceAll('_', '/'),
+    );
     return jsonDecode(utf8.decode(decoded)) as Map<String, dynamic>;
   } catch (_) {
     return null;
@@ -139,11 +148,17 @@ class AuthService {
   }) async {
     if (accessToken != null) {
       _accessToken = accessToken;
-      await _secureStorage.write(key: _kSecureAccessToken, value: accessToken);
+      await _secureStorage.write(
+        key: _kSecureAccessToken,
+        value: accessToken,
+      );
     }
     if (refreshToken != null) {
       _refreshToken = refreshToken;
-      await _secureStorage.write(key: _kSecureRefreshToken, value: refreshToken);
+      await _secureStorage.write(
+        key: _kSecureRefreshToken,
+        value: refreshToken,
+      );
     }
     if (user != null) {
       _userId = user.id;
@@ -154,8 +169,16 @@ class AuthService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kUserId, user.id);
       await prefs.setString(_kUserEmail, user.email);
-      if (user.name != null) await prefs.setString(_kUserName, user.name!);
-      if (user.avatarUrl != null) await prefs.setString(_kUserAvatar, user.avatarUrl!);
+      if (user.name != null && user.name!.trim().isNotEmpty) {
+        await prefs.setString(_kUserName, user.name!);
+      } else {
+        await prefs.remove(_kUserName);
+      }
+      if (user.avatarUrl != null && user.avatarUrl!.trim().isNotEmpty) {
+        await prefs.setString(_kUserAvatar, user.avatarUrl!);
+      } else {
+        await prefs.remove(_kUserAvatar);
+      }
       await prefs.setBool(_kIsVerified, user.isVerified);
     }
   }
@@ -171,13 +194,13 @@ class AuthService {
     _userName = null;
     _userAvatar = null;
     _isVerified = false;
-    for (final k in [_kUserId, _kUserEmail, _kUserName, _kUserAvatar]) {
-      await prefs.remove(k);
+    for (final key in [_kUserId, _kUserEmail, _kUserName, _kUserAvatar]) {
+      await prefs.remove(key);
     }
     await prefs.remove(_kIsVerified);
   }
 
-  bool get isLoggedIn => _accessToken != null && _userId != null;
+  bool get isLoggedIn => _loaded && _accessToken != null && _userId != null;
 
   Future<bool> checkIsLoggedIn() async {
     await _ensureLoaded();
@@ -187,29 +210,53 @@ class AuthService {
   String? get userId => _userId;
   String? get userEmail => _userEmail;
   String? get userName => _userName;
+  String? get userAvatar => _userAvatar;
   bool get isVerified => _isVerified;
 
   Future<String?> getValidToken() async {
     await _ensureLoaded();
-    if (_accessToken == null) return null;
-    if (!_isTokenExpired(_accessToken!)) return _accessToken;
-    if (_refreshToken == null) return null;
+    final accessToken = _accessToken;
+    if (accessToken == null) return null;
+    if (!_isTokenExpired(accessToken)) return accessToken;
+
+    final refreshToken = _refreshToken;
+    if (refreshToken == null || refreshToken.isEmpty) {
+      // An expired access token with no refresh token cannot become a valid
+      // session again. Remove the stale account state instead of leaving the UI
+      // looking signed in while every authenticated request fails.
+      await _clearPersisted();
+      return null;
+    }
+
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/refresh'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'refresh_token': _refreshToken}),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/refresh'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(_timeout);
+
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map<String, dynamic>) {
           final newToken = decoded['access_token'] as String?;
           if (newToken != null && newToken.isNotEmpty) {
             _accessToken = newToken;
-            await _secureStorage.write(key: _kSecureAccessToken, value: newToken);
+            await _secureStorage.write(
+              key: _kSecureAccessToken,
+              value: newToken,
+            );
             return newToken;
           }
         }
+      }
+
+      if (res.statusCode == 401 || res.statusCode == 403) {
+        // The server has definitively rejected this refresh session. Clear only
+        // in this case; transient network/server failures must not destroy a
+        // locally remembered account while the user is offline.
+        await _clearPersisted();
       }
     } catch (e) {
       debugPrint('[AuthService] Token refresh failed: ${e.runtimeType}');
@@ -226,20 +273,22 @@ class AuthService {
     bool marketingConsent = false,
   }) async {
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/register'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          if (name != null) 'name': name,
-          'terms_accepted': termsAccepted,
-          'terms_version': termsVersion,
-          'privacy_accepted': privacyAccepted,
-          'privacy_version': privacyVersion,
-          'marketing_consent': marketingConsent,
-        }),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/register'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              if (name != null) 'name': name,
+              'terms_accepted': termsAccepted,
+              'terms_version': termsVersion,
+              'privacy_accepted': privacyAccepted,
+              'privacy_version': privacyVersion,
+              'marketing_consent': marketingConsent,
+            }),
+          )
+          .timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
       debugPrint('[AuthService] Register request failed: ${e.runtimeType}');
@@ -254,18 +303,20 @@ class AuthService {
     String? recoveryCode,
   }) async {
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/login'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          if (totpCode != null && totpCode.trim().isNotEmpty)
-            'totp_code': totpCode.trim(),
-          if (recoveryCode != null && recoveryCode.trim().isNotEmpty)
-            'recovery_code': recoveryCode.trim(),
-        }),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/login'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'password': password,
+              if (totpCode != null && totpCode.trim().isNotEmpty)
+                'totp_code': totpCode.trim(),
+              if (recoveryCode != null && recoveryCode.trim().isNotEmpty)
+                'recovery_code': recoveryCode.trim(),
+            }),
+          )
+          .timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
       debugPrint('[AuthService] Login request failed: ${e.runtimeType}');
@@ -281,19 +332,21 @@ class AuthService {
     bool marketingConsent = false,
   }) async {
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/google'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'id_token': idToken,
-          'drive_access_token': driveAccessToken,
-          'terms_accepted': termsAccepted,
-          'terms_version': termsVersion,
-          'privacy_accepted': privacyAccepted,
-          'privacy_version': privacyVersion,
-          'marketing_consent': marketingConsent,
-        }),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/google'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'id_token': idToken,
+              'drive_access_token': driveAccessToken,
+              'terms_accepted': termsAccepted,
+              'terms_version': termsVersion,
+              'privacy_accepted': privacyAccepted,
+              'privacy_version': privacyVersion,
+              'marketing_consent': marketingConsent,
+            }),
+          )
+          .timeout(_timeout);
       return _handleAuthResponse(res);
     } catch (e) {
       debugPrint('[AuthService] Google auth request failed: ${e.runtimeType}');
@@ -303,14 +356,20 @@ class AuthService {
 
   Future<void> logout() async {
     await _ensureLoaded();
-    if (_refreshToken != null) {
+    final refreshToken = _refreshToken;
+    if (refreshToken != null) {
       try {
-        await _client.post(
-          Uri.parse('$_kAuthBase/logout'),
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'refresh_token': _refreshToken}),
-        ).timeout(_timeout);
+        await _client
+            .post(
+              Uri.parse('$_kAuthBase/logout'),
+              headers: {'Content-Type': 'application/json'},
+              body: jsonEncode({'refresh_token': refreshToken}),
+            )
+            .timeout(_timeout);
       } catch (e) {
+        // Local sign-out must still work if the network is unavailable. The
+        // server-side refresh token expires independently and can also be
+        // revoked from Devices & sessions.
         debugPrint('[AuthService] Logout request failed: ${e.runtimeType}');
       }
     }
@@ -321,16 +380,21 @@ class AuthService {
     final token = await getValidToken();
     if (token == null) return null;
     try {
-      final res = await _client.get(
-        Uri.parse('$_kAuthBase/me'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(_timeout);
+      final res = await _client
+          .get(
+            Uri.parse('$_kAuthBase/me'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(_timeout);
       if (res.statusCode != 200) return null;
       final decoded = jsonDecode(res.body);
-      if (decoded is! Map<String, dynamic> || decoded['user'] is! Map<String, dynamic>) {
+      if (decoded is! Map<String, dynamic> ||
+          decoded['user'] is! Map<String, dynamic>) {
         return null;
       }
-      final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
+      final user = UserProfile.fromJson(
+        decoded['user'] as Map<String, dynamic>,
+      );
       await _persist(user: user);
       return user;
     } catch (e) {
@@ -346,15 +410,23 @@ class AuthService {
       final body = <String, dynamic>{};
       if (name != null) body['name'] = name;
       if (avatarUrl != null) body['avatar_url'] = avatarUrl;
-      final res = await _client.patch(
-        Uri.parse('$_kAuthBase/me'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-        body: jsonEncode(body),
-      ).timeout(_timeout);
+      final res = await _client
+          .patch(
+            Uri.parse('$_kAuthBase/me'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode(body),
+          )
+          .timeout(_timeout);
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic> && decoded['user'] is Map<String, dynamic>) {
-          final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
+        if (decoded is Map<String, dynamic> &&
+            decoded['user'] is Map<String, dynamic>) {
+          final user = UserProfile.fromJson(
+            decoded['user'] as Map<String, dynamic>,
+          );
           await _persist(user: user);
         }
       }
@@ -367,13 +439,17 @@ class AuthService {
     final token = await getValidToken();
     if (token == null) return false;
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/send-verification'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/send-verification'),
+            headers: {'Authorization': 'Bearer $token'},
+          )
+          .timeout(_timeout);
       return res.statusCode >= 200 && res.statusCode < 300;
     } catch (e) {
-      debugPrint('[AuthService] sendVerificationOtp failed: ${e.runtimeType}');
+      debugPrint(
+        '[AuthService] sendVerificationOtp failed: ${e.runtimeType}',
+      );
       return false;
     }
   }
@@ -382,11 +458,16 @@ class AuthService {
     final token = await getValidToken();
     if (token == null) return false;
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/verify-email'),
-        headers: {'Content-Type': 'application/json', 'Authorization': 'Bearer $token'},
-        body: jsonEncode({'otp': otp}),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/verify-email'),
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': 'Bearer $token',
+            },
+            body: jsonEncode({'otp': otp}),
+          )
+          .timeout(_timeout);
       if (res.statusCode == 200) {
         _isVerified = true;
         final prefs = await SharedPreferences.getInstance();
@@ -402,11 +483,13 @@ class AuthService {
 
   Future<bool> forgotPassword(String email) async {
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/forgot-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email}),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/forgot-password'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'email': email}),
+          )
+          .timeout(_timeout);
       return res.statusCode >= 200 && res.statusCode < 300;
     } catch (e) {
       debugPrint('[AuthService] forgotPassword failed: ${e.runtimeType}');
@@ -414,13 +497,23 @@ class AuthService {
     }
   }
 
-  Future<bool> resetPassword(String email, String otp, String newPassword) async {
+  Future<bool> resetPassword(
+    String email,
+    String otp,
+    String newPassword,
+  ) async {
     try {
-      final res = await _client.post(
-        Uri.parse('$_kAuthBase/reset-password'),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'otp': otp, 'new_password': newPassword}),
-      ).timeout(_timeout);
+      final res = await _client
+          .post(
+            Uri.parse('$_kAuthBase/reset-password'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({
+              'email': email,
+              'otp': otp,
+              'new_password': newPassword,
+            }),
+          )
+          .timeout(_timeout);
       return res.statusCode == 200;
     } catch (e) {
       debugPrint('[AuthService] resetPassword failed: ${e.runtimeType}');
@@ -428,17 +521,30 @@ class AuthService {
     }
   }
 
+  /// Permanently deletes the authenticated OTYA cloud account.
+  ///
+  /// This intentionally throws when deletion is not confirmed by the server.
+  /// Callers must not sign the device out or claim success after a timeout,
+  /// offline failure or rejected request. Local media is never touched here.
   Future<void> deleteAccount() async {
     final token = await getValidToken();
-    if (token == null) return;
-    try {
-      await _client.post(
-        Uri.parse('$_kAuthBase/delete-account'),
-        headers: {'Authorization': 'Bearer $token'},
-      ).timeout(_timeout);
-    } catch (e) {
-      debugPrint('[AuthService] deleteAccount failed: ${e.runtimeType}');
+    if (token == null) {
+      throw StateError('No valid OTYA session is available.');
     }
+
+    final res = await _client
+        .post(
+          Uri.parse('$_kAuthBase/delete-account'),
+          headers: {'Authorization': 'Bearer $token'},
+        )
+        .timeout(_timeout);
+
+    if (res.statusCode < 200 || res.statusCode >= 300) {
+      throw StateError(
+        'OTYA account deletion was not confirmed (HTTP ${res.statusCode}).',
+      );
+    }
+
     await _clearPersisted();
   }
 
@@ -447,24 +553,33 @@ class AuthService {
     if (raw.isEmpty) {
       return AuthResult(
         ok: false,
-        error: 'Authentication service returned an empty response (HTTP ${res.statusCode}). Please try again.',
+        error:
+            'Authentication service returned an empty response (HTTP ${res.statusCode}). Please try again.',
       );
     }
+
     try {
       final decoded = jsonDecode(raw);
       if (decoded is! Map<String, dynamic>) {
         return AuthResult(
           ok: false,
-          error: 'Authentication service returned an invalid response (HTTP ${res.statusCode}).',
+          error:
+              'Authentication service returned an invalid response (HTTP ${res.statusCode}).',
         );
       }
       final data = decoded;
-      if (res.statusCode >= 200 && res.statusCode < 300 && data['ok'] == true) {
+      if (res.statusCode >= 200 &&
+          res.statusCode < 300 &&
+          data['ok'] == true) {
         final accessToken = data['access_token'] as String?;
         final refreshToken = data['refresh_token'] as String?;
         final userJson = data['user'] as Map<String, dynamic>?;
         final user = userJson != null ? UserProfile.fromJson(userJson) : null;
-        await _persist(accessToken: accessToken, refreshToken: refreshToken, user: user);
+        await _persist(
+          accessToken: accessToken,
+          refreshToken: refreshToken,
+          user: user,
+        );
         return AuthResult(
           ok: true,
           accessToken: accessToken,
@@ -489,7 +604,8 @@ class AuthService {
       );
       return AuthResult(
         ok: false,
-        error: 'Authentication service response was invalid (HTTP ${res.statusCode}).',
+        error:
+            'Authentication service response was invalid (HTTP ${res.statusCode}).',
       );
     }
   }
