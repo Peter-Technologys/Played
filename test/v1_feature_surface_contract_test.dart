@@ -1,3 +1,4 @@
+// OTYA v1 release contract: this file also triggers strict CI after source patches.
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
