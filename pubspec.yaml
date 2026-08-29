@@ -105,15 +105,6 @@ dev_dependencies:
   json_serializable: ^6.8.0
   riverpod_generator: ^2.4.0
   flutter_lints: ^5.0.0
-  flutter_launcher_icons: ^0.14.3
-
-flutter_launcher_icons:
-  android: true
-  ios: false
-  image_path: assets/icons/play_store_512.png
-  adaptive_icon_background: '#111218'
-  adaptive_icon_foreground: assets/icons/play_store_512.png
-  min_sdk_android: 24
 
 flutter:
   uses-material-design: true
