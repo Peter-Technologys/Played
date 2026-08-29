@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -14,7 +13,6 @@ import '../../../core/models/media_item.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/services/auto_eq_service.dart';
 import '../../../core/services/vault_service.dart';
-import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/speed_memory_service.dart';
 import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
@@ -27,13 +25,10 @@ import '../../../core/utils/duration_formatter.dart';
 import '../../../features/settings/settings_provider.dart';
 import 'mini_player.dart';
 import 'queue_screen.dart';
-// queueProvider and miniPlayerItemProvider are defined in queue_screen.dart
 import 'lyrics_screen.dart';
 import 'file_info_sheet.dart';
 import 'car_mode_screen.dart';
 import 'widgets/sleep_timer.dart';
-
-// ── State ──────────────────────────────────────────────────────
 
 enum RepeatState { off, one, all }
 
@@ -57,24 +52,26 @@ class AudioPlayerState {
   });
 
   AudioPlayerState copyWith({
-    bool? isPlaying, Duration? position, Duration? duration,
-    double? speed, bool? isLoading, bool? isFavorite,
+    bool? isPlaying,
+    Duration? position,
+    Duration? duration,
+    double? speed,
+    bool? isLoading,
+    bool? isFavorite,
     RepeatState? repeat,
-  }) => AudioPlayerState(
-    isPlaying: isPlaying ?? this.isPlaying,
-    position: position ?? this.position,
-    duration: duration ?? this.duration,
-    speed: speed ?? this.speed,
-    isLoading: isLoading ?? this.isLoading,
-    isFavorite: isFavorite ?? this.isFavorite,
-    repeat: repeat ?? this.repeat,
-  );
+  }) =>
+      AudioPlayerState(
+        isPlaying: isPlaying ?? this.isPlaying,
+        position: position ?? this.position,
+        duration: duration ?? this.duration,
+        speed: speed ?? this.speed,
+        isLoading: isLoading ?? this.isLoading,
+        isFavorite: isFavorite ?? this.isFavorite,
+        repeat: repeat ?? this.repeat,
+      );
 }
 
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
-  // media_kit Player owned directly — single engine, no audio_service wrapper.
-  // backgroundAudio: true keeps playback alive when the screen locks or the
-  // app is backgrounded (sets WakeLock + AudioFocus on Android).
   final Player _player = Player(
     configuration: const PlayerConfiguration(
       title: 'OTYA Player',
@@ -83,43 +80,24 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   );
 
   String? _currentItemId;
-  bool    _loading        = false;
-  int     _loadGeneration = 0;
-
-  // Cache the last resolved album art path per item ID so _updateNotification()
-  // does not re-resolve on every play/pause event (which fires AlbumArtService
-  // on every state change). Only re-resolves when the item ID changes.
+  int _loadGeneration = 0;
   String? _lastNotificationItemId;
   String? _lastResolvedArtPath;
 
-  // Held subscriptions — cancelled on dispose.
   StreamSubscription? _playingSub;
   StreamSubscription? _bufferingSub;
   StreamSubscription? _positionSub;
   StreamSubscription? _durationSub;
   StreamSubscription? _completedSub;
-
-  // Keep a reference to the ProviderContainer so load() can update
-  // miniPlayerItemProvider and read queueProvider without a BuildContext.
   ProviderContainer? _container;
 
-  // _attachStreams() is called by the provider factory AFTER _container is
-  // assigned, so _onTrackComplete() can safely read queueProvider.
   AudioPlayerNotifier() : super(const AudioPlayerState());
 
   void init() {
-    // Attach the Player to the audio_service handler so the foreground
-    // service and system MediaSession are driven by this player's streams.
     AudioHandlerSingleton.instance.attachPlayer(_player);
     _attachStreams();
-    // Wire notification prev/next buttons to this notifier's queue logic.
     MediaNotificationService.instance.onSkipPrevious = skipPrevious;
-    MediaNotificationService.instance.onSkipNext     = skipNext;
-
-    // Wire SleepDetectionService so inactivity pauses playback.
-    // The service is started when the user sets a sleep timer (via
-    // SleepTimerButton) and stopped when the timer fires or is cancelled.
-    // Here we only set the callback — start/stop is controlled by the UI.
+    MediaNotificationService.instance.onSkipNext = skipNext;
     SleepDetectionService.instance.onSleepDetected = () {
       debugPrint('[AudioPlayer] Sleep detected — pausing playback.');
       pause();
@@ -127,7 +105,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void _attachStreams() {
-    // playing stream — reflects actual play/pause state
     _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
       state = state.copyWith(isPlaying: playing);
@@ -137,7 +114,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       _updateNotification();
     });
 
-    // buffering stream — only show spinner during initial load (no duration yet).
     _bufferingSub = _player.stream.buffering.listen((buffering) {
       if (!mounted) return;
       if (buffering && state.duration == Duration.zero) {
@@ -147,27 +123,24 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       }
     });
 
-    // Debounce position saves: write to DB at most once every 5 seconds.
-    DateTime lastSave = DateTime.fromMillisecondsSinceEpoch(0);
-    _positionSub = _player.stream.position.listen((p) {
+    var lastSave = DateTime.fromMillisecondsSinceEpoch(0);
+    _positionSub = _player.stream.position.listen((position) {
       if (!mounted) return;
-      state = state.copyWith(position: p);
-      if (_currentItemId != null && p.inSeconds > 0) {
+      state = state.copyWith(position: position);
+      if (_currentItemId != null && position.inSeconds > 0) {
         final now = DateTime.now();
         if (now.difference(lastSave).inSeconds >= 5) {
           lastSave = now;
-          OtyaDatabase.instance.saveSeekPosition(_currentItemId!, p);
+          OtyaDatabase.instance.saveSeekPosition(_currentItemId!, position);
         }
       }
     });
 
-    _durationSub = _player.stream.duration.listen((d) {
+    _durationSub = _player.stream.duration.listen((duration) {
       if (!mounted) return;
-      state = state.copyWith(duration: d);
+      state = state.copyWith(duration: duration);
     });
 
-    // completed stream — repeat-one reloads current; all other modes call
-    // _onTrackComplete() which advances the queue.
     _completedSub = _player.stream.completed.listen((completed) {
       if (!completed) return;
       if (state.repeat == RepeatState.one) {
@@ -181,23 +154,21 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   void _onTrackComplete() {
     if (_container == null) return;
-    final queue    = _container!.read(queueProvider);
+    final queue = _container!.read(queueProvider);
     final notifier = _container!.read(queueProvider.notifier);
     switch (state.repeat) {
       case RepeatState.one:
-        // Handled directly in _completedSub.
         break;
       case RepeatState.all:
         notifier.next();
-        final nextAll = _container!.read(queueProvider).current;
-        if (nextAll != null) load(nextAll);
+        final next = _container!.read(queueProvider).current;
+        if (next != null) load(next);
         break;
       case RepeatState.off:
-        final hasNext = queue.currentIndex < queue.items.length - 1;
-        if (hasNext) {
+        if (queue.currentIndex < queue.items.length - 1) {
           notifier.next();
-          final nextOff = _container!.read(queueProvider).current;
-          if (nextOff != null) load(nextOff);
+          final next = _container!.read(queueProvider).current;
+          if (next != null) load(next);
         }
         break;
     }
@@ -209,48 +180,37 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     Duration? savedPosition,
   }) async {
     _loadGeneration++;
-    final myGeneration = _loadGeneration;
-
-    // Fix #4: Only set _loading for this generation. If another call has
-    // already incremented _loadGeneration past myGeneration by the time we
-    // reach the finally block, we must NOT clear _loading — that belongs to
-    // the newer call. Guard every _loading mutation with a generation check.
-    _loading = true;
+    final generation = _loadGeneration;
 
     try {
       if (_player.state.playing) await _player.pause();
-      if (_loadGeneration != myGeneration) return;
+      if (_loadGeneration != generation) return;
 
       try {
         await _player.open(Media(item.filePath), play: false);
-      } catch (srcErr) {
-        debugPrint('[AudioPlayer] player.open failed: $srcErr\nPath: ${item.filePath}');
-        if (_loadGeneration == myGeneration && mounted) {
+      } catch (error) {
+        debugPrint('[AudioPlayer] player.open failed: $error\nPath: ${item.filePath}');
+        if (_loadGeneration == generation && mounted) {
           state = state.copyWith(isLoading: false);
         }
         return;
       }
 
-      if (_loadGeneration != myGeneration) return;
+      if (_loadGeneration != generation) return;
       await _player.setRate(speed);
-      if (_loadGeneration != myGeneration) return;
+      if (_loadGeneration != generation) return;
 
       if (savedPosition != null && savedPosition.inSeconds > 0) {
         await _player.seek(savedPosition);
       }
-      if (_loadGeneration != myGeneration) return;
+      if (_loadGeneration != generation) return;
 
       await PlaybackCoordinator.instance.register(_player, 'audio');
       await _player.play();
-    } catch (e) {
-      debugPrint('[AudioPlayer] _loadCurrent error: $e');
-      if (_loadGeneration == myGeneration && mounted) {
+    } catch (error) {
+      debugPrint('[AudioPlayer] load failed: $error');
+      if (_loadGeneration == generation && mounted) {
         state = state.copyWith(isLoading: false);
-      }
-    } finally {
-      // Only clear _loading if we are still the active generation.
-      if (_loadGeneration == myGeneration) {
-        _loading = false;
       }
     }
   }
@@ -258,29 +218,29 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
     _currentItemId = item.id;
     if (mounted) {
-      state = state.copyWith(isLoading: true, isFavorite: _loadFavorite(item.id));
+      state = state.copyWith(
+        isLoading: true,
+        isFavorite: _loadFavorite(item.id),
+      );
     }
 
-    // Auto-EQ: detect a genre preset from the filename and apply it via
-    // AutoEqService.applyPreset() — single, testable call site.
     final eqPreset = AutoEqService.instance.detectPreset(item.fileName);
     if (eqPreset.name != 'Flat') {
-      debugPrint('[AudioPlayer] Auto-EQ: ${eqPreset.name} for ${item.fileName}');
       unawaited(AutoEqService.instance.applyPreset(eqPreset));
     }
     _container?.read(miniPlayerItemProvider.notifier).state = item;
     _updateNotification();
 
-    final saved      = OtyaDatabase.instance.getSeekPosition(item.id);
+    final saved = OtyaDatabase.instance.getSeekPosition(item.id);
     final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
-    final speed      = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
+    final speed = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
 
     try {
       await _loadCurrent(item, speed: speed, savedPosition: saved);
       if (mounted) state = state.copyWith(speed: speed, isLoading: false);
       OtyaDatabase.instance.recordPlay(item).ignore();
-    } catch (e) {
-      debugPrint('[AudioPlayer] load error: $e');
+    } catch (error) {
+      debugPrint('[AudioPlayer] load error: $error');
       if (mounted) state = state.copyWith(isLoading: false);
     }
   }
@@ -289,8 +249,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final item = _container?.read(miniPlayerItemProvider);
     if (item == null) return;
 
-    // Performance: only re-resolve album art when the item ID changes.
-    // On play/pause events the item is the same — reuse the cached path.
     if (item.id == _lastNotificationItemId) {
       MediaNotificationService.instance.show(
         id: item.id,
@@ -302,7 +260,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       return;
     }
 
-    // New item — resolve art and cache the result.
     _lastNotificationItemId = item.id;
     AlbumArtService.instance.resolve(item.albumArtPath).then((resolvedPath) {
       _lastResolvedArtPath = resolvedPath;
@@ -316,18 +273,20 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     });
   }
 
-  bool _loadFavorite(String id) =>
-      OtyaDatabase.instance.getFavoriteFlag(id);
+  bool _loadFavorite(String id) => OtyaDatabase.instance.getFavoriteFlag(id);
 
   void togglePlay() {
     final willPlay = !state.isPlaying;
-    state = state.copyWith(isPlaying: willPlay);
-    if (willPlay) { _player.play(); } else { _player.pause(); }
+    if (willPlay) {
+      _player.play();
+    } else {
+      _player.pause();
+    }
   }
 
   void pause() => _player.pause();
 
-  Future<void> seek(Duration p) => _player.seek(p);
+  Future<void> seek(Duration position) => _player.seek(position);
 
   Future<void> skipForward() =>
       _player.seek(state.position + const Duration(seconds: 10));
@@ -355,15 +314,15 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       OtyaDatabase.instance.saveSeekPosition(_currentItemId!, Duration.zero);
     }
     _container!.read(queueProvider.notifier).previous();
-    final prev = _container!.read(queueProvider).current;
-    if (prev != null) load(prev);
+    final previous = _container!.read(queueProvider).current;
+    if (previous != null) load(previous);
   }
 
-  void setSpeed(double s) {
-    _player.setRate(s);
-    state = state.copyWith(speed: s);
+  void setSpeed(double speed) {
+    _player.setRate(speed);
+    state = state.copyWith(speed: speed);
     if (_currentItemId != null) {
-      SpeedMemoryService.instance.saveSpeed(_currentItemId!, s);
+      SpeedMemoryService.instance.saveSpeed(_currentItemId!, speed);
     }
   }
 
@@ -380,9 +339,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   }
 
   void cycleRepeat() {
-    // Repeat is handled entirely by _completedSub logic.
-    // Do NOT call _player.setPlaylistMode() — media_kit's internal playlist
-    // mode conflicts with manual queue management.
     final next = RepeatState.values[
         (state.repeat.index + 1) % RepeatState.values.length];
     state = state.copyWith(repeat: next);
@@ -398,11 +354,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _positionSub?.cancel();
     _durationSub?.cancel();
     _completedSub?.cancel();
-    // Clear notification callbacks so they don't hold a reference to this
-    // disposed notifier after a new AudioPlayerNotifier is created.
     MediaNotificationService.instance.onSkipPrevious = null;
-    MediaNotificationService.instance.onSkipNext     = null;
-    // Clear sleep detection callback.
+    MediaNotificationService.instance.onSkipNext = null;
     SleepDetectionService.instance.onSleepDetected = null;
     PlaybackCoordinator.instance.unregister(_player);
     MediaNotificationService.instance.dismiss();
@@ -413,25 +366,22 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 }
 
 final audioPlayerProvider =
-    StateNotifierProvider<AudioPlayerNotifier, AudioPlayerState>(
-  (ref) {
-    final notifier = AudioPlayerNotifier();
-    notifier._container = ref.container;
-    // init() must be called AFTER _container is set so that stream callbacks
-    // that call _container?.read(...) do not NPE on first track completion.
-    notifier.init();
-    return notifier;
-  },
-);
-
-// ── Screen ─────────────────────────────────────────────────────
+    StateNotifierProvider<AudioPlayerNotifier, AudioPlayerState>((ref) {
+  final notifier = AudioPlayerNotifier();
+  notifier._container = ref.container;
+  notifier.init();
+  return notifier;
+});
 
 class AudioPlayerScreen extends ConsumerStatefulWidget {
   final MediaItem mediaItem;
-  /// If true, do NOT call load() — just show the UI for the already-playing track.
-  /// Used when the mini player taps open the full-screen player without restarting.
   final bool resumeOnly;
-  const AudioPlayerScreen({super.key, required this.mediaItem, this.resumeOnly = false});
+
+  const AudioPlayerScreen({
+    super.key,
+    required this.mediaItem,
+    this.resumeOnly = false,
+  });
 
   @override
   ConsumerState<AudioPlayerScreen> createState() => _AudioPlayerScreenState();
@@ -439,28 +389,21 @@ class AudioPlayerScreen extends ConsumerStatefulWidget {
 
 class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     with WidgetsBindingObserver {
-
-  // Fix A: Track how long we've been in the loading state so we can show
-  // a retry button if AudioService never becomes ready.
-  DateTime? _loadStartTime;
   bool _showRetry = false;
   Timer? _loadTimeoutTimer;
 
   void _startLoad() {
-    _loadStartTime = DateTime.now();
     _showRetry = false;
     _loadTimeoutTimer?.cancel();
-    // After 10 s of continuous loading, surface a retry button.
     _loadTimeoutTimer = Timer(const Duration(seconds: 10), () {
       if (mounted && ref.read(audioPlayerProvider).isLoading) {
         setState(() => _showRetry = true);
       }
     });
-    final settings = ref.read(settingsProvider);
     ref.read(audioPlayerProvider.notifier).load(
-      widget.mediaItem,
-      settings: settings,
-    );
+          widget.mediaItem,
+          settings: ref.read(settingsProvider),
+        );
   }
 
   @override
@@ -468,18 +411,13 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!widget.resumeOnly) {
-        // load() already calls OtyaDatabase.instance.recordPlay() internally
-        // — do not call it again here to avoid double-counting play history.
-        _startLoad();
-      }
-      // If resumeOnly, the player is already playing — just show the UI.
+      if (!widget.resumeOnly) _startLoad();
     });
   }
 
   @override
-  void didChangeAppLifecycleState(AppLifecycleState s) {
-    if (s == AppLifecycleState.paused) {
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
       ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
     }
   }
@@ -493,53 +431,51 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   }
 
   void _showQueue() => showModalBottomSheet(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    builder: (_) => const QueueScreen(),
-  );
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (_) => const QueueScreen(),
+      );
 
-  void _showLyrics(Duration pos) => showModalBottomSheet(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    builder: (_) => LyricsSheet(item: widget.mediaItem, position: pos),
-  );
+  void _showLyrics(Duration position) => showModalBottomSheet(
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (_) => LyricsSheet(item: widget.mediaItem, position: position),
+      );
 
   void _showFileInfo() => showModalBottomSheet(
-    context: context,
-    useSafeArea: true,
-    isScrollControlled: true,
-    builder: (_) => FileInfoSheet(item: widget.mediaItem),
-  );
+        context: context,
+        useSafeArea: true,
+        isScrollControlled: true,
+        builder: (_) => FileInfoSheet(item: widget.mediaItem),
+      );
 
   void _showOptions() => showModalBottomSheet(
-    context: context,
-    useSafeArea: true,
-    builder: (_) => _OptionsSheet(
-      mediaItem: widget.mediaItem,
-      onFileInfo:        () { Navigator.pop(context); _showFileInfo(); },
-      onTrimForWhatsApp: () {
-        Navigator.pop(context);
-        context.push('/tools/whatsapp', extra: widget.mediaItem);
-      },
-    ),
-  );
+        context: context,
+        useSafeArea: true,
+        builder: (_) => _OptionsSheet(
+          mediaItem: widget.mediaItem,
+          onFileInfo: () {
+            Navigator.pop(context);
+            _showFileInfo();
+          },
+        ),
+      );
 
   @override
   Widget build(BuildContext context) {
-    final ps = ref.watch(audioPlayerProvider);
-    // Shuffle state is owned by QueueNotifier — single source of truth.
-    final isShuffle = ref.watch(queueProvider.select((q) => q.shuffle));
+    final playerState = ref.watch(audioPlayerProvider);
+    final isShuffle = ref.watch(queueProvider.select((queue) => queue.shuffle));
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmall = screenHeight < 680;
     final isMedium = screenHeight < 780;
     final isTablet = screenWidth > 600;
     final artPadding = isTablet ? 80.0 : isSmall ? 12.0 : isMedium ? 24.0 : 36.0;
-    final playBtnSize = isTablet ? 80.0 : isSmall ? 56.0 : 68.0;
+    final playButtonSize = isTablet ? 80.0 : isSmall ? 56.0 : 68.0;
     final skipIconSize = isTablet ? 34.0 : isSmall ? 24.0 : 30.0;
-    final vSpace = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
+    final spacing = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
 
     return WallpaperScaffold(
       body: SafeArea(
@@ -550,26 +486,35 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               child: Row(
                 children: [
                   IconButton(
-                    icon: Icon(Icons.keyboard_arrow_down_rounded,
-                        color: Theme.of(context).colorScheme.onSurface, size: 30),
+                    icon: Icon(
+                      Icons.keyboard_arrow_down_rounded,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: 30,
+                    ),
                     onPressed: () => Navigator.of(context).pop(),
                   ),
                   const Spacer(),
-                  const Text('NOW PLAYING',
-                      style: TextStyle(
-                        fontSize: 11, fontWeight: FontWeight.w600,
-                        color: AppColors.textSecondary,
-                        letterSpacing: 1.5, fontFamily: 'Inter',
-                      )),
+                  const Text(
+                    'NOW PLAYING',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                      letterSpacing: 1.5,
+                      fontFamily: 'Inter',
+                    ),
+                  ),
                   const Spacer(),
                   SleepTimerButton(
-                    onExpire: () =>
-                        ref.read(audioPlayerProvider.notifier).pause(),
+                    onExpire: () => ref.read(audioPlayerProvider.notifier).pause(),
                   ),
                   const SizedBox(width: 4),
                   IconButton(
-                    icon: const Icon(Icons.more_vert_rounded,
-                        color: AppColors.textSecondary, size: 22),
+                    icon: const Icon(
+                      Icons.more_vert_rounded,
+                      color: AppColors.textSecondary,
+                      size: 22,
+                    ),
                     onPressed: _showOptions,
                   ),
                 ],
@@ -580,14 +525,16 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 padding: EdgeInsets.symmetric(horizontal: artPadding, vertical: 8),
                 child: _AlbumArt(
                   albumArtPath: widget.mediaItem.albumArtPath,
-                  isPlaying: ps.isPlaying,
+                  isPlaying: playerState.isPlaying,
                   title: widget.mediaItem.title,
-                  onSwipeLeft:  () => ref.read(audioPlayerProvider.notifier).skipNext(),
-                  onSwipeRight: () => ref.read(audioPlayerProvider.notifier).skipPrevious(),
+                  onSwipeLeft: () =>
+                      ref.read(audioPlayerProvider.notifier).skipNext(),
+                  onSwipeRight: () =>
+                      ref.read(audioPlayerProvider.notifier).skipPrevious(),
                 ),
               ),
             ),
-            SizedBox(height: vSpace),
+            SizedBox(height: spacing),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -596,19 +543,28 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(widget.mediaItem.title,
-                            style: TextStyle(
-                              fontSize: 20, fontWeight: FontWeight.w700,
-                              color: Theme.of(context).colorScheme.onSurface,
-                              fontFamily: 'Inter',
-                            ),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          widget.mediaItem.title,
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w700,
+                            color: Theme.of(context).colorScheme.onSurface,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                         const SizedBox(height: 4),
-                        Text(widget.mediaItem.artist ?? 'Unknown Artist',
-                            style: const TextStyle(
-                                fontSize: 13, color: AppColors.textSecondary,
-                                fontFamily: 'Inter'),
-                            maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Text(
+                          widget.mediaItem.artist ?? 'Unknown Artist',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppColors.textSecondary,
+                            fontFamily: 'Inter',
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ],
                     ),
                   ),
@@ -618,11 +574,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     child: AnimatedSwitcher(
                       duration: const Duration(milliseconds: 250),
                       child: Icon(
-                        ps.isFavorite
+                        playerState.isFavorite
                             ? Icons.favorite_rounded
                             : Icons.favorite_border_rounded,
-                        key: ValueKey(ps.isFavorite),
-                        color: ps.isFavorite
+                        key: ValueKey(playerState.isFavorite),
+                        color: playerState.isFavorite
                             ? Colors.redAccent
                             : AppColors.textSecondary,
                         size: 26,
@@ -632,17 +588,17 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-            SizedBox(height: vSpace),
+            SizedBox(height: spacing),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: _SeekBar(
-                position: ps.position,
-                duration: ps.duration,
-                onSeek: (d) =>
-                    ref.read(audioPlayerProvider.notifier).seek(d),
+                position: playerState.position,
+                duration: playerState.duration,
+                onSeek: (position) =>
+                    ref.read(audioPlayerProvider.notifier).seek(position),
               ),
             ),
-            SizedBox(height: vSpace / 2),
+            SizedBox(height: spacing / 2),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 28),
               child: Row(
@@ -657,36 +613,41 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   GestureDetector(
                     onTap: () {
                       const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-                      final idx = speeds.indexOf(ps.speed);
-                      ref.read(audioPlayerProvider.notifier)
-                          .setSpeed(speeds[(idx + 1) % speeds.length]);
+                      final index = speeds.indexOf(playerState.speed);
+                      ref
+                          .read(audioPlayerProvider.notifier)
+                          .setSpeed(speeds[(index + 1) % speeds.length]);
                     },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 5),
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
                       decoration: BoxDecoration(
                         color: Theme.of(context).colorScheme.surface,
                         borderRadius: BorderRadius.circular(8),
                         border: Border.all(color: AppColors.borderOf(context)),
                       ),
                       child: Text(
-                          _formatSpeed(ps.speed),
-                          style: const TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700,
-                            color: AppColors.accent,
-                            fontFamily: 'Inter',
-                          )),
+                        _formatSpeed(playerState.speed),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.accent,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
                     ),
                   ),
                   _RepeatBtn(
-                    repeat: ps.repeat,
+                    repeat: playerState.repeat,
                     onTap: () =>
                         ref.read(audioPlayerProvider.notifier).cycleRepeat(),
                   ),
                 ],
               ),
             ),
-            SizedBox(height: vSpace / 2),
+            SizedBox(height: spacing / 2),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Row(
@@ -694,26 +655,30 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   IconButton(
-                    icon: Icon(Icons.skip_previous_rounded,
-                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
+                    icon: Icon(
+                      Icons.skip_previous_rounded,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: skipIconSize,
+                    ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipPrevious();
                     },
                   ),
                   IconButton(
-                    icon: Icon(Icons.replay_10_rounded,
-                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
+                    icon: Icon(
+                      Icons.replay_10_rounded,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: skipIconSize,
+                    ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipBack();
                     },
                   ),
-                  // Primary play button (also retries a timed-out load)
                   GestureDetector(
                     onTap: () {
                       if (_showRetry) {
-                        // Fix A: Retry loading when AudioService was not ready.
                         setState(() => _showRetry = false);
                         _startLoad();
                       } else {
@@ -723,7 +688,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: playBtnSize, height: playBtnSize,
+                      width: playButtonSize,
+                      height: playButtonSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: AppColors.accent,
@@ -736,35 +702,49 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                           ),
                         ],
                       ),
-                      child: ps.isLoading && !_showRetry
+                      child: playerState.isLoading && !_showRetry
                           ? const Padding(
                               padding: EdgeInsets.all(20),
                               child: CircularProgressIndicator(
-                                  color: Colors.white, strokeWidth: 2))
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            )
                           : _showRetry
                               ? const Padding(
                                   padding: EdgeInsets.all(14),
-                                  child: Icon(Icons.refresh_rounded,
-                                      color: Colors.white, size: 30))
+                                  child: Icon(
+                                    Icons.refresh_rounded,
+                                    color: Colors.white,
+                                    size: 30,
+                                  ),
+                                )
                               : Icon(
-                                  ps.isPlaying
+                                  playerState.isPlaying
                                       ? Icons.pause_rounded
                                       : Icons.play_arrow_rounded,
-                                  color: Colors.white, size: 38,
+                                  color: Colors.white,
+                                  size: 38,
                                 ),
                     ),
                   ),
                   IconButton(
-                    icon: Icon(Icons.forward_10_rounded,
-                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
+                    icon: Icon(
+                      Icons.forward_10_rounded,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: skipIconSize,
+                    ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipForward();
                     },
                   ),
                   IconButton(
-                    icon: Icon(Icons.skip_next_rounded,
-                        color: Theme.of(context).colorScheme.onSurface, size: skipIconSize),
+                    icon: Icon(
+                      Icons.skip_next_rounded,
+                      color: Theme.of(context).colorScheme.onSurface,
+                      size: skipIconSize,
+                    ),
                     onPressed: () {
                       HapticFeedback.lightImpact();
                       ref.read(audioPlayerProvider.notifier).skipNext();
@@ -773,7 +753,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                 ],
               ),
             ),
-            SizedBox(height: vSpace),
+            SizedBox(height: spacing),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: FittedBox(
@@ -784,11 +764,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     _SecondaryBtn(
                       icon: Icons.lyrics_rounded,
                       label: 'Lyrics',
-                      onTap: () => _showLyrics(ps.position),
+                      onTap: () => _showLyrics(playerState.position),
                     ),
                     _SecondaryBtn(
                       icon: Icons.graphic_eq_rounded,
-                      label: 'Tuner',
+                      label: 'Equalizer',
                       onTap: () => context.push('/player/equalizer'),
                     ),
                     _SecondaryBtn(
@@ -815,29 +795,18 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     );
   }
 
-  String _formatSpeed(double speed) {
-    if (speed == speed.truncateToDouble()) {
-      return '${speed.toInt()}x';
-    }
-    return '${speed}x';
-  }
+  String _formatSpeed(double speed) => speed == speed.truncateToDouble()
+      ? '${speed.toInt()}x'
+      : '${speed}x';
 }
 
-// ── Album Art ──────────────────────────────────────────────────
-
-/// Displays album art for the currently playing audio track.
-///
-/// Handles `albumid:NNNN` paths by resolving them to real file-system paths
-/// via [AlbumArtService] (which calls the `getAlbumArt` method on the
-/// `com.otyaplayer.app/media_store` MethodChannel). While the resolution is
-/// in progress the placeholder gradient is shown; once resolved the image is
-/// displayed (or the placeholder if resolution failed).
 class _AlbumArt extends StatefulWidget {
   final String? albumArtPath;
   final bool isPlaying;
   final String title;
-  final VoidCallback? onSwipeLeft;   // skip next
-  final VoidCallback? onSwipeRight;  // skip previous
+  final VoidCallback? onSwipeLeft;
+  final VoidCallback? onSwipeRight;
+
   const _AlbumArt({
     this.albumArtPath,
     required this.isPlaying,
@@ -862,29 +831,34 @@ class _AlbumArtState extends State<_AlbumArt> {
   }
 
   @override
-  void didUpdateWidget(_AlbumArt old) {
-    super.didUpdateWidget(old);
-    if (old.albumArtPath != widget.albumArtPath) _resolve();
+  void didUpdateWidget(_AlbumArt oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.albumArtPath != widget.albumArtPath) _resolve();
   }
 
   Future<void> _resolve() async {
     final path = widget.albumArtPath;
-
-    // Fix #10: non-albumid: paths are already real file paths — resolve
-    // synchronously without going async to avoid unnecessary overhead.
     if (path == null) {
-      if (mounted) setState(() { _resolvedPath = null; _loading = false; });
+      if (mounted) setState(() {
+        _resolvedPath = null;
+        _loading = false;
+      });
       return;
     }
     if (!path.startsWith('albumid:')) {
-      if (mounted) setState(() { _resolvedPath = path; _loading = false; });
+      if (mounted) setState(() {
+        _resolvedPath = path;
+        _loading = false;
+      });
       return;
     }
 
-    // albumid: paths need an async MethodChannel call.
     if (mounted) setState(() => _loading = true);
     final resolved = await AlbumArtService.instance.resolve(path);
-    if (mounted) setState(() { _resolvedPath = resolved; _loading = false; });
+    if (mounted) setState(() {
+      _resolvedPath = resolved;
+      _loading = false;
+    });
   }
 
   @override
@@ -892,15 +866,15 @@ class _AlbumArtState extends State<_AlbumArt> {
     final showArt = !_loading && _resolvedPath != null;
 
     return GestureDetector(
-      onHorizontalDragUpdate: (d) {
-        setState(() => _dragX += d.delta.dx);
+      onHorizontalDragUpdate: (details) {
+        setState(() => _dragX += details.delta.dx);
       },
-      onHorizontalDragEnd: (d) {
-        final v = d.primaryVelocity ?? 0;
-        if (_dragX < -60 || v < -400) {
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (_dragX < -60 || velocity < -400) {
           HapticFeedback.mediumImpact();
           widget.onSwipeLeft?.call();
-        } else if (_dragX > 60 || v > 400) {
+        } else if (_dragX > 60 || velocity > 400) {
           HapticFeedback.mediumImpact();
           widget.onSwipeRight?.call();
         }
@@ -910,51 +884,57 @@ class _AlbumArtState extends State<_AlbumArt> {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Swipe hint: next (right arrow, shown when dragging left)
           if (_dragX < -20)
             Positioned(
               right: 12,
               child: AnimatedOpacity(
                 opacity: (_dragX.abs() / 80).clamp(0.0, 1.0),
                 duration: const Duration(milliseconds: 80),
-                child: const Icon(Icons.skip_next_rounded,
-                    color: AppColors.accent, size: 40),
+                child: const Icon(
+                  Icons.skip_next_rounded,
+                  color: AppColors.accent,
+                  size: 40,
+                ),
               ),
             ),
-          // Swipe hint: previous (left arrow, shown when dragging right)
           if (_dragX > 20)
             Positioned(
               left: 12,
               child: AnimatedOpacity(
                 opacity: (_dragX.abs() / 80).clamp(0.0, 1.0),
                 duration: const Duration(milliseconds: 80),
-                child: const Icon(Icons.skip_previous_rounded,
-                    color: AppColors.accent, size: 40),
+                child: const Icon(
+                  Icons.skip_previous_rounded,
+                  color: AppColors.accent,
+                  size: 40,
+                ),
               ),
             ),
-          // Album art — translates slightly in the drag direction
           Transform.translate(
             offset: Offset(_dragX.clamp(-40.0, 40.0), 0),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 400),
               curve: Curves.easeInOut,
               transform: Matrix4.diagonal3Values(
-                  widget.isPlaying ? 1.0 : 0.88,
-                  widget.isPlaying ? 1.0 : 0.88,
-                  1.0),
+                widget.isPlaying ? 1.0 : 0.88,
+                widget.isPlaying ? 1.0 : 0.88,
+                1.0,
+              ),
               transformAlignment: Alignment.center,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
                     color: AppColors.accent.withValues(
-                        alpha: widget.isPlaying ? 0.35 : 0.1),
+                      alpha: widget.isPlaying ? 0.35 : 0.1,
+                    ),
                     blurRadius: widget.isPlaying ? 48 : 16,
                     spreadRadius: widget.isPlaying ? 6 : 0,
                   ),
                   BoxShadow(
                     color: AppColors.accentViolet.withValues(
-                        alpha: widget.isPlaying ? 0.20 : 0.05),
+                      alpha: widget.isPlaying ? 0.20 : 0.05,
+                    ),
                     blurRadius: widget.isPlaying ? 64 : 20,
                     spreadRadius: widget.isPlaying ? 8 : 0,
                   ),
@@ -984,12 +964,14 @@ class _AlbumArtState extends State<_AlbumArt> {
   }
 }
 
-/// Fix #17: Dynamic album art placeholder — blurred gradient background,
-/// first letter of the track title, and a subtle vinyl ring animation.
 class _DynamicArtPlaceholder extends StatelessWidget {
   final String title;
   final bool isPlaying;
-  const _DynamicArtPlaceholder({required this.title, required this.isPlaying});
+
+  const _DynamicArtPlaceholder({
+    required this.title,
+    required this.isPlaying,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -997,7 +979,6 @@ class _DynamicArtPlaceholder extends StatelessWidget {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Blurred gradient background
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -1014,11 +995,7 @@ class _DynamicArtPlaceholder extends StatelessWidget {
           filter: ImageFilter.blur(sigmaX: 32, sigmaY: 32),
           child: Container(color: Colors.transparent),
         ),
-        // Subtle vinyl ring — animated when playing
-        Center(
-          child: _VinylRing(isPlaying: isPlaying),
-        ),
-        // First letter of track title
+        Center(child: _VinylRing(isPlaying: isPlaying)),
         Center(
           child: Text(
             letter,
@@ -1026,7 +1003,8 @@ class _DynamicArtPlaceholder extends StatelessWidget {
               fontSize: 96,
               fontWeight: FontWeight.w900,
               color: AppColors.accent.withValues(
-                  alpha: isPlaying ? 0.95 : 0.60),
+                alpha: isPlaying ? 0.95 : 0.60,
+              ),
               fontFamily: 'Inter',
               height: 1,
             ),
@@ -1037,9 +1015,9 @@ class _DynamicArtPlaceholder extends StatelessWidget {
   }
 }
 
-/// Subtle vinyl record ring that rotates when [isPlaying] is true.
 class _VinylRing extends StatelessWidget {
   final bool isPlaying;
+
   const _VinylRing({required this.isPlaying});
 
   @override
@@ -1057,21 +1035,22 @@ class _VinylRing extends StatelessWidget {
     );
 
     if (!isPlaying) return ring;
-
     return ring
-        .animate(onPlay: (c) => c.repeat())
+        .animate(onPlay: (controller) => controller.repeat())
         .rotate(duration: 4000.ms, curve: Curves.linear);
   }
 }
-
-// ── Seek Bar ───────────────────────────────────────────────────
 
 class _SeekBar extends StatelessWidget {
   final Duration position;
   final Duration duration;
   final ValueChanged<Duration> onSeek;
-  const _SeekBar(
-      {required this.position, required this.duration, required this.onSeek});
+
+  const _SeekBar({
+    required this.position,
+    required this.duration,
+    required this.onSeek,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1092,8 +1071,9 @@ class _SeekBar extends StatelessWidget {
           ),
           child: Slider(
             value: progress,
-            onChanged: (v) => onSeek(
-                Duration(milliseconds: (v * duration.inMilliseconds).toInt())),
+            onChanged: (value) => onSeek(
+              Duration(milliseconds: (value * duration.inMilliseconds).toInt()),
+            ),
           ),
         ),
         Padding(
@@ -1101,12 +1081,20 @@ class _SeekBar extends StatelessWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(DurationFormatter.format(position),
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
-              Text(DurationFormatter.format(duration),
-                  style: const TextStyle(
-                      fontSize: 12, color: AppColors.textSecondary)),
+              Text(
+                DurationFormatter.format(position),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              Text(
+                DurationFormatter.format(duration),
+                style: const TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                ),
+              ),
             ],
           ),
         ),
@@ -1115,31 +1103,37 @@ class _SeekBar extends StatelessWidget {
   }
 }
 
-// ── Toggle Icon Button ─────────────────────────────────────────
-
 class _ToggleIconBtn extends StatelessWidget {
   final IconData icon;
   final bool active;
   final VoidCallback onTap;
-  const _ToggleIconBtn(
-      {required this.icon, required this.active, required this.onTap});
+
+  const _ToggleIconBtn({
+    required this.icon,
+    required this.active,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () { HapticFeedback.selectionClick(); onTap(); },
-      child: Icon(icon,
-          color: active ? AppColors.accent : AppColors.textSecondary,
-          size: 24),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Icon(
+        icon,
+        color: active ? AppColors.accent : AppColors.textSecondary,
+        size: 24,
+      ),
     );
   }
 }
 
-// ── Repeat Button ──────────────────────────────────────────────
-
 class _RepeatBtn extends StatelessWidget {
   final RepeatState repeat;
   final VoidCallback onTap;
+
   const _RepeatBtn({required this.repeat, required this.onTap});
 
   @override
@@ -1147,24 +1141,32 @@ class _RepeatBtn extends StatelessWidget {
     final icon = repeat == RepeatState.one
         ? Icons.repeat_one_rounded
         : Icons.repeat_rounded;
-    final active = repeat != RepeatState.off;
     return GestureDetector(
-      onTap: () { HapticFeedback.selectionClick(); onTap(); },
-      child: Icon(icon,
-          color: active ? AppColors.accent : AppColors.textSecondary,
-          size: 24),
+      onTap: () {
+        HapticFeedback.selectionClick();
+        onTap();
+      },
+      child: Icon(
+        icon,
+        color: repeat == RepeatState.off
+            ? AppColors.textSecondary
+            : AppColors.accent,
+        size: 24,
+      ),
     );
   }
 }
-
-// ── Secondary Button ───────────────────────────────────────────
 
 class _SecondaryBtn extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _SecondaryBtn(
-      {required this.icon, required this.label, required this.onTap});
+
+  const _SecondaryBtn({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -1174,42 +1176,40 @@ class _SecondaryBtn extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         children: [
           Container(
-            width: 44, height: 44,
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
               color: AppColors.accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.accent.withValues(alpha: 0.35)),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.accent.withValues(alpha: 0.08),
-                  blurRadius: 8,
-                ),
-              ],
+              border: Border.all(
+                color: AppColors.accent.withValues(alpha: 0.35),
+              ),
             ),
             child: Icon(icon, color: AppColors.accent, size: 20),
           ),
           const SizedBox(height: 4),
-          Text(label,
-              style: const TextStyle(
-                fontSize: 10, color: AppColors.accent,
-                fontFamily: 'Inter', fontWeight: FontWeight.w600,
-              )),
+          Text(
+            label,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.accent,
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Options Sheet ──────────────────────────────────────────────
-
 class _OptionsSheet extends ConsumerWidget {
   final MediaItem mediaItem;
   final VoidCallback onFileInfo;
-  final VoidCallback onTrimForWhatsApp;
+
   const _OptionsSheet({
     required this.mediaItem,
     required this.onFileInfo,
-    required this.onTrimForWhatsApp,
   });
 
   @override
@@ -1225,25 +1225,21 @@ class _OptionsSheet extends ConsumerWidget {
         ref.read(queueProvider.notifier).addToQueue(mediaItem);
         Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Queued!')));
+          const SnackBar(content: Text('Queued!')),
+        );
       }),
-      _Opt(Icons.lock_rounded, 'Hide in Safe', AppColors.accentViolet, () async {
+      _Opt(Icons.lock_rounded, 'Move to Private', AppColors.accentViolet, () async {
         Navigator.pop(context);
         await VaultService.instance.lockItem(mediaItem);
-        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Moved to Safe'))); }
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Moved to Private')),
+          );
+        }
       }),
-      _Opt(Icons.wifi_tethering_rounded, 'Beam It', AppColors.accent, () {
+      _Opt(Icons.send_rounded, 'Transfer', AppColors.accent, () {
         Navigator.pop(context);
-        context.go('/airdrop');
-      }),
-      _Opt(Icons.phone_android_rounded, 'Trim',   AppColors.accent, onTrimForWhatsApp),
-      _Opt(Icons.download_rounded, 'Extract Audio (MP3)', AppColors.accent, () async {
-        Navigator.pop(context);
-        await FfmpegService.instance.extractAudio(
-            videoPath: mediaItem.filePath, onProgress: (_) {});
-        if (context.mounted) { ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Audio saved to Downloads'))); }
+        context.go('/transfer');
       }),
       _Opt(Icons.info_outline_rounded, 'Details', AppColors.textSecondary, onFileInfo),
     ];
@@ -1255,38 +1251,53 @@ class _OptionsSheet extends ConsumerWidget {
         children: [
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2)),
+                color: AppColors.border,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
           const SizedBox(height: 16),
           Row(
             children: [
               Container(
-                width: 48, height: 48,
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(12)),
-                child: const Icon(Icons.music_note_rounded,
-                    color: AppColors.accent, size: 24),
+                  color: AppColors.border,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.music_note_rounded,
+                  color: AppColors.accent,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(mediaItem.title,
-                        style: const TextStyle(
-                          fontSize: 14, fontWeight: FontWeight.w700,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                        ),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                    Text(mediaItem.formattedSize,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
+                    Text(
+                      mediaItem.title,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      mediaItem.formattedSize,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
                   ],
                 ),
               ),
@@ -1295,25 +1306,30 @@ class _OptionsSheet extends ConsumerWidget {
           const SizedBox(height: 16),
           const Divider(color: AppColors.border, height: 1),
           const SizedBox(height: 8),
-          ...options.map((o) => ListTile(
-                leading: Container(
-                  width: 36, height: 36,
-                  decoration: BoxDecoration(
-                    color: o.color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(o.icon, color: o.color, size: 18),
+          ...options.map(
+            (option) => ListTile(
+              leading: Container(
+                width: 36,
+                height: 36,
+                decoration: BoxDecoration(
+                  color: option.color.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                title: Text(o.label,
-                    style: const TextStyle(
-                      fontSize: 14, color: AppColors.textPrimary,
-                      fontFamily: 'Inter',
-                    )),
-                // All _Opt instances have non-null onTap; call directly.
-                onTap: o.onTap,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 0),
-                dense: true,
-              )),
+                child: Icon(option.icon, color: option.color, size: 18),
+              ),
+              title: Text(
+                option.label,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: AppColors.textPrimary,
+                  fontFamily: 'Inter',
+                ),
+              ),
+              onTap: option.onTap,
+              contentPadding: EdgeInsets.zero,
+              dense: true,
+            ),
+          ),
         ],
       ),
     );
@@ -1324,6 +1340,7 @@ class _Opt {
   final IconData icon;
   final String label;
   final Color color;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
+
   const _Opt(this.icon, this.label, this.color, this.onTap);
 }
