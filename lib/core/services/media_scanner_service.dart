@@ -1,7 +1,9 @@
 import 'dart:io';
 import 'dart:math' show min;
-import 'package:flutter/services.dart';
+
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+
 import '../models/media_item.dart';
 import '../permissions/permission_helper.dart';
 import 'new_media_tracker.dart';
@@ -156,7 +158,9 @@ class MediaScannerService {
     for (var i = 0; i < existingDirs.length; i += batchSize) {
       final batch = existingDirs.sublist(i, min(i + batchSize, existingDirs.length));
       final results = await Future.wait(batch.map((d) => _scanSingleDir(d, alreadySeen)));
-      for (final r in results) merged.addAll(r);
+      for (final r in results) {
+        merged.addAll(r);
+      }
     }
     debugPrint('[Scanner] Receive dirs: ${merged.length} extra items.');
     return merged;
