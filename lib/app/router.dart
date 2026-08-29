@@ -28,7 +28,6 @@ import '../features/playlists/playlist_screen.dart'
     show PlaylistDetailScreenById, PlaylistsScreen;
 import '../features/profile/profile_screen.dart'
     show ProfileScreen, WhatsNewScreen;
-import '../features/search/smart_search_sheet.dart';
 import '../features/settings/presentation/about_screen.dart';
 import '../features/settings/presentation/privacy_policy_screen.dart';
 import '../features/settings/presentation/settings_with_ai_screen.dart';
@@ -82,8 +81,8 @@ class AppRouter {
   static String? _redirect(BuildContext context, GoRouterState state) {
     final remote = RemoteControlService.instance;
     final feature = switch (state.matchedLocation) {
-      '/transfer' => 'beam',
-      '/vault' => 'safe',
+      '/transfer' => 'transfer',
+      '/vault' => 'private',
       '/player/equalizer' => 'equalizer',
       '/tools/whatsapp' => 'whatsappTrimmer',
       _ => null,
@@ -206,6 +205,15 @@ class AppRouter {
         path: '/tools/folder-detail',
         pageBuilder: (c, s) {
           final args = (s.extra as Map<String, dynamic>?) ?? {};
+          if (args['folderName'] is! String ||
+              args['fullPath'] is! String ||
+              args['items'] is! List<MediaItem>) {
+            return _fadePage(
+              context: c,
+              state: s,
+              child: const _RouteErrorScreen(message: 'Could not open this folder.'),
+            );
+          }
           return _fadePage(
             context: c,
             state: s,
@@ -266,9 +274,7 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const Scaffold(
-                body: Center(child: Text('Could not open this folder.')),
-              ),
+              child: const _RouteErrorScreen(message: 'Could not open this folder.'),
             );
           }
           return _fadePage(
@@ -313,7 +319,7 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const SizedBox.shrink(),
+              child: const _RouteErrorScreen(message: 'Could not open this video.'),
             );
           }
           return _slideUpPage(
@@ -328,11 +334,19 @@ class AppRouter {
         pageBuilder: (c, s) {
           final extra = s.extra;
           if (extra is Map<String, dynamic>) {
+            final item = extra['item'];
+            if (item is! MediaItem) {
+              return _fadePage(
+                context: c,
+                state: s,
+                child: const _RouteErrorScreen(message: 'Could not open this song.'),
+              );
+            }
             return _slideUpPage(
               context: c,
               state: s,
               child: AudioPlayerScreen(
-                mediaItem: extra['item'] as MediaItem,
+                mediaItem: item,
                 resumeOnly: extra['resumeOnly'] as bool? ?? false,
               ),
             );
@@ -341,7 +355,7 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const SizedBox.shrink(),
+              child: const _RouteErrorScreen(message: 'Could not open this song.'),
             );
           }
           return _slideUpPage(
@@ -364,9 +378,7 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const Scaffold(
-                body: Center(child: Text('Could not open this folder.')),
-              ),
+              child: const _RouteErrorScreen(message: 'Could not open this folder.'),
             );
           }
           return _fadePage(
@@ -387,9 +399,7 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const Scaffold(
-                body: Center(child: Text('Could not open this album.')),
-              ),
+              child: const _RouteErrorScreen(message: 'Could not open this album.'),
             );
           }
           return _fadePage(
@@ -410,9 +420,7 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const Scaffold(
-                body: Center(child: Text('Could not open this artist.')),
-              ),
+              child: const _RouteErrorScreen(message: 'Could not open this artist.'),
             );
           }
           return _fadePage(
@@ -448,7 +456,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const SizedBox.shrink(),
+              child: const _RouteErrorScreen(
+                message: 'Choose a video before opening Trim Video.',
+              ),
             );
           }
           return _fadePage(
@@ -495,17 +505,9 @@ class _MainShellState extends ConsumerState<_MainShell> {
             ? 2
             : 0;
 
+    final dark = Theme.of(context).brightness == Brightness.dark;
     return Scaffold(
       body: widget.child,
-      floatingActionButton: FloatingActionButton.small(
-        heroTag: 'otya-global-search',
-        tooltip: 'Search OTYA',
-        onPressed: () {
-          HapticFeedback.selectionClick();
-          SmartSearchSheet.show(context);
-        },
-        child: const Icon(Icons.search_rounded),
-      ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -518,55 +520,45 @@ class _MainShellState extends ConsumerState<_MainShell> {
             },
           ),
           Container(
-            margin: EdgeInsets.fromLTRB(
-              12,
-              0,
-              12,
-              MediaQuery.of(context).padding.bottom + 6,
-            ),
             decoration: BoxDecoration(
-              color: Theme.of(context).brightness == Brightness.dark
-                  ? const Color(0xFF111218).withValues(alpha: .98)
-                  : Colors.white.withValues(alpha: .98),
-              borderRadius: BorderRadius.circular(24),
-              border: Border.all(color: AppColors.borderOf(context)),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: .08),
-                  blurRadius: 24,
-                  offset: const Offset(0, 8),
-                ),
-              ],
+              color: dark ? const Color(0xFF0F1015) : Colors.white,
+              border: Border(
+                top: BorderSide(color: AppColors.borderOf(context), width: .7),
+              ),
             ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.video_library_rounded,
-                      label: 'Video',
-                      isActive: currentIndex == 0,
-                      onTap: () => _onTap(0),
+            child: SafeArea(
+              top: false,
+              minimum: const EdgeInsets.only(bottom: 2),
+              child: SizedBox(
+                height: 56,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _NavItem(
+                        icon: Icons.video_library_rounded,
+                        label: 'Video',
+                        isActive: currentIndex == 0,
+                        onTap: () => _onTap(0),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.library_music_rounded,
-                      label: 'Music',
-                      isActive: currentIndex == 1,
-                      onTap: () => _onTap(1),
+                    Expanded(
+                      child: _NavItem(
+                        icon: Icons.library_music_rounded,
+                        label: 'Music',
+                        isActive: currentIndex == 1,
+                        onTap: () => _onTap(1),
+                      ),
                     ),
-                  ),
-                  Expanded(
-                    child: _NavItem(
-                      icon: Icons.person_rounded,
-                      label: 'Me',
-                      isActive: currentIndex == 2,
-                      onTap: () => _onTap(2),
+                    Expanded(
+                      child: _NavItem(
+                        icon: Icons.person_rounded,
+                        label: 'Me',
+                        isActive: currentIndex == 2,
+                        onTap: () => _onTap(2),
+                      ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
             ),
           ),
@@ -595,45 +587,71 @@ class _NavItem extends StatelessWidget {
         selected: isActive,
         label: label,
         child: InkWell(
-          borderRadius: BorderRadius.circular(18),
           onTap: onTap,
+          child: Center(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOut,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
+              decoration: BoxDecoration(
+                color: isActive
+                    ? AppColors.accent.withValues(alpha: .10)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    icon,
+                    size: 20,
+                    color: isActive
+                        ? AppColors.accent
+                        : AppColors.textSecondary,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 9.5,
+                      height: 1,
+                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
+                      color: isActive
+                          ? AppColors.accent
+                          : AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _RouteErrorScreen extends StatelessWidget {
+  final String message;
+  const _RouteErrorScreen({required this.message});
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: const Text('OTYA')),
+        body: Center(
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 5),
+            padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                AnimatedContainer(
-                  duration: const Duration(milliseconds: 180),
-                  width: 42,
-                  height: 30,
-                  decoration: BoxDecoration(
-                    color: isActive
-                        ? AppColors.accent.withValues(alpha: .14)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(15),
-                  ),
-                  child: Icon(
-                    icon,
-                    color: isActive
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
-                    size: 21,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 10.5,
-                    fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                    color: isActive
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
-                  ),
+                const Icon(Icons.error_outline_rounded, size: 36),
+                const SizedBox(height: 12),
+                Text(message, textAlign: TextAlign.center),
+                const SizedBox(height: 16),
+                FilledButton(
+                  onPressed: () => context.go('/'),
+                  child: const Text('Back to OTYA'),
                 ),
               ],
             ),
           ),
         ),
       );
-}
