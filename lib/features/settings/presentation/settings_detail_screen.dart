@@ -1,1337 +1,369 @@
-import 'dart:io';
-
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import '../../../app/theme/app_colors.dart';
-import '../../../core/database/otya_database.dart';
 import '../../../core/services/custom_theme_manager.dart';
-import '../../../core/services/update_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../core/widgets/update_dialog.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../settings_provider.dart';
-import '../../my_space/presentation/providers/my_space_provider.dart';
 
-
-/// Grouped settings screen pushed from My Space hub.
-/// Groups: Playback / Storage & Privacy / Updates & About
-class SettingsDetailScreen extends ConsumerStatefulWidget {
+/// OTYA v1 preferences.
+///
+/// This screen intentionally exposes only settings that have a real runtime
+/// owner. Legacy donor controls that no longer affect playback are not shown.
+class SettingsDetailScreen extends ConsumerWidget {
   const SettingsDetailScreen({super.key});
 
   @override
-  ConsumerState<SettingsDetailScreen> createState() => _SettingsDetailScreenState();
-}
-
-class _SettingsDetailScreenState extends ConsumerState<SettingsDetailScreen> {
-  @override
-  Widget build(BuildContext context) {
-    final s  = ref.watch(settingsProvider);
-    final sn = ref.read(settingsProvider.notifier);
+  Widget build(BuildContext context, WidgetRef ref) {
+    final settings = ref.watch(settingsProvider);
+    final notifier = ref.read(settingsProvider.notifier);
 
     return WallpaperScaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
+        title: const Text('Settings'),
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_ios_new_rounded,
-              color: Theme.of(context).colorScheme.onSurface, size: 20),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Preferences',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontFamily: 'Inter',
-          ),
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/myspace'),
         ),
       ),
       body: ListView(
-        padding: EdgeInsets.fromLTRB(16, 4, 16, MediaQuery.of(context).padding.bottom + 100),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.paddingOf(context).bottom + 28,
+        ),
         children: [
-
-          // ── Theme & Appearance ────────────────────────────────────
-          _GroupCard(children: [
+          const _SectionTitle('Appearance'),
+          _Card(children: [
             _NavTile(
               icon: Icons.palette_rounded,
-              label: 'Look & Feel',
-              subtitle: 'Themes, AMOLED & wallpaper',
-              color: AppColors.accentViolet,
+              title: 'Personalize',
+              subtitle: 'Light, dark, AMOLED, themes and seasonal artwork',
               onTap: () => context.push('/theme'),
             ),
-            _Divider(),
+            const _Line(),
             _NavTile(
               icon: Icons.wallpaper_rounded,
-              label: 'Change Wallpaper',
-              subtitle: 'Set a photo as the app background',
-              color: AppColors.accentAmber,
-              onTap: () => _pickWallpaper(context),
+              title: 'Choose wallpaper',
+              subtitle: 'Use a photo from this device',
+              onTap: () => _chooseWallpaper(context),
             ),
-            _Divider(),
+            const _Line(),
             _NavTile(
               icon: Icons.hide_image_rounded,
-              label: 'Remove Wallpaper',
-              subtitle: 'Restore the default background',
-              color: AppColors.textSecondary,
-              onTap: () => _clearWallpaper(context),
+              title: 'Remove wallpaper',
+              subtitle: 'Return to the selected OTYA theme background',
+              onTap: () => _removeWallpaper(context),
             ),
           ]),
-
           const SizedBox(height: 24),
-
-          // ── GROUP 1: PLAYBACK ─────────────────────────────────────
-          _SectionHeader(label: 'Playback'),
-          const SizedBox(height: 10),
-
-          _GroupCard(children: [
-            _NavTile(
-              icon: Icons.tune_rounded,
-              label: 'General',
-              subtitle: 'Language & cache',
-              color: AppColors.accent,
-              onTap: () => _showGeneralSheet(context, ref),
+          const _SectionTitle('Playback'),
+          _Card(children: [
+            _SwitchTile(
+              icon: Icons.history_rounded,
+              title: 'Resume playback',
+              subtitle: 'Continue from the last saved position',
+              value: settings.autoResume,
+              onChanged: notifier.setAutoResume,
             ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.videocam_rounded,
-              label: 'Video',
-              subtitle: 'PiP, rotation & resume',
-              color: AppColors.accentViolet,
-              onTap: () => _showVideoSheet(context, ref),
+            const _Line(),
+            _SwitchTile(
+              icon: Icons.picture_in_picture_alt_rounded,
+              title: 'Automatic picture-in-picture',
+              subtitle: 'Enter PiP when a supported video leaves the foreground',
+              value: settings.autoPip,
+              onChanged: notifier.setAutoPip,
             ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.headphones_rounded,
-              label: 'Audio',
-              subtitle: 'EQ, format & filters',
-              color: AppColors.accentGreen,
-              onTap: () => _showAudioSheet(context, ref),
+            const _Line(),
+            _SwitchTile(
+              icon: Icons.screen_rotation_alt_rounded,
+              title: 'Lock video orientation',
+              subtitle: 'Keep the selected orientation while a video is playing',
+              value: settings.orientationLocked,
+              onChanged: notifier.setOrientationLocked,
+            ),
+            const _Line(),
+            _SwitchTile(
+              icon: Icons.skip_next_rounded,
+              title: 'Continuous playback',
+              subtitle: 'Continue to the next item in the current queue',
+              value: settings.continuousPlayback,
+              onChanged: notifier.setContinuousPlayback,
+            ),
+            const _Line(),
+            _SwitchTile(
+              icon: Icons.closed_caption_rounded,
+              title: 'Auto-load subtitles',
+              subtitle: 'Use compatible subtitle tracks when available',
+              value: settings.autoLoadSubtitles,
+              onChanged: notifier.setAutoLoadSubtitles,
+            ),
+            const _Line(),
+            _SwitchTile(
+              icon: Icons.phone_in_talk_rounded,
+              title: 'Pause during calls',
+              subtitle: 'Pause media when Android reports an active phone call',
+              value: settings.pauseDuringCalls,
+              onChanged: notifier.setPauseDuringCalls,
+            ),
+            const _Line(),
+            _SpeedTile(
+              value: settings.playbackSpeed,
+              onChanged: notifier.setPlaybackSpeed,
             ),
           ]),
-
-          const SizedBox(height: 8),
-
-          // Default Speed (not duplicated in any sheet)
-          _GroupCard(children: [
-            _SwitchRow(
-              icon: Icons.speed_rounded,
-              label: 'Default Speed',
-              trailing: _Chip(
-                label: '${s.playbackSpeed}x',
-                onTap: () => _showSpeedPicker(context, sn, s.playbackSpeed),
-              ),
-            ),
-          ]),
-
           const SizedBox(height: 24),
-
-          // ── GROUP 2: STORAGE & PRIVACY ────────────────────────────
-          _SectionHeader(label: 'Storage & Privacy'),
-          const SizedBox(height: 10),
-
-          _GroupCard(children: [
+          const _SectionTitle('Privacy & device'),
+          _Card(children: [
             _NavTile(
-              icon: Icons.download_rounded,
-              label: 'Downloads',
-              subtitle: 'Path & speed',
-              color: AppColors.accent,
-              onTap: () => _showDownloadsSheet(context, ref),
+              icon: Icons.lock_rounded,
+              title: 'Private',
+              subtitle: 'Protected local media and authentication',
+              onTap: () => context.push('/vault'),
             ),
-            _Divider(),
-            _NavTile(
-              icon: Icons.security_rounded,
-              label: 'Privacy',
-              subtitle: 'Lock, biometrics & Safe',
-              color: AppColors.accentViolet,
-              onTap: () => _showPrivacySheet(context, ref),
+            const _Line(),
+            _SwitchTile(
+              icon: Icons.manage_search_rounded,
+              title: 'Search history',
+              subtitle: 'Remember recent OTYA searches on this device',
+              value: settings.searchHistory,
+              onChanged: notifier.setSearchHistory,
             ),
-            _Divider(),
+            const _Line(),
             _NavTile(
-              icon: Icons.policy_rounded,
-              label: 'Privacy Policy',
-              subtitle: 'Read our policy',
-              color: AppColors.accentGreen,
+              icon: Icons.notifications_active_rounded,
+              title: 'Notification permission',
+              subtitle: 'Playback controls, completed tasks and OTYA updates',
+              onTap: () async {
+                HapticFeedback.selectionClick();
+                final granted = await NotificationService.instance.requestPermission();
+                if (!context.mounted) return;
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text(granted
+                        ? 'Notifications are enabled.'
+                        : 'Notification permission was not granted.'),
+                  ),
+                );
+              },
+            ),
+            const _Line(),
+            _NavTile(
+              icon: Icons.settings_applications_rounded,
+              title: 'Android app permissions',
+              subtitle: 'Review media, notification and phone permissions',
+              onTap: () => openAppSettings(),
+            ),
+            const _Line(),
+            _NavTile(
+              icon: Icons.storage_rounded,
+              title: 'Storage',
+              subtitle: 'Inspect OTYA media and device storage',
+              onTap: () => context.push('/settings/storage'),
+            ),
+          ]),
+          const SizedBox(height: 24),
+          const _SectionTitle('OTYA'),
+          _Card(children: [
+            _NavTile(
+              icon: Icons.system_update_rounded,
+              title: 'Check for updates',
+              subtitle: 'Check the canonical OTYA release service',
+              onTap: () async {
+                HapticFeedback.selectionClick();
+                await UpdateDialog.checkAndShow(context, forceCheck: true);
+              },
+            ),
+            const _Line(),
+            _NavTile(
+              icon: Icons.help_outline_rounded,
+              title: 'Ask OTYA',
+              subtitle: 'Help with playback, Transfer, Private and OTYA features',
+              onTap: () => context.push('/support'),
+            ),
+            const _Line(),
+            _NavTile(
+              icon: Icons.privacy_tip_outlined,
+              title: 'Privacy policy',
+              subtitle: 'How OTYA handles account and service data',
               onTap: () => context.push('/privacy'),
             ),
+            const _Line(),
+            _NavTile(
+              icon: Icons.info_outline_rounded,
+              title: 'About OTYA',
+              subtitle: 'Version, product information and legal links',
+              onTap: () => context.push('/about'),
+            ),
           ]),
-
-          const SizedBox(height: 24),
-
-          // ── CHECK FOR UPDATES ─────────────────────────────────────
-          const _UpdateCheckerTile(),
-
-          const SizedBox(height: 40),
         ],
       ),
     );
   }
 
-  // ── Wallpaper helpers ─────────────────────────────────────────────────
-
-  Future<void> _pickWallpaper(BuildContext context) async {
+  static Future<void> _chooseWallpaper(BuildContext context) async {
     try {
-      // Use image_picker to let the user choose a photo from the gallery.
-      // image_picker is already a dependency (pubspec.yaml).
-      // We import it lazily here to avoid a top-level import that would
-      // require the plugin to be initialised before it is needed.
-      final picked = await _pickImageFromGallery();
+      final picked = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 92,
+      );
       if (picked == null) return;
-      await CustomThemeManager.instance.setWallpaper(picked);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Wallpaper updated'),
-            backgroundColor: AppColors.surface,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Could not set wallpaper: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _clearWallpaper(BuildContext context) async {
-    await CustomThemeManager.instance.clearWallpaper();
-    if (context.mounted) {
+      await CustomThemeManager.instance.setWallpaper(picked.path);
+      if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Wallpaper removed'),
-          backgroundColor: AppColors.surface,
-        ),
+        const SnackBar(content: Text('Wallpaper updated.')),
+      );
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('OTYA could not use that image.')),
       );
     }
   }
 
-  /// Picks an image from the gallery using image_picker.
-  /// Returns the file path, or null if the user cancelled.
-  Future<String?> _pickImageFromGallery() async {
-    try {
-      final picker = ImagePicker();
-      final xFile = await picker.pickImage(source: ImageSource.gallery);
-      return xFile?.path;
-    } catch (e) {
-      debugPrint('[Settings] _pickImageFromGallery error: $e');
-      return null;
-    }
-  }
-
-  // ── Bottom-sheet helpers ──────────────────────────────────────────────
-
-  /// Shared drag-handle + title header used by every bottom sheet.
-  Widget _sheetHeader(String title) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.border,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 20),
-        Text(
-          title,
-          style: const TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.w700,
-            color: AppColors.textPrimary,
-            fontFamily: 'Inter',
-          ),
-        ),
-        const SizedBox(height: 4),
-        const Divider(color: AppColors.border, height: 24),
-      ],
-    );
-  }
-
-  // ── General ───────────────────────────────────────────────────────────
-
-  void _showGeneralSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Consumer(
-        builder: (ctx, sheetRef, __) {
-          final s  = sheetRef.watch(settingsProvider);
-          final sn = sheetRef.read(settingsProvider.notifier);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20, 16, 20,
-              MediaQuery.of(ctx).viewInsets.bottom + 32,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sheetHeader('General'),
-
-                  // Language selector
-                  const Text(
-                    'Language',
-                    style: TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  ...{
-                    'en': 'English',
-                    'fr': 'French',
-                    'es': 'Spanish',
-                    'sw': 'Swahili',
-                  }.entries.map((e) {
-                    final selected = s.language == e.key;
-                    return RadioListTile<String>(
-                      value: e.key,
-                      groupValue: s.language,
-                      onChanged: (v) {
-                        if (v != null) {
-                          HapticFeedback.selectionClick();
-                          sn.setLanguage(v);
-                        }
-                      },
-                      title: Text(
-                        e.value,
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: selected
-                              ? AppColors.accent
-                              : AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                          fontWeight: selected
-                              ? FontWeight.w700
-                              : FontWeight.w400,
-                        ),
-                      ),
-                      activeColor: AppColors.accent,
-                      contentPadding: EdgeInsets.zero,
-                      dense: true,
-                    );
-                  }),
-
-                  const Divider(color: AppColors.border, height: 24),
-
-                  // Search history toggle — persisted via settingsProvider
-                  SwitchListTile(
-                    value: s.searchHistory,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setSearchHistory(v);
-                    },
-                    title: const Text(
-                      'Search History',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Remember recent searches',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    thumbColor: WidgetStateProperty.resolveWith((states) =>
-                        states.contains(WidgetState.selected)
-                            ? Colors.black
-                            : AppColors.textSecondary),
-                    activeTrackColor: AppColors.accent,
-                    inactiveTrackColor: AppColors.border,
-                    contentPadding: EdgeInsets.zero,
-                  ),
-
-                  const Divider(color: AppColors.border, height: 24),
-
-                  // Clear cache button — real implementation
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: Container(
-                      width: 36,
-                      height: 36,
-                      decoration: BoxDecoration(
-                        color: Colors.redAccent.withValues(alpha: 0.12),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.delete_sweep_rounded,
-                          color: Colors.redAccent, size: 18),
-                    ),
-                    title: const Text(
-                      'Clear Cache',
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: AppColors.textPrimary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    subtitle: const Text(
-                      'Free up temporary storage',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: AppColors.textSecondary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                    trailing: const Icon(Icons.chevron_right_rounded,
-                        color: AppColors.textSecondary, size: 18),
-                    onTap: () async {
-                      HapticFeedback.selectionClick();
-                      Navigator.pop(ctx);
-                      await _clearCache(context);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Video ─────────────────────────────────────────────────────────────
-
-  void _showVideoSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Consumer(
-        builder: (ctx, sheetRef, __) {
-          final s  = sheetRef.watch(settingsProvider);
-          final sn = sheetRef.read(settingsProvider.notifier);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20, 16, 20,
-              MediaQuery.of(ctx).viewInsets.bottom + 32,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sheetHeader('Video'),
-
-                  _SheetSwitch(
-                    label: 'Pop-up Play',
-                    subtitle: 'Float video when you leave the app',
-                    value: s.autoPip,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoPip(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Lock Screen Orientation',
-                    subtitle: 'Prevent auto-rotate during playback',
-                    value: s.orientationLocked,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setOrientationLocked(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Continuous Playback',
-                    subtitle: 'Auto-play next video in folder',
-                    value: s.continuousPlayback,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setContinuousPlayback(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Auto-Resume',
-                    subtitle: 'Resume from where you left off',
-                    value: s.autoResume,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoResume(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Auto-load Subtitles',
-                    subtitle: 'Load .srt/.ass from same folder',
-                    value: s.autoLoadSubtitles,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoLoadSubtitles(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Battery Saver by Default',
-                    subtitle: 'Start video in audio-only mode',
-                    value: s.defaultBatterySaver,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setDefaultBatterySaver(v);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Audio ─────────────────────────────────────────────────────────────
-
-  void _showAudioSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Consumer(
-        builder: (ctx, sheetRef, __) {
-          final s  = sheetRef.watch(settingsProvider);
-          final sn = sheetRef.read(settingsProvider.notifier);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20, 16, 20,
-              MediaQuery.of(ctx).viewInsets.bottom + 32,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sheetHeader('Audio'),
-
-                  _SheetSwitch(
-                    label: 'Auto-Resume',
-                    subtitle: 'Resume playback automatically (headset connect, app return)',
-                    value: s.autoResume,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAutoResume(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Pause During Calls',
-                    subtitle: 'Pause playback when a call arrives',
-                    value: s.pauseDuringCalls,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setPauseDuringCalls(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 1),
-                  _SheetSwitch(
-                    label: 'Now Playing Notification',
-                    subtitle: 'Show media controls in notification bar',
-                    value: s.nowPlayingNotification,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setNowPlayingNotification(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 24),
-
-                  // .nomedia info tile
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.info_outline_rounded,
-                            color: AppColors.textSecondary, size: 18),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            '.nomedia folders\n'
-                            'Place an empty file named ".nomedia" in any folder '
-                            'to hide its contents from OTYA Player\'s media scanner.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontFamily: 'Inter',
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  // ── Downloads ─────────────────────────────────────────────────────────
-
-  void _showDownloadsSheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Consumer(
-        builder: (ctx, sheetRef, __) {
-          final s  = sheetRef.watch(settingsProvider);
-          final sn = sheetRef.read(settingsProvider.notifier);
-          return _DownloadsSheetBody(s: s, sn: sn);
-        },
-      ),
-    );
-  }
-
-  // ── Cache clearing ────────────────────────────────────────────────────
-
-  Future<void> _clearCache(BuildContext context) async {
-    try {
-      await OtyaDatabase.instance.clearAllSeekPositions();
-      // Delete temp dirs if they exist
-      final tmpDir = await getTemporaryDirectory();
-      if (tmpDir.existsSync()) {
-        for (final entity in tmpDir.listSync()) {
-          try {
-            entity.deleteSync(recursive: true);
-          } catch (_) {}
-        }
-      }
-    } catch (_) {}
+  static Future<void> _removeWallpaper(BuildContext context) async {
+    await CustomThemeManager.instance.clearWallpaper();
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Cleared ✅'),
-        backgroundColor: AppColors.surface,
-      ),
+      const SnackBar(content: Text('Wallpaper removed.')),
     );
   }
-
-  // ── Privacy & Security ────────────────────────────────────────────────
-
-  void _showPrivacySheet(BuildContext context, WidgetRef ref) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      builder: (_) => Consumer(
-        builder: (ctx, sheetRef, __) {
-          final s  = sheetRef.watch(settingsProvider);
-          final sn = sheetRef.read(settingsProvider.notifier);
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              20, 16, 20,
-              MediaQuery.of(ctx).viewInsets.bottom + 32,
-            ),
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _sheetHeader('Privacy & Security'),
-
-                  _SheetSwitch(
-                    label: 'App Lock',
-                    subtitle: 'Require biometrics to open OTYA Player',
-                    value: s.appLockEnabled,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setAppLock(v);
-                    },
-                  ),
-                  const Divider(color: AppColors.border, height: 24),
-
-                  // Biometrics info tile
-                  Container(
-                    padding: const EdgeInsets.all(14),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.fingerprint_rounded,
-                            color: AppColors.textSecondary, size: 18),
-                        const SizedBox(width: 10),
-                        const Expanded(
-                          child: Text(
-                            'Biometrics\n'
-                            'Uses device biometrics (fingerprint or face) '
-                            'when App Lock is enabled.',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                              fontFamily: 'Inter',
-                              height: 1.5,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  const Divider(color: AppColors.border, height: 24),
-
-                  _SheetSwitch(
-                    label: 'Hide Vault from Recents',
-                    subtitle: 'Blur screenshot when switching apps',
-                    value: s.hideVaultFromRecents,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      sn.setHideVaultFromRecents(v);
-                    },
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _showSpeedPicker(
-      BuildContext context, SettingsNotifier sn, double current) {
-    const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Default Playback Speed',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                )),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
-              children: speeds.map((sp) {
-                final active = sp == current;
-                return GestureDetector(
-                  onTap: () {
-                    sn.setPlaybackSpeed(sp);
-                    Navigator.pop(context);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: active ? AppColors.accent : AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                          color: active ? AppColors.accent : AppColors.border),
-                    ),
-                    child: Text(
-                      '${sp}x',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: active ? Colors.black : AppColors.textPrimary,
-                        fontFamily: 'Inter',
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
 }
 
-// ── Shared widgets ────────────────────────────────────────────────────
-
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
+class _SectionTitle extends StatelessWidget {
+  const _SectionTitle(this.text);
+  final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Container(
-          width: 3,
-          height: 14,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              colors: [AppColors.accent, AppColors.accentViolet],
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-            ),
-            borderRadius: BorderRadius.circular(2),
-          ),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label.toUpperCase(),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
+        child: Text(
+          text.toUpperCase(),
           style: const TextStyle(
             fontSize: 11,
-            fontWeight: FontWeight.w700,
+            letterSpacing: 1.2,
+            fontWeight: FontWeight.w800,
             color: AppColors.textSecondary,
-            letterSpacing: 1.4,
-            fontFamily: 'Inter',
           ),
         ),
-      ],
-    );
-  }
+      );
 }
 
-class _GroupCard extends StatelessWidget {
+class _Card extends StatelessWidget {
+  const _Card({required this.children});
   final List<Widget> children;
-  const _GroupCard({required this.children});
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.borderOf(context)),
-      ),
-      child: Column(
-        children: children,
-      ),
-    );
-  }
+  Widget build(BuildContext context) => Container(
+        decoration: BoxDecoration(
+          color: AppColors.cardOf(context),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: AppColors.borderOf(context)),
+        ),
+        child: Column(children: children),
+      );
 }
 
-class _Divider extends StatelessWidget {
+class _Line extends StatelessWidget {
+  const _Line();
   @override
-  Widget build(BuildContext context) {
-    return Divider(
-      height: 1,
-      thickness: 1,
-      color: AppColors.borderOf(context),
-      indent: 16,
-      endIndent: 16,
-    );
-  }
+  Widget build(BuildContext context) => Divider(
+        height: 1,
+        indent: 58,
+        color: AppColors.borderOf(context),
+      );
 }
 
 class _NavTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final Color color;
-  final VoidCallback onTap;
   const _NavTile({
     required this.icon,
-    required this.label,
-    this.subtitle,
-    required this.color,
+    required this.title,
+    required this.subtitle,
     required this.onTap,
   });
 
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        onTap();
-      },
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: color, size: 18),
-      ),
-      title: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-          fontFamily: 'Inter',
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            )
-          : null,
-      trailing: const Icon(
-        Icons.chevron_right_rounded,
-        color: AppColors.textSecondary,
-        size: 18,
-      ),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    );
-  }
-}
-
-class _SwitchRow extends StatelessWidget {
   final IconData icon;
-  final String label;
-  final String? subtitle;
-  final bool? value;
-  final ValueChanged<bool>? onChanged;
-  final Widget? trailing;
-  const _SwitchRow({
-    required this.icon,
-    required this.label,
-    this.subtitle,
-    this.value,
-    this.onChanged,
-    this.trailing,
-  });
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppColors.textSecondary.withValues(alpha: 0.10),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Icon(icon, color: AppColors.textSecondary, size: 18),
-      ),
-      title: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-          color: AppColors.textPrimary,
-          fontFamily: 'Inter',
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            )
-          : null,
-      trailing: trailing ??
-          (value != null && onChanged != null
-              ? Switch(
-                  value: value!,
-                  onChanged: (v) {
-                    HapticFeedback.selectionClick();
-                    onChanged!(v);
-                  },
-                  thumbColor: WidgetStateProperty.resolveWith((states) =>
-                      states.contains(WidgetState.selected)
-                          ? Colors.black
-                          : AppColors.textSecondary),
-                  activeTrackColor: AppColors.accent,
-                  inactiveTrackColor: AppColors.border,
-                )
-              : null),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-    );
-  }
+  Widget build(BuildContext context) => ListTile(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        leading: Icon(icon, color: AppColors.accent),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(subtitle, maxLines: 2),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+      );
 }
 
-/// Compact switch row used inside bottom sheets.
-class _SheetSwitch extends StatelessWidget {
-  final String label;
-  final String? subtitle;
-  final bool value;
-  final ValueChanged<bool> onChanged;
-  const _SheetSwitch({
-    required this.label,
-    this.subtitle,
+class _SwitchTile extends StatelessWidget {
+  const _SwitchTile({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
     required this.value,
     required this.onChanged,
   });
 
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final bool value;
+  final ValueChanged<bool> onChanged;
+
   @override
-  Widget build(BuildContext context) {
-    return SwitchListTile(
-      value: value,
-      onChanged: onChanged,
-      title: Text(
-        label,
-        style: const TextStyle(
-          fontSize: 14,
-          color: AppColors.textPrimary,
-          fontFamily: 'Inter',
-        ),
-      ),
-      subtitle: subtitle != null
-          ? Text(
-              subtitle!,
-              style: const TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            )
-          : null,
-      thumbColor: WidgetStateProperty.resolveWith((states) =>
-          states.contains(WidgetState.selected)
-              ? Colors.black
-              : AppColors.textSecondary),
-      activeTrackColor: AppColors.accent,
-      inactiveTrackColor: AppColors.border,
-      contentPadding: EdgeInsets.zero,
-    );
-  }
+  Widget build(BuildContext context) => SwitchListTile(
+        value: value,
+        onChanged: (next) {
+          HapticFeedback.selectionClick();
+          onChanged(next);
+        },
+        secondary: Icon(icon, color: AppColors.accent),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text(subtitle),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      );
 }
 
-/// Downloads sheet body — uses Consumer so it can watch settingsProvider
-/// and persist maxConcurrentDownloads without a local StatefulBuilder.
-class _DownloadsSheetBody extends StatefulWidget {
-  final AppSettings s;
-  final SettingsNotifier sn;
-  const _DownloadsSheetBody({required this.s, required this.sn});
+class _SpeedTile extends StatelessWidget {
+  const _SpeedTile({required this.value, required this.onChanged});
+  final double value;
+  final ValueChanged<double> onChanged;
+
+  static const speeds = <double>[0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0];
 
   @override
-  State<_DownloadsSheetBody> createState() => _DownloadsSheetBodyState();
-}
-
-class _DownloadsSheetBodyState extends State<_DownloadsSheetBody> {
-  String _downloadPath = 'Loading…';
-
-  @override
-  void initState() {
-    super.initState();
-    getApplicationDocumentsDirectory().then((dir) {
-      if (mounted) setState(() => _downloadPath = dir.path);
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        20, 16, 20,
-        MediaQuery.of(context).viewInsets.bottom + 32,
-      ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text(
-              'Downloads',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 4),
-            const Divider(color: AppColors.border, height: 24),
-
-            // Download path (read-only)
-            const Text(
-              'Download Location',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 8),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.background,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Text(
-                _downloadPath,
-                style: const TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ),
-
-            const Divider(color: AppColors.border, height: 28),
-
-            // Max concurrent tasks — persisted via settingsProvider
-            const Text(
-              'Max Concurrent Downloads',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: AppColors.textSecondary,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [1, 2, 3].map((n) {
-                final active = widget.s.maxConcurrentDownloads == n;
-                return Padding(
-                  padding: const EdgeInsets.only(right: 10),
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      widget.sn.setMaxConcurrentDownloads(n);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: active ? AppColors.accent : AppColors.background,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: active ? AppColors.accent : AppColors.border,
-                        ),
-                      ),
-                      child: Text(
-                        '$n',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: active ? Colors.black : AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ],
+  Widget build(BuildContext context) => ListTile(
+        leading: const Icon(Icons.speed_rounded, color: AppColors.accent),
+        title: const Text('Default playback speed',
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: const Text('Used when a player starts a new session'),
+        trailing: DropdownButton<double>(
+          value: speeds.contains(value) ? value : 1.0,
+          underline: const SizedBox.shrink(),
+          items: speeds
+              .map((speed) => DropdownMenuItem(
+                    value: speed,
+                    child: Text('${speed}×'),
+                  ))
+              .toList(growable: false),
+          onChanged: (next) {
+            if (next == null) return;
+            HapticFeedback.selectionClick();
+            onChanged(next);
+          },
         ),
-      ),
-    );
-  }
+      );
 }
-
-class _Chip extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _Chip({required this.label, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: AppColors.accent.withValues(alpha: 0.12),
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: AppColors.accent.withValues(alpha: 0.4)),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: AppColors.accent,
-            fontFamily: 'Inter',
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Update Checker Tile ────────────────────────────────────────────────────
-
-enum _UpdateState { idle, checking, upToDate, updateAvailable, error }
-
-class _UpdateCheckerTile extends StatefulWidget {
-  const _UpdateCheckerTile();
-
-  @override
-  State<_UpdateCheckerTile> createState() => _UpdateCheckerTileState();
-}
-
-class _UpdateCheckerTileState extends State<_UpdateCheckerTile> {
-  _UpdateState _state = _UpdateState.idle;
-
-  Future<void> _check() async {
-    setState(() => _state = _UpdateState.checking);
-    try {
-      final info = await UpdateService.instance.checkForUpdate(force: true);
-      if (!mounted) return;
-      if (info == null) {
-        setState(() => _state = _UpdateState.upToDate);
-      } else {
-        setState(() => _state = _UpdateState.updateAvailable);
-        if (mounted) await UpdateDialog.checkAndShow(context);
-      }
-    } catch (_) {
-      if (mounted) setState(() => _state = _UpdateState.error);
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final icon = switch (_state) {
-      _UpdateState.idle            => Icons.system_update_outlined,
-      _UpdateState.checking        => Icons.sync_rounded,
-      _UpdateState.upToDate        => Icons.check_circle_outline_rounded,
-      _UpdateState.updateAvailable => Icons.new_releases_rounded,
-      _UpdateState.error           => Icons.wifi_off_rounded,
-    };
-    final subtitle = switch (_state) {
-      _UpdateState.idle            => 'Tap to check for a new version',
-      _UpdateState.checking        => 'Checking\u2026',
-      _UpdateState.upToDate        => 'You have the latest version \u2705',
-      _UpdateState.updateAvailable => 'New version available! Tap to update \ud83c\udf89',
-      _UpdateState.error           => 'Could not check. Make sure you have internet.',
-    };
-    final color = switch (_state) {
-      _UpdateState.upToDate        => AppColors.accentGreen,
-      _UpdateState.updateAvailable => AppColors.accent,
-      _UpdateState.error           => AppColors.error,
-      _                            => AppColors.textSecondary,
-    };
-
-    return GestureDetector(
-      onTap: _state == _UpdateState.checking ? null : _check,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(
-            color: _state == _UpdateState.updateAvailable
-                ? AppColors.accent.withValues(alpha: 0.5)
-                : AppColors.borderOf(context),
-          ),
-        ),
-        child: Row(
-          children: [
-            _state == _UpdateState.checking
-                ? const SizedBox(
-                    width: 20, height: 20,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2, color: AppColors.accent))
-                : Icon(icon, color: color, size: 20),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Check for Updates',
-                      style: TextStyle(
-                        fontSize: 14, color: Theme.of(context).colorScheme.onSurface,
-                        fontWeight: FontWeight.w500, fontFamily: 'Inter',
-                      )),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: TextStyle(
-                        fontSize: 11, color: color, fontFamily: 'Inter',
-                      )),
-                ],
-              ),
-            ),
-            if (_state != _UpdateState.checking)
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.textMuted, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-
