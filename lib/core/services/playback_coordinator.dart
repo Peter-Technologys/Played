@@ -1,8 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
 /// Coordinates the single media player that is allowed to be active at once.
-/// A stuck previous player must never block registration of the next player.
+///
+/// Players are observed after their first registration. If a previously
+/// inactive player starts from a system media button, mini-player or another
+/// UI path that calls `Player.play()` directly, the coordinator automatically
+/// promotes it and pauses the previous owner. This keeps the one-player rule
+/// true even when a caller forgets to register before playing.
 class PlaybackCoordinator {
   PlaybackCoordinator._();
   static final PlaybackCoordinator instance = PlaybackCoordinator._();
@@ -10,6 +17,11 @@ class PlaybackCoordinator {
   Player? _activePlayer;
   String? _activeType;
   double? _speedBeforeBoost;
+  bool _switching = false;
+
+  final Map<Player, String> _registeredTypes = <Player, String>{};
+  final Map<Player, StreamSubscription<bool>> _playingSubscriptions =
+      <Player, StreamSubscription<bool>>{};
 
   static const Duration pauseTimeout = Duration(seconds: 2);
 
@@ -17,34 +29,65 @@ class PlaybackCoordinator {
   String? get activeType => _activeType;
 
   Future<void> register(Player player, String type) async {
-    final previous = _activePlayer;
-    final previousType = _activeType;
-
-    if (previous != null && previous != player && previous.state.playing) {
-      debugPrint(
-        '[PlaybackCoordinator] Pausing $previousType player before starting $type',
-      );
-      try {
-        await previous.pause().timeout(
-          pauseTimeout,
-          onTimeout: () {
-            debugPrint(
-              '[PlaybackCoordinator] $previousType pause timed out after '
-              '${pauseTimeout.inSeconds}s; continuing with $type',
-            );
-          },
-        );
-      } catch (e, st) {
-        debugPrint(
-          '[PlaybackCoordinator] Failed to pause $previousType player: $e\n$st',
-        );
-      }
+    _observe(player, type);
+    if (_activePlayer == player) {
+      _activeType = type;
+      return;
     }
 
-    _activePlayer = player;
-    _activeType = type;
-    _speedBeforeBoost = null;
-    debugPrint('[PlaybackCoordinator] Registered $type player');
+    if (_switching) return;
+    _switching = true;
+    try {
+      final previous = _activePlayer;
+      final previousType = _activeType;
+
+      if (previous != null && previous != player && previous.state.playing) {
+        debugPrint(
+          '[PlaybackCoordinator] Pausing $previousType player before starting $type',
+        );
+        try {
+          await previous.pause().timeout(
+            pauseTimeout,
+            onTimeout: () {
+              debugPrint(
+                '[PlaybackCoordinator] $previousType pause timed out after '
+                '${pauseTimeout.inSeconds}s; continuing with $type',
+              );
+            },
+          );
+        } catch (e, st) {
+          debugPrint(
+            '[PlaybackCoordinator] Failed to pause $previousType player: $e\n$st',
+          );
+        }
+      }
+
+      _activePlayer = player;
+      _activeType = type;
+      _speedBeforeBoost = null;
+      debugPrint('[PlaybackCoordinator] Registered $type player');
+    } finally {
+      _switching = false;
+    }
+  }
+
+  void _observe(Player player, String type) {
+    _registeredTypes[player] = type;
+    if (_playingSubscriptions.containsKey(player)) return;
+
+    _playingSubscriptions[player] = player.stream.playing.listen(
+      (playing) {
+        if (!playing || _activePlayer == player || _switching) return;
+        final registeredType = _registeredTypes[player] ?? type;
+        // A user/system action started a non-active registered player. Treat
+        // that action as intent to switch playback owners rather than allowing
+        // two players to continue at once.
+        unawaited(register(player, registeredType));
+      },
+      onError: (Object error, StackTrace stack) {
+        debugPrint('[PlaybackCoordinator] playing stream error: $error');
+      },
+    );
   }
 
   /// Temporarily boosts the active player's rate while the user holds a
@@ -80,6 +123,10 @@ class PlaybackCoordinator {
   }
 
   void unregister(Player player) {
+    final subscription = _playingSubscriptions.remove(player);
+    unawaited(subscription?.cancel());
+    _registeredTypes.remove(player);
+
     if (_activePlayer == player) {
       _activePlayer = null;
       _activeType = null;
