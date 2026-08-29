@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../config/environment.dart';
 import 'auth_service.dart';
+import 'firebase_platform_service.dart';
 import 'http_client.dart';
 
 class OtyaSupportReply {
@@ -81,10 +82,12 @@ class OtyaSupportService {
 
   Future<Map<String, String>> _headers() async {
     final token = await AuthService.instance.getValidToken();
-    return {
-      'Content-Type': 'application/json',
-      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-    };
+    return FirebasePlatformService.instance.protectedHeaders(
+      base: {
+        'Content-Type': 'application/json',
+        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      },
+    );
   }
 
   Future<List<OtyaAiModel>> models() async {
