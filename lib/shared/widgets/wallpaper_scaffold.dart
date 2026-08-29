@@ -50,9 +50,6 @@ class WallpaperScaffold extends StatelessWidget {
         final storyTheme = manager.storyTheme;
         final isDark = Theme.of(context).brightness == Brightness.dark;
 
-        // Keep Android system bars visually attached to the active OTYA
-        // background. SafeArea remains the responsibility of each screen, but
-        // the navigation/status regions no longer become unrelated opaque bars.
         final overlayStyle = SystemUiOverlayStyle(
           statusBarColor: Colors.transparent,
           statusBarIconBrightness: isDark || hasWallpaper
@@ -117,9 +114,19 @@ class _ImageThemeBackground extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final decodeWidth = (media.size.width * media.devicePixelRatio)
+        .round()
+        .clamp(1, 4096);
+    final decodeHeight = (media.size.height * media.devicePixelRatio)
+        .round()
+        .clamp(1, 4096);
+
     Widget image = Image.file(
       File(path),
       fit: BoxFit.cover,
+      cacheWidth: decodeWidth,
+      cacheHeight: decodeHeight,
       filterQuality: FilterQuality.medium,
       gaplessPlayback: true,
       errorBuilder: (_, __, ___) => const OtyaMountainBackground(),
