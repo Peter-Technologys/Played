@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:collection';
 import 'dart:isolate';
 
-import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,14 +30,7 @@ final mediaLibraryProvider =
 );
 
 class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
-  // A4: Single debounce guard inside the notifier so that multiple callers
-  // (VideoTabScreen + MusicTabScreen both alive via AutomaticKeepAliveClientMixin)
-  // never double-fire a background refresh within 2 seconds of each other.
   Timer? _resumeDebounce;
-
-  // STABILITY 2: Incremental Set of known Hive IDs — populated once and
-  // updated incrementally so _writeBackToHive never does a full O(n) Hive
-  // read on every background refresh.
   Set<String>? _knownHiveIds;
 
   @override
@@ -68,25 +60,18 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       periodicTimer.cancel();
     });
 
-    // Phase 1a — in-memory cache (zero I/O, truly instant)
     final cached = MediaRepository.instance.cachedItems;
     if (cached != null && cached.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
       return cached;
     }
 
-    // Phase 1b — Hive history seed (< 5 ms).
     final history = OtyaDatabase.instance.getRecentlyPlayed(limit: 9999);
     if (history.isNotEmpty) {
       Future.microtask(_backgroundRefresh);
       return history;
     }
 
-    // Fresh install / empty local cache. Render the shell immediately, then
-    // scan in the background. If Android denies media access, _backgroundRefresh
-    // promotes that failure to AsyncError because there is no existing library
-    // to preserve. Video/Music can then show PermissionDeniedScreen instead of
-    // misleading the user with a permanent "No media found" state.
     final db = OtyaDatabase.instance;
     final cinemaIds = db.getShelfCache('cinema');
     final streetIds = db.getShelfCache('street');
@@ -110,10 +95,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
         forceRefresh: true,
       );
 
-      // An empty scan is a valid library result (for example a new phone with
-      // no media). Publish it when the current library is also empty; otherwise
-      // retain the prior non-empty snapshot to avoid flashing the library away
-      // during transient MediaStore/OEM failures.
       final currentItems = state.valueOrNull ?? const <MediaItem>[];
       if (fresh.isNotEmpty || currentItems.isEmpty) {
         try {
@@ -131,10 +112,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       debugPrint('[MediaLibrary] Background refresh failed: $error');
       final currentItems = state.valueOrNull ?? const <MediaItem>[];
       if (currentItems.isEmpty) {
-        // With no usable local snapshot, swallowing the error makes permission
-        // denial indistinguishable from a genuinely empty phone. Surface the
-        // failure so Video/Music can offer recovery. Once a real library exists,
-        // refresh failures remain non-destructive and silent.
         try {
           state = AsyncError(error, stack);
         } catch (_) {}
@@ -142,9 +119,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
-  /// Runs duplicate detection outside Flutter's UI isolate. The detector is
-  /// intentionally O(n²) and uses Levenshtein comparisons; moving it off the
-  /// main isolate prevents a large library refresh from stealing frame time.
   Future<void> _detectDuplicates(List<MediaItem> items) async {
     try {
       final metas = items
@@ -173,9 +147,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
-  /// Upsert fresh scan results into the Hive history box so Phase 1b seed is
-  /// always populated after the first scan. Only items not already in history
-  /// are written, preserving lastPlayedAt for played tracks.
   Future<void> _writeBackToHive(List<MediaItem> items) async {
     try {
       final db = OtyaDatabase.instance;
@@ -193,7 +164,6 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
-  /// Silent background refresh with a single debounce guard.
   Future<void> backgroundRefresh() async {
     _resumeDebounce?.cancel();
     _resumeDebounce = Timer(const Duration(seconds: 2), () async {
@@ -208,5 +178,4 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
   }
 }
 
-// Alias kept for MediaCard and other widgets.
 final mySpaceProvider = mediaLibraryProvider;
