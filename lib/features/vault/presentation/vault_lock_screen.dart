@@ -1,63 +1,29 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:math';
+
+import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
-import '../../../app/theme/app_colors.dart';
-import '../../../core/models/media_item.dart';
-import '../../../core/database/otya_database.dart';
-import '../../../core/services/vault_service.dart';
-import '../../../core/models/vault_item.dart';
-import '../../player/presentation/mini_player.dart';
-import '../../player/presentation/queue_screen.dart';
-import '../../../shared/widgets/wallpaper_scaffold.dart';
-
-// ── PIN helpers ────────────────────────────────────────────────────
-//
-// Security fix: PIN hash is stored in flutter_secure_storage (Android
-// Keystore / iOS Secure Enclave) instead of SharedPreferences, which is
-// readable by any app with root access or a backup extraction.
-//
-// Biometric re-auth timeout: after 5 minutes of vault inactivity the
-// vault is automatically locked and re-authentication is required.
-import 'dart:convert';
-import 'dart:io';
-import 'package:crypto/crypto.dart';
-import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:go_router/go_router.dart';
 import 'package:local_auth/local_auth.dart';
 
-const _kPinKey = 'vault_pin_hash';
-const _kBiometricTimeout = Duration(minutes: 5);
+import '../../../app/theme/app_colors.dart';
+import '../../../core/models/media_item.dart';
+import '../../../core/models/vault_item.dart';
+import '../../../core/services/vault_service.dart';
+import '../../player/presentation/mini_player.dart';
+import '../../player/presentation/queue_screen.dart';
 
-const _vaultStorage = FlutterSecureStorage(
+const _pinKey = 'vault_pin_hash';
+const _storage = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
 );
-
-Future<bool> _hasPinSet() async {
-  final stored = await _vaultStorage.read(key: _kPinKey);
-  return stored != null;
-}
-
-Future<bool> _verifyPin(String pin) async {
-  final stored = await _vaultStorage.read(key: _kPinKey);
-  final hash = sha256.convert(utf8.encode(pin)).toString();
-  return stored == hash;
-}
-
-Future<void> _savePin(String pin) async {
-  final hash = sha256.convert(utf8.encode(pin)).toString();
-  await _vaultStorage.write(key: _kPinKey, value: hash);
-}
+const _sessionTtl = Duration(minutes: 5);
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
-
-/// Returns true if the vault session has expired (> 5 minutes since unlock).
-bool _isVaultSessionExpired() {
-  if (_VaultLockScreenState._lastUnlockTime == null) return true;
-  return DateTime.now().difference(_VaultLockScreenState._lastUnlockTime!) > _kBiometricTimeout;
-}
-
-// ── Lock Screen ────────────────────────────────────────────────────
 
 class VaultLockScreen extends ConsumerStatefulWidget {
   const VaultLockScreen({super.key});
@@ -66,359 +32,22 @@ class VaultLockScreen extends ConsumerStatefulWidget {
   ConsumerState<VaultLockScreen> createState() => _VaultLockScreenState();
 }
 
-class _VaultLockScreenState extends ConsumerState<VaultLockScreen> {
-  /// Static so it persists across widget rebuilds and is shared with _VaultGalleryScreenState.
-  static DateTime? _lastUnlockTime;
-
-  final LocalAuthentication _auth = LocalAuthentication();
-  bool _isAuthenticating = false;
-  String? _errorMessage;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      // If the vault was previously unlocked but the session has expired,
-      // force re-authentication (Bug 6 fix: biometric re-auth timeout).
-      if (ref.read(vaultUnlockedProvider) && _isVaultSessionExpired()) {
-        ref.read(vaultUnlockedProvider.notifier).state = false;
-        _VaultLockScreenState._lastUnlockTime = null;
-      }
-      _authenticate();
-    });
-  }
-
-  Future<void> _authenticate() async {
-    setState(() { _isAuthenticating = true; _errorMessage = null; });
-    try {
-      final canCheck = await _auth.canCheckBiometrics;
-      final isSupported = await _auth.isDeviceSupported();
-      if (!canCheck && !isSupported) {
-        if (!mounted) return;
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (_) => _SetPinDialog(
-              onSuccess: () =>
-                  ref.read(vaultUnlockedProvider.notifier).state = true),
-        );
-        return;
-      }
-      final ok = await _auth.authenticate(
-        localizedReason: 'Unlock your Private Vault',
-        options: const AuthenticationOptions(
-            biometricOnly: false, stickyAuth: true),
-      );
-      if (ok) {
-        HapticFeedback.mediumImpact();
-        _VaultLockScreenState._lastUnlockTime = DateTime.now(); // record unlock time for timeout
-        ref.read(vaultUnlockedProvider.notifier).state = true;
-      } else {
-        setState(() => _errorMessage = 'Authentication failed. Try again.');
-      }
-    } catch (e) {
-      setState(() => _errorMessage = e.toString());
-    } finally {
-      if (mounted) setState(() => _isAuthenticating = false);
-    }
-  }
-
-  Future<void> _showPinDialog() async {
-    final pinSet = await _hasPinSet();
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => pinSet
-          ? _PinDialog(
-              onSuccess: () =>
-                  ref.read(vaultUnlockedProvider.notifier).state = true)
-          : _SetPinDialog(
-              onSuccess: () =>
-                  ref.read(vaultUnlockedProvider.notifier).state = true),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (ref.watch(vaultUnlockedProvider)) return const VaultGalleryScreen();
-
-    return PopScope(
-      onPopInvokedWithResult: (didPop, _) {
-        if (didPop) ref.read(vaultUnlockedProvider.notifier).state = false;
-      },
-      child: Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () {
-            ref.read(vaultUnlockedProvider.notifier).state = false;
-            Navigator.of(context).pop();
-          },
-        ),
-        elevation: 0,
-      ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 100, height: 100,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.surface,
-                  border: Border.all(color: AppColors.accentViolet, width: 2),
-                  boxShadow: [BoxShadow(
-                      color: AppColors.accentViolet.withValues(alpha: 0.35),
-                      blurRadius: 32, spreadRadius: 4)],
-                ),
-                child: const Icon(Icons.lock_rounded,
-                    color: AppColors.accentViolet, size: 44),
-              ).animate().scale(
-                    begin: const Offset(0.8, 0.8), end: const Offset(1, 1),
-                    duration: 500.ms, curve: Curves.elasticOut),
-              const SizedBox(height: 28),
-              Text('Safe',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700,
-                      color: Theme.of(context).colorScheme.onSurface))
-                  .animate().fadeIn(delay: 200.ms),
-              const SizedBox(height: 8),
-              const Text(
-                'Your private media is encrypted.\nAuthenticate to access.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.6),
-              ).animate().fadeIn(delay: 300.ms),
-              const SizedBox(height: 40),
-              if (_isAuthenticating)
-                const CircularProgressIndicator(color: AppColors.accentViolet)
-              else
-                GestureDetector(
-                  onTap: _authenticate,
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.accentViolet,
-                      borderRadius: BorderRadius.circular(16),
-                      boxShadow: [BoxShadow(
-                          color: AppColors.accentViolet.withValues(alpha: 0.4),
-                          blurRadius: 20, offset: const Offset(0, 4))],
-                    ),
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.fingerprint_rounded, color: Colors.white, size: 24),
-                        SizedBox(width: 10),
-                        Text('Unlock with Biometrics',
-                            style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700,
-                                color: Colors.white)),
-                      ],
-                    ),
-                  ),
-                ).animate().fadeIn(delay: 400.ms).slideY(begin: 0.1),
-              const SizedBox(height: 16),
-              TextButton(
-                onPressed: _showPinDialog,
-                child: const Text('Use PIN instead',
-                    style: TextStyle(color: AppColors.textSecondary, fontSize: 13)),
-              ),
-              if (_errorMessage != null) ...[  
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: AppColors.error.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppColors.error.withValues(alpha: 0.3)),
-                  ),
-                  child: Text(_errorMessage!,
-                      style: const TextStyle(color: AppColors.error, fontSize: 12),
-                      textAlign: TextAlign.center),
-                ),
-              ],
-            ],
-          ),
-        ),
-      ),
-    ), // end Scaffold
-    ); // end PopScope
-  }
-}
-
-// ── PIN Dialogs ────────────────────────────────────────────────────
-
-class _PinDialog extends StatefulWidget {
-  final VoidCallback onSuccess;
-  const _PinDialog({required this.onSuccess});
-  @override State<_PinDialog> createState() => _PinDialogState();
-}
-
-class _PinDialogState extends State<_PinDialog> {
-  final _controller = TextEditingController();
-  bool _error = false;
-  bool _loading = false;
-
-  Future<void> _verify() async {
-    setState(() { _loading = true; _error = false; });
-    final ok = await _verifyPin(_controller.text);
-    if (!mounted) return;
-    setState(() => _loading = false);
-    if (ok) {
-      HapticFeedback.mediumImpact();
-      _VaultLockScreenState._lastUnlockTime = DateTime.now(); // record unlock time for timeout
-      Navigator.of(context).pop();
-      widget.onSuccess();
-    } else {
-      setState(() => _error = true);
-      _controller.clear();
-    }
-  }
-
-  @override void dispose() { _controller.dispose(); super.dispose(); }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Enter PIN', style: TextStyle(color: AppColors.textPrimary)),
-      content: TextField(
-        controller: _controller, obscureText: true,
-        keyboardType: TextInputType.number, maxLength: 6, autofocus: true,
-        style: const TextStyle(color: AppColors.textPrimary),
-        decoration: InputDecoration(
-          hintText: 'Enter your PIN',
-          hintStyle: const TextStyle(color: AppColors.textSecondary),
-          counterText: '',
-          errorText: _error ? 'Incorrect PIN' : null,
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.border)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.accentViolet)),
-          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.error)),
-        ),
-        onSubmitted: (_) => _verify(),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
-        ElevatedButton(
-          onPressed: _loading ? null : _verify,
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentViolet,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          child: _loading
-              ? const SizedBox(width: 16, height: 16,
-                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-              : const Text('Unlock', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    );
-  }
-}
-
-class _SetPinDialog extends StatefulWidget {
-  final VoidCallback onSuccess;
-  const _SetPinDialog({required this.onSuccess});
-  @override State<_SetPinDialog> createState() => _SetPinDialogState();
-}
-
-class _SetPinDialogState extends State<_SetPinDialog> {
-  final _pin1 = TextEditingController();
-  final _pin2 = TextEditingController();
-  String? _error;
-
-  Future<void> _save() async {
-    if (_pin1.text.length < 4) { setState(() => _error = 'PIN must be at least 4 digits'); return; }
-    if (_pin1.text != _pin2.text) { setState(() => _error = 'PINs do not match'); _pin2.clear(); return; }
-    await _savePin(_pin1.text);
-    if (!mounted) return;
-    Navigator.of(context).pop();
-    widget.onSuccess();
-  }
-
-  @override void dispose() { _pin1.dispose(); _pin2.dispose(); super.dispose(); }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      backgroundColor: AppColors.surface,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      title: const Text('Create Safe PIN', style: TextStyle(color: AppColors.textPrimary)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Text('Set a PIN to protect your Safe.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
-          const SizedBox(height: 16),
-          _PinField(controller: _pin1, hint: 'New PIN (4–6 digits)'),
-          const SizedBox(height: 12),
-          _PinField(controller: _pin2, hint: 'Confirm PIN'),
-          if (_error != null) ...[  
-            const SizedBox(height: 8),
-            Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 12)),
-          ],
-        ],
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel', style: TextStyle(color: AppColors.textSecondary))),
-        ElevatedButton(
-          onPressed: _save,
-          style: ElevatedButton.styleFrom(backgroundColor: AppColors.accentViolet,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10))),
-          child: const Text('Save PIN', style: TextStyle(color: Colors.white)),
-        ),
-      ],
-    );
-  }
-}
-
-class _PinField extends StatelessWidget {
-  final TextEditingController controller;
-  final String hint;
-  const _PinField({required this.controller, required this.hint});
-  @override
-  Widget build(BuildContext context) {
-    return TextField(
-      controller: controller, obscureText: true,
-      keyboardType: TextInputType.number, maxLength: 6,
-      style: const TextStyle(color: AppColors.textPrimary),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: const TextStyle(color: AppColors.textSecondary),
-        counterText: '',
-        enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.border)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12),
-            borderSide: const BorderSide(color: AppColors.accentViolet)),
-      ),
-    );
-  }
-}
-
-// ── Vault Gallery ──────────────────────────────────────────────────
-
-class VaultGalleryScreen extends ConsumerStatefulWidget {
-  const VaultGalleryScreen({super.key});
-  @override ConsumerState<VaultGalleryScreen> createState() => _VaultGalleryScreenState();
-}
-
-class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
+class _VaultLockScreenState extends ConsumerState<VaultLockScreen>
     with WidgetsBindingObserver {
-  List<VaultItem> _items = [];
-  bool _loading = true;
-  int? _vaultSizeBytes;
+  static DateTime? _lastUnlock;
+
+  final _localAuth = LocalAuthentication();
+  bool _checking = false;
+  String? _message;
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_expired) ref.read(vaultUnlockedProvider.notifier).state = false;
+      if (!ref.read(vaultUnlockedProvider)) _unlockWithDevice();
+    });
   }
 
   @override
@@ -427,249 +56,465 @@ class _VaultGalleryScreenState extends ConsumerState<VaultGalleryScreen>
     super.dispose();
   }
 
-  /// When the app resumes from background, check if the vault session has
-  /// expired and lock the vault if so (biometric re-auth timeout).
+  bool get _expired =>
+      _lastUnlock == null || DateTime.now().difference(_lastUnlock!) > _sessionTtl;
+
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed && _isVaultSessionExpired()) {
+    if (state == AppLifecycleState.resumed && _expired) {
       ref.read(vaultUnlockedProvider.notifier).state = false;
-      _VaultLockScreenState._lastUnlockTime = null;
     }
   }
 
-  Future<void> _load() async {
-    final items = await OtyaDatabase.instance.getAllVaultItems();
-    final size  = await VaultService.instance.getVaultSize();
-    if (mounted) setState(() { _items = items; _vaultSizeBytes = size; _loading = false; });
+  void _markUnlocked() {
+    _lastUnlock = DateTime.now();
+    ref.read(vaultUnlockedProvider.notifier).state = true;
   }
 
-  String _formatSize(int bytes) {
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
-
-  Future<void> _removeItem(VaultItem item) async {
-    HapticFeedback.mediumImpact();
-    await VaultService.instance.unlockItem(item.mediaId);
-    await _load();
-  }
-
-  void _playItem(VaultItem item) {
-    // The vault stores a plain copy of the file in the app private directory.
-    // Use encryptedPath (the actual stored path) directly.
-    // Verify the file exists before attempting playback.
-    final vaultFile = File(item.encryptedPath);
-    if (!vaultFile.existsSync()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('File not found in vault. It may have been deleted.'),
-          backgroundColor: Colors.red,
+  Future<void> _unlockWithDevice() async {
+    if (_checking) return;
+    setState(() { _checking = true; _message = null; });
+    try {
+      final supported = await _localAuth.isDeviceSupported();
+      if (!supported) {
+        if (mounted) setState(() => _message = 'Use your Private PIN to continue.');
+        return;
+      }
+      final ok = await _localAuth.authenticate(
+        localizedReason: 'Unlock OTYA Private',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+          useErrorDialogs: true,
         ),
       );
-      return;
+      if (ok) {
+        HapticFeedback.mediumImpact();
+        _markUnlocked();
+      }
+    } catch (_) {
+      if (mounted) setState(() => _message = 'Device authentication was unavailable. Use your Private PIN instead.');
+    } finally {
+      if (mounted) setState(() => _checking = false);
     }
-    final media = MediaItem(
-      id:            item.mediaId,
-      title:         item.originalPath.split('/').last
-                         .replaceAll(RegExp(r'\.[^.]+$'), ''),
-      fileName:      item.originalPath.split('/').last,
-      filePath:      item.encryptedPath,
-      isVideo:       item.mediaType == 'video',
-      addedAt:       DateTime.now(),
-      fileSizeBytes: 0,
+  }
+
+  Future<void> _unlockWithPin() async {
+    final stored = await _storage.read(key: _pinKey);
+    if (!mounted) return;
+    final created = stored == null;
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _PrivatePinDialog(create: created),
     );
-    ref.read(miniPlayerItemProvider.notifier).state = media;
-    ref.read(queueProvider.notifier).setQueue([media]);
-    if (media.isVideo) {
-      context.push('/player/video', extra: media);
-    } else {
-      context.push('/player/audio', extra: media);
-    }
+    if (result == true) _markUnlocked();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (ref.watch(vaultUnlockedProvider)) {
+      return const _PrivateLibrary();
+    }
+
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {
         if (didPop) ref.read(vaultUnlockedProvider.notifier).state = false;
       },
       child: Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded, color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () {
-            ref.read(vaultUnlockedProvider.notifier).state = false;
-            Navigator.of(context).pop();
-          },
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () => context.canPop() ? context.pop() : context.go('/myspace'),
+          ),
+          title: const Text('Private'),
         ),
-        title: Text('Safe',
-            style: TextStyle(fontWeight: FontWeight.w700,
-                color: Theme.of(context).colorScheme.onSurface, fontSize: 18)),
-        actions: [
-          if (_vaultSizeBytes != null)
-            Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Center(
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        body: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 92,
+                  height: 92,
                   decoration: BoxDecoration(
-                    color: AppColors.accentViolet.withValues(alpha: 0.15),
-                    borderRadius: BorderRadius.circular(8),
+                    shape: BoxShape.circle,
+                    color: AppColors.cardOf(context),
+                    border: Border.all(color: AppColors.accent.withValues(alpha: .45)),
                   ),
-                  child: Text(_formatSize(_vaultSizeBytes!),
-                      style: const TextStyle(fontSize: 11,
-                          color: AppColors.accentViolet, fontWeight: FontWeight.w600)),
+                  child: const Icon(Icons.lock_rounded, size: 42, color: AppColors.accent),
                 ),
-              ),
-            ),
-        ],
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.accentViolet))
-          : _items.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: 80, height: 80,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle, color: AppColors.surface,
-                          border: Border.all(color: AppColors.border),
-                        ),
-                        child: const Icon(Icons.lock_open_rounded,
-                            color: AppColors.textSecondary, size: 36),
-                      ),
-                      const SizedBox(height: 20),
-                      Text('Safe is empty',
-                          style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700,
-                              color: Theme.of(context).colorScheme.onSurface)),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Long-press any file and tap\n"Move to Safe" to protect it.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(fontSize: 13, color: AppColors.textSecondary, height: 1.5),
-                      ),
-                    ],
-                  ),
-                )
-              : GridView.builder(
-                  padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
-                  physics: const BouncingScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2, crossAxisSpacing: 12,
-                    mainAxisSpacing: 12, childAspectRatio: 0.82,
-                  ),
-                  itemCount: _items.length,
-                  itemBuilder: (context, i) => _VaultCard(
-                    item: _items[i],
-                    onPlay:   () => _playItem(_items[i]),
-                    onRemove: () => _removeItem(_items[i]),
-                  ),
+                const SizedBox(height: 22),
+                const Text('OTYA Private', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
+                const SizedBox(height: 8),
+                const Text(
+                  'Protected media stays inside OTYA app-private storage until you restore it.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(height: 1.45, color: AppColors.textSecondary),
                 ),
-    ), // end Scaffold
-    ); // end PopScope
-  }
-}
-
-class _VaultCard extends StatelessWidget {
-  final VaultItem item;
-  final VoidCallback onPlay;
-  final VoidCallback onRemove;
-  const _VaultCard({required this.item, required this.onPlay, required this.onRemove});
-
-  @override
-  Widget build(BuildContext context) {
-    final isVideo = item.mediaType == 'video';
-    return GestureDetector(
-      onTap: onPlay,
-      child: Container(
-        decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.borderOf(context)),
-        ),
-        child: Column(
-          children: [
-            Expanded(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: AppColors.accentViolet.withValues(alpha: 0.08),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-                ),
-                child: Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(
-                        isVideo ? Icons.video_file_rounded : Icons.audio_file_rounded,
-                        color: AppColors.accentViolet, size: 40,
-                      ),
-                      const SizedBox(height: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: AppColors.accentViolet.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: const Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.play_arrow_rounded,
-                                color: AppColors.accentViolet, size: 14),
-                            SizedBox(width: 3),
-                            Text('Play', style: TextStyle(
-                                fontSize: 11, color: AppColors.accentViolet,
-                                fontWeight: FontWeight.w700)),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.all(10),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    () {
-                      final rawName = item.originalPath.split('/').last;
-                      return rawName.contains('.')
-                          ? rawName.substring(0, rawName.lastIndexOf('.'))
-                          : rawName;
-                    }(),
-                    style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600,
-                        color: Theme.of(context).colorScheme.onSurface),
-                    maxLines: 2, overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      const Icon(Icons.lock_rounded,
-                          color: AppColors.accentViolet, size: 12),
-                      const SizedBox(width: 4),
-                      const Text('Encrypted',
-                          style: TextStyle(fontSize: 10, color: AppColors.accentViolet)),
-                      const Spacer(),
-                      GestureDetector(
-                        onTap: onRemove,
-                        child: const Icon(Icons.lock_open_rounded,
-                            color: AppColors.textSecondary, size: 16),
-                      ),
-                    ],
-                  ),
+                if (_message != null) ...[
+                  const SizedBox(height: 14),
+                  Text(_message!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
                 ],
-              ),
+                const SizedBox(height: 28),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _checking ? null : _unlockWithDevice,
+                    icon: _checking
+                        ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        : const Icon(Icons.fingerprint_rounded),
+                    label: const Text('Unlock with device security'),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                TextButton(onPressed: _unlockWithPin, child: const Text('Use Private PIN')),
+              ],
             ),
-          ],
+          ),
         ),
       ),
     );
   }
 }
+
+class _PrivatePinDialog extends StatefulWidget {
+  const _PrivatePinDialog({required this.create});
+  final bool create;
+
+  @override
+  State<_PrivatePinDialog> createState() => _PrivatePinDialogState();
+}
+
+class _PrivatePinDialogState extends State<_PrivatePinDialog> {
+  final _pin = TextEditingController();
+  final _confirm = TextEditingController();
+  String? _error;
+  bool _busy = false;
+  int _failedAttempts = 0;
+  DateTime? _blockedUntil;
+
+  @override
+  void dispose() {
+    _pin.dispose();
+    _confirm.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_busy) return;
+    final now = DateTime.now();
+    if (_blockedUntil != null && now.isBefore(_blockedUntil!)) {
+      setState(() => _error = 'Too many attempts. Try again shortly.');
+      return;
+    }
+    final pin = _pin.text;
+    if (!RegExp(r'^\d{4,6}$').hasMatch(pin)) {
+      setState(() => _error = 'Use a 4–6 digit PIN.');
+      return;
+    }
+
+    setState(() { _busy = true; _error = null; });
+    try {
+      if (widget.create) {
+        if (pin != _confirm.text) {
+          setState(() => _error = 'PINs do not match.');
+          return;
+        }
+        await _savePin(pin);
+        if (mounted) Navigator.pop(context, true);
+        return;
+      }
+
+      final ok = await _verifyPin(pin);
+      if (ok) {
+        if (mounted) Navigator.pop(context, true);
+      } else {
+        _failedAttempts++;
+        if (_failedAttempts >= 5) {
+          _blockedUntil = DateTime.now().add(const Duration(seconds: 30));
+          _failedAttempts = 0;
+        }
+        _pin.clear();
+        if (mounted) setState(() => _error = 'Incorrect PIN.');
+      }
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+        title: Text(widget.create ? 'Create Private PIN' : 'Enter Private PIN'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: _pin,
+              autofocus: true,
+              obscureText: true,
+              keyboardType: TextInputType.number,
+              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+              decoration: InputDecoration(labelText: widget.create ? 'New PIN' : 'PIN', errorText: _error),
+              onSubmitted: (_) => widget.create ? null : _submit(),
+            ),
+            if (widget.create) ...[
+              const SizedBox(height: 10),
+              TextField(
+                controller: _confirm,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                decoration: const InputDecoration(labelText: 'Confirm PIN'),
+                onSubmitted: (_) => _submit(),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Cancel')),
+          FilledButton(onPressed: _busy ? null : _submit, child: Text(widget.create ? 'Create' : 'Unlock')),
+        ],
+      );
+}
+
+Future<void> _savePin(String pin) async {
+  final random = Random.secure();
+  final salt = List<int>.generate(16, (_) => random.nextInt(256));
+  final digest = sha256.convert([...salt, ...utf8.encode(pin)]).toString();
+  await _storage.write(key: _pinKey, value: '${base64UrlEncode(salt)}:$digest');
+}
+
+Future<bool> _verifyPin(String pin) async {
+  final stored = await _storage.read(key: _pinKey);
+  if (stored == null) return false;
+
+  if (!stored.contains(':')) {
+    // Migrate the original unsalted SHA-256 format after the next successful unlock.
+    final legacy = sha256.convert(utf8.encode(pin)).toString();
+    final ok = _constantTimeEqual(stored, legacy);
+    if (ok) await _savePin(pin);
+    return ok;
+  }
+
+  final parts = stored.split(':');
+  if (parts.length != 2) return false;
+  try {
+    final salt = base64Url.decode(parts[0]);
+    final digest = sha256.convert([...salt, ...utf8.encode(pin)]).toString();
+    return _constantTimeEqual(parts[1], digest);
+  } catch (_) {
+    return false;
+  }
+}
+
+bool _constantTimeEqual(String a, String b) {
+  if (a.length != b.length) return false;
+  var diff = 0;
+  for (var i = 0; i < a.length; i++) {
+    diff |= a.codeUnitAt(i) ^ b.codeUnitAt(i);
+  }
+  return diff == 0;
+}
+
+class _PrivateLibrary extends ConsumerStatefulWidget {
+  const _PrivateLibrary();
+
+  @override
+  ConsumerState<_PrivateLibrary> createState() => _PrivateLibraryState();
+}
+
+class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
+    with WidgetsBindingObserver {
+  List<VaultItem> _items = const [];
+  int _size = 0;
+  bool _loading = true;
+  String? _message;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _refresh();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
+      ref.read(vaultUnlockedProvider.notifier).state = false;
+    }
+  }
+
+  Future<void> _refresh() async {
+    final items = VaultService.instance.getAllItems();
+    final size = await VaultService.instance.getVaultSize();
+    if (!mounted) return;
+    setState(() {
+      _items = items;
+      _size = size;
+      _loading = false;
+    });
+  }
+
+  Future<void> _restore(VaultItem item) async {
+    setState(() => _message = null);
+    try {
+      await VaultService.instance.unlockItem(item.mediaId);
+      await _refresh();
+      if (mounted) setState(() => _message = 'Restored to its original folder.');
+    } catch (_) {
+      if (mounted) setState(() => _message = 'OTYA could not restore that file.');
+    }
+  }
+
+  Future<void> _delete(VaultItem item) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete protected file?'),
+        content: const Text('This permanently removes the copy stored in OTYA Private. It cannot be restored after deletion.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Delete')),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    try {
+      await VaultService.instance.deleteFromVault(item.mediaId);
+      await _refresh();
+    } catch (_) {
+      if (mounted) setState(() => _message = 'OTYA could not delete that protected file.');
+    }
+  }
+
+  Future<void> _play(VaultItem item) async {
+    final file = File(item.encryptedPath);
+    if (!await file.exists()) {
+      if (mounted) setState(() => _message = 'This protected file is missing from device storage.');
+      return;
+    }
+    final fileName = item.originalPath.replaceAll('\\', '/').split('/').last;
+    final media = MediaItem(
+      id: 'private:${item.mediaId}',
+      title: fileName.replaceFirst(RegExp(r'\.[^.]+$'), ''),
+      fileName: fileName,
+      filePath: item.encryptedPath,
+      isVideo: item.mediaType == 'video',
+      addedAt: item.lockedAt,
+      fileSizeBytes: await file.length(),
+    );
+    if (!mounted) return;
+    if (media.isVideo) {
+      context.push('/player/video', extra: media);
+    } else {
+      ref.read(queueProvider.notifier).setQueue([media]);
+      ref.read(miniPlayerItemProvider.notifier).state = media;
+      context.push('/player/audio', extra: media);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_rounded),
+            onPressed: () {
+              ref.read(vaultUnlockedProvider.notifier).state = false;
+              context.canPop() ? context.pop() : context.go('/myspace');
+            },
+          ),
+          title: const Text('Private'),
+          actions: [
+            IconButton(
+              tooltip: 'Lock now',
+              onPressed: () => ref.read(vaultUnlockedProvider.notifier).state = false,
+              icon: const Icon(Icons.lock_outline_rounded),
+            ),
+          ],
+        ),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : RefreshIndicator(
+                onRefresh: _refresh,
+                child: ListView(
+                  physics: const AlwaysScrollableScrollPhysics(),
+                  padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 28),
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: AppColors.cardOf(context),
+                        borderRadius: BorderRadius.circular(18),
+                        border: Border.all(color: AppColors.borderOf(context)),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.shield_rounded, color: AppColors.accent),
+                          const SizedBox(width: 12),
+                          Expanded(child: Text('${_items.length} protected file${_items.length == 1 ? '' : 's'}')),
+                          Text(_formatBytes(_size), style: const TextStyle(color: AppColors.textSecondary)),
+                        ],
+                      ),
+                    ),
+                    if (_message != null) ...[
+                      const SizedBox(height: 10),
+                      Text(_message!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                    ],
+                    const SizedBox(height: 12),
+                    if (_items.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 70),
+                        child: Column(
+                          children: [
+                            Icon(Icons.lock_open_rounded, size: 54, color: AppColors.textSecondary),
+                            SizedBox(height: 12),
+                            Text('Private is empty', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                            SizedBox(height: 6),
+                            Text('Move media to Private from the player or supported file actions.', textAlign: TextAlign.center),
+                          ],
+                        ),
+                      )
+                    else
+                      ..._items.map((item) {
+                        final name = item.originalPath.replaceAll('\\', '/').split('/').last;
+                        return Card(
+                          child: ListTile(
+                            onTap: () => _play(item),
+                            leading: Icon(item.mediaType == 'video' ? Icons.movie_rounded : Icons.music_note_rounded, color: AppColors.accent),
+                            title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text('Protected ${_shortDate(item.lockedAt)}'),
+                            trailing: PopupMenuButton<String>(
+                              onSelected: (action) {
+                                if (action == 'restore') _restore(item);
+                                if (action == 'delete') _delete(item);
+                              },
+                              itemBuilder: (_) => const [
+                                PopupMenuItem(value: 'restore', child: Text('Restore to original folder')),
+                                PopupMenuItem(value: 'delete', child: Text('Delete permanently')),
+                              ],
+                            ),
+                          ),
+                        );
+                      }),
+                  ],
+                ),
+              ),
+      );
+}
+
+String _formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
+}
+
+String _shortDate(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
