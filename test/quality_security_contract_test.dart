@@ -24,7 +24,7 @@ void main() {
     ).readAsStringSync();
     expect(source, contains("uri.scheme != 'http'"));
     expect(source, contains("uri.path != '/media'"));
-    expect(source, contains("RegExp(r'^[a-f0-9]{64}\\$')"));
+    expect(source, contains("RegExp(r'^[a-f0-9]{64}\$')"));
     expect(source, contains('(a == 192 && b == 168)'));
   });
 
