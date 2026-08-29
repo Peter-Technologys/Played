@@ -73,9 +73,19 @@ class OnlineMusicException implements Exception {
   String toString() => message;
 }
 
+class _CachedOnlineTracks {
+  const _CachedOnlineTracks(this.createdAt, this.tracks);
+  final DateTime createdAt;
+  final List<OnlineTrack> tracks;
+}
+
 class OnlineMusicService {
   OnlineMusicService._();
   static final instance = OnlineMusicService._();
+
+  static const _cacheTtl = Duration(minutes: 3);
+  static const _maxCacheEntries = 32;
+  final Map<String, _CachedOnlineTracks> _cache = {};
 
   Future<List<OnlineTrack>> discover({int limit = 24}) =>
       _load(limit: limit);
@@ -84,10 +94,18 @@ class OnlineMusicService {
       _load(query: query.trim(), limit: limit);
 
   Future<List<OnlineTrack>> _load({String query = '', int limit = 24}) async {
+    final safeLimit = limit.clamp(1, 50);
+    final cacheKey = '${query.toLowerCase()}|$safeLimit';
+    final now = DateTime.now();
+    final cached = _cache[cacheKey];
+    if (cached != null && now.difference(cached.createdAt) <= _cacheTtl) {
+      return cached.tracks;
+    }
+
     final uri = Uri.parse(Environment.onlineMusicUrl).replace(
       queryParameters: {
         if (query.isNotEmpty) 'q': query,
-        'limit': limit.clamp(1, 50).toString(),
+        'limit': safeLimit.toString(),
       },
     );
 
@@ -113,10 +131,19 @@ class OnlineMusicService {
 
     final raw = body['tracks'];
     if (raw is! List) return const [];
-    return raw
+    final tracks = raw
         .whereType<Map>()
         .map((item) => OnlineTrack.fromJson(Map<String, dynamic>.from(item)))
         .where((track) => track.id.isNotEmpty && track.streamUrl.isNotEmpty)
         .toList(growable: false);
+
+    if (_cache.length >= _maxCacheEntries) {
+      final oldest = _cache.entries.reduce(
+        (a, b) => a.value.createdAt.isBefore(b.value.createdAt) ? a : b,
+      );
+      _cache.remove(oldest.key);
+    }
+    _cache[cacheKey] = _CachedOnlineTracks(now, tracks);
+    return tracks;
   }
 }
