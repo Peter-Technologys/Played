@@ -58,12 +58,15 @@ dependencies:
   permission_handler: ^11.3.1
   image_picker: ^1.1.2
 
-  # Notifications. Cloudflare owns notification business logic. Firebase
-  # Messaging has one job only: reliable Android background/terminated push
-  # delivery. It is not OTYA's auth, database, AI, crash or app-config backend.
+  # Firebase Android services. Cloudflare remains the OTYA control plane and
+  # backend authority. These matched FlutterFire versions belong to the same
+  # firebase_core 3.15.2 generation already used by OTYA.
   flutter_local_notifications: ^18.0.1
   firebase_core: ^3.15.2
   firebase_messaging: ^15.2.10
+  firebase_app_check: ^0.3.2+10
+  firebase_analytics: ^11.6.0
+  firebase_performance: ^0.10.1+10
 
   # Secure storage for vault key
   flutter_secure_storage: ^9.2.4
