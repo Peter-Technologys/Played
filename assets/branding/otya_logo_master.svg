@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">OTYA master logo</title>
+  <desc id="desc">Official OTYA loop symbol. In a horizontal wordmark this symbol is the letter O and is followed only by TYA.</desc>
+  <defs>
+    <linearGradient id="brand" x1="0.12" y1="0.1" x2="0.9" y2="0.92">
+      <stop offset="0" stop-color="#31E9FF"/>
+      <stop offset="0.18" stop-color="#1267FF"/>
+      <stop offset="0.42" stop-color="#3520FF"/>
+      <stop offset="0.66" stop-color="#D916FF"/>
+      <stop offset="0.82" stop-color="#FF3C9E"/>
+      <stop offset="0.93" stop-color="#FF8A19"/>
+      <stop offset="1" stop-color="#FFE34A"/>
+    </linearGradient>
+    <linearGradient id="front" x1="0.08" y1="0.2" x2="0.92" y2="0.84">
+      <stop offset="0" stop-color="#22DFFF"/>
+      <stop offset="0.28" stop-color="#173BFF"/>
+      <stop offset="0.56" stop-color="#7A13FF"/>
+      <stop offset="0.8" stop-color="#FF20C5"/>
+      <stop offset="1" stop-color="#FFB11E"/>
+    </linearGradient>
+    <filter id="glow" x="-35%" y="-35%" width="170%" height="170%">
+      <feGaussianBlur stdDeviation="14" result="blur"/>
+      <feColorMatrix in="blur" type="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 .55 0" result="soft"/>
+      <feMerge><feMergeNode in="soft"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round" filter="url(#glow)">
+    <path d="M260 700 C130 480 205 220 430 142 C660 62 885 214 894 454 C903 672 760 865 550 885 C372 902 225 808 260 700" stroke="url(#brand)" stroke-width="214"/>
+    <path d="M252 596 C248 327 486 179 690 246 C823 289 879 425 830 553 C787 666 696 741 598 784" stroke="url(#front)" stroke-width="166" opacity=".96"/>
+    <path d="M352 780 C492 864 681 809 779 656" stroke="#FF5BCB" stroke-width="18" opacity=".52"/>
+    <path d="M220 444 C278 226 522 126 729 224" stroke="#77F1FF" stroke-width="15" opacity=".72"/>
+  </g>
+</svg>
