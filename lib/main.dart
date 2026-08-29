@@ -49,36 +49,22 @@ Future<void> main() async {
   };
 
   await runZonedGuarded(() async {
-    var databaseReady = false;
-    try {
-      databaseReady = await _initDatabase();
-    } catch (e, st) {
-      debugPrint('[Database] init failed: $e\n$st');
-      CrashReporter.instance.report(e, st);
-    }
+    final settingsNotifier = SettingsNotifier(const AppSettings());
 
-    AppSettings savedSettings;
-    try {
-      savedSettings = await AppSettings.load();
-    } catch (e, st) {
-      debugPrint('[Settings] load failed: $e\n$st');
-      CrashReporter.instance.report(e, st);
-      savedSettings = const AppSettings();
-    }
-
+    // First paint must not wait on SharedPreferences, SQLite, MediaKit,
+    // AudioService, Firebase or any other plugin-backed service. Render OTYA
+    // immediately with safe local defaults, then hydrate after the first frame.
     runApp(
       ProviderScope(
         overrides: [
-          settingsProvider.overrideWith(
-            (ref) => SettingsNotifier(savedSettings),
-          ),
+          settingsProvider.overrideWith((ref) => settingsNotifier),
         ],
         child: const OtyaPlayerApp(),
       ),
     );
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(_initBackground(savedSettings, databaseReady));
+      unawaited(_bootstrapAfterFirstFrame(settingsNotifier));
     });
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
@@ -87,6 +73,27 @@ Future<void> main() async {
       _showCrashOverlay('Startup Crash', '$error\n\n$stack');
     }
   });
+}
+
+Future<void> _bootstrapAfterFirstFrame(SettingsNotifier settingsNotifier) async {
+  var savedSettings = const AppSettings();
+  try {
+    savedSettings = await AppSettings.load();
+    settingsNotifier.hydrate(savedSettings);
+  } catch (e, st) {
+    debugPrint('[Settings] load failed: $e\n$st');
+    CrashReporter.instance.report(e, st);
+  }
+
+  var databaseReady = false;
+  try {
+    databaseReady = await _initDatabase();
+  } catch (e, st) {
+    debugPrint('[Database] init failed: $e\n$st');
+    CrashReporter.instance.report(e, st);
+  }
+
+  await _initBackground(savedSettings, databaseReady);
 }
 
 void _showCrashOverlay(String title, String details) {
