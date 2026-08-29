@@ -9,7 +9,6 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/services/new_media_tracker.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
 import '../../playlists/playlist_screen.dart' show playlistsProvider;
@@ -397,7 +396,6 @@ class _ShuffleBar extends ConsumerWidget {
           if (songs.isEmpty) return;
           HapticFeedback.lightImpact();
           final shuffled = List.of(songs)..shuffle();
-          NewMediaTracker.instance.markSeen(shuffled.first).ignore();
           ref.read(queueProvider.notifier).setQueue(shuffled);
           ref.read(_musicNowPlayingIdProvider.notifier).state = shuffled.first.id;
           context.push('/player/audio', extra: shuffled.first);
@@ -454,10 +452,7 @@ class _SongRow extends ConsumerWidget {
     final isPlaying = nowPlayingId == item.id;
 
     return InkWell(
-      onTap: () {
-        NewMediaTracker.instance.markSeen(item).ignore();
-        onTap();
-      },
+      onTap: onTap,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
