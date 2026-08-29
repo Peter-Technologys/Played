@@ -217,6 +217,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     }
   }
 
+  void _openAccountCenter(String section, String title) {
+    context.push('/webview', extra: {
+      'url': 'https://petersmartlink.com/account#$section',
+      'title': title,
+    });
+  }
+
   Future<void> _signOut() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -292,6 +299,20 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                               ? 'Google is linked to this same OTYA account'
                               : 'Link Google without creating a second OTYA account',
                           onTap: _connectGoogle,
+                        ),
+                        const _Divider(),
+                        _ActionTile(
+                          icon: Icons.phonelink_lock_rounded,
+                          title: 'Two-step verification',
+                          subtitle: 'Set up or manage authenticator and recovery codes in the OTYA account center',
+                          onTap: () => _openAccountCenter('security', 'Account security'),
+                        ),
+                        const _Divider(),
+                        _ActionTile(
+                          icon: Icons.devices_rounded,
+                          title: 'Devices & sessions',
+                          subtitle: 'Review active sessions and sign out devices you no longer use',
+                          onTap: () => _openAccountCenter('sessions', 'Devices & sessions'),
                         ),
                       ]),
                       const SizedBox(height: 22),
