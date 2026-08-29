@@ -1,20 +1,16 @@
-// A single FlutterLocalNotificationsPlugin shared across all notification
-// services to avoid duplicate Android channel registrations and conflicting
-// onDidReceiveNotificationResponse callbacks.
+// One FlutterLocalNotificationsPlugin shared by OTYA's local notification
+// owners so Android channel registration and tap handling stay centralized.
 //
-// Notification ID routing:
-//   9001      -> UpdateNotificationService (update download)
-//   2000-2003 -> PushNotificationService   (FCM push)
-//   else      -> NotificationService       (FFmpeg tools)
+// Notification routing:
+//   2000-2003 -> PushNotificationService (updates, downloads, announcements)
+//   everything else -> NotificationService (tool/local notifications)
 //
-// Note: Media playback notifications (previously ID 1000) are now handled
-// natively by audio_service via the system MediaSession. They no longer
-// go through this plugin.
+// Media playback notifications are owned by audio_service/MediaSession and do
+// not go through this plugin.
 
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'notification_service.dart';
 import 'push_notification_service.dart';
-import 'update_notification_service.dart';
 
 final sharedNotificationsPlugin = FlutterLocalNotificationsPlugin();
 bool _sharedPluginInitialized = false;
@@ -32,14 +28,9 @@ Future<void> initSharedNotificationsPlugin() async {
 
 void sharedNotificationRouter(NotificationResponse response) {
   final id = response.id ?? -1;
-  if (id == 9001) {
-    UpdateNotificationService.instance.handleTap(response);
-  } else if (id >= 2000 && id <= 2003) {
+  if (id >= 2000 && id <= 2003) {
     PushNotificationService.instance.handleTap(response);
-  } else if (id == 3000) {
-    // ProChurnService notification - open payload URL
-    NotificationService.instance.handleTap(response);
-  } else {
-    NotificationService.instance.handleTap(response);
+    return;
   }
+  NotificationService.instance.handleTap(response);
 }
