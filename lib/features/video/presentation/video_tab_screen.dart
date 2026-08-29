@@ -12,6 +12,7 @@ import '../../../core/services/file_ops_service.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
 import '../../playlists/playlist_screen.dart' show playlistsProvider;
+import '../../../shared/widgets/media_new_indicator.dart';
 import '../../../shared/widgets/playlists_view.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
@@ -45,9 +46,6 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // A4: Debounce is now handled inside MediaLibraryNotifier.backgroundRefresh()
-    // so both VideoTabScreen and MusicTabScreen can call it directly without
-    // double-firing when both tabs are alive via AutomaticKeepAliveClientMixin.
     if (state == AppLifecycleState.resumed) {
       ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
     }
@@ -61,7 +59,7 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // required by AutomaticKeepAliveClientMixin
+    super.build(context);
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_videoFilterProvider);
 
@@ -69,13 +67,8 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
       body: SafeArea(
         child: Column(
           children: [
-            // ── Header ──────────────────────────────────────────────
             _VideoHeader(libraryAsync: libraryAsync),
-
-            // ── Filter pills ─────────────────────────────────────────
             _FilterPills(current: filter),
-
-            // ── Content ──────────────────────────────────────────────
             Expanded(
               child: libraryAsync.when(
                 loading: () => libraryAsync.valueOrNull != null
@@ -83,7 +76,6 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
                         context, libraryAsync.valueOrNull!, filter)
                     : const _VideoShimmer(),
                 error: (e, _) {
-                  // A2: Show permission recovery screen for storage errors.
                   final msg = e.toString().toLowerCase();
                   if (msg.contains('permission')) {
                     return PermissionDeniedScreen(
@@ -128,8 +120,6 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
     }
   }
 }
-
-// ── Header ────────────────────────────────────────────────────────────────
 
 class _VideoHeader extends ConsumerWidget {
   final AsyncValue<List<MediaItem>> libraryAsync;
@@ -207,7 +197,6 @@ class _VideoHeader extends ConsumerWidget {
               ],
             ),
           ),
-          // Search
           _IconBtn(
             icon: Icons.search_rounded,
             onTap: () {
@@ -221,7 +210,6 @@ class _VideoHeader extends ConsumerWidget {
             },
           ),
           const SizedBox(width: 6),
-          // History
           _IconBtn(
             icon: Icons.history_rounded,
             onTap: () => context.push('/history'),
@@ -232,8 +220,6 @@ class _VideoHeader extends ConsumerWidget {
   }
 }
 
-// ── Filter pills ──────────────────────────────────────────────────────────
-
 class _FilterPills extends ConsumerWidget {
   final _VideoFilter current;
   const _FilterPills({required this.current});
@@ -241,8 +227,8 @@ class _FilterPills extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     const pills = [
-      (_VideoFilter.videos,    'Videos',    Icons.play_circle_rounded),
-      (_VideoFilter.folders,   'Folders',   Icons.folder_rounded),
+      (_VideoFilter.videos, 'Videos', Icons.play_circle_rounded),
+      (_VideoFilter.folders, 'Folders', Icons.folder_rounded),
       (_VideoFilter.playlists, 'Playlists', Icons.queue_play_next_rounded),
     ];
 
@@ -294,11 +280,8 @@ class _FilterPills extends ConsumerWidget {
   }
 }
 
-// ── Video Grid / List ─────────────────────────────────────────────────────
-
 class _VideoGrid extends ConsumerWidget {
   final List<MediaItem> items;
-  /// When true, renders a list view; when false, renders the grid view.
   final bool isListView;
   const _VideoGrid({required this.items, this.isListView = true});
 
@@ -309,8 +292,7 @@ class _VideoGrid extends ConsumerWidget {
           icon: Icons.videocam_rounded, label: 'No videos found');
     }
 
-    // ── Shuffle bar widget (reused in both list and grid paths) ───────
-    Widget shuffleBar = GestureDetector(
+    final shuffleBar = GestureDetector(
       onTap: () {
         HapticFeedback.selectionClick();
         final shuffled = List<MediaItem>.from(items)..shuffle();
@@ -345,7 +327,6 @@ class _VideoGrid extends ConsumerWidget {
       ),
     );
 
-    // ── List view — shuffle bar is slot 0, videos start at slot 1 ────
     if (isListView) {
       return ListView.builder(
         padding: EdgeInsets.fromLTRB(
@@ -353,7 +334,7 @@ class _VideoGrid extends ConsumerWidget {
         physics: const BouncingScrollPhysics(),
         cacheExtent: 600,
         itemExtent: 86,
-        itemCount: items.length + 1, // slot 0 = shuffle bar
+        itemCount: items.length + 1,
         itemBuilder: (context, i) {
           if (i == 0) return shuffleBar;
           final item = items[i - 1];
@@ -371,7 +352,6 @@ class _VideoGrid extends ConsumerWidget {
       );
     }
 
-    // ── Grid view — CustomScrollView with shuffle bar sliver + grid ───
     return CustomScrollView(
       physics: const BouncingScrollPhysics(),
       cacheExtent: 400,
@@ -416,13 +396,6 @@ class _VideoGrid extends ConsumerWidget {
   }
 }
 
-// Dead code placeholder removed — list and grid views are above.
-
-// ── Video List Item ───────────────────────────────────────────────────────
-
-/// Row-layout list item used when the Videos tab is in list-view mode.
-///
-/// Layout: [Compact 16:9 thumbnail | Metadata Column | 3-dot menu]
 class _VideoListItem extends StatefulWidget {
   final MediaItem item;
   final VoidCallback onTap;
@@ -436,9 +409,6 @@ class _VideoListItemState extends State<_VideoListItem> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
   String? _thumbPath;
   bool _disposed = false;
-
-  // Share the same LRU cache as _VideoCardState so thumbnails loaded in
-  // grid mode are instantly available when switching to list mode.
   static final Map<String, String?> _thumbCache = _VideoCardState._thumbCache;
 
   @override
@@ -472,7 +442,6 @@ class _VideoListItemState extends State<_VideoListItem> {
         setState(() => _thumbPath = path);
       }
     } catch (_) {
-      // Same retry logic as _VideoCardState: one deferred retry before giving up.
       if (!_VideoCardState._retryKeys.contains(key)) {
         _VideoCardState._retryKeys.add(key);
         await Future.delayed(const Duration(seconds: 4));
@@ -497,25 +466,22 @@ class _VideoListItemState extends State<_VideoListItem> {
     }
   }
 
-  /// Infer a resolution badge from the file path (same logic as _VideoCardState).
   String _resolutionBadge() {
     final p = widget.item.filePath.toLowerCase();
     if (p.contains('2160') || p.contains('4k')) return '4K';
     if (p.contains('1080')) return '1080p';
-    if (p.contains('720'))  return '720p';
-    if (p.contains('480'))  return '480p';
-    if (p.contains('360'))  return '360p';
+    if (p.contains('720')) return '720p';
+    if (p.contains('480')) return '480p';
+    if (p.contains('360')) return '360p';
     return 'SD';
   }
 
-  /// Extract the immediate parent folder name from the file path.
   String _folderName() {
     final parts = widget.item.filePath.split('/');
     if (parts.length >= 2) return parts[parts.length - 2];
     return 'Local';
   }
 
-  /// Infer a source icon from the folder path.
   IconData _sourceIcon() {
     final p = widget.item.filePath.toLowerCase();
     if (p.contains('dcim') || p.contains('camera')) return Icons.camera_alt;
@@ -559,7 +525,6 @@ class _VideoListItemState extends State<_VideoListItem> {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            // ── LEFT: Compact 16:9 thumbnail ─────────────────────────
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: SizedBox(
@@ -568,7 +533,6 @@ class _VideoListItemState extends State<_VideoListItem> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Thumbnail or placeholder
                     _thumbPath != null
                         ? Image.file(
                             File(_thumbPath!),
@@ -578,8 +542,11 @@ class _VideoListItemState extends State<_VideoListItem> {
                                 _thumbnailPlaceholder(),
                           )
                         : _thumbnailPlaceholder(),
-
-                    // Duration badge — bottom-right
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: MediaNewIndicator(item: widget.item),
+                    ),
                     Positioned(
                       bottom: 4,
                       right: 4,
@@ -605,16 +572,12 @@ class _VideoListItemState extends State<_VideoListItem> {
                 ),
               ),
             ),
-
             const SizedBox(width: 10),
-
-            // ── MIDDLE: Metadata ──────────────────────────────────────
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Title
                   Text(
                     widget.item.fileName.isNotEmpty
                         ? widget.item.fileName
@@ -629,7 +592,6 @@ class _VideoListItemState extends State<_VideoListItem> {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  // Resolution + size row
                   Row(
                     children: [
                       Container(
@@ -667,7 +629,6 @@ class _VideoListItemState extends State<_VideoListItem> {
                     ],
                   ),
                   const SizedBox(height: 4),
-                  // Source icon + folder name row
                   Row(
                     children: [
                       Icon(_sourceIcon(),
@@ -690,10 +651,7 @@ class _VideoListItemState extends State<_VideoListItem> {
                 ],
               ),
             ),
-
             const SizedBox(width: 4),
-
-            // ── RIGHT: 3-dot menu ─────────────────────────────────────
             GestureDetector(
               onTap: () {
                 HapticFeedback.selectionClick();
@@ -719,8 +677,6 @@ class _VideoListItemState extends State<_VideoListItem> {
   );
 }
 
-// ── Video Card ────────────────────────────────────────────────────────────
-
 class _VideoCard extends StatefulWidget {
   final MediaItem item;
   final VoidCallback onTap;
@@ -734,20 +690,12 @@ class _VideoCardState extends State<_VideoCard> {
   static const _channel = MethodChannel('com.otyaplayer.app/media_store');
   String? _thumbPath;
   bool _disposed = false;
-
-  // A3: 200-entry LRU thumbnail cache (insertion-order eviction via LinkedHashMap).
-  // Replaces the previous unbounded Map to prevent unbounded memory growth on
-  // large video libraries.
   static final Map<String, String?> _thumbCache = {};
   static const _maxThumbCache = 200;
-
-  // Keys whose first thumbnail generation attempt failed.
-  // Used by _loadThumb to schedule one retry instead of caching null forever.
   static final Set<String> _retryKeys = {};
 
   static void _thumbCacheSet(String key, String? value) {
     if (_thumbCache.length >= _maxThumbCache) {
-      // LinkedHashMap preserves insertion order — evict the oldest entry.
       _thumbCache.remove(_thumbCache.keys.first);
     }
     _thumbCache[key] = value;
@@ -784,15 +732,12 @@ class _VideoCardState extends State<_VideoCard> {
         setState(() => _thumbPath = path);
       }
     } catch (_) {
-      // First failure: schedule one retry after 4 s instead of caching null
-      // permanently. Transient MediaStore / IO errors resolve on their own.
       if (!_retryKeys.contains(key)) {
         _retryKeys.add(key);
         await Future.delayed(const Duration(seconds: 4));
         if (!_disposed && mounted) await _retryThumb(key);
         _retryKeys.remove(key);
       } else {
-        // Retry also failed — give up and cache null so we stop retrying.
         _thumbCacheSet(key, null);
       }
     }
@@ -809,22 +754,20 @@ class _VideoCardState extends State<_VideoCard> {
         setState(() => _thumbPath = path);
       }
     } catch (_) {
-      _thumbCacheSet(key, null); // Give up after one retry.
+      _thumbCacheSet(key, null);
     }
   }
 
-  /// Infer a resolution badge from the file path.
   String _resolutionBadge() {
     final p = widget.item.filePath.toLowerCase();
     if (p.contains('2160') || p.contains('4k')) return '4K';
     if (p.contains('1080')) return '1080p';
-    if (p.contains('720'))  return '720p';
-    if (p.contains('480'))  return '480p';
-    if (p.contains('360'))  return '360p';
+    if (p.contains('720')) return '720p';
+    if (p.contains('480')) return '480p';
+    if (p.contains('360')) return '360p';
     return 'SD';
   }
 
-  /// Extract the immediate parent folder name from the file path.
   String _folderName() {
     final parts = widget.item.filePath.split('/');
     if (parts.length >= 2) return parts[parts.length - 2];
@@ -865,7 +808,6 @@ class _VideoCardState extends State<_VideoCard> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Thumbnail area
             Expanded(
               child: ClipRRect(
                 borderRadius:
@@ -873,7 +815,6 @@ class _VideoCardState extends State<_VideoCard> {
                 child: Stack(
                   fit: StackFit.expand,
                   children: [
-                    // Thumbnail or gradient placeholder
                     _thumbPath != null
                         ? Image.file(
                             File(_thumbPath!),
@@ -882,8 +823,11 @@ class _VideoCardState extends State<_VideoCard> {
                             errorBuilder: (_, __, ___) => _gradientBg(),
                           )
                         : _gradientBg(),
-
-                    // Play button overlay
+                    Positioned(
+                      top: 6,
+                      left: 6,
+                      child: MediaNewIndicator(item: widget.item),
+                    ),
                     Center(
                       child: Container(
                         width: 34,
@@ -896,8 +840,6 @@ class _VideoCardState extends State<_VideoCard> {
                             color: Colors.white, size: 22),
                       ),
                     ),
-
-                    // Duration badge (bottom-right)
                     Positioned(
                       bottom: 6,
                       right: 6,
@@ -919,8 +861,6 @@ class _VideoCardState extends State<_VideoCard> {
                         ),
                       ),
                     ),
-
-                    // 3-dot menu (top-right)
                     Positioned(
                       top: 4,
                       right: 4,
@@ -944,8 +884,6 @@ class _VideoCardState extends State<_VideoCard> {
                 ),
               ),
             ),
-
-            // Info area
             Padding(
               padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
               child: Column(
@@ -965,17 +903,14 @@ class _VideoCardState extends State<_VideoCard> {
                   const SizedBox(height: 3),
                   Row(
                     children: [
-                      // Resolution badge
                       _Badge(
                           label: _resolutionBadge(),
                           color: AppColors.accent),
                       const SizedBox(width: 4),
-                      // File size
                       _Badge(
                           label: widget.item.formattedSize,
                           color: AppColors.textSecondary),
                       const Spacer(),
-                      // Folder name
                       Flexible(
                         child: Text(
                           _folderName(),
@@ -1007,8 +942,6 @@ class _VideoCardState extends State<_VideoCard> {
   );
 }
 
-// ── Small badge widget ────────────────────────────────────────────────────
-
 class _Badge extends StatelessWidget {
   final String label;
   final Color color;
@@ -1036,8 +969,6 @@ class _Badge extends StatelessWidget {
   }
 }
 
-// ── Video context menu ────────────────────────────────────────────────────
-
 class _VideoContextMenu extends ConsumerWidget {
   final MediaItem item;
   final VoidCallback onPlay;
@@ -1050,7 +981,7 @@ class _VideoContextMenu extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('"${item.title}" moved to Safe'),
+            content: Text('"${item.title}" moved to Private'),
             backgroundColor: AppColors.surface,
           ),
         );
@@ -1059,7 +990,7 @@ class _VideoContextMenu extends ConsumerWidget {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Failed to add to Safe: $e'),
+            content: Text('Failed to move to Private: $e'),
             backgroundColor: AppColors.error,
           ),
         );
@@ -1218,7 +1149,6 @@ class _VideoContextMenu extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           Center(
             child: Container(
               width: 40,
@@ -1229,7 +1159,6 @@ class _VideoContextMenu extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 12),
-          // Title row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
@@ -1301,7 +1230,7 @@ class _VideoContextMenu extends ConsumerWidget {
           ),
           _ContextOption(
             icon: Icons.lock_rounded,
-            label: 'Move to Safe',
+            label: 'Move to Private',
             color: AppColors.accentViolet,
             onTap: () => _addToVault(context),
           ),
@@ -1344,8 +1273,6 @@ class _ContextOption extends StatelessWidget {
     );
   }
 }
-
-// ── Video Folders Tab ─────────────────────────────────────────────────────
 
 class _VideoFoldersTab extends StatelessWidget {
   final List<MediaItem> items;
@@ -1435,7 +1362,6 @@ class _VideoFoldersTab extends StatelessWidget {
   }
 }
 
-// Public so it can be referenced from router.dart via GoRoute.
 class VideoFolderDetailPage extends ConsumerWidget {
   final String name;
   final List<MediaItem> items;
@@ -1505,10 +1431,6 @@ class VideoFolderDetailPage extends ConsumerWidget {
     );
   }
 }
-
-// PlaylistsView is now in lib/shared/widgets/playlists_view.dart
-
-// ── Search delegate ───────────────────────────────────────────────────────
 
 class _VideoSearchDelegate extends SearchDelegate<MediaItem?> {
   final List<MediaItem> videos;
@@ -1596,8 +1518,6 @@ class _VideoSearchDelegate extends SearchDelegate<MediaItem?> {
     );
   }
 }
-
-// ── Shared helpers ────────────────────────────────────────────────────────
 
 class _IconBtn extends StatelessWidget {
   final IconData icon;
