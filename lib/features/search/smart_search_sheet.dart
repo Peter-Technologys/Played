@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -8,6 +10,7 @@ import '../../app/theme/app_colors.dart';
 import '../../core/models/media_item.dart';
 import '../../core/models/playlist.dart';
 import '../../core/services/otya_support_service.dart';
+import '../music/online/online_music_service.dart';
 import '../my_space/presentation/providers/my_space_provider.dart';
 import '../player/presentation/mini_player.dart';
 import '../player/presentation/queue_screen.dart';
@@ -52,11 +55,16 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final _ai = OtyaSupportService.instance;
+  final _onlineMusic = OnlineMusicService.instance;
 
+  Timer? _onlineDebounce;
+  int _onlineGeneration = 0;
   String _query = '';
   String? _aiAnswer;
   String? _aiError;
   bool _asking = false;
+  bool _onlineLoading = false;
+  List<OnlineTrack> _onlineTracks = const [];
 
   static const _help = <_HelpHit>[
     _HelpHit('Add subtitles', 'Open a video and use the CC control. OTYA can select embedded subtitle tracks when they are available.', ['subtitle', 'subtitles', 'caption', 'captions', 'cc']),
@@ -65,6 +73,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
     _HelpHit('Convert video to audio', 'Open Me → Converter and choose a local video. OTYA extracts its existing audio track on the device without uploading it.', ['convert', 'converter', 'extract audio', 'm4a']),
     _HelpHit('Private media', 'Open Me → Private. Protected media stays in OTYA app-private storage until you restore it.', ['private', 'vault', 'lock', 'hide media']),
     _HelpHit('Downloads', 'Playable files in Android Download/Downloads folders automatically belong to Video or Music after scanning. Me → Files → Downloads shows that subset.', ['download', 'downloads', 'downloaded']),
+    _HelpHit('Online music', 'When internet is available, Search can also show legal online music. Local songs and downloaded music remain available without internet.', ['online music', 'jamendo', 'stream', 'streaming', 'online song']),
   ];
 
   @override
@@ -75,6 +84,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
 
   @override
   void dispose() {
+    _onlineDebounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -144,6 +154,57 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
     }).take(5).toList(growable: false);
   }
 
+  void _queryChanged(String value) {
+    setState(() {
+      _query = value;
+      _aiAnswer = null;
+      _aiError = null;
+      if (value.trim().length < 2) {
+        _onlineTracks = const [];
+        _onlineLoading = false;
+      }
+    });
+    _scheduleOnlineSearch(value);
+  }
+
+  void _scheduleOnlineSearch(String value) {
+    _onlineDebounce?.cancel();
+    final query = value.trim();
+    final generation = ++_onlineGeneration;
+    if (query.length < 2) return;
+    _onlineDebounce = Timer(const Duration(milliseconds: 380), () {
+      _searchOnline(query, generation);
+    });
+  }
+
+  Future<void> _searchOnline(String query, int generation) async {
+    try {
+      final connectivity = await Connectivity().checkConnectivity();
+      if (!mounted || generation != _onlineGeneration) return;
+      if (connectivity.every((result) => result == ConnectivityResult.none)) {
+        setState(() {
+          _onlineLoading = false;
+          _onlineTracks = const [];
+        });
+        return;
+      }
+
+      setState(() => _onlineLoading = true);
+      final tracks = await _onlineMusic.search(query, limit: 10);
+      if (!mounted || generation != _onlineGeneration || _query.trim() != query) return;
+      setState(() {
+        _onlineTracks = tracks.take(10).toList(growable: false);
+        _onlineLoading = false;
+      });
+    } catch (_) {
+      if (!mounted || generation != _onlineGeneration) return;
+      setState(() {
+        _onlineTracks = const [];
+        _onlineLoading = false;
+      });
+    }
+  }
+
   Future<void> _askAi() async {
     final query = _query.trim();
     if (query.isEmpty || _asking) return;
@@ -177,6 +238,15 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
     ref.read(queueProvider.notifier).setQueue(queue, startIndex: index < 0 ? 0 : index);
     if (!item.isVideo) ref.read(miniPlayerItemProvider.notifier).state = item;
     _closeThen(() => context.push(item.isVideo ? '/player/video' : '/player/audio', extra: item));
+  }
+
+  void _openOnlineTrack(OnlineTrack track) {
+    final queue = _onlineTracks.map((entry) => entry.toMediaItem()).toList(growable: false);
+    final item = track.toMediaItem();
+    final index = queue.indexWhere((entry) => entry.id == item.id);
+    ref.read(queueProvider.notifier).setQueue(queue, startIndex: index < 0 ? 0 : index);
+    ref.read(miniPlayerItemProvider.notifier).state = item;
+    _closeThen(() => context.push('/player/audio', extra: item));
   }
 
   void _openGroup(_GroupHit hit) {
@@ -213,12 +283,25 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
     final playlistHits = _playlistMatches(playlists);
     final help = _helpMatches();
     final hasQuery = _q.isNotEmpty;
-    final noLocalAnswer = hasQuery && media.isEmpty && groups.isEmpty && playlistHits.isEmpty && help.isEmpty;
+    final noLocalAnswer = hasQuery &&
+        media.isEmpty &&
+        groups.isEmpty &&
+        playlistHits.isEmpty &&
+        help.isEmpty &&
+        _onlineTracks.isEmpty &&
+        !_onlineLoading;
 
     return Column(
       children: [
         const SizedBox(height: 10),
-        Container(width: 42, height: 4, decoration: BoxDecoration(color: AppColors.borderOf(context), borderRadius: BorderRadius.circular(99))),
+        Container(
+          width: 42,
+          height: 4,
+          decoration: BoxDecoration(
+            color: AppColors.borderOf(context),
+            borderRadius: BorderRadius.circular(99),
+          ),
+        ),
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
           child: TextField(
@@ -228,11 +311,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
             onSubmitted: (_) {
               if (noLocalAnswer) _askAi();
             },
-            onChanged: (value) => setState(() {
-              _query = value;
-              _aiAnswer = null;
-              _aiError = null;
-            }),
+            onChanged: _queryChanged,
             decoration: InputDecoration(
               hintText: 'Search OTYA',
               prefixIcon: const Icon(Icons.search_rounded),
@@ -241,18 +320,25 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
                   : IconButton(
                       tooltip: 'Clear',
                       onPressed: () {
+                        _onlineDebounce?.cancel();
+                        _onlineGeneration++;
                         _controller.clear();
                         setState(() {
                           _query = '';
                           _aiAnswer = null;
                           _aiError = null;
+                          _onlineTracks = const [];
+                          _onlineLoading = false;
                         });
                       },
                       icon: const Icon(Icons.close_rounded),
                     ),
               filled: true,
               fillColor: Theme.of(context).scaffoldBackgroundColor,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(18), borderSide: BorderSide.none),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(18),
+                borderSide: BorderSide.none,
+              ),
             ),
           ),
         ),
@@ -266,61 +352,119 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
                     if (groups.isNotEmpty) ...[
                       _SectionLabel('Albums, artists & folders', '${groups.length}'),
                       ...groups.map((hit) => ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.cardOf(context),
-                          child: Icon(hit.type == 'Album' ? Icons.album_rounded : hit.type == 'Artist' ? Icons.person_rounded : Icons.folder_rounded, color: AppColors.accent),
-                        ),
-                        title: Text(hit.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        subtitle: Text('${hit.type} · ${hit.items.length} item${hit.items.length == 1 ? '' : 's'}'),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => _openGroup(hit),
-                      )),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.cardOf(context),
+                              child: Icon(
+                                hit.type == 'Album'
+                                    ? Icons.album_rounded
+                                    : hit.type == 'Artist'
+                                        ? Icons.person_rounded
+                                        : Icons.folder_rounded,
+                                color: AppColors.accent,
+                              ),
+                            ),
+                            title: Text(hit.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text('${hit.type} · ${hit.items.length} item${hit.items.length == 1 ? '' : 's'}'),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => _openGroup(hit),
+                          )),
                     ],
                     if (playlistHits.isNotEmpty) ...[
                       _SectionLabel('Playlists', '${playlistHits.length}'),
                       ...playlistHits.map((playlist) => ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        leading: const CircleAvatar(child: Icon(Icons.queue_music_rounded)),
-                        title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        subtitle: Text('${playlist.mediaIds.length} saved item${playlist.mediaIds.length == 1 ? '' : 's'}'),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () => _closeThen(() => context.push('/playlist/${playlist.id}')),
-                      )),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                            leading: const CircleAvatar(child: Icon(Icons.queue_music_rounded)),
+                            title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text('${playlist.mediaIds.length} saved item${playlist.mediaIds.length == 1 ? '' : 's'}'),
+                            trailing: const Icon(Icons.chevron_right_rounded),
+                            onTap: () => _closeThen(() => context.push('/playlist/${playlist.id}')),
+                          )),
                     ],
                     if (media.isNotEmpty) ...[
-                      _SectionLabel('Media', '${media.length}'),
+                      _SectionLabel('On this phone', '${media.length}'),
                       ...media.map((item) => ListTile(
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                        leading: CircleAvatar(
-                          backgroundColor: AppColors.cardOf(context),
-                          child: Icon(item.isVideo ? Icons.movie_outlined : Icons.music_note_rounded, color: AppColors.accent),
-                        ),
-                        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                        subtitle: Text(item.isVideo ? '${item.formattedDuration} · ${item.formattedSize}' : (item.artist?.trim().isNotEmpty == true ? item.artist!.trim() : item.formattedDuration), maxLines: 1, overflow: TextOverflow.ellipsis),
-                        trailing: const Icon(Icons.play_arrow_rounded),
-                        onTap: () => _openMedia(item, library),
-                      )),
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                            leading: CircleAvatar(
+                              backgroundColor: AppColors.cardOf(context),
+                              child: Icon(item.isVideo ? Icons.movie_outlined : Icons.music_note_rounded, color: AppColors.accent),
+                            ),
+                            title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                            subtitle: Text(
+                              item.isVideo
+                                  ? '${item.formattedDuration} · ${item.formattedSize}'
+                                  : (item.artist?.trim().isNotEmpty == true ? item.artist!.trim() : item.formattedDuration),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            trailing: const Icon(Icons.play_arrow_rounded),
+                            onTap: () => _openMedia(item, library),
+                          )),
+                    ],
+                    if (_onlineLoading || _onlineTracks.isNotEmpty) ...[
+                      _SectionLabel(
+                        'Online music',
+                        _onlineLoading ? 'Checking…' : '${_onlineTracks.length}',
+                      ),
+                      if (_onlineLoading && _onlineTracks.isEmpty)
+                        const LinearProgressIndicator(minHeight: 2)
+                      else
+                        ..._onlineTracks.map((track) => ListTile(
+                              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(10),
+                                child: SizedBox.square(
+                                  dimension: 44,
+                                  child: track.artworkUrl.isEmpty
+                                      ? const ColoredBox(
+                                          color: AppColors.surfaceElevated,
+                                          child: Icon(Icons.music_note_rounded, color: AppColors.accent),
+                                        )
+                                      : CachedNetworkImage(
+                                          imageUrl: track.artworkUrl,
+                                          fit: BoxFit.cover,
+                                          errorWidget: (_, __, ___) => const ColoredBox(
+                                            color: AppColors.surfaceElevated,
+                                            child: Icon(Icons.music_note_rounded, color: AppColors.accent),
+                                          ),
+                                        ),
+                                ),
+                              ),
+                              title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                              subtitle: Text('${track.artist} · Online', maxLines: 1, overflow: TextOverflow.ellipsis),
+                              trailing: const Icon(Icons.play_arrow_rounded),
+                              onTap: () => _openOnlineTrack(track),
+                            )),
                     ],
                     if (help.isNotEmpty) ...[
                       _SectionLabel('OTYA help', '${help.length}'),
                       ...help.map((entry) => Container(
-                        margin: const EdgeInsets.only(bottom: 9),
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.borderOf(context))),
-                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                          Text(entry.title, style: const TextStyle(fontWeight: FontWeight.w800)),
-                          const SizedBox(height: 5),
-                          Text(entry.answer, style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textSecondary)),
-                        ]),
-                      )),
+                            margin: const EdgeInsets.only(bottom: 9),
+                            padding: const EdgeInsets.all(14),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(15),
+                              border: Border.all(color: AppColors.borderOf(context)),
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(entry.title, style: const TextStyle(fontWeight: FontWeight.w800)),
+                                const SizedBox(height: 5),
+                                Text(entry.answer, style: const TextStyle(fontSize: 12.5, height: 1.45, color: AppColors.textSecondary)),
+                              ],
+                            ),
+                          )),
                     ],
                     if (noLocalAnswer || _aiAnswer != null || _aiError != null) ...[
                       _SectionLabel('Ask OTYA', noLocalAnswer ? 'Online help' : ''),
                       if (_aiAnswer != null)
                         Container(
                           padding: const EdgeInsets.all(15),
-                          decoration: BoxDecoration(color: AppColors.cardOf(context), borderRadius: BorderRadius.circular(15), border: Border.all(color: AppColors.borderOf(context))),
+                          decoration: BoxDecoration(
+                            color: AppColors.cardOf(context),
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(color: AppColors.borderOf(context)),
+                          ),
                           child: SelectableText(_aiAnswer!, style: const TextStyle(height: 1.5)),
                         )
                       else if (_aiError != null)
@@ -347,6 +491,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
 
 class _SearchStart extends StatelessWidget {
   const _SearchStart();
+
   @override
   Widget build(BuildContext context) => const Center(
         child: Padding(
@@ -358,7 +503,11 @@ class _SearchStart extends StatelessWidget {
               SizedBox(height: 14),
               Text('Search OTYA', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               SizedBox(height: 7),
-              Text('Search songs, videos, albums, artists, folders and playlists locally. OTYA help works offline; online Ask OTYA is only used when needed.', textAlign: TextAlign.center, style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary)),
+              Text(
+                'Local songs, videos, albums, artists, folders and playlists appear instantly. When internet is available, OTYA can add online music without slowing or blocking offline search.',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
+              ),
             ],
           ),
         ),
@@ -369,15 +518,18 @@ class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.title, this.detail);
   final String title;
   final String detail;
+
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(2, 13, 2, 7),
-        child: Row(children: [
-          Text(title.toUpperCase(), style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: .5)),
-          if (detail.isNotEmpty) ...[
-            const Spacer(),
-            Text(detail, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
+        child: Row(
+          children: [
+            Text(title.toUpperCase(), style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w900, letterSpacing: .5)),
+            if (detail.isNotEmpty) ...[
+              const Spacer(),
+              Text(detail, style: const TextStyle(fontSize: 10.5, color: AppColors.textSecondary)),
+            ],
           ],
-        ]),
+        ),
       );
 }
