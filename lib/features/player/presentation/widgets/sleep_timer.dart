@@ -1,11 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../../app/theme/app_colors.dart';
-import '../../../../core/services/sleep_detection_service.dart';
 
-// ── Provider ───────────────────────────────────────────────
+import '../../../../app/theme/app_dimensions.dart';
+import '../../../../core/services/playback_coordinator.dart';
 
 final sleepTimerProvider =
     StateNotifierProvider<SleepTimerNotifier, SleepTimerState>(
@@ -13,207 +13,225 @@ final sleepTimerProvider =
 );
 
 class SleepTimerState {
+  const SleepTimerState({this.remaining, this.isActive = false});
+
   final Duration? remaining;
   final bool isActive;
-  const SleepTimerState({this.remaining, this.isActive = false});
 }
 
+/// One owner for the user-selected countdown.
+///
+/// A sleep timer is a fixed deadline, not an inactivity detector. The final
+/// 30 seconds fade the active OTYA player's own volume and restore the previous
+/// volume when cancelled or after the expiry callback pauses playback.
 class SleepTimerNotifier extends StateNotifier<SleepTimerState> {
   SleepTimerNotifier() : super(const SleepTimerState());
 
-  // UI countdown ticker — updates remaining display every second.
   Timer? _ticker;
-  // Fade callback — set by the audio player screen
-  Future<void> Function(double volume)? onSetVolume;
+  DateTime? _deadline;
+  double? _volumeBeforeFade;
 
   void start(Duration duration, VoidCallback onExpire) {
-    _ticker?.cancel();
-    SleepDetectionService.instance.stop();
+    cancel(restoreVolume: true);
+    if (duration <= Duration.zero) return;
 
+    _deadline = DateTime.now().add(duration);
     state = SleepTimerState(remaining: duration, isActive: true);
-    var remaining = duration;
-
-    // Delegate the actual sleep detection to SleepDetectionService.
-    SleepDetectionService.instance.onSleepDetected = () {
-      _ticker?.cancel();
-      state = const SleepTimerState(isActive: false);
-      onSetVolume?.call(1.0); // restore volume
-      onExpire();
-    };
-    SleepDetectionService.instance.start(duration);
-
-    // Keep a UI ticker for the countdown display and volume fade.
     _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!state.isActive) { _ticker?.cancel(); return; }
-      remaining -= const Duration(seconds: 1);
-      state = SleepTimerState(remaining: remaining, isActive: true);
-
-      // Start 30-second volume fade before expiry
-      if (remaining.inSeconds <= 30 && remaining.inSeconds > 0) {
-        final fadeProgress = remaining.inSeconds / 30.0;
-        onSetVolume?.call(fadeProgress.clamp(0.0, 1.0));
-      }
+      _tick(onExpire);
     });
   }
 
-  void cancel() {
+  void _tick(VoidCallback onExpire) {
+    final deadline = _deadline;
+    if (deadline == null || !state.isActive) {
+      _ticker?.cancel();
+      return;
+    }
+
+    final now = DateTime.now();
+    final remaining = deadline.difference(now);
+    if (remaining <= Duration.zero) {
+      _ticker?.cancel();
+      _ticker = null;
+      _deadline = null;
+      state = const SleepTimerState(isActive: false);
+      _restoreVolume();
+      onExpire();
+      return;
+    }
+
+    state = SleepTimerState(remaining: remaining, isActive: true);
+    if (remaining <= const Duration(seconds: 30)) {
+      _fadeVolume(remaining);
+    }
+  }
+
+  void _fadeVolume(Duration remaining) {
+    final player = PlaybackCoordinator.instance.activePlayer;
+    if (player == null) return;
+
+    _volumeBeforeFade ??= player.state.volume;
+    final original = _volumeBeforeFade ?? 100.0;
+    final fraction = (remaining.inMilliseconds / 30000).clamp(0.0, 1.0);
+    unawaited(player.setVolume(original * fraction));
+  }
+
+  void _restoreVolume() {
+    final original = _volumeBeforeFade;
+    _volumeBeforeFade = null;
+    if (original == null) return;
+    final player = PlaybackCoordinator.instance.activePlayer;
+    if (player != null) unawaited(player.setVolume(original));
+  }
+
+  void cancel({bool restoreVolume = true}) {
     _ticker?.cancel();
-    SleepDetectionService.instance.stop();
-    SleepDetectionService.instance.onSleepDetected = null;
-    onSetVolume?.call(1.0); // restore volume
+    _ticker = null;
+    _deadline = null;
+    if (restoreVolume) _restoreVolume();
     state = const SleepTimerState(isActive: false);
   }
 
   @override
   void dispose() {
     _ticker?.cancel();
-    SleepDetectionService.instance.stop();
+    _restoreVolume();
     super.dispose();
   }
 }
 
-// ── Sleep Timer Button ─────────────────────────────────────────────
-
 class SleepTimerButton extends ConsumerWidget {
-  final VoidCallback onExpire;
   const SleepTimerButton({super.key, required this.onExpire});
+
+  final VoidCallback onExpire;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final timer = ref.watch(sleepTimerProvider);
+    final scheme = Theme.of(context).colorScheme;
 
-    return GestureDetector(
-      onTap: () {
-        HapticFeedback.lightImpact();
-        if (timer.isActive) {
-          ref.read(sleepTimerProvider.notifier).cancel();
-        } else {
-          _showPicker(context, ref);
-        }
-      },
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: timer.isActive
-              ? AppColors.accentViolet.withValues(alpha: 0.15)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: timer.isActive ? AppColors.accentViolet : AppColors.border,
+    return Tooltip(
+      message: timer.isActive ? 'Cancel sleep timer' : 'Set sleep timer',
+      child: InkWell(
+        borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
+        onTap: () {
+          HapticFeedback.lightImpact();
+          if (timer.isActive) {
+            ref.read(sleepTimerProvider.notifier).cancel();
+          } else {
+            _showPicker(context, ref);
+          }
+        },
+        child: AnimatedContainer(
+          duration: AppDimensions.motionStandard,
+          constraints: const BoxConstraints(
+            minHeight: AppDimensions.minimumTouchTarget,
+            minWidth: AppDimensions.minimumTouchTarget,
           ),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              Icons.bedtime_rounded,
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+          decoration: BoxDecoration(
+            color: timer.isActive
+                ? scheme.primary.withValues(alpha: .12)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppDimensions.radiusSmall),
+            border: Border.all(
               color: timer.isActive
-                  ? AppColors.accentViolet
-                  : AppColors.textSecondary,
-              size: 16,
+                  ? scheme.primary.withValues(alpha: .55)
+                  : scheme.outlineVariant,
             ),
-            if (timer.isActive && timer.remaining != null) ...[
-              const SizedBox(width: 5),
-              Text(
-                _fmt(timer.remaining!),
-                style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.accentViolet,
-                  fontFamily: 'Inter',
-                ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.bedtime_rounded,
+                color: timer.isActive
+                    ? scheme.primary
+                    : scheme.onSurfaceVariant,
+                size: 18,
               ),
+              if (timer.isActive && timer.remaining != null) ...[
+                const SizedBox(width: 6),
+                Text(
+                  _format(timer.remaining!),
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    color: scheme.primary,
+                    fontFeatures: const [FontFeature.tabularFigures()],
+                  ),
+                ),
+              ],
             ],
-          ],
+          ),
         ),
       ),
     );
   }
 
-  String _fmt(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
+  String _format(Duration duration) {
+    if (duration.inHours > 0) {
+      final hours = duration.inHours;
+      final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+      return '$hours:$minutes';
+    }
+    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$minutes:$seconds';
   }
 
   void _showPicker(BuildContext context, WidgetRef ref) {
-    final options = [
-      const Duration(minutes: 5),
-      const Duration(minutes: 10),
-      const Duration(minutes: 15),
-      const Duration(minutes: 30),
-      const Duration(minutes: 45),
-      const Duration(hours: 1),
+    const options = <Duration>[
+      Duration(minutes: 5),
+      Duration(minutes: 10),
+      Duration(minutes: 15),
+      Duration(minutes: 30),
+      Duration(minutes: 45),
+      Duration(hours: 1),
     ];
-    showModalBottomSheet(
+
+    showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+      builder: (sheetContext) => Padding(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Center(
-              child: Container(
-                width: 40, height: 4,
-                decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 20),
-            const Text('Sleep Timer',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                )),
-            const SizedBox(height: 4),
             const Text(
-              'Audio fades out smoothly over 30 seconds before stopping.',
-              style: TextStyle(fontSize: 12, color: AppColors.textSecondary),
+              'Sleep timer',
+              style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 6),
+            Text(
+              'OTYA will gently fade the active player during the final 30 seconds, then pause playback.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+            ),
+            const SizedBox(height: 18),
             Wrap(
               spacing: 10,
               runSpacing: 10,
-              children: options.map((d) {
-                final label = d.inHours >= 1
-                    ? '${d.inHours}h'
-                    : '${d.inMinutes}m';
-                return GestureDetector(
-                  onTap: () {
-                    Navigator.pop(context);
+              children: options.map((duration) {
+                final label = duration.inHours >= 1
+                    ? '${duration.inHours} hour'
+                    : '${duration.inMinutes} min';
+                return ActionChip(
+                  label: Text(label),
+                  avatar: const Icon(Icons.timer_outlined, size: 17),
+                  onPressed: () {
+                    Navigator.pop(sheetContext);
                     HapticFeedback.mediumImpact();
                     ref
                         .read(sleepTimerProvider.notifier)
-                        .start(d, onExpire);
+                        .start(duration, onExpire);
                   },
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.background,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.border),
-                    ),
-                    child: Text(label,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                          fontFamily: 'Inter',
-                        )),
-                  ),
                 );
-              }).toList(),
+              }).toList(growable: false),
             ),
           ],
         ),
