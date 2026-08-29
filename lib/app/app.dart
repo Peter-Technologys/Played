@@ -15,6 +15,7 @@ import '../core/widgets/remote_control_gate.dart';
 import '../core/widgets/update_dialog.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/settings_provider.dart';
+import '../shared/widgets/otya_logo.dart';
 import 'router.dart';
 import 'theme/app_colors.dart';
 import 'theme/app_theme.dart';
@@ -34,52 +35,30 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
 
-    // FIRST-PAINT RULE:
-    // Only local state is read before the app becomes usable. No Firebase,
-    // Cloudflare, auth, AI, update, announcement, or online-theme request is
-    // allowed to control startup. OTYA must open with airplane mode enabled.
+    // Only local state is allowed to affect first paint. Network services begin
+    // after Flutter has already produced a usable frame.
     _checkOnboarding();
     unawaited(_loadLocalVisualTheme());
 
     SchedulerBinding.instance.addPostFrameCallback((_) {
-      // All online/remote work starts only after Flutter has produced a frame.
-      // Every task is fire-and-forget and owns its own failure handling.
       unawaited(_startRemoteServicesAfterFirstFrame());
-
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
-        try {
-          AnnouncementDialog.showIfPending(context);
-        } catch (_) {}
+        try { AnnouncementDialog.showIfPending(context); } catch (_) {}
       });
       Future.delayed(const Duration(seconds: 4), () {
         if (!mounted) return;
-        try {
-          UpdateDialog.checkAndShow(context);
-        } catch (_) {}
+        try { UpdateDialog.checkAndShow(context); } catch (_) {}
       });
     });
   }
 
-  /// Loads only app-owned/local theme data. This method never needs internet.
   Future<void> _loadLocalVisualTheme() async {
-    try {
-      await CustomThemeManager.instance.load();
-    } catch (_) {
-      // Theme failure must never prevent Video/Music/Me from opening.
-    }
+    try { await CustomThemeManager.instance.load(); } catch (_) {}
   }
 
-  /// Remote work is deliberately kept out of the critical startup path.
   Future<void> _startRemoteServicesAfterFirstFrame() async {
-    try {
-      await RemoteControlService.instance.init();
-    } catch (_) {
-      // Cached/default configuration remains valid while offline.
-    }
-
-    // Seasonal themes are optional decoration. They must never delay startup,
-    // playback, media scanning, transfer, or local file access.
+    try { await RemoteControlService.instance.init(); } catch (_) {}
     unawaited(CustomThemeManager.instance.refreshSeasonalTheme().catchError((_) {}));
   }
 
@@ -120,27 +99,10 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       context: context,
       barrierDismissible: false,
       builder: (dialogContext) => AlertDialog(
-        icon: Container(
-          width: 58,
-          height: 58,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: const LinearGradient(
-              colors: [Color(0xFF11D7FF), Color(0xFF7544FF), Color(0xFFFF2CAA)],
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.accent.withValues(alpha: .25),
-                blurRadius: 20,
-              ),
-            ],
-          ),
-          child: const Icon(Icons.notifications_active_rounded,
-              color: Colors.white, size: 29),
-        ),
-        title: const Text('Stay in the loop'),
+        icon: const OtyaLogo(iconOnly: true, fontSize: 48),
+        title: const Text('Enable OTYA notifications?'),
         content: const Text(
-          'Allow notifications for Now Playing controls, completed downloads, important account alerts and new OTYA updates. You can change this later in Android settings.',
+          'Notifications provide Now Playing controls, completed local-task alerts, account/security messages and OTYA update notices. You can change this later in Android settings.',
         ),
         actions: [
           TextButton(
@@ -149,14 +111,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Enable notifications'),
+            child: const Text('Enable'),
           ),
         ],
       ),
     );
-    if (enable == true) {
-      await NotificationService.instance.requestPermission();
-    }
+    if (enable == true) await NotificationService.instance.requestPermission();
   }
 
   ThemeMode _materialThemeMode(AppThemeMode mode) => switch (mode) {
@@ -169,8 +129,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     if (mode == AppThemeMode.amoled) {
       return AppTheme.dark.copyWith(
         scaffoldBackgroundColor: Colors.black,
-        appBarTheme:
-            AppTheme.dark.appBarTheme.copyWith(backgroundColor: Colors.black),
+        appBarTheme: AppTheme.dark.appBarTheme.copyWith(backgroundColor: Colors.black),
       );
     }
     return AppTheme.dark;
@@ -178,7 +137,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
   @override
   Widget build(BuildContext context) {
-    final locale = ref.watch(localeProvider);
     final settings = ref.watch(settingsProvider);
 
     if (_checking) {
@@ -186,6 +144,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           ? AppTheme.light
           : _darkTheme(settings.themeMode);
       return MaterialApp(
+        title: 'OTYA',
         debugShowCheckedModeBanner: false,
         theme: startupTheme,
         home: Scaffold(
@@ -193,41 +152,22 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.accent,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.28),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 44,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
+                const OtyaLogo(iconOnly: true, fontSize: 68),
+                const SizedBox(height: 16),
+                Text(
                   'OTYA',
                   style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 4,
+                    color: AppColors.textPrimaryOf(context),
+                    fontSize: 18,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 3,
                     fontFamily: 'Inter',
                   ),
                 ),
-                const SizedBox(height: 32),
-                const CircularProgressIndicator(
-                  color: AppColors.accent,
-                  strokeWidth: 2,
+                const SizedBox(height: 26),
+                const SizedBox.square(
+                  dimension: 22,
+                  child: CircularProgressIndicator(strokeWidth: 2),
                 ),
               ],
             ),
@@ -243,9 +183,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       ]),
       builder: (context, _) {
         final themeManager = CustomThemeManager.instance;
-        final hasArtwork =
-            themeManager.hasImageWallpaper || themeManager.storyTheme != null;
-
+        final hasArtwork = themeManager.hasImageWallpaper || themeManager.storyTheme != null;
         final baseLight = AppTheme.light;
         final baseDark = _darkTheme(settings.themeMode);
         final lightTheme = hasArtwork
@@ -261,13 +199,8 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: _materialThemeMode(settings.themeMode),
-          locale: locale,
-          supportedLocales: const [
-            Locale('en'),
-            Locale('fr'),
-            Locale('es'),
-            Locale('sw'),
-          ],
+          locale: const Locale('en'),
+          supportedLocales: const [Locale('en')],
           localizationsDelegates: const [
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
@@ -278,12 +211,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             final isDark = Theme.of(context).brightness == Brightness.dark;
             final overlay = SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,
-              statusBarIconBrightness:
-                  isDark ? Brightness.light : Brightness.dark,
-              systemNavigationBarColor:
-                  Theme.of(context).scaffoldBackgroundColor,
-              systemNavigationBarIconBrightness:
-                  isDark ? Brightness.light : Brightness.dark,
+              statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
+              systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
             );
 
             Widget wrappedChild = child ?? const SizedBox.shrink();
@@ -308,8 +238,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                   child: Stack(
                     children: [
                       wrappedChild,
-                      if (!_onboardingDone)
-                        OnboardingOverlay(onDone: _completeOnboarding),
+                      if (!_onboardingDone) OnboardingOverlay(onDone: _completeOnboarding),
                     ],
                   ),
                 ),
