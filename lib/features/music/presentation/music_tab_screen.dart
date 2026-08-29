@@ -369,3 +369,84 @@ class _LibraryError extends StatelessWidget {
         ),
       );
 }
+
+class MusicFolderDetailPage extends _MusicGroupDetailPage {
+  const MusicFolderDetailPage({super.key, required super.name, required super.items})
+      : super(icon: Icons.folder_rounded);
+}
+
+class MusicAlbumDetailPage extends _MusicGroupDetailPage {
+  const MusicAlbumDetailPage({super.key, required super.name, required super.items})
+      : super(icon: Icons.album_rounded);
+}
+
+class MusicArtistDetailPage extends _MusicGroupDetailPage {
+  const MusicArtistDetailPage({super.key, required super.name, required super.items})
+      : super(icon: Icons.person_rounded);
+}
+
+class _MusicGroupDetailPage extends ConsumerWidget {
+  const _MusicGroupDetailPage({
+    super.key,
+    required this.name,
+    required this.items,
+    required this.icon,
+  });
+
+  final String name;
+  final List<MediaItem> items;
+  final IconData icon;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final songs = List<MediaItem>.from(items)
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
+
+    void play(int index) {
+      if (songs.isEmpty || index < 0 || index >= songs.length) return;
+      final item = songs[index];
+      ref.read(queueProvider.notifier).setQueue(songs, startIndex: index);
+      ref.read(miniPlayerItemProvider.notifier).state = item;
+      context.push('/player/audio', extra: item);
+    }
+
+    return WallpaperScaffold(
+      appBar: AppBar(title: Text(name)),
+      body: songs.isEmpty
+          ? const Center(child: Text('No songs found'))
+          : ListView.builder(
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 28),
+              itemCount: songs.length,
+              itemBuilder: (context, index) {
+                final item = songs[index];
+                return ListTile(
+                  leading: item.albumArtPath != null
+                      ? AlbumArtThumb(
+                          albumArtPath: item.albumArtPath,
+                          size: 44,
+                          borderRadius: 12,
+                        )
+                      : Icon(icon, color: AppColors.accent),
+                  title: Text(
+                    item.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  subtitle: Text(
+                    [
+                      if ((item.artist ?? '').trim().isNotEmpty &&
+                          item.artist != '<unknown>')
+                        item.artist!.trim(),
+                      item.formattedDuration,
+                    ].join(' · '),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  trailing: const Icon(Icons.play_arrow_rounded),
+                  onTap: () => play(index),
+                );
+              },
+            ),
+    );
+  }
+}
