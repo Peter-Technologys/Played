@@ -28,6 +28,7 @@ import '../features/playlists/playlist_screen.dart'
     show PlaylistDetailScreenById, PlaylistsScreen;
 import '../features/profile/profile_screen.dart'
     show ProfileScreen, WhatsNewScreen;
+import '../features/search/smart_search_sheet.dart';
 import '../features/settings/presentation/about_screen.dart';
 import '../features/settings/presentation/privacy_policy_screen.dart';
 import '../features/settings/presentation/settings_with_ai_screen.dart';
@@ -38,7 +39,6 @@ import '../features/vault/presentation/vault_lock_screen.dart';
 import '../features/video/presentation/video_tab_screen.dart'
     show VideoFolderDetailPage, VideoTabScreen;
 import '../features/webview/otya_webview_screen.dart';
-import '../shared/widgets/pro_gate.dart';
 
 CustomTransitionPage<void> _fadePage({
   required BuildContext context,
@@ -140,8 +140,6 @@ class AppRouter {
         pageBuilder: (c, s) =>
             _fadePage(context: c, state: s, child: const OtyaSupportScreen()),
       ),
-      // Compatibility: older deep links opened the standalone AI screen.
-      // Keep the link working, but route it into the focused OTYA support UI.
       GoRoute(path: '/ai', redirect: (_, __) => '/support'),
       GoRoute(
         path: '/auth',
@@ -169,7 +167,6 @@ class AppRouter {
         pageBuilder: (c, s) =>
             _fadePage(context: c, state: s, child: const AirDropScreen()),
       ),
-      // Compatibility for old shortcuts/bookmarks. User-facing naming is Transfer.
       GoRoute(path: '/airdrop', redirect: (_, __) => '/transfer'),
       GoRoute(
         path: '/profile',
@@ -305,11 +302,7 @@ class AppRouter {
         pageBuilder: (c, s) => _fadePage(
           context: c,
           state: s,
-          child: const ProGate(
-            featureName: 'Equalizer',
-            featureDescription: 'Fine-tune your audio with a 5-band equalizer.',
-            child: EqualizerScreen(),
-          ),
+          child: const EqualizerScreen(),
         ),
       ),
       GoRoute(
@@ -461,11 +454,7 @@ class AppRouter {
           return _fadePage(
             context: c,
             state: s,
-            child: ProGate(
-              featureName: 'Video trimmer',
-              featureDescription: 'Trim and compress a video for sharing.',
-              child: WhatsAppTrimmerScreen(mediaItem: item),
-            ),
+            child: WhatsAppTrimmerScreen(mediaItem: item),
           );
         },
       ),
@@ -508,6 +497,15 @@ class _MainShellState extends ConsumerState<_MainShell> {
 
     return Scaffold(
       body: widget.child,
+      floatingActionButton: FloatingActionButton.small(
+        heroTag: 'otya-global-search',
+        tooltip: 'Search OTYA',
+        onPressed: () {
+          HapticFeedback.selectionClick();
+          SmartSearchSheet.show(context);
+        },
+        child: const Icon(Icons.search_rounded),
+      ),
       bottomNavigationBar: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
