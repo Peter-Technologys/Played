@@ -17,6 +17,7 @@ abstract class Environment {
   static const String apiVersionUrl = '$workerUrl/api/version';
   static const String apiDeviceUrl = '$workerUrl/api/device';
   static const String apiFeedbackUrl = '$workerUrl/api/feedback';
+  static const String onlineMusicUrl = '$workerUrl/api/music/jamendo';
   static const String latestUrl = '$workerUrl/latest';
 
   static const String arm64DownloadUrl = '$workerUrl/apk/arm64';
