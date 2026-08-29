@@ -7,17 +7,19 @@ import 'package:path_provider/path_provider.dart';
 
 import 'album_art_service.dart';
 import 'audio_handler.dart';
-import 'notification_service.dart';
 import 'shared_notification_plugin.dart';
 
 /// Owns system Now Playing metadata for notification shade, lock screen,
 /// Bluetooth/headset controls and Android media surfaces.
+///
+/// Android media-session notifications are exempt from the Android 13+
+/// POST_NOTIFICATIONS runtime permission. Keep ordinary notification consent
+/// separate from playback so pressing Play never triggers an unrelated prompt.
 class MediaNotificationService {
   MediaNotificationService._();
   static final MediaNotificationService instance = MediaNotificationService._();
 
   bool _initialized = false;
-  bool _permissionChecked = false;
   String? _lastArtworkKey;
   Uri? _lastArtworkUri;
 
@@ -31,21 +33,10 @@ class MediaNotificationService {
     debugPrint('[MediaNotificationService] Initialized.');
   }
 
-  Future<void> _ensureNotificationPermission() async {
-    if (_permissionChecked) return;
-    _permissionChecked = true;
-    try {
-      final granted = await NotificationService.instance.requestPermission();
-      debugPrint('[MediaNotificationService] Notification permission: $granted');
-    } catch (e) {
-      debugPrint('[MediaNotificationService] Permission request skipped: $e');
-    }
-  }
-
   Future<Directory> _artworkDir() async {
     final cache = await getApplicationCacheDirectory();
     final dir = Directory('${cache.path}/now_playing_art');
-    if (!dir.existsSync()) await dir.create(recursive: true);
+    if (!await dir.exists()) await dir.create(recursive: true);
     return dir;
   }
 
@@ -114,7 +105,6 @@ class MediaNotificationService {
     String? albumArtPath,
   }) async {
     if (!_initialized) await init();
-    await _ensureNotificationPermission();
     final artUri = await _stableArtUri(albumArtPath, id);
     final handler = AudioHandlerSingleton.instance.handler;
     handler?.updateMediaItemFromParts(
@@ -134,7 +124,6 @@ class MediaNotificationService {
     required Uint8List albumArtBytes,
   }) async {
     if (!_initialized) await init();
-    await _ensureNotificationPermission();
     Uri? artUri;
     try {
       final dir = await _artworkDir();
