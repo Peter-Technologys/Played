@@ -4,6 +4,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+
 import '../../app/theme/app_colors.dart';
 
 /// Shows a bottom sheet that lets the user pick a playback speed.
@@ -92,7 +93,7 @@ class SpeedPickerSheet extends StatelessWidget {
               return Semantics(
                 button: true,
                 selected: isActive,
-                label: '${speed} times playback speed',
+                label: '$speed times playback speed',
                 child: InkWell(
                   borderRadius: BorderRadius.circular(12),
                   onTap: () {
@@ -102,18 +103,29 @@ class SpeedPickerSheet extends StatelessWidget {
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 160),
-                    constraints: const BoxConstraints(minWidth: 64, minHeight: 44),
+                    constraints: const BoxConstraints(
+                      minWidth: 64,
+                      minHeight: 44,
+                    ),
                     alignment: Alignment.center,
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 10,
+                    ),
                     decoration: BoxDecoration(
                       gradient: isActive
                           ? const LinearGradient(
-                              colors: [AppColors.accent, AppColors.accentViolet],
+                              colors: [
+                                AppColors.accent,
+                                AppColors.accentViolet,
+                              ],
                             )
                           : null,
                       color: isActive
                           ? null
-                          : scheme.surfaceContainerHighest.withValues(alpha: 0.72),
+                          : scheme.surfaceContainerHighest.withValues(
+                              alpha: 0.72,
+                            ),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isActive
