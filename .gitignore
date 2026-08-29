@@ -59,11 +59,20 @@ lib/generated_plugin_registrant.dart
 # Environment / Secrets — NEVER commit these
 .env
 .env.*
+!.env.example
+.dev.vars
 *.pem
+*.key
+*.p12
+*.pfx
 google-services.json
 GoogleService-Info.plist
 key.properties
 keystore.jks
+*firebase-adminsdk*.json
+service-account*.json
+credentials/
+secrets/
 
 # Test coverage
 coverage/
