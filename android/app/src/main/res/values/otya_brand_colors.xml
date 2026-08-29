@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+ <color name="otya_launcher_background">#030516</color>
+ <color name="otya_brand_navy">#030516</color>
+ <color name="otya_brand_blue">#146BFF</color>
+ <color name="otya_brand_violet">#6A19FF</color>
+ <color name="otya_brand_magenta">#E81CFF</color>
+ <color name="otya_brand_orange">#FF8A00</color>
+</resources>
