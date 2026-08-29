@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:collection';
+import 'dart:isolate';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -124,7 +125,7 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
 
       if (fresh.isNotEmpty) {
         _writeBackToHive(fresh).ignore();
-        _detectDuplicates(fresh);
+        unawaited(_detectDuplicates(fresh));
       }
     } catch (error, stack) {
       debugPrint('[MediaLibrary] Background refresh failed: $error');
@@ -141,9 +142,10 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
     }
   }
 
-  /// Runs [DuplicateDetectorService.findDuplicates] on [items] and updates
-  /// [duplicatesProvider] with the result.
-  void _detectDuplicates(List<MediaItem> items) {
+  /// Runs duplicate detection outside Flutter's UI isolate. The detector is
+  /// intentionally O(n²) and uses Levenshtein comparisons; moving it off the
+  /// main isolate prevents a large library refresh from stealing frame time.
+  Future<void> _detectDuplicates(List<MediaItem> items) async {
     try {
       final metas = items
           .map(
@@ -154,8 +156,10 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
               fileSizeBytes: item.fileSizeBytes,
             ),
           )
-          .toList();
-      final groups = DuplicateDetectorService.instance.findDuplicates(metas);
+          .toList(growable: false);
+      final groups = await Isolate.run<List<List<String>>>(
+        () => DuplicateDetectorService.instance.findDuplicates(metas),
+      );
       try {
         ref.read(duplicatesProvider.notifier).state = groups;
       } catch (_) {}
