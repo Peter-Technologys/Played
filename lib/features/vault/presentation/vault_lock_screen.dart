@@ -18,10 +18,14 @@ import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
 
 const _pinKey = 'vault_pin_hash';
+const _pinAttemptsKey = 'vault_pin_failed_attempts';
+const _pinBlockedUntilKey = 'vault_pin_blocked_until_ms';
 const _storage = FlutterSecureStorage(
   aOptions: AndroidOptions(encryptedSharedPreferences: true),
 );
 const _sessionTtl = Duration(minutes: 5);
+const _pinMaxAttempts = 5;
+const _pinBlockDuration = Duration(seconds: 30);
 
 final vaultUnlockedProvider = StateProvider<bool>((_) => false);
 
@@ -73,11 +77,16 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen>
 
   Future<void> _unlockWithDevice() async {
     if (_checking) return;
-    setState(() { _checking = true; _message = null; });
+    setState(() {
+      _checking = true;
+      _message = null;
+    });
     try {
       final supported = await _localAuth.isDeviceSupported();
       if (!supported) {
-        if (mounted) setState(() => _message = 'Use your Private PIN to continue.');
+        if (mounted) {
+          setState(() => _message = 'Use your Private PIN to continue.');
+        }
         return;
       }
       final ok = await _localAuth.authenticate(
@@ -93,7 +102,10 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen>
         _markUnlocked();
       }
     } catch (_) {
-      if (mounted) setState(() => _message = 'Device authentication was unavailable. Use your Private PIN instead.');
+      if (mounted) {
+        setState(() => _message =
+            'Device authentication was unavailable. Use your Private PIN instead.');
+      }
     } finally {
       if (mounted) setState(() => _checking = false);
     }
@@ -125,7 +137,8 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen>
         appBar: AppBar(
           leading: IconButton(
             icon: const Icon(Icons.arrow_back_rounded),
-            onPressed: () => context.canPop() ? context.pop() : context.go('/myspace'),
+            onPressed: () =>
+                context.canPop() ? context.pop() : context.go('/myspace'),
           ),
           title: const Text('Private'),
         ),
@@ -141,21 +154,37 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen>
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.cardOf(context),
-                    border: Border.all(color: AppColors.accent.withValues(alpha: .45)),
+                    border: Border.all(
+                      color: AppColors.accent.withValues(alpha: .45),
+                    ),
                   ),
-                  child: const Icon(Icons.lock_rounded, size: 42, color: AppColors.accent),
+                  child: const Icon(
+                    Icons.lock_rounded,
+                    size: 42,
+                    color: AppColors.accent,
+                  ),
                 ),
                 const SizedBox(height: 22),
-                const Text('OTYA Private', style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900)),
+                const Text(
+                  'OTYA Private',
+                  style: TextStyle(fontSize: 25, fontWeight: FontWeight.w900),
+                ),
                 const SizedBox(height: 8),
                 const Text(
                   'Protected media stays inside OTYA app-private storage until you restore it.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(height: 1.45, color: AppColors.textSecondary),
+                  style: TextStyle(
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                  ),
                 ),
                 if (_message != null) ...[
                   const SizedBox(height: 14),
-                  Text(_message!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                  Text(
+                    _message!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(color: AppColors.textSecondary),
+                  ),
                 ],
                 const SizedBox(height: 28),
                 SizedBox(
@@ -163,13 +192,19 @@ class _VaultLockScreenState extends ConsumerState<VaultLockScreen>
                   child: FilledButton.icon(
                     onPressed: _checking ? null : _unlockWithDevice,
                     icon: _checking
-                        ? const SizedBox.square(dimension: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
                         : const Icon(Icons.fingerprint_rounded),
                     label: const Text('Unlock with device security'),
                   ),
                 ),
                 const SizedBox(height: 8),
-                TextButton(onPressed: _unlockWithPin, child: const Text('Use Private PIN')),
+                TextButton(
+                  onPressed: _unlockWithPin,
+                  child: const Text('Use Private PIN'),
+                ),
               ],
             ),
           ),
@@ -192,8 +227,6 @@ class _PrivatePinDialogState extends State<_PrivatePinDialog> {
   final _confirm = TextEditingController();
   String? _error;
   bool _busy = false;
-  int _failedAttempts = 0;
-  DateTime? _blockedUntil;
 
   @override
   void dispose() {
@@ -204,40 +237,54 @@ class _PrivatePinDialogState extends State<_PrivatePinDialog> {
 
   Future<void> _submit() async {
     if (_busy) return;
-    final now = DateTime.now();
-    if (_blockedUntil != null && now.isBefore(_blockedUntil!)) {
-      setState(() => _error = 'Too many attempts. Try again shortly.');
-      return;
+
+    if (!widget.create) {
+      final blockedUntil = await _readBlockedUntil();
+      if (blockedUntil != null && DateTime.now().isBefore(blockedUntil)) {
+        final seconds = blockedUntil.difference(DateTime.now()).inSeconds + 1;
+        if (mounted) {
+          setState(() => _error =
+              'Too many attempts. Try again in about $seconds seconds.');
+        }
+        return;
+      }
+      if (blockedUntil != null) await _clearExpiredPinBlock();
     }
+
     final pin = _pin.text;
     if (!RegExp(r'^\d{4,6}$').hasMatch(pin)) {
       setState(() => _error = 'Use a 4–6 digit PIN.');
       return;
     }
 
-    setState(() { _busy = true; _error = null; });
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
     try {
       if (widget.create) {
         if (pin != _confirm.text) {
-          setState(() => _error = 'PINs do not match.');
+          if (mounted) setState(() => _error = 'PINs do not match.');
           return;
         }
         await _savePin(pin);
+        await _clearPinThrottle();
         if (mounted) Navigator.pop(context, true);
         return;
       }
 
       final ok = await _verifyPin(pin);
       if (ok) {
+        await _clearPinThrottle();
         if (mounted) Navigator.pop(context, true);
       } else {
-        _failedAttempts++;
-        if (_failedAttempts >= 5) {
-          _blockedUntil = DateTime.now().add(const Duration(seconds: 30));
-          _failedAttempts = 0;
-        }
+        final blocked = await _registerPinFailure();
         _pin.clear();
-        if (mounted) setState(() => _error = 'Incorrect PIN.');
+        if (mounted) {
+          setState(() => _error = blocked
+              ? 'Too many attempts. Private PIN is locked for 30 seconds.'
+              : 'Incorrect PIN.');
+        }
       }
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -255,8 +302,14 @@ class _PrivatePinDialogState extends State<_PrivatePinDialog> {
               autofocus: true,
               obscureText: true,
               keyboardType: TextInputType.number,
-              inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
-              decoration: InputDecoration(labelText: widget.create ? 'New PIN' : 'PIN', errorText: _error),
+              inputFormatters: [
+                FilteringTextInputFormatter.digitsOnly,
+                LengthLimitingTextInputFormatter(6),
+              ],
+              decoration: InputDecoration(
+                labelText: widget.create ? 'New PIN' : 'PIN',
+                errorText: _error,
+              ),
               onSubmitted: (_) => widget.create ? null : _submit(),
             ),
             if (widget.create) ...[
@@ -265,7 +318,10 @@ class _PrivatePinDialogState extends State<_PrivatePinDialog> {
                 controller: _confirm,
                 obscureText: true,
                 keyboardType: TextInputType.number,
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+                inputFormatters: [
+                  FilteringTextInputFormatter.digitsOnly,
+                  LengthLimitingTextInputFormatter(6),
+                ],
                 decoration: const InputDecoration(labelText: 'Confirm PIN'),
                 onSubmitted: (_) => _submit(),
               ),
@@ -273,17 +329,59 @@ class _PrivatePinDialogState extends State<_PrivatePinDialog> {
           ],
         ),
         actions: [
-          TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(onPressed: _busy ? null : _submit, child: Text(widget.create ? 'Create' : 'Unlock')),
+          TextButton(
+            onPressed: _busy ? null : () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: _busy ? null : _submit,
+            child: Text(widget.create ? 'Create' : 'Unlock'),
+          ),
         ],
       );
+}
+
+Future<DateTime?> _readBlockedUntil() async {
+  final raw = await _storage.read(key: _pinBlockedUntilKey);
+  final millis = int.tryParse(raw ?? '');
+  return millis == null ? null : DateTime.fromMillisecondsSinceEpoch(millis);
+}
+
+Future<void> _clearExpiredPinBlock() async {
+  await _storage.delete(key: _pinBlockedUntilKey);
+  await _storage.write(key: _pinAttemptsKey, value: '0');
+}
+
+Future<bool> _registerPinFailure() async {
+  final currentRaw = await _storage.read(key: _pinAttemptsKey);
+  final current = int.tryParse(currentRaw ?? '') ?? 0;
+  final next = current + 1;
+  if (next >= _pinMaxAttempts) {
+    final blockedUntil = DateTime.now().add(_pinBlockDuration);
+    await _storage.write(
+      key: _pinBlockedUntilKey,
+      value: blockedUntil.millisecondsSinceEpoch.toString(),
+    );
+    await _storage.write(key: _pinAttemptsKey, value: '0');
+    return true;
+  }
+  await _storage.write(key: _pinAttemptsKey, value: next.toString());
+  return false;
+}
+
+Future<void> _clearPinThrottle() async {
+  await _storage.delete(key: _pinBlockedUntilKey);
+  await _storage.delete(key: _pinAttemptsKey);
 }
 
 Future<void> _savePin(String pin) async {
   final random = Random.secure();
   final salt = List<int>.generate(16, (_) => random.nextInt(256));
   final digest = sha256.convert([...salt, ...utf8.encode(pin)]).toString();
-  await _storage.write(key: _pinKey, value: '${base64UrlEncode(salt)}:$digest');
+  await _storage.write(
+    key: _pinKey,
+    value: '${base64UrlEncode(salt)}:$digest',
+  );
 }
 
 Future<bool> _verifyPin(String pin) async {
@@ -368,9 +466,13 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
     try {
       await VaultService.instance.unlockItem(item.mediaId);
       await _refresh();
-      if (mounted) setState(() => _message = 'Restored to its original folder.');
+      if (mounted) {
+        setState(() => _message = 'Restored to its original folder.');
+      }
     } catch (_) {
-      if (mounted) setState(() => _message = 'OTYA could not restore that file.');
+      if (mounted) {
+        setState(() => _message = 'OTYA could not restore that file.');
+      }
     }
   }
 
@@ -379,10 +481,18 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
       context: context,
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete protected file?'),
-        content: const Text('This permanently removes the copy stored in OTYA Private. It cannot be restored after deletion.'),
+        content: const Text(
+          'This permanently removes the copy stored in OTYA Private. It cannot be restored after deletion.',
+        ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
-          FilledButton(onPressed: () => Navigator.pop(dialogContext, true), child: const Text('Delete')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Delete'),
+          ),
         ],
       ),
     );
@@ -391,14 +501,20 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
       await VaultService.instance.deleteFromVault(item.mediaId);
       await _refresh();
     } catch (_) {
-      if (mounted) setState(() => _message = 'OTYA could not delete that protected file.');
+      if (mounted) {
+        setState(() => _message =
+            'OTYA could not delete that protected file.');
+      }
     }
   }
 
   Future<void> _play(VaultItem item) async {
     final file = File(item.encryptedPath);
     if (!await file.exists()) {
-      if (mounted) setState(() => _message = 'This protected file is missing from device storage.');
+      if (mounted) {
+        setState(() => _message =
+            'This protected file is missing from device storage.');
+      }
       return;
     }
     final fileName = item.originalPath.replaceAll('\\', '/').split('/').last;
@@ -435,7 +551,8 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
           actions: [
             IconButton(
               tooltip: 'Lock now',
-              onPressed: () => ref.read(vaultUnlockedProvider.notifier).state = false,
+              onPressed: () =>
+                  ref.read(vaultUnlockedProvider.notifier).state = false,
               icon: const Icon(Icons.lock_outline_rounded),
             ),
           ],
@@ -446,7 +563,12 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
                 onRefresh: _refresh,
                 child: ListView(
                   physics: const AlwaysScrollableScrollPhysics(),
-                  padding: EdgeInsets.fromLTRB(16, 8, 16, MediaQuery.paddingOf(context).bottom + 28),
+                  padding: EdgeInsets.fromLTRB(
+                    16,
+                    8,
+                    16,
+                    MediaQuery.paddingOf(context).bottom + 28,
+                  ),
                   children: [
                     Container(
                       padding: const EdgeInsets.all(16),
@@ -457,16 +579,34 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
                       ),
                       child: Row(
                         children: [
-                          const Icon(Icons.shield_rounded, color: AppColors.accent),
+                          const Icon(
+                            Icons.shield_rounded,
+                            color: AppColors.accent,
+                          ),
                           const SizedBox(width: 12),
-                          Expanded(child: Text('${_items.length} protected file${_items.length == 1 ? '' : 's'}')),
-                          Text(_formatBytes(_size), style: const TextStyle(color: AppColors.textSecondary)),
+                          Expanded(
+                            child: Text(
+                              '${_items.length} protected file${_items.length == 1 ? '' : 's'}',
+                            ),
+                          ),
+                          Text(
+                            _formatBytes(_size),
+                            style: const TextStyle(
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
                         ],
                       ),
                     ),
                     if (_message != null) ...[
                       const SizedBox(height: 10),
-                      Text(_message!, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondary)),
+                      Text(
+                        _message!,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
                     ],
                     const SizedBox(height: 12),
                     if (_items.isEmpty)
@@ -474,31 +614,63 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
                         padding: EdgeInsets.symmetric(vertical: 70),
                         child: Column(
                           children: [
-                            Icon(Icons.lock_open_rounded, size: 54, color: AppColors.textSecondary),
+                            Icon(
+                              Icons.lock_open_rounded,
+                              size: 54,
+                              color: AppColors.textSecondary,
+                            ),
                             SizedBox(height: 12),
-                            Text('Private is empty', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                            Text(
+                              'Private is empty',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
                             SizedBox(height: 6),
-                            Text('Move media to Private from the player or supported file actions.', textAlign: TextAlign.center),
+                            Text(
+                              'Move media to Private from the player or supported file actions.',
+                              textAlign: TextAlign.center,
+                            ),
                           ],
                         ),
                       )
                     else
                       ..._items.map((item) {
-                        final name = item.originalPath.replaceAll('\\', '/').split('/').last;
+                        final name = item.originalPath
+                            .replaceAll('\\', '/')
+                            .split('/')
+                            .last;
                         return Card(
                           child: ListTile(
                             onTap: () => _play(item),
-                            leading: Icon(item.mediaType == 'video' ? Icons.movie_rounded : Icons.music_note_rounded, color: AppColors.accent),
-                            title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis),
-                            subtitle: Text('Protected ${_shortDate(item.lockedAt)}'),
+                            leading: Icon(
+                              item.mediaType == 'video'
+                                  ? Icons.movie_rounded
+                                  : Icons.music_note_rounded,
+                              color: AppColors.accent,
+                            ),
+                            title: Text(
+                              name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            subtitle:
+                                Text('Protected ${_shortDate(item.lockedAt)}'),
                             trailing: PopupMenuButton<String>(
                               onSelected: (action) {
                                 if (action == 'restore') _restore(item);
                                 if (action == 'delete') _delete(item);
                               },
                               itemBuilder: (_) => const [
-                                PopupMenuItem(value: 'restore', child: Text('Restore to original folder')),
-                                PopupMenuItem(value: 'delete', child: Text('Delete permanently')),
+                                PopupMenuItem(
+                                  value: 'restore',
+                                  child: Text('Restore to original folder'),
+                                ),
+                                PopupMenuItem(
+                                  value: 'delete',
+                                  child: Text('Delete permanently'),
+                                ),
                               ],
                             ),
                           ),
@@ -512,9 +684,14 @@ class _PrivateLibraryState extends ConsumerState<_PrivateLibrary>
 
 String _formatBytes(int bytes) {
   if (bytes < 1024) return '$bytes B';
-  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-  if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  if (bytes < 1024 * 1024) {
+    return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  }
+  if (bytes < 1024 * 1024 * 1024) {
+    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  }
   return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(1)} GB';
 }
 
-String _shortDate(DateTime value) => '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
+String _shortDate(DateTime value) =>
+    '${value.year}-${value.month.toString().padLeft(2, '0')}-${value.day.toString().padLeft(2, '0')}';
