@@ -1,194 +1,161 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../my_space/data/media_repository.dart';
+import '../../my_space/presentation/providers/my_space_provider.dart';
+import '../../player/presentation/mini_player.dart';
+import '../../player/presentation/queue_screen.dart';
+import '../../search/smart_search_sheet.dart';
 
-class FolderBrowserScreen extends StatelessWidget {
+class FolderBrowserScreen extends ConsumerWidget {
   const FolderBrowserScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return const _FolderBrowserBody();
-  }
-}
-
-class _FolderBrowserBody extends StatefulWidget {
-  const _FolderBrowserBody();
-
-  @override
-  State<_FolderBrowserBody> createState() => _FolderBrowserBodyState();
-}
-
-class _FolderBrowserBodyState extends State<_FolderBrowserBody> {
-  Map<String, List<MediaItem>>? _folders;
-  bool _loading = true;
-  String? _error;
-
-  @override
-  void initState() {
-    super.initState();
-    _load();
-  }
-
-  Future<void> _load() async {
-    try {
-      final items = MediaRepository.instance.cachedItems ??
-          await MediaRepository.instance.getAllMedia();
-      final Map<String, List<MediaItem>> folders = {};
-      for (final item in items) {
-        final parts = item.filePath.split('/');
-        final folder = parts.length > 1
-            ? parts.sublist(0, parts.length - 1).join('/')
-            : '/';
-        folders.putIfAbsent(folder, () => []).add(item);
-      }
-      if (mounted) setState(() { _folders = folders; _loading = false; });
-    } catch (e) {
-      if (mounted) setState(() { _error = e.toString(); _loading = false; });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final library = ref.watch(mediaLibraryProvider);
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/myspace'),
         ),
-        title: const Text('Browse by Folder',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontSize: 18,
-            )),
+        title: const Text('Files'),
+        actions: [
+          IconButton(
+            tooltip: 'Search OTYA',
+            onPressed: () => SmartSearchSheet.show(context),
+            icon: const Icon(Icons.search_rounded),
+          ),
+        ],
       ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.accent))
-          : _error != null
-              ? Center(
-                  child: Text(_error!,
-                      style: const TextStyle(color: AppColors.error)))
-              : _folders == null || _folders!.isEmpty
-                  ? const Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.folder_off_rounded,
-                              color: AppColors.textSecondary, size: 48),
-                          SizedBox(height: 12),
-                          Text('No folders found',
-                              style: TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 15)),
-                        ],
-                      ),
-                    )
-                  : _FolderList(folders: _folders!),
+      body: library.when(
+        loading: () {
+          final cached = library.valueOrNull;
+          return cached == null
+              ? const Center(child: CircularProgressIndicator())
+              : _FilesBody(items: cached);
+        },
+        error: (_, __) => _FilesError(
+          onRetry: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+        ),
+        data: (items) => RefreshIndicator(
+          onRefresh: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+          child: _FilesBody(items: items),
+        ),
+      ),
     );
   }
 }
 
-class _FolderList extends StatelessWidget {
-  final Map<String, List<MediaItem>> folders;
-  const _FolderList({required this.folders});
+class _FilesBody extends StatelessWidget {
+  const _FilesBody({required this.items});
+  final List<MediaItem> items;
 
   @override
   Widget build(BuildContext context) {
-    final keys = folders.keys.toList()..sort();
-    return ListView.separated(
-      padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
-      physics: const BouncingScrollPhysics(),
-      itemCount: keys.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (context, i) {
-        final path = keys[i];
-        final files = folders[path]!;
-        final parts = path.split('/');
-        final folderName = parts.last.isEmpty && parts.length > 1
-            ? parts[parts.length - 2]
-            : parts.last.isEmpty ? path : parts.last;
-        return GestureDetector(
-          onTap: () => context.push(
-            '/tools/folder-detail',
-            extra: {
-              'folderName': folderName,
-              'fullPath': path,
-              'items': files,
-            },
+    final folders = <String, List<MediaItem>>{};
+    for (final item in items) {
+      final normalized = item.filePath.replaceAll('\\', '/');
+      final lastSlash = normalized.lastIndexOf('/');
+      final path = lastSlash > 0 ? normalized.substring(0, lastSlash) : '/';
+      folders.putIfAbsent(path, () => <MediaItem>[]).add(item);
+    }
+    final entries = folders.entries.toList()
+      ..sort((a, b) => _folderName(a.key).toLowerCase().compareTo(_folderName(b.key).toLowerCase()));
+
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: EdgeInsets.fromLTRB(14, 8, 14, MediaQuery.paddingOf(context).bottom + 24),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardOf(context),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: AppColors.borderOf(context)),
           ),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: Row(
+          child: Row(
+            children: [
+              const Icon(Icons.folder_copy_rounded, color: AppColors.accent, size: 28),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('${items.length} playable file${items.length == 1 ? '' : 's'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                    const SizedBox(height: 2),
+                    Text('${entries.length} media folder${entries.length == 1 ? '' : 's'}', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+                  ],
+                ),
+              ),
+              TextButton.icon(
+                onPressed: () => context.push('/downloads'),
+                icon: const Icon(Icons.download_rounded, size: 18),
+                label: const Text('Downloads'),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        if (entries.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 72),
+            child: Column(
               children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.folder_rounded,
-                      color: AppColors.accent, size: 24),
-                ),
-                const SizedBox(width: 14),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(folderName,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textPrimary,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 2),
-                      Text(
-                        '${files.length} file${files.length == 1 ? '' : 's'}',
-                        style: const TextStyle(
-                            fontSize: 11,
-                            color: AppColors.textSecondary),
-                      ),
-                    ],
-                  ),
-                ),
-                const Icon(Icons.chevron_right_rounded,
-                    color: AppColors.textSecondary, size: 20),
+                Icon(Icons.folder_off_outlined, size: 54, color: AppColors.textSecondary),
+                SizedBox(height: 12),
+                Text('No playable media folders found', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+                SizedBox(height: 6),
+                Text('OTYA Files currently shows folders containing audio or video indexed by Android MediaStore.', textAlign: TextAlign.center),
               ],
             ),
-          ).animate().fadeIn(
-                duration: 300.ms,
-                delay: Duration(milliseconds: i * 30),
+          )
+        else
+          ...entries.map((entry) {
+            final name = _folderName(entry.key);
+            final videoCount = entry.value.where((item) => item.isVideo).length;
+            final audioCount = entry.value.length - videoCount;
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
+                leading: Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: AppColors.accent.withValues(alpha: .13),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  child: const Icon(Icons.folder_rounded, color: AppColors.accent),
+                ),
+                title: Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+                subtitle: Text([
+                  if (videoCount > 0) '$videoCount video',
+                  if (audioCount > 0) '$audioCount audio',
+                ].join(' · ')),
+                trailing: const Icon(Icons.chevron_right_rounded),
+                onTap: () => context.push('/tools/folder-detail', extra: {
+                  'folderName': name,
+                  'fullPath': entry.key,
+                  'items': entry.value,
+                }),
               ),
-        );
-      },
+            );
+          }),
+      ],
     );
+  }
+
+  static String _folderName(String path) {
+    final parts = path.replaceAll('\\', '/').split('/').where((part) => part.isNotEmpty).toList();
+    return parts.isEmpty ? 'Device' : parts.last;
   }
 }
 
-// Public so it can be referenced from router.dart via GoRoute.
-class FolderDetailScreen extends StatelessWidget {
-  final String folderName;
-  final String fullPath;
-  final List<MediaItem> items;
+class FolderDetailScreen extends ConsumerWidget {
   const FolderDetailScreen({
     super.key,
     required this.folderName,
@@ -196,120 +163,73 @@ class FolderDetailScreen extends StatelessWidget {
     required this.items,
   });
 
+  final String folderName;
+  final String fullPath;
+  final List<MediaItem> items;
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final queue = List<MediaItem>.from(items)
+      ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: AppColors.background,
-        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded,
-              color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/tools/folders'),
         ),
-        title: Text(folderName,
-            style: const TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontSize: 16,
-            )),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Text(
-                '${items.length} file${items.length == 1 ? '' : 's'}',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
-              ),
+        title: Text(folderName),
+      ),
+      body: queue.isEmpty
+          ? const Center(child: Text('This folder has no playable media.'))
+          : ListView.builder(
+              padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 24),
+              itemCount: queue.length,
+              itemBuilder: (context, index) {
+                final item = queue[index];
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  leading: CircleAvatar(
+                    backgroundColor: AppColors.cardOf(context),
+                    child: Icon(item.isVideo ? Icons.movie_rounded : Icons.music_note_rounded, color: AppColors.accent),
+                  ),
+                  title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text('${item.formattedDuration} · ${item.formattedSize}'),
+                  trailing: const Icon(Icons.play_arrow_rounded, color: AppColors.accent),
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    ref.read(queueProvider.notifier).setQueue(queue, startIndex: index);
+                    if (item.isVideo) {
+                      context.push('/player/video', extra: item);
+                    } else {
+                      ref.read(miniPlayerItemProvider.notifier).state = item;
+                      context.push('/player/audio', extra: item);
+                    }
+                  },
+                );
+              },
             ),
-          ),
-        ],
-      ),
-      body: ListView.separated(
-        padding: EdgeInsets.fromLTRB(16, 16, 16, MediaQuery.of(context).padding.bottom + 120),
-        physics: const BouncingScrollPhysics(),
-        itemCount: items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (context, i) {
-          final item = items[i];
-          return GestureDetector(
-            onTap: () {
-              HapticFeedback.lightImpact();
-              final route =
-                  item.isVideo ? '/player/video' : '/player/audio';
-              context.push(route, extra: item);
-            },
-            child: Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.border),
-              ),
-              child: Row(
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: item.isVideo
-                          ? AppColors.accent.withValues(alpha: 0.1)
-                          : AppColors.accentViolet.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Icon(
-                      item.isVideo
-                          ? Icons.videocam_rounded
-                          : Icons.music_note_rounded,
-                      color: item.isVideo
-                          ? AppColors.accent
-                          : AppColors.accentViolet,
-                      size: 22,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(item.title,
-                            style: const TextStyle(
-                              fontSize: 13,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.textPrimary,
-                              fontFamily: 'Inter',
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${item.formattedDuration} · ${item.formattedSize}',
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.textSecondary),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Icon(
-                    item.isVideo
-                        ? Icons.play_circle_outline_rounded
-                        : Icons.headphones_rounded,
-                    color: AppColors.textSecondary,
-                    size: 18,
-                  ),
-                ],
-              ),
-            ).animate().fadeIn(
-                  duration: 250.ms,
-                  delay: Duration(milliseconds: i * 20),
-                ),
-          );
-        },
-      ),
     );
   }
+}
+
+class _FilesError extends StatelessWidget {
+  const _FilesError({required this.onRetry});
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 50, color: AppColors.error),
+              const SizedBox(height: 12),
+              const Text('OTYA could not read the local media folders.', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+            ],
+          ),
+        ),
+      );
 }
