@@ -8,6 +8,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../shared/widgets/media_new_indicator.dart';
+import '../../../shared/widgets/otya_logo.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
@@ -86,7 +87,8 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
       ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
     return CustomScrollView(
-      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      physics:
+          const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       slivers: [
         SliverToBoxAdapter(child: _VideoHeader(count: videos.length)),
         SliverToBoxAdapter(child: _VideoPicker(value: view)),
@@ -107,7 +109,9 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
                         _playVideo(context, queue, 0);
                       },
                       icon: const Icon(Icons.shuffle_rounded),
-                      label: Text('Shuffle ${videos.length} video${videos.length == 1 ? '' : 's'}'),
+                      label: Text(
+                        'Shuffle ${videos.length} video${videos.length == 1 ? '' : 's'}',
+                      ),
                     ),
                   );
                 }
@@ -130,11 +134,22 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.playlist_play_rounded, size: 56, color: AppColors.accent),
+                    const Icon(
+                      Icons.playlist_play_rounded,
+                      size: 56,
+                      color: AppColors.accent,
+                    ),
                     const SizedBox(height: 14),
-                    const Text('Playlists are shared across OTYA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                    const Text(
+                      'Playlists are shared across OTYA',
+                      style:
+                          TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
+                    ),
                     const SizedBox(height: 7),
-                    const Text('A playlist can contain local video or audio. Manage them from one Playlists screen.', textAlign: TextAlign.center),
+                    const Text(
+                      'A playlist can contain local video or audio. Manage them from one Playlists screen.',
+                      textAlign: TextAlign.center,
+                    ),
                     const SizedBox(height: 18),
                     FilledButton.icon(
                       onPressed: () => context.push('/playlists'),
@@ -155,8 +170,12 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
     final folders = <String, List<MediaItem>>{};
     for (final item in videos) {
       final normalized = item.filePath.replaceAll('\\', '/').split('/');
-      final folder = normalized.length >= 2 ? normalized[normalized.length - 2].trim() : 'Device';
-      folders.putIfAbsent(folder.isEmpty ? 'Device' : folder, () => <MediaItem>[]).add(item);
+      final folder = normalized.length >= 2
+          ? normalized[normalized.length - 2].trim()
+          : 'Device';
+      folders
+          .putIfAbsent(folder.isEmpty ? 'Device' : folder, () => <MediaItem>[])
+          .add(item);
     }
     final entries = folders.entries.toList()
       ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
@@ -166,7 +185,8 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
       itemBuilder: (context, index) {
         final entry = entries[index];
         return ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
           leading: Container(
             width: 48,
             height: 48,
@@ -175,12 +195,23 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
               borderRadius: BorderRadius.circular(14),
               border: Border.all(color: AppColors.borderOf(context)),
             ),
-            child: const Icon(Icons.folder_rounded, color: AppColors.accent),
+            child:
+                const Icon(Icons.folder_rounded, color: AppColors.accent),
           ),
-          title: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text('${entry.value.length} video${entry.value.length == 1 ? '' : 's'}'),
+          title: Text(
+            entry.key,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontWeight: FontWeight.w800),
+          ),
+          subtitle: Text(
+            '${entry.value.length} video${entry.value.length == 1 ? '' : 's'}',
+          ),
           trailing: const Icon(Icons.chevron_right_rounded),
-          onTap: () => context.push('/video/folder', extra: {'name': entry.key, 'items': entry.value}),
+          onTap: () => context.push(
+            '/video/folder',
+            extra: {'name': entry.key, 'items': entry.value},
+          ),
         );
       },
     );
@@ -195,7 +226,11 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
 }
 
 class VideoFolderDetailPage extends ConsumerWidget {
-  const VideoFolderDetailPage({super.key, required this.name, required this.items});
+  const VideoFolderDetailPage({
+    super.key,
+    required this.name,
+    required this.items,
+  });
   final String name;
   final List<MediaItem> items;
 
@@ -211,15 +246,24 @@ class VideoFolderDetailPage extends ConsumerWidget {
         title: Text(name),
       ),
       body: videos.isEmpty
-          ? const Center(child: Text('No videos are available in this folder.'))
+          ? const Center(
+              child: Text('No videos are available in this folder.'),
+            )
           : ListView.builder(
-              padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 24),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                8,
+                12,
+                MediaQuery.paddingOf(context).bottom + 24,
+              ),
               itemCount: videos.length,
               itemBuilder: (context, index) => _VideoTile(
                 item: videos[index],
                 onTap: () {
                   HapticFeedback.lightImpact();
-                  ref.read(queueProvider.notifier).setQueue(videos, startIndex: index);
+                  ref
+                      .read(queueProvider.notifier)
+                      .setQueue(videos, startIndex: index);
                   context.push('/player/video', extra: videos[index]);
                 },
               ),
@@ -237,17 +281,27 @@ class _VideoHeader extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 10, 8),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset('assets/icons/play_store_512.png', width: 38, height: 38),
-            ),
+            const OtyaMark(size: 38),
             const SizedBox(width: 11),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Video', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -.5)),
-                  Text('$count local video${count == 1 ? '' : 's'}', style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                  const Text(
+                    'Video',
+                    style: TextStyle(
+                      fontSize: 23,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.5,
+                    ),
+                  ),
+                  Text(
+                    '$count local video${count == 1 ? '' : 's'}',
+                    style: const TextStyle(
+                      fontSize: 11.5,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -312,16 +366,29 @@ class _VideoTile extends StatelessWidget {
   Widget build(BuildContext context) => Card(
         margin: const EdgeInsets.symmetric(vertical: 4),
         child: ListTile(
-          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
           leading: _VideoThumb(item: item),
           title: Row(
             children: [
-              Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
+              Expanded(
+                child: Text(
+                  item.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+              ),
               MediaNewIndicator(item: item),
             ],
           ),
-          subtitle: Text('${item.formattedDuration} · ${item.formattedSize}', maxLines: 1, overflow: TextOverflow.ellipsis),
-          trailing: const Icon(Icons.play_arrow_rounded, color: AppColors.accent),
+          subtitle: Text(
+            '${item.formattedDuration} · ${item.formattedSize}',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          trailing:
+              const Icon(Icons.play_arrow_rounded, color: AppColors.accent),
           onTap: onTap,
         ),
       );
@@ -367,7 +434,12 @@ class _VideoThumbState extends State<_VideoThumb> {
           width: 74,
           height: 48,
           child: _path != null && File(_path!).existsSync()
-              ? Image.file(File(_path!), fit: BoxFit.cover, cacheWidth: 240, errorBuilder: (_, __, ___) => _placeholder(context))
+              ? Image.file(
+                  File(_path!),
+                  fit: BoxFit.cover,
+                  cacheWidth: 240,
+                  errorBuilder: (_, __, ___) => _placeholder(context),
+                )
               : _placeholder(context),
         ),
       );
@@ -390,9 +462,15 @@ class _EmptyVideo extends StatelessWidget {
             children: [
               Icon(Icons.movie_outlined, size: 58, color: AppColors.accent),
               SizedBox(height: 14),
-              Text('No videos found', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              Text(
+                'No videos found',
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900),
+              ),
               SizedBox(height: 7),
-              Text('OTYA shows playable video discovered by Android MediaStore. Check media permissions if videos are missing.', textAlign: TextAlign.center),
+              Text(
+                'OTYA shows playable video discovered by Android MediaStore. Check media permissions if videos are missing.',
+                textAlign: TextAlign.center,
+              ),
             ],
           ),
         ),
@@ -409,11 +487,22 @@ class _VideoError extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.error_outline_rounded, size: 50, color: AppColors.error),
+              const Icon(
+                Icons.error_outline_rounded,
+                size: 50,
+                color: AppColors.error,
+              ),
               const SizedBox(height: 12),
-              const Text('OTYA could not refresh your video library.', textAlign: TextAlign.center),
+              const Text(
+                'OTYA could not refresh your video library.',
+                textAlign: TextAlign.center,
+              ),
               const SizedBox(height: 16),
-              OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+              OutlinedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh_rounded),
+                label: const Text('Try again'),
+              ),
             ],
           ),
         ),
