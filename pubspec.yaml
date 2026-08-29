@@ -1,7 +1,7 @@
 name: otya_player
-description: OTYA Player — the official media experience of the OTYA System, built for private, reliable playback and media management.
+description: OTYA — a private, reliable Android media experience for video, music, transfer, files and local tools.
 publish_to: 'none'
-version: 1.7.0+11
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -23,12 +23,11 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # Encryption / Vault (encrypt removed — vault uses crypto + flutter_secure_storage directly)
+  # Encryption / Vault
   crypto: ^3.0.5
   local_auth: ^2.3.0
 
-  # Flash Share (pure Dart HTTP — replaces nearby_connections which required
-  # CMake native compilation and caused CI runner timeouts)
+  # OTYA Transfer — pure Dart/local-network transport.
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
 
@@ -59,8 +58,9 @@ dependencies:
   permission_handler: ^11.3.1
   image_picker: ^1.1.2
 
-  # Notifications. Cloudflare owns notification logic; Firebase Messaging is
-  # only the Android push transport used when the app is backgrounded/closed.
+  # Notifications. Cloudflare owns notification business logic. Firebase
+  # Messaging has one job only: reliable Android background/terminated push
+  # delivery. It is not OTYA's auth, database, AI, crash or app-config backend.
   flutter_local_notifications: ^18.0.1
   firebase_core: ^3.15.2
   firebase_messaging: ^15.2.10
