@@ -1,281 +1,280 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:flutter_animate/flutter_animate.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
-import '../../../app/theme/app_colors.dart';
-import '../../../core/models/media_item.dart';
-import '../../../core/database/otya_database.dart';
 
-// ── LRC line model ─────────────────────────────────────────────────
+import '../../../app/theme/app_dimensions.dart';
+import '../../../core/database/otya_database.dart';
+import '../../../core/models/media_item.dart';
+import '../../../core/services/playback_coordinator.dart';
 
 class LrcLine {
+  const LrcLine({required this.timestamp, required this.text});
+
   final Duration timestamp;
   final String text;
-  const LrcLine({required this.timestamp, required this.text});
 }
 
-// ── Provider ───────────────────────────────────────────────
+class LyricsState {
+  const LyricsState({
+    this.lines = const [],
+    this.lrcLines = const [],
+    this.isLrc = false,
+    this.isLoading = false,
+    this.source,
+  });
+
+  final List<String> lines;
+  final List<LrcLine> lrcLines;
+  final bool isLrc;
+  final bool isLoading;
+  final String? source;
+
+  bool get isEmpty => lines.isEmpty && lrcLines.isEmpty;
+}
 
 final lyricsProvider =
     StateNotifierProvider.family<LyricsNotifier, LyricsState, MediaItem>(
   (ref, item) => LyricsNotifier(item),
 );
 
-class LyricsState {
-  final List<String> lines;       // plain text lines (fallback)
-  final List<LrcLine> lrcLines;   // timestamped LRC lines
-  final bool isLrc;               // true when LRC is available
-  final bool isLoading;
-  final bool hasError;
-  final bool isOffline;
-  const LyricsState({
-    this.lines = const [],
-    this.lrcLines = const [],
-    this.isLrc = false,
-    this.isLoading = false,
-    this.hasError = false,
-    this.isOffline = false,
-  });
-}
-
 class LyricsNotifier extends StateNotifier<LyricsState> {
-  final MediaItem item;
-  LyricsNotifier(this.item) : super(const LyricsState()) {
-    fetch();
+  LyricsNotifier(this.item) : super(const LyricsState(isLoading: true)) {
+    _load();
   }
 
-  Future<void> fetch() async {
-    // 1. Check for a local .lrc file alongside the audio file
-    final lrcPath = item.filePath.replaceAll(RegExp(r'\.[^.]+$'), '.lrc');
-    final lrcFile = File(lrcPath);
-    if (await lrcFile.exists()) {
+  final MediaItem item;
+
+  Future<void> _load() async {
+    // OTYA v1 deliberately does not send track metadata to an unaffiliated
+    // lyrics service. Prefer a same-name .lrc file beside the media file.
+    final sidecarPath = item.filePath.replaceAll(RegExp(r'\.[^.]+$'), '.lrc');
+    final sidecar = File(sidecarPath);
+    if (await sidecar.exists()) {
       try {
-        final raw = await lrcFile.readAsString();
-        final parsed = _parseLrc(raw);
-        if (parsed.isNotEmpty) {
-          state = LyricsState(lrcLines: parsed, isLrc: true);
+        final raw = await sidecar.readAsString();
+        final lrc = _parseLrc(raw);
+        if (lrc.isNotEmpty) {
+          state = LyricsState(
+            lrcLines: lrc,
+            isLrc: true,
+            source: 'Local LRC',
+          );
+          return;
+        }
+        final plain = _splitPlain(raw);
+        if (plain.isNotEmpty) {
+          state = LyricsState(lines: plain, source: 'Local file');
           return;
         }
       } catch (_) {}
     }
 
-    // 2. Check offline plain-text cache
+    // Preserve lyrics already stored locally by an earlier OTYA build. New v1
+    // installs do not fetch or populate this cache from a third-party service.
     final cached = OtyaDatabase.instance.getCachedLyrics(item.id);
-    if (cached != null) {
-      // Try to parse as LRC first
-      final parsed = _parseLrc(cached);
-      if (parsed.isNotEmpty) {
-        state = LyricsState(lrcLines: parsed, isLrc: true);
+    if (cached != null && cached.trim().isNotEmpty) {
+      final lrc = _parseLrc(cached);
+      if (lrc.isNotEmpty) {
+        state = LyricsState(
+          lrcLines: lrc,
+          isLrc: true,
+          source: 'Saved locally',
+        );
         return;
       }
-      final lines = _splitPlain(cached);
-      state = LyricsState(lines: lines);
-      return;
+      final plain = _splitPlain(cached);
+      if (plain.isNotEmpty) {
+        state = LyricsState(lines: plain, source: 'Saved locally');
+        return;
+      }
     }
 
-    // 3. Fetch from network
-    state = const LyricsState(isLoading: true);
-    try {
-      final artist = Uri.encodeComponent(item.artist ?? '');
-      final title  = Uri.encodeComponent(item.title);
-      final url = 'https://api.lyrics.ovh/v1/$artist/$title';
-      final res = await http
-          .get(Uri.parse(url))
-          .timeout(const Duration(seconds: 8));
-      if (res.statusCode == 200) {
-        final data = jsonDecode(res.body) as Map<String, dynamic>;
-        final raw  = data['lyrics'] as String? ?? '';
-        await OtyaDatabase.instance.cacheLyrics(item.id, raw);
-        final parsed = _parseLrc(raw);
-        if (parsed.isNotEmpty) {
-          state = LyricsState(lrcLines: parsed, isLrc: true);
-        } else {
-          state = LyricsState(lines: _splitPlain(raw));
-        }
-      } else {
-        state = const LyricsState(hasError: true);
-      }
-    } catch (_) {
-      state = const LyricsState(hasError: true, isOffline: true);
-    }
+    state = const LyricsState();
   }
 
-  /// Parse LRC format: [mm:ss.xx] lyric line
   List<LrcLine> _parseLrc(String raw) {
     final result = <LrcLine>[];
-    final regex = RegExp(r'\[(\d{2}):(\d{2})(?:\.(\d+))?\](.*)');
-    for (final line in raw.split('\n')) {
-      final match = regex.firstMatch(line.trim());
-      if (match != null) {
-        final minutes = int.parse(match.group(1)!);
-        final seconds = int.parse(match.group(2)!);
-        final millis  = int.tryParse((match.group(3) ?? '0').padRight(3, '0').substring(0, 3)) ?? 0;
-        final text    = match.group(4)?.trim() ?? '';
-        if (text.isNotEmpty) {
-          result.add(LrcLine(
-            timestamp: Duration(
-                minutes: minutes, seconds: seconds, milliseconds: millis),
-            text: text,
-          ));
-        }
-      }
+    final regex = RegExp(r'\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\](.*)');
+    for (final rawLine in raw.split('\n')) {
+      final match = regex.firstMatch(rawLine.trim());
+      if (match == null) continue;
+      final minutes = int.tryParse(match.group(1) ?? '') ?? 0;
+      final seconds = int.tryParse(match.group(2) ?? '') ?? 0;
+      final fraction = (match.group(3) ?? '0').padRight(3, '0');
+      final millis = int.tryParse(fraction.substring(0, 3)) ?? 0;
+      final text = match.group(4)?.trim() ?? '';
+      if (text.isEmpty) continue;
+      result.add(
+        LrcLine(
+          timestamp: Duration(
+            minutes: minutes,
+            seconds: seconds,
+            milliseconds: millis,
+          ),
+          text: text,
+        ),
+      );
     }
+    result.sort((a, b) => a.timestamp.compareTo(b.timestamp));
     return result;
   }
 
   List<String> _splitPlain(String raw) => raw
       .split('\n')
-      .map((l) => l.trim())
-      .where((l) => l.isNotEmpty)
-      .toList();
+      .map((line) => line.trim())
+      .where((line) => line.isNotEmpty)
+      .toList(growable: false);
 }
 
-// ── Lyrics Sheet ─────────────────────────────────────────────
-
 class LyricsSheet extends ConsumerStatefulWidget {
+  const LyricsSheet({
+    super.key,
+    required this.item,
+    required this.position,
+  });
+
   final MediaItem item;
+
+  /// Fallback position when the sheet is opened without an active player.
   final Duration position;
-  const LyricsSheet({super.key, required this.item, required this.position});
 
   @override
   ConsumerState<LyricsSheet> createState() => _LyricsSheetState();
 }
 
 class _LyricsSheetState extends ConsumerState<LyricsSheet> {
-  final ScrollController _scroll = ScrollController();
+  final ScrollController _scrollController = ScrollController();
   int _lastActiveIndex = -1;
 
   @override
   void dispose() {
-    _scroll.dispose();
+    _scrollController.dispose();
     super.dispose();
   }
 
-  /// Auto-scroll to keep the active line centred.
-  void _scrollToActive(int index) {
-    if (!_scroll.hasClients) return;
-    if (index == _lastActiveIndex) return;
+  int _activeIndex(List<LrcLine> lines, Duration position) {
+    var active = -1;
+    for (var index = 0; index < lines.length; index++) {
+      if (lines[index].timestamp <= position) {
+        active = index;
+      } else {
+        break;
+      }
+    }
+    return active;
+  }
+
+  void _keepActiveVisible(int index) {
+    if (index < 0 || index == _lastActiveIndex) return;
     _lastActiveIndex = index;
-    const itemHeight = 52.0;
-    final target = (index * itemHeight) -
-        (_scroll.position.viewportDimension / 2) +
-        itemHeight / 2;
-    _scroll.animateTo(
-      target.clamp(0, _scroll.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeInOut,
-    );
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      const estimatedHeight = 58.0;
+      final target = index * estimatedHeight -
+          (_scrollController.position.viewportDimension / 2) +
+          estimatedHeight / 2;
+      _scrollController.animateTo(
+        target.clamp(0.0, _scrollController.position.maxScrollExtent),
+        duration: AppDimensions.motionEmphasized,
+        curve: Curves.easeOutCubic,
+      );
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(lyricsProvider(widget.item));
+    final player = PlaybackCoordinator.instance.activePlayer;
+    final positionStream = player?.stream.position;
 
-    return Container(
-      height: MediaQuery.of(context).size.height * 0.75,
-      decoration: const BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
+    return FractionallySizedBox(
+      heightFactor: .82,
       child: Column(
         children: [
-          const SizedBox(height: 12),
-          Center(
-            child: Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.fromLTRB(20, 4, 12, 10),
             child: Row(
               children: [
-                const Icon(Icons.lyrics_rounded,
-                    color: AppColors.accent, size: 20),
-                const SizedBox(width: 8),
-                const Text('Lyrics',
+                const Icon(Icons.lyrics_rounded, size: 21),
+                const SizedBox(width: 9),
+                const Expanded(
+                  child: Text(
+                    'Lyrics',
                     style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                      fontFamily: 'Inter',
-                    )),
-                if (state.isLrc) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(
-                          color: AppColors.accent.withValues(alpha: 0.4)),
+                      fontSize: 17,
+                      fontWeight: FontWeight.w800,
                     ),
-                    child: const Text('SYNC',
-                        style: TextStyle(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                          letterSpacing: 0.8,
-                        )),
                   ),
-                ],
-                const Spacer(),
-                Text(widget.item.title,
-                    style: const TextStyle(
-                        fontSize: 11, color: AppColors.textSecondary),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis),
+                ),
+                if (state.source != null)
+                  Text(
+                    state.source!,
+                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                  ),
+                IconButton(
+                  tooltip: 'Close lyrics',
+                  onPressed: () => Navigator.of(context).pop(),
+                  icon: const Icon(Icons.close_rounded),
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 16),
-          const Divider(color: AppColors.border, height: 1),
+          const Divider(),
           Expanded(
             child: state.isLoading
-                ? const Center(
-                    child: CircularProgressIndicator(color: AppColors.accent))
-                : state.hasError
-                    ? Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              state.isOffline
-                                  ? Icons.wifi_off_rounded
-                                  : Icons.lyrics_outlined,
-                              color: AppColors.textSecondary,
-                              size: 40,
-                            ),
-                            const SizedBox(height: 12),
-                            Text(
-                              state.isOffline
-                                  ? 'Connect to internet to fetch lyrics'
-                                  : 'Lyrics not found for this track',
-                              style: const TextStyle(
-                                  color: AppColors.textSecondary,
-                                  fontSize: 13),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
-                        ),
-                      )
+                ? const Center(child: CircularProgressIndicator())
+                : state.isEmpty
+                    ? _EmptyLyrics(item: widget.item)
                     : state.isLrc
-                        ? _LrcView(
-                            lines: state.lrcLines,
-                            position: widget.position,
-                            scroll: _scroll,
-                            onActiveIndex: _scrollToActive,
+                        ? StreamBuilder<Duration>(
+                            stream: positionStream,
+                            initialData: player?.state.position ?? widget.position,
+                            builder: (context, snapshot) {
+                              final position = snapshot.data ?? widget.position;
+                              final active = _activeIndex(state.lrcLines, position);
+                              _keepActiveVisible(active);
+                              return ListView.builder(
+                                controller: _scrollController,
+                                padding: const EdgeInsets.fromLTRB(24, 28, 24, 80),
+                                itemCount: state.lrcLines.length,
+                                itemBuilder: (context, index) {
+                                  final line = state.lrcLines[index];
+                                  final selected = index == active;
+                                  return AnimatedDefaultTextStyle(
+                                    duration: AppDimensions.motionFast,
+                                    style: TextStyle(
+                                      color: selected
+                                          ? Theme.of(context).colorScheme.primary
+                                          : Theme.of(context)
+                                              .colorScheme
+                                              .onSurface
+                                              .withValues(alpha: .56),
+                                      fontSize: selected ? 20 : 16,
+                                      fontWeight: selected
+                                          ? FontWeight.w800
+                                          : FontWeight.w500,
+                                      height: 1.35,
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(vertical: 10),
+                                      child: Text(line.text),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
                           )
-                        : _PlainView(
-                            lines: state.lines,
-                            position: widget.position,
+                        : ListView.separated(
+                            padding: const EdgeInsets.fromLTRB(24, 26, 24, 60),
+                            itemCount: state.lines.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (_, index) => Text(
+                              state.lines[index],
+                              style: const TextStyle(fontSize: 17, height: 1.5),
+                            ),
                           ),
           ),
         ],
@@ -284,113 +283,49 @@ class _LyricsSheetState extends ConsumerState<LyricsSheet> {
   }
 }
 
-// ── LRC synced view ────────────────────────────────────────────────
+class _EmptyLyrics extends StatelessWidget {
+  const _EmptyLyrics({required this.item});
 
-class _LrcView extends StatelessWidget {
-  final List<LrcLine> lines;
-  final Duration position;
-  final ScrollController scroll;
-  final ValueChanged<int> onActiveIndex;
-
-  const _LrcView({
-    required this.lines,
-    required this.position,
-    required this.scroll,
-    required this.onActiveIndex,
-  });
-
-  int get _active {
-    int a = 0;
-    for (int i = 0; i < lines.length; i++) {
-      if (lines[i].timestamp <= position) a = i;
-    }
-    return a;
-  }
+  final MediaItem item;
 
   @override
   Widget build(BuildContext context) {
-    final active = _active;
-    WidgetsBinding.instance.addPostFrameCallback((_) => onActiveIndex(active));
+    final scheme = Theme.of(context).colorScheme;
+    final mediaName = item.filePath.split(Platform.pathSeparator).last;
+    final lrcName = mediaName.replaceAll(RegExp(r'\.[^.]+$'), '.lrc');
 
-    return ListView.builder(
-      controller: scroll,
-      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 80),
-      itemCount: lines.length,
-      itemBuilder: (context, i) {
-        final isActive = i == active;
-        return AnimatedContainer(
-          duration: const Duration(milliseconds: 300),
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          child: Text(
-            lines[i].text,
-            style: TextStyle(
-              fontSize: isActive ? 18 : 14,
-              fontWeight:
-                  isActive ? FontWeight.w700 : FontWeight.w400,
-              color: isActive
-                  ? AppColors.accent
-                  : AppColors.textSecondary,
-              height: 1.5,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ).animate(target: isActive ? 1 : 0).scaleXY(
-              begin: 1, end: 1.03, duration: 200.ms);
-      },
-    );
-  }
-}
-
-// ── Plain text view ────────────────────────────────────────────────
-
-class _PlainView extends StatelessWidget {
-  final List<String> lines;
-  // position is kept in the constructor signature for API compatibility
-  // but is intentionally unused — plain-text lyrics have no timestamp data,
-  // so any position-based highlight would be a false approximation.
-  // ignore: unused_field
-  final Duration position;
-
-  const _PlainView({required this.lines, required this.position});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(24, 16, 24, MediaQuery.of(context).padding.bottom + 32),
-      // +1 for the sync-unavailable notice at the top
-      itemCount: lines.length + 1,
-      itemBuilder: (context, i) {
-        if (i == 0) {
-          // Honest UX: tell the user why there is no highlight
-          return const Padding(
-            padding: EdgeInsets.only(bottom: 12),
-            child: Text(
-              'Sync unavailable for plain-text lyrics',
-              style: TextStyle(
-                fontSize: 11,
-                color: AppColors.textSecondary,
-                fontStyle: FontStyle.italic,
-                fontFamily: 'Inter',
+    return Center(
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(30),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.lyrics_outlined,
+                size: 52,
+                color: scheme.onSurfaceVariant,
               ),
-              textAlign: TextAlign.center,
-            ),
-          );
-        }
-        final lineIndex = i - 1;
-        return Padding(
-          padding: const EdgeInsets.symmetric(vertical: 6),
-          child: Text(
-            lines[lineIndex],
-            style: const TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w400,
-              color: AppColors.textSecondary,
-              height: 1.5,
-              fontFamily: 'Inter',
-            ),
+              const SizedBox(height: 16),
+              const Text(
+                'No local lyrics found',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+              ),
+              const SizedBox(height: 9),
+              Text(
+                'For private offline lyrics, place a matching $lrcName file beside this track. Timestamped LRC files will follow playback automatically.',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: scheme.onSurfaceVariant,
+                  height: 1.5,
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
