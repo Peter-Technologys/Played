@@ -1,16 +1,24 @@
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 
 class StorageReport {
   final int videoBytes, audioBytes, cacheBytes, otherBytes, totalBytes;
-  const StorageReport({required this.videoBytes, required this.audioBytes,
-      required this.cacheBytes, required this.otherBytes, required this.totalBytes});
+  const StorageReport({
+    required this.videoBytes,
+    required this.audioBytes,
+    required this.cacheBytes,
+    required this.otherBytes,
+    required this.totalBytes,
+  });
   int get usedBytes => videoBytes + audioBytes + cacheBytes + otherBytes;
   int get freeBytes => (totalBytes - usedBytes).clamp(0, totalBytes);
   String fmt(int b) {
     if (b < 1024 * 1024) return '${(b / 1024).toStringAsFixed(1)} KB';
-    if (b < 1024 * 1024 * 1024) return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (b < 1024 * 1024 * 1024) {
+      return '${(b / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(b / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 }
@@ -31,9 +39,15 @@ class StorageAnalyzerService {
     final audioBytes = results[2];
     final cacheBytes = results[3];
     final totalBytes = results[4];
-    final otherBytes = (totalBytes - videoBytes - audioBytes - cacheBytes).clamp(0, totalBytes);
-    return StorageReport(videoBytes: videoBytes, audioBytes: audioBytes,
-        cacheBytes: cacheBytes, otherBytes: otherBytes, totalBytes: totalBytes);
+    final otherBytes =
+        (totalBytes - videoBytes - audioBytes - cacheBytes).clamp(0, totalBytes);
+    return StorageReport(
+      videoBytes: videoBytes,
+      audioBytes: audioBytes,
+      cacheBytes: cacheBytes,
+      otherBytes: otherBytes,
+      totalBytes: totalBytes,
+    );
   }
 
   Future<int> purgeCache() async {
@@ -56,17 +70,21 @@ class StorageAnalyzerService {
             }
           } catch (_) {}
         }
-      } catch (e) { debugPrint('[Analyzer] Purge error: $e'); }
+      } catch (e) {
+        debugPrint('[Analyzer] Purge error: $e');
+      }
     }
     return freed;
   }
 
   Future<List<Directory>> _cacheDirs() async {
     final dirs = <Directory>[];
-    try { dirs.add(await getTemporaryDirectory()); } catch (_) {}
+    try {
+      dirs.add(await getTemporaryDirectory());
+    } catch (_) {}
     try {
       final d = await getApplicationDocumentsDirectory();
-      for (final sub in ['cache','thumbnails','video_thumbs','album_art']) {
+      for (final sub in ['cache', 'thumbnails', 'video_thumbs', 'album_art']) {
         final dir = Directory('${d.path}/$sub');
         if (await dir.exists()) dirs.add(dir);
       }
@@ -76,7 +94,9 @@ class StorageAnalyzerService {
 
   Future<int> _appCacheSize() async {
     int t = 0;
-    for (final d in await _cacheDirs()) t += await _dirSize(d.path);
+    for (final d in await _cacheDirs()) {
+      t += await _dirSize(d.path);
+    }
     return t;
   }
 
@@ -85,8 +105,13 @@ class StorageAnalyzerService {
     try {
       final dir = Directory(path);
       if (!await dir.exists()) return 0;
-      await for (final e in dir.list(recursive: true, followLinks: false))
-        if (e is File) try { t += await e.length(); } catch (_) {}
+      await for (final e in dir.list(recursive: true, followLinks: false)) {
+        if (e is File) {
+          try {
+            t += await e.length();
+          } catch (_) {}
+        }
+      }
     } catch (_) {}
     return t;
   }
