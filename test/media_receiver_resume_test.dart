@@ -4,6 +4,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:otya_player/features/air_drop/data/media_receiver.dart';
 
 void main() {
+  const tokenA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const tokenB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const tokenC = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
+
   test('MediaReceiver resumes only a matching transfer partial', () async {
     final source = List<int>.generate(4096, (index) => index % 251);
     final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
@@ -12,10 +16,10 @@ void main() {
 
     String? receivedRange;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final url = 'http://127.0.0.1:${server.port}/media?t=test';
+    final url = 'http://127.0.0.1:${server.port}/media?t=$tokenA';
     await target.writeAsBytes(source.take(existing).toList(), flush: true);
     await File('${target.path}.otya-transfer')
-        .writeAsString('127.0.0.1:${server.port}/media|test', flush: true);
+        .writeAsString('127.0.0.1:${server.port}/media|$tokenA', flush: true);
 
     server.listen((request) async {
       receivedRange = request.headers.value(HttpHeaders.rangeHeader);
@@ -72,7 +76,7 @@ void main() {
     try {
       final receiver = MediaReceiver();
       final result = await receiver.download(
-        url: 'http://127.0.0.1:${server.port}/media?t=new-transfer',
+        url: 'http://127.0.0.1:${server.port}/media?t=$tokenB',
         savePath: target.path,
       );
 
@@ -92,10 +96,10 @@ void main() {
     final target = File('${temp.path}/received.bin');
 
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
-    final url = 'http://127.0.0.1:${server.port}/media?t=range-ignore';
+    final url = 'http://127.0.0.1:${server.port}/media?t=$tokenC';
     await target.writeAsBytes(const [1, 2, 3, 4, 5], flush: true);
     await File('${target.path}.otya-transfer')
-        .writeAsString('127.0.0.1:${server.port}/media|range-ignore', flush: true);
+        .writeAsString('127.0.0.1:${server.port}/media|$tokenC', flush: true);
 
     server.listen((request) async {
       request.response
@@ -113,6 +117,36 @@ void main() {
       expect(await result.readAsBytes(), source);
     } finally {
       await server.close(force: true);
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('MediaReceiver rejects non-local or malformed transfer URLs', () async {
+    final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
+    final receiver = MediaReceiver();
+    try {
+      await expectLater(
+        receiver.download(
+          url: 'http://example.com/media?t=$tokenA',
+          savePath: '${temp.path}/remote.bin',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      await expectLater(
+        receiver.download(
+          url: 'https://127.0.0.1/media?t=$tokenA',
+          savePath: '${temp.path}/https.bin',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      await expectLater(
+        receiver.download(
+          url: 'http://127.0.0.1/media?t=short',
+          savePath: '${temp.path}/short.bin',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+    } finally {
       await temp.delete(recursive: true);
     }
   });
