@@ -22,7 +22,9 @@ class VaultService {
 
   static String _sanitizeFileName(String name) {
     final base = name.split(RegExp(r'[/\\]')).last;
-    final clean = base.replaceAll('..', '').replaceAll(RegExp(r'[^\w\s.\-]'), '_');
+    final clean = base
+        .replaceAll('..', '')
+        .replaceAll(RegExp(r'[^\w\s.\-]'), '_');
     return clean.isEmpty
         ? 'private_file_${DateTime.now().millisecondsSinceEpoch}'
         : clean;
@@ -47,16 +49,44 @@ class VaultService {
     return dir;
   }
 
+  /// Current Private metadata, newest first. Missing files remain visible so
+  /// the UI can explain the storage problem instead of silently losing records.
+  List<VaultItem> getAllItems() {
+    final items = OtyaDatabase.instance.getAllVaultItems();
+    items.sort((a, b) => b.lockedAt.compareTo(a.lockedAt));
+    return items;
+  }
+
+  /// Total bytes physically present in OTYA Private.
+  Future<int> getVaultSize() async {
+    var total = 0;
+    for (final item in getAllItems()) {
+      try {
+        await _assertWithinVault(item.encryptedPath);
+        final file = File(item.encryptedPath);
+        if (await file.exists()) total += await file.length();
+      } catch (_) {
+        // A corrupt/migrated record should not make the whole Private screen
+        // unavailable. The item itself remains visible for user action.
+      }
+    }
+    return total;
+  }
+
   Future<VaultItem> lockItem(MediaItem item) async {
     final dir = await _vaultDir;
-    final rawExt = item.fileName.contains('.') ? item.fileName.split('.').last : 'bin';
+    final rawExt = item.fileName.contains('.')
+        ? item.fileName.split('.').last
+        : 'bin';
     final privateExt = _sanitizeFileName('file.$rawExt').split('.').last;
     final privateId = _sanitizeFileName(item.id);
     final vaultPath = '${dir.path}/$privateId.$privateExt';
     await _assertWithinVault(vaultPath);
 
     final source = File(item.filePath);
-    if (!await source.exists()) throw Exception('Source file not found: ${item.filePath}');
+    if (!await source.exists()) {
+      throw FileSystemException('Source file not found', item.filePath);
+    }
 
     final copied = await source.copy(vaultPath);
     if (!await copied.exists()) {
@@ -74,7 +104,9 @@ class VaultService {
     try {
       await OtyaDatabase.instance.addToVault(vaultItem);
     } catch (_) {
-      try { await copied.delete(); } catch (_) {}
+      try {
+        await copied.delete();
+      } catch (_) {}
       rethrow;
     }
 
@@ -85,11 +117,17 @@ class VaultService {
         await OtyaDatabase.instance.removeFromVault(item.id);
         await copied.delete();
       } catch (_) {}
-      throw FileSystemException('Could not move the original media into Private', item.filePath);
+      throw FileSystemException(
+        'Could not move the original media into Private',
+        item.filePath,
+      );
     }
 
     try {
-      await _kMediaChannel.invokeMethod<void>('triggerScan', {'path': item.filePath});
+      await _kMediaChannel.invokeMethod<void>(
+        'triggerScan',
+        {'path': item.filePath},
+      );
     } catch (_) {}
 
     debugPrint('[Private] Locked: ${item.title}');
@@ -103,7 +141,10 @@ class VaultService {
     await _assertWithinVault(vaultItem.encryptedPath);
     final vaultFile = File(vaultItem.encryptedPath);
     if (!await vaultFile.exists()) {
-      throw FileSystemException('Private file is missing', vaultItem.encryptedPath);
+      throw FileSystemException(
+        'Private file is missing',
+        vaultItem.encryptedPath,
+      );
     }
 
     final original = File(vaultItem.originalPath);
@@ -114,12 +155,32 @@ class VaultService {
     }
 
     await OtyaDatabase.instance.removeFromVault(mediaId);
-    try { await vaultFile.delete(); } catch (_) {}
+    try {
+      await vaultFile.delete();
+    } catch (_) {}
 
     try {
-      await _kMediaChannel.invokeMethod<void>('triggerScan', {'path': vaultItem.originalPath});
+      await _kMediaChannel.invokeMethod<void>(
+        'triggerScan',
+        {'path': vaultItem.originalPath},
+      );
     } catch (_) {}
 
     debugPrint('[Private] Restored: $mediaId');
+  }
+
+  /// Permanently removes only the app-private copy and its metadata. Refuse to
+  /// delete any path that does not resolve inside OTYA Private.
+  Future<void> deleteFromVault(String mediaId) async {
+    final item = OtyaDatabase.instance.getVaultItem(mediaId);
+    if (item == null) return;
+
+    await _assertWithinVault(item.encryptedPath);
+    final file = File(item.encryptedPath);
+    if (await file.exists()) {
+      await file.delete();
+    }
+    await OtyaDatabase.instance.removeFromVault(mediaId);
+    debugPrint('[Private] Permanently deleted: $mediaId');
   }
 }
