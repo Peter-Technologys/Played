@@ -55,7 +55,6 @@ jobs:
     needs: validate
     runs-on: ubuntu-latest
     timeout-minutes: 35
-    environment: development
     steps:
       - name: Free disk space
         run: |
