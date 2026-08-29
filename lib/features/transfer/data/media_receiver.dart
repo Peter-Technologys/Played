@@ -131,6 +131,7 @@ class MediaReceiver {
     final a = octets[0]!;
     final b = octets[1]!;
     return a == 10 ||
+        a == 127 ||
         (a == 172 && b >= 16 && b <= 31) ||
         (a == 192 && b == 168);
   }
