@@ -15,10 +15,23 @@ class GoogleAccountService {
   GoogleAccountService._();
   static final GoogleAccountService instance = GoogleAccountService._();
 
-  static const String _clientId = String.fromEnvironment(
+  /// Android Google Sign-In uses the Web OAuth client as serverClientId so the
+  /// returned ID token is intended for OTYA's backend. The Android OAuth client
+  /// remains registered in Google/Firebase against package + signing SHA.
+  static const String _webClientId = String.fromEnvironment(
+    'GOOGLE_WEB_CLIENT_ID',
+    defaultValue: '',
+  );
+
+  /// Temporary compatibility for older CI/local builds. New production builds
+  /// must define GOOGLE_WEB_CLIENT_ID explicitly.
+  static const String _legacyClientId = String.fromEnvironment(
     'GOOGLE_CLIENT_ID',
     defaultValue: '',
   );
+
+  static String get _clientId =>
+      _webClientId.isNotEmpty ? _webClientId : _legacyClientId;
 
   static const String _driveAppDataScope =
       'https://www.googleapis.com/auth/drive.appdata';
