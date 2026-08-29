@@ -164,6 +164,12 @@ class AppSettings {
 class SettingsNotifier extends StateNotifier<AppSettings> {
   SettingsNotifier(super.initial);
 
+  /// Applies settings loaded from local storage after OTYA has rendered its
+  /// first frame. Hydration must not write them back or touch native services.
+  void hydrate(AppSettings settings) {
+    state = settings;
+  }
+
   Future<void> _update(AppSettings s) async {
     state = s;
     s.save().ignore();
