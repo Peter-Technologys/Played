@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../config/environment.dart';
-import '../services/apk_downloader.dart';
 import '../services/update_service.dart';
 
 /// Single-purpose OTYA update dialog.
+///
+/// OTYA intentionally does not install APKs itself. Google Play restricts the
+/// REQUEST_INSTALL_PACKAGES permission for self-update use, and local playback
+/// must not depend on a privileged installer path. The app checks canonical
+/// release metadata, explains the update, and hands the user to the official
+/// HTTPS update destination in their browser.
 class UpdateDialog extends StatefulWidget {
   const UpdateDialog({super.key, required this.info});
   final UpdateInfo info;
@@ -15,10 +21,6 @@ class UpdateDialog extends StatefulWidget {
     BuildContext context, {
     bool forceCheck = false,
   }) async {
-    // OTYA has more than one legitimate update trigger (startup, Settings,
-    // notification taps). Never let two triggers stack dialogs or race the APK
-    // downloader. A manual force-check while a dialog is already visible is a
-    // no-op because the visible dialog is already the actionable result.
     if (_showing) return;
 
     final update = await UpdateService.instance.checkForUpdate(force: forceCheck);
@@ -48,10 +50,8 @@ class UpdateDialog extends StatefulWidget {
     }
   }
 
-  // OTYA does not currently hard-block the whole offline app. Minimum-version
-  // policy is enforced at online-service boundaries so local media stays
-  // usable. Keep this false until a separate offline-safe forced-update UX is
-  // explicitly implemented.
+  // Minimum-version policy is enforced at online-service boundaries. OTYA
+  // never blocks a user's local media library behind an internet update.
   static bool updateIsMandatory(UpdateInfo info) => false;
 
   @override
@@ -59,48 +59,51 @@ class UpdateDialog extends StatefulWidget {
 }
 
 class _UpdateDialogState extends State<UpdateDialog> {
-  double? _progress;
-  bool _downloading = false;
+  bool _opening = false;
   String? _error;
 
-  @override
-  void dispose() {
-    if (_downloading) ApkDownloader.instance.cancel();
-    super.dispose();
-  }
-
-  Future<void> _download() async {
-    if (_downloading) return;
+  Future<void> _openOfficialUpdate() async {
+    if (_opening) return;
     setState(() {
-      _downloading = true;
-      _progress = 0;
+      _opening = true;
       _error = null;
     });
 
-    final url = widget.info.directUrl.isNotEmpty
-        ? widget.info.directUrl
-        : widget.info.downloadUrl.isNotEmpty
-            ? widget.info.downloadUrl
+    // Prefer the public download page when release metadata provides one. A
+    // direct APK URL remains a valid fallback for PeterSmart Link distribution,
+    // but Android/browser owns the actual download/install permission flow.
+    final raw = widget.info.downloadUrl.isNotEmpty
+        ? widget.info.downloadUrl
+        : widget.info.directUrl.isNotEmpty
+            ? widget.info.directUrl
             : Environment.downloadUrl;
+    final uri = Uri.tryParse(raw);
 
-    await ApkDownloader.instance.downloadAndInstall(
-      url: url,
-      version: widget.info.version,
-      onProgress: (value) {
-        if (mounted) setState(() => _progress = value.clamp(0.0, 1.0));
-      },
-      onError: (message) {
-        if (!mounted) return;
+    if (uri == null || uri.scheme != 'https') {
+      if (mounted) {
         setState(() {
-          _downloading = false;
-          _progress = null;
-          _error = message;
+          _opening = false;
+          _error = 'OTYA could not verify the official update address.';
         });
-      },
-    );
+      }
+      return;
+    }
 
-    if (mounted && _downloading) {
-      setState(() => _downloading = false);
+    try {
+      final opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened && mounted) {
+        setState(() => _error = 'Could not open the official OTYA update page.');
+      }
+      if (opened && mounted) Navigator.of(context).pop();
+    } catch (_) {
+      if (mounted) {
+        setState(() => _error = 'Could not open the official OTYA update page.');
+      }
+    } finally {
+      if (mounted) setState(() => _opening = false);
     }
   }
 
@@ -121,7 +124,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           gradient: const LinearGradient(
-            colors: [Color(0xFF7544FF), Color(0xFF11D7FF)],
+            colors: [Color(0xFF8173F2), Color(0xFF668FE8)],
           ),
         ),
         child: const Icon(
@@ -155,17 +158,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 ),
               ),
             ],
-            if (_downloading) ...[
-              const SizedBox(height: 16),
-              LinearProgressIndicator(value: _progress),
-              const SizedBox(height: 7),
-              Text(
-                _progress == null
-                    ? 'Preparing download…'
-                    : 'Downloading ${(_progress! * 100).round()}%',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
+            const SizedBox(height: 14),
+            Text(
+              'OTYA will open the official PeterSmart Link update destination. '
+              'The app does not silently install packages or require installer permission.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
             if (_error != null) ...[
               const SizedBox(height: 14),
               Container(
@@ -186,15 +184,18 @@ class _UpdateDialogState extends State<UpdateDialog> {
       ),
       actions: [
         TextButton(
-          onPressed: _downloading ? null : _later,
+          onPressed: _opening ? null : _later,
           child: const Text('Later'),
         ),
         FilledButton.icon(
-          onPressed: _downloading ? null : _download,
-          icon: Icon(
-            _error == null ? Icons.download_rounded : Icons.refresh_rounded,
-          ),
-          label: Text(_error == null ? 'Update now' : 'Retry'),
+          onPressed: _opening ? null : _openOfficialUpdate,
+          icon: _opening
+              ? const SizedBox.square(
+                  dimension: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : const Icon(Icons.open_in_new_rounded),
+          label: Text(_opening ? 'Opening…' : 'Update'),
         ),
       ],
     );
