@@ -26,27 +26,6 @@ import 'features/settings/settings_provider.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  MediaKit.ensureInitialized();
-
-  await SystemChrome.setPreferredOrientations(const [
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-    DeviceOrientation.landscapeLeft,
-    DeviceOrientation.landscapeRight,
-  ]);
-
-  // Android 15+ is edge-to-edge by default when targeting API 35. Explicitly
-  // opt into the same behavior on older supported Android versions so OTYA has
-  // one predictable inset model instead of two visually different shells.
-  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarDividerColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.light,
-    systemNavigationBarContrastEnforced: false,
-  ));
 
   FlutterError.onError = (details) {
     FlutterError.presentError(details);
@@ -68,26 +47,6 @@ Future<void> main() async {
     }
     return true;
   };
-
-  try {
-    final audioHandler = await AudioService.init(
-      builder: () => OtyaAudioHandler(),
-      config: AudioServiceConfig(
-        androidNotificationChannelId: 'com.otyaplayer.app.audio',
-        androidNotificationChannelName: 'OTYA — Now Playing',
-        androidNotificationOngoing: true,
-        androidStopForegroundOnPause: false,
-        androidNotificationIcon: 'drawable/ic_notification',
-        notificationColor: const Color(0xFF8B5CF6),
-        androidShowNotificationBadge: false,
-        preloadArtwork: true,
-      ),
-    );
-    AudioHandlerSingleton.instance.handler = audioHandler;
-  } catch (e, st) {
-    debugPrint('[AudioService] init failed: $e\n$st');
-    CrashReporter.instance.report(e, st);
-  }
 
   await runZonedGuarded(() async {
     var databaseReady = false;
@@ -118,7 +77,9 @@ Future<void> main() async {
       ),
     );
 
-    unawaited(_initBackground(savedSettings, databaseReady));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_initBackground(savedSettings, databaseReady));
+    });
   }, (error, stack) {
     debugPrint('[ZoneError] $error\n$stack');
     CrashReporter.instance.report(error, stack);
@@ -196,6 +157,7 @@ Future<void> _initBackground(
   AppSettings savedSettings,
   bool databaseReady,
 ) async {
+  await _safeBackground('playback platform', _initPlaybackPlatform);
   await _safeBackground('notifications', _initNotifications);
   await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
   await _safeBackground('connectivity', ConnectivityService.instance.init);
@@ -204,26 +166,20 @@ Future<void> _initBackground(
   unawaited(_safeBackground('cache eviction', CacheService.instance.evictExpired));
 
   if (databaseReady) {
-    unawaited(_safeBackground(
-      'device registration',
-      DeviceService.instance.registerIfNeeded,
-    ));
+    unawaited(
+      _safeBackground('device registration', DeviceService.instance.registerIfNeeded),
+    );
   }
 
-  unawaited(_safeBackground(
-    'update check',
-    UpdateService.instance.checkAndNotify,
-  ));
+  unawaited(
+    _safeBackground('update check', UpdateService.instance.checkAndNotify),
+  );
 
   PipService.listenForNativePause(
     () => PlaybackCoordinator.instance.activePlayer?.pause(),
     () => PlaybackCoordinator.instance.activePlayer?.play(),
   );
 
-  // Configure shared audio focus only after audio_service/media_kit have loaded.
-  // The audio session is OTYA's single interruption owner on modern Android;
-  // call interruptions are optional, while unplugged/Bluetooth-loss safety is
-  // always active.
   await _safeBackground(
     'audio session',
     () => AudioSessionService.instance.init(
@@ -231,15 +187,47 @@ Future<void> _initBackground(
     ),
   );
 
-  // Firebase is optional and starts only after OTYA is already usable. App
-  // Check/Analytics/Performance policy comes from Cloudflare app config. FCM
-  // then reuses the same initialized Firebase app.
   await _safeBackground(
     'Firebase platform',
     FirebasePlatformService.instance.initOptionalServices,
   );
   unawaited(_safeBackground('FCM', FcmService.instance.init));
   unawaited(_safeBackground('crash reporter', CrashReporter.instance.init));
+}
+
+Future<void> _initPlaybackPlatform() async {
+  MediaKit.ensureInitialized();
+
+  await SystemChrome.setPreferredOrientations(const [
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+    DeviceOrientation.landscapeLeft,
+    DeviceOrientation.landscapeRight,
+  ]);
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarContrastEnforced: false,
+  ));
+
+  final audioHandler = await AudioService.init(
+    builder: () => OtyaAudioHandler(),
+    config: AudioServiceConfig(
+      androidNotificationChannelId: 'com.otyaplayer.app.audio',
+      androidNotificationChannelName: 'OTYA — Now Playing',
+      androidNotificationOngoing: true,
+      androidStopForegroundOnPause: false,
+      androidNotificationIcon: 'drawable/ic_notification',
+      notificationColor: const Color(0xFF8B5CF6),
+      androidShowNotificationBadge: false,
+      preloadArtwork: true,
+    ),
+  );
+  AudioHandlerSingleton.instance.handler = audioHandler;
 }
 
 Future<void> _safeBackground(
