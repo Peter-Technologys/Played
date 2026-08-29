@@ -111,9 +111,9 @@ jobs:
       - name: Static analysis
         shell: bash
         run: |
-          set -o pipefail
+          set -euo pipefail
           mkdir -p build
-          flutter analyze --no-fatal-warnings --no-fatal-infos 2>&1 | tee build/flutter-analyze-release.log
+          flutter analyze 2>&1 | tee build/flutter-analyze-release.log
 
       - name: Run tests
         run: flutter test
