@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../../core/config/environment.dart';
+import '../../../core/models/media_item.dart';
 
 class OnlineTrack {
   const OnlineTrack({
@@ -48,6 +49,20 @@ class OnlineTrack {
         shareUrl: json['shareUrl'] as String? ?? '',
         licenseUrl: json['licenseUrl'] as String? ?? '',
         provider: json['provider'] as String? ?? 'unknown',
+      );
+
+  MediaItem toMediaItem() => MediaItem(
+        id: 'online:$provider:$id',
+        title: title,
+        fileName: title,
+        filePath: streamUrl,
+        isVideo: false,
+        duration: duration,
+        addedAt: DateTime.now(),
+        fileSizeBytes: 0,
+        albumArtPath: artworkUrl.isEmpty ? null : artworkUrl,
+        artist: artist,
+        album: album.isEmpty ? null : album,
       );
 }
 
