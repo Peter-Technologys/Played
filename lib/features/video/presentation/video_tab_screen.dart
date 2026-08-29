@@ -1,30 +1,21 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:shimmer/shimmer.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/services/vault_service.dart';
-import '../../../core/services/file_ops_service.dart';
-import '../../my_space/presentation/providers/my_space_provider.dart';
-import '../../player/presentation/queue_screen.dart';
-import '../../playlists/playlist_screen.dart' show playlistsProvider;
 import '../../../shared/widgets/media_new_indicator.dart';
-import '../../../shared/widgets/playlists_view.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
+import '../../my_space/presentation/providers/my_space_provider.dart';
+import '../../player/presentation/queue_screen.dart';
+import '../../search/smart_search_sheet.dart';
 
-// ── Filter pill state ─────────────────────────────────────────────────────
-
-enum _VideoFilter { videos, folders, playlists }
-
-final _videoFilterProvider =
-    StateProvider<_VideoFilter>((_) => _VideoFilter.videos);
-
-// ── Video Tab Screen ──────────────────────────────────────────────────────
+enum _VideoView { videos, folders, playlists }
+final _videoViewProvider = StateProvider<_VideoView>((_) => _VideoView.videos);
 
 class VideoTabScreen extends ConsumerStatefulWidget {
   const VideoTabScreen({super.key});
@@ -60,1618 +51,371 @@ class _VideoTabScreenState extends ConsumerState<VideoTabScreen>
   @override
   Widget build(BuildContext context) {
     super.build(context);
-    final libraryAsync = ref.watch(mediaLibraryProvider);
-    final filter = ref.watch(_videoFilterProvider);
-
+    final library = ref.watch(mediaLibraryProvider);
+    final view = ref.watch(_videoViewProvider);
     return WallpaperScaffold(
       body: SafeArea(
-        child: Column(
-          children: [
-            _VideoHeader(libraryAsync: libraryAsync),
-            _FilterPills(current: filter),
-            Expanded(
-              child: libraryAsync.when(
-                loading: () => libraryAsync.valueOrNull != null
-                    ? _buildContent(
-                        context, libraryAsync.valueOrNull!, filter)
-                    : const _VideoShimmer(),
-                error: (e, _) {
-                  final msg = e.toString().toLowerCase();
-                  if (msg.contains('permission')) {
-                    return PermissionDeniedScreen(
-                      onRetry: () =>
-                          ref.read(mediaLibraryProvider.notifier).refresh(),
-                    );
-                  }
-                  return _ErrorView(
-                    message: e.toString(),
-                    onRetry: () =>
-                        ref.read(mediaLibraryProvider.notifier).refresh(),
-                  );
-                },
-                data: (items) => RefreshIndicator(
-                  color: AppColors.accent,
-                  backgroundColor: AppColors.surface,
-                  onRefresh: () => ref
-                      .read(mediaLibraryProvider.notifier)
-                      .backgroundRefresh(),
-                  child: _buildContent(context, items, filter),
-                ),
-              ),
-            ),
-          ],
+        child: library.when(
+          loading: () {
+            final cached = library.valueOrNull;
+            return cached == null
+                ? const Center(child: CircularProgressIndicator())
+                : _content(context, cached, view);
+          },
+          error: (error, _) {
+            if (error.toString().toLowerCase().contains('permission')) {
+              return PermissionDeniedScreen(
+                onRetry: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+              );
+            }
+            return _VideoError(
+              onRetry: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+            );
+          },
+          data: (items) => RefreshIndicator(
+            onRefresh: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+            child: _content(context, items, view),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildContent(
-      BuildContext context, List<MediaItem> items, _VideoFilter filter) {
-    final videos = items.where((e) => e.isVideo).toList()
+  Widget _content(BuildContext context, List<MediaItem> items, _VideoView view) {
+    final videos = items.where((item) => item.isVideo).toList()
       ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
-    switch (filter) {
-      case _VideoFilter.videos:
-        return _VideoGrid(items: videos, isListView: true);
-      case _VideoFilter.folders:
-        return _VideoFoldersTab(items: videos);
-      case _VideoFilter.playlists:
-        return const PlaylistsView(showCreateButton: true);
-    }
-  }
-}
-
-class _VideoHeader extends ConsumerWidget {
-  final AsyncValue<List<MediaItem>> libraryAsync;
-  const _VideoHeader({required this.libraryAsync});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final videos = libraryAsync.valueOrNull?.where((e) => e.isVideo).toList();
-    final count = videos?.length ?? 0;
-    final isScanning =
-        libraryAsync.isLoading && libraryAsync.valueOrNull != null;
-
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Row(
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.asset(
-              'assets/icons/play_store_512.png',
-              width: 34,
-              height: 34,
-              fit: BoxFit.cover,
-              errorBuilder: (_, __, ___) => const Icon(
-                Icons.play_circle_fill_rounded,
-                color: AppColors.accent,
-                size: 34,
-              ),
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                ShaderMask(
-                  shaderCallback: (b) => const LinearGradient(
-                    colors: [AppColors.accent, AppColors.accentViolet],
-                  ).createShader(b),
-                  child: const Text(
-                    'Video Library',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
-                      fontFamily: 'Inter',
-                      letterSpacing: -0.3,
-                    ),
-                  ),
-                ),
-                Row(
-                  children: [
-                    if (count > 0)
-                      Text(
-                        '$count video${count == 1 ? '' : 's'}',
-                        style: const TextStyle(
-                          fontSize: 11,
-                          color: AppColors.textSecondary,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    if (isScanning) ...[
-                      const SizedBox(width: 6),
-                      const SizedBox(
-                        width: 10,
-                        height: 10,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 1.5,
-                          color: AppColors.accent,
-                        ),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
-          ),
-          _IconBtn(
-            icon: Icons.search_rounded,
-            onTap: () {
-              final items =
-                  ref.read(mediaLibraryProvider).valueOrNull ?? [];
-              final videos = items.where((e) => e.isVideo).toList();
-              showSearch(
-                context: context,
-                delegate: _VideoSearchDelegate(videos: videos, ref: ref),
-              );
-            },
-          ),
-          const SizedBox(width: 6),
-          _IconBtn(
-            icon: Icons.history_rounded,
-            onTap: () => context.push('/history'),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _FilterPills extends ConsumerWidget {
-  final _VideoFilter current;
-  const _FilterPills({required this.current});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    const pills = [
-      (_VideoFilter.videos, 'Videos', Icons.play_circle_rounded),
-      (_VideoFilter.folders, 'Folders', Icons.folder_rounded),
-      (_VideoFilter.playlists, 'Playlists', Icons.queue_play_next_rounded),
-    ];
-
-    return SizedBox(
-      height: 52,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.fromLTRB(16, 6, 16, 6),
-        itemCount: pills.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final (filter, label, icon) = pills[index];
-          final isActive = current == filter;
-          return GestureDetector(
-            onTap: () {
-              HapticFeedback.selectionClick();
-              ref.read(_videoFilterProvider.notifier).state = filter;
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              decoration: BoxDecoration(
-                color: isActive ? AppColors.accent : AppColors.surface,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: isActive ? Colors.transparent : AppColors.border,
-                ),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(icon, size: 14,
-                      color: isActive ? Colors.white : AppColors.textSecondary),
-                  const SizedBox(width: 4),
-                  Text(label,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                        color: isActive ? Colors.white : AppColors.textSecondary,
-                        fontFamily: 'Inter',
-                      )),
-                ],
-              ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _VideoGrid extends ConsumerWidget {
-  final List<MediaItem> items;
-  final bool isListView;
-  const _VideoGrid({required this.items, this.isListView = true});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (items.isEmpty) {
-      return const _EmptyState(
-          icon: Icons.videocam_rounded, label: 'No videos found');
-    }
-
-    final shuffleBar = GestureDetector(
-      onTap: () {
-        HapticFeedback.selectionClick();
-        final shuffled = List<MediaItem>.from(items)..shuffle();
-        ref.read(queueProvider.notifier).setQueue(shuffled, startIndex: 0);
-        context.push('/player/video', extra: shuffled.first);
-      },
-      child: Container(
-        margin: const EdgeInsets.fromLTRB(0, 12, 0, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Row(
-          children: [
-            const Icon(Icons.shuffle_rounded, color: AppColors.accent, size: 20),
-            const SizedBox(width: 10),
-            Text(
-              'Shuffle all (${items.length})',
-              style: TextStyle(
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontFamily: 'Inter',
-              ),
-            ),
-            const Spacer(),
-            const Icon(Icons.play_arrow_rounded, color: AppColors.accent, size: 20),
-          ],
-        ),
-      ),
-    );
-
-    if (isListView) {
-      return ListView.builder(
-        padding: EdgeInsets.fromLTRB(
-            16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
-        physics: const BouncingScrollPhysics(),
-        cacheExtent: 600,
-        itemExtent: 86,
-        itemCount: items.length + 1,
-        itemBuilder: (context, i) {
-          if (i == 0) return shuffleBar;
-          final item = items[i - 1];
-          return RepaintBoundary(
-            child: _VideoListItem(
-              item: item,
-              onTap: () {
-                HapticFeedback.lightImpact();
-                ref.read(queueProvider.notifier).setQueue(items, startIndex: i - 1);
-                context.push('/player/video', extra: item);
-              },
-            ),
-          );
-        },
-      );
-    }
-
     return CustomScrollView(
-      physics: const BouncingScrollPhysics(),
-      cacheExtent: 400,
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
       slivers: [
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: shuffleBar,
-          ),
-        ),
-        SliverPadding(
-          padding: EdgeInsets.fromLTRB(
-              16, 0, 16, MediaQuery.of(context).padding.bottom + 120),
-          sliver: SliverGrid(
-            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio:
-                  MediaQuery.of(context).size.width > 600 ? 16 / 10.5 : 16 / 11,
-            ),
-            delegate: SliverChildBuilderDelegate(
-              (context, i) {
-                final item = items[i];
-                return RepaintBoundary(
-                  child: _VideoCard(
-                    item: item,
-                    onTap: () {
-                      HapticFeedback.lightImpact();
-                      ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
-                      context.push('/player/video', extra: item);
-                    },
-                  ),
+        SliverToBoxAdapter(child: _VideoHeader(count: videos.length)),
+        SliverToBoxAdapter(child: _VideoPicker(value: view)),
+        if (videos.isEmpty)
+          const SliverFillRemaining(hasScrollBody: false, child: _EmptyVideo())
+        else if (view == _VideoView.videos)
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 12),
+            sliver: SliverList.builder(
+              itemCount: videos.length + 1,
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 3, 4, 9),
+                    child: FilledButton.tonalIcon(
+                      onPressed: () {
+                        final queue = List<MediaItem>.from(videos)..shuffle();
+                        _playVideo(context, queue, 0);
+                      },
+                      icon: const Icon(Icons.shuffle_rounded),
+                      label: Text('Shuffle ${videos.length} video${videos.length == 1 ? '' : 's'}'),
+                    ),
+                  );
+                }
+                final videoIndex = index - 1;
+                return _VideoTile(
+                  item: videos[videoIndex],
+                  onTap: () => _playVideo(context, videos, videoIndex),
                 );
               },
-              childCount: items.length,
+            ),
+          )
+        else if (view == _VideoView.folders)
+          _folderSliver(context, videos)
+        else
+          SliverFillRemaining(
+            hasScrollBody: false,
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.playlist_play_rounded, size: 56, color: AppColors.accent),
+                    const SizedBox(height: 14),
+                    const Text('Playlists are shared across OTYA', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 7),
+                    const Text('A playlist can contain local video or audio. Manage them from one Playlists screen.', textAlign: TextAlign.center),
+                    const SizedBox(height: 18),
+                    FilledButton.icon(
+                      onPressed: () => context.push('/playlists'),
+                      icon: const Icon(Icons.queue_music_rounded),
+                      label: const Text('Open Playlists'),
+                    ),
+                  ],
+                ),
+              ),
             ),
           ),
-        ),
+        const SliverToBoxAdapter(child: SizedBox(height: 26)),
       ],
     );
   }
-}
 
-class _VideoListItem extends StatefulWidget {
-  final MediaItem item;
-  final VoidCallback onTap;
-  const _VideoListItem({required this.item, required this.onTap});
-
-  @override
-  State<_VideoListItem> createState() => _VideoListItemState();
-}
-
-class _VideoListItemState extends State<_VideoListItem> {
-  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
-  String? _thumbPath;
-  bool _disposed = false;
-  static final Map<String, String?> _thumbCache = _VideoCardState._thumbCache;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThumb();
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
-
-  Future<void> _loadThumb() async {
-    final key = widget.item.id;
-    if (_thumbCache.containsKey(key)) {
-      final cached = _thumbCache[key];
-      if (!_disposed && mounted && cached != null) {
-        setState(() => _thumbPath = cached);
-      }
-      return;
+  SliverList _folderSliver(BuildContext context, List<MediaItem> videos) {
+    final folders = <String, List<MediaItem>>{};
+    for (final item in videos) {
+      final normalized = item.filePath.replaceAll('\\', '/').split('/');
+      final folder = normalized.length >= 2 ? normalized[normalized.length - 2].trim() : 'Device';
+      folders.putIfAbsent(folder.isEmpty ? 'Device' : folder, () => <MediaItem>[]).add(item);
     }
-    try {
-      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
-        'path': widget.item.filePath,
-        'id': widget.item.mediaStoreId ?? widget.item.id,
-      });
-      _VideoCardState._thumbCacheSet(key, path);
-      if (!_disposed && mounted && path != null) {
-        setState(() => _thumbPath = path);
-      }
-    } catch (_) {
-      if (!_VideoCardState._retryKeys.contains(key)) {
-        _VideoCardState._retryKeys.add(key);
-        await Future.delayed(const Duration(seconds: 4));
-        if (!_disposed && mounted) {
-          try {
-            final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
-              'path': widget.item.filePath,
-              'id': widget.item.mediaStoreId ?? widget.item.id,
-            });
-            _VideoCardState._thumbCacheSet(key, path);
-            if (!_disposed && mounted && path != null) {
-              setState(() => _thumbPath = path);
-            }
-          } catch (_) {
-            _VideoCardState._thumbCacheSet(key, null);
-          }
-        }
-        _VideoCardState._retryKeys.remove(key);
-      } else {
-        _VideoCardState._thumbCacheSet(key, null);
-      }
-    }
-  }
+    final entries = folders.entries.toList()
+      ..sort((a, b) => a.key.toLowerCase().compareTo(b.key.toLowerCase()));
 
-  String _resolutionBadge() {
-    final p = widget.item.filePath.toLowerCase();
-    if (p.contains('2160') || p.contains('4k')) return '4K';
-    if (p.contains('1080')) return '1080p';
-    if (p.contains('720')) return '720p';
-    if (p.contains('480')) return '480p';
-    if (p.contains('360')) return '360p';
-    return 'SD';
-  }
-
-  String _folderName() {
-    final parts = widget.item.filePath.split('/');
-    if (parts.length >= 2) return parts[parts.length - 2];
-    return 'Local';
-  }
-
-  IconData _sourceIcon() {
-    final p = widget.item.filePath.toLowerCase();
-    if (p.contains('dcim') || p.contains('camera')) return Icons.camera_alt;
-    if (p.contains('whatsapp')) return Icons.chat;
-    return Icons.videocam;
-  }
-
-  void _showContextMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _VideoContextMenu(
-        item: widget.item,
-        onPlay: widget.onTap,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accent.withValues(alpha: 0.05),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: SizedBox(
-                width: 104,
-                height: 60,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _thumbPath != null
-                        ? Image.file(
-                            File(_thumbPath!),
-                            fit: BoxFit.cover,
-                            cacheWidth: 160,
-                            errorBuilder: (_, __, ___) =>
-                                _thumbnailPlaceholder(),
-                          )
-                        : _thumbnailPlaceholder(),
-                    Positioned(
-                      top: 4,
-                      left: 4,
-                      child: MediaNewIndicator(item: widget.item),
-                    ),
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '▶ ${widget.item.formattedDuration}',
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    widget.item.fileName.isNotEmpty
-                        ? widget.item.fileName
-                        : widget.item.title,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 4, vertical: 1),
-                        decoration: BoxDecoration(
-                          color: AppColors.accent.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(4),
-                          border: Border.all(
-                              color: AppColors.accent.withValues(alpha: 0.5),
-                              width: 0.8),
-                        ),
-                        child: Text(
-                          _resolutionBadge(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w700,
-                            color: AppColors.accent,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 6),
-                      Flexible(
-                        child: Text(
-                          '| ${widget.item.formattedSize}',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(_sourceIcon(),
-                          color: AppColors.textSecondary, size: 13),
-                      const SizedBox(width: 4),
-                      Flexible(
-                        child: Text(
-                          _folderName(),
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 4),
-            GestureDetector(
-              onTap: () {
-                HapticFeedback.selectionClick();
-                _showContextMenu(context);
-              },
-              child: const Padding(
-                padding: EdgeInsets.all(6),
-                child: Icon(Icons.more_vert,
-                    color: AppColors.textSecondary, size: 20),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _thumbnailPlaceholder() => Container(
-    color: const Color(0xFF1B1E2B),
-    child: const Center(
-      child: Icon(Icons.movie, color: Colors.white24, size: 24),
-    ),
-  );
-}
-
-class _VideoCard extends StatefulWidget {
-  final MediaItem item;
-  final VoidCallback onTap;
-  const _VideoCard({required this.item, required this.onTap});
-
-  @override
-  State<_VideoCard> createState() => _VideoCardState();
-}
-
-class _VideoCardState extends State<_VideoCard> {
-  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
-  String? _thumbPath;
-  bool _disposed = false;
-  static final Map<String, String?> _thumbCache = {};
-  static const _maxThumbCache = 200;
-  static final Set<String> _retryKeys = {};
-
-  static void _thumbCacheSet(String key, String? value) {
-    if (_thumbCache.length >= _maxThumbCache) {
-      _thumbCache.remove(_thumbCache.keys.first);
-    }
-    _thumbCache[key] = value;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _loadThumb();
-  }
-
-  @override
-  void dispose() {
-    _disposed = true;
-    super.dispose();
-  }
-
-  Future<void> _loadThumb() async {
-    final key = widget.item.id;
-    if (_thumbCache.containsKey(key)) {
-      final cached = _thumbCache[key];
-      if (!_disposed && mounted && cached != null) {
-        setState(() => _thumbPath = cached);
-      }
-      return;
-    }
-    try {
-      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
-        'path': widget.item.filePath,
-        'id': widget.item.mediaStoreId ?? widget.item.id,
-      });
-      _thumbCacheSet(key, path);
-      if (!_disposed && mounted && path != null) {
-        setState(() => _thumbPath = path);
-      }
-    } catch (_) {
-      if (!_retryKeys.contains(key)) {
-        _retryKeys.add(key);
-        await Future.delayed(const Duration(seconds: 4));
-        if (!_disposed && mounted) await _retryThumb(key);
-        _retryKeys.remove(key);
-      } else {
-        _thumbCacheSet(key, null);
-      }
-    }
-  }
-
-  Future<void> _retryThumb(String key) async {
-    try {
-      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
-        'path': widget.item.filePath,
-        'id': widget.item.mediaStoreId ?? widget.item.id,
-      });
-      _thumbCacheSet(key, path);
-      if (!_disposed && mounted && path != null) {
-        setState(() => _thumbPath = path);
-      }
-    } catch (_) {
-      _thumbCacheSet(key, null);
-    }
-  }
-
-  String _resolutionBadge() {
-    final p = widget.item.filePath.toLowerCase();
-    if (p.contains('2160') || p.contains('4k')) return '4K';
-    if (p.contains('1080')) return '1080p';
-    if (p.contains('720')) return '720p';
-    if (p.contains('480')) return '480p';
-    if (p.contains('360')) return '360p';
-    return 'SD';
-  }
-
-  String _folderName() {
-    final parts = widget.item.filePath.split('/');
-    if (parts.length >= 2) return parts[parts.length - 2];
-    return 'Local';
-  }
-
-  void _showContextMenu(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => _VideoContextMenu(
-        item: widget.item,
-        onPlay: widget.onTap,
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.border),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accent.withValues(alpha: 0.07),
-              blurRadius: 12,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(
-              child: ClipRRect(
-                borderRadius:
-                    const BorderRadius.vertical(top: Radius.circular(17)),
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _thumbPath != null
-                        ? Image.file(
-                            File(_thumbPath!),
-                            fit: BoxFit.cover,
-                            cacheWidth: 160,
-                            errorBuilder: (_, __, ___) => _gradientBg(),
-                          )
-                        : _gradientBg(),
-                    Positioned(
-                      top: 6,
-                      left: 6,
-                      child: MediaNewIndicator(item: widget.item),
-                    ),
-                    Center(
-                      child: Container(
-                        width: 34,
-                        height: 34,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.45),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            color: Colors.white, size: 22),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 6,
-                      right: 6,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.72),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          widget.item.formattedDuration,
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.w600,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: GestureDetector(
-                        onTap: () {
-                          HapticFeedback.selectionClick();
-                          _showContextMenu(context);
-                        },
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.5),
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(Icons.more_vert_rounded,
-                              color: Colors.white, size: 14),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(8, 5, 8, 6),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    widget.item.title,
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      fontFamily: 'Inter',
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 3),
-                  Row(
-                    children: [
-                      _Badge(
-                          label: _resolutionBadge(),
-                          color: AppColors.accent),
-                      const SizedBox(width: 4),
-                      _Badge(
-                          label: widget.item.formattedSize,
-                          color: AppColors.textSecondary),
-                      const Spacer(),
-                      Flexible(
-                        child: Text(
-                          _folderName(),
-                          style: const TextStyle(
-                            fontSize: 9,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _gradientBg() => Container(
-    color: const Color(0xFF171820),
-    child: const Center(
-      child: Icon(Icons.movie_rounded, color: AppColors.accent, size: 28),
-    ),
-  );
-}
-
-class _Badge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _Badge({required this.label, required this.color});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          fontSize: 8,
-          fontWeight: FontWeight.w700,
-          color: color,
-          fontFamily: 'Inter',
-        ),
-      ),
-    );
-  }
-}
-
-class _VideoContextMenu extends ConsumerWidget {
-  final MediaItem item;
-  final VoidCallback onPlay;
-  const _VideoContextMenu({required this.item, required this.onPlay});
-
-  Future<void> _addToVault(BuildContext context) async {
-    Navigator.pop(context);
-    try {
-      await VaultService.instance.lockItem(item);
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('"${item.title}" moved to Private'),
-            backgroundColor: AppColors.surface,
-          ),
-        );
-      }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to move to Private: $e'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
-
-  Future<void> _confirmDelete(BuildContext context) async {
-    Navigator.pop(context);
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text(
-          'Delete Video?',
-          style: TextStyle(
-            color: AppColors.textPrimary,
-            fontWeight: FontWeight.w700,
-            fontFamily: 'Inter',
-          ),
-        ),
-        content: Text(
-          'This will permanently delete "${item.title}". This action cannot be undone.',
-          style: const TextStyle(
-            color: AppColors.textSecondary,
-            fontSize: 13,
-            height: 1.5,
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.error,
-              shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(10)),
-            ),
-            child: const Text('Delete',
-                style: TextStyle(
-                    color: Colors.white, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true || !context.mounted) return;
-    HapticFeedback.mediumImpact();
-    final ok = await FileOpsService.instance.deleteFile(item.filePath);
-    if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok
-            ? '"${item.title}" deleted'
-            : 'Failed to delete "${item.title}"'),
-        backgroundColor: ok ? AppColors.surface : AppColors.error,
-      ),
-    );
-  }
-
-  void _showPlaylistPicker(BuildContext context, WidgetRef ref) {
-    final playlists = ref.read(playlistsProvider);
-    showModalBottomSheet(
-      context: context,
-      useSafeArea: true,
-      backgroundColor: AppColors.surface,
-      shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      builder: (_) => Padding(
-        padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                    color: AppColors.border,
-                    borderRadius: BorderRadius.circular(2)),
-              ),
-            ),
-            const SizedBox(height: 12),
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 20),
-              child: Text('Add to List',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.textPrimary,
-                    fontFamily: 'Inter',
-                  )),
-            ),
-            const SizedBox(height: 8),
-            if (playlists.isEmpty)
-              const Padding(
-                padding: EdgeInsets.all(20),
-                child: Text('No lists yet. Create one first.',
-                    style: TextStyle(color: AppColors.textSecondary)),
-              )
-            else
-              ...playlists.map((pl) => ListTile(
-                    leading: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppColors.accent, AppColors.accentViolet],
-                        ),
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(Icons.queue_music_rounded,
-                          color: Colors.black, size: 20),
-                    ),
-                    title: Text(pl.name,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.onSurface,
-                          fontFamily: 'Inter',
-                        )),
-                    subtitle: Text(
-                        '${pl.mediaIds.length} track${pl.mediaIds.length == 1 ? '' : 's'}',
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.textSecondary)),
-                    onTap: () async {
-                      Navigator.pop(context);
-                      await ref
-                          .read(playlistsProvider.notifier)
-                          .addTrack(pl.id, item);
-                      if (context.mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          SnackBar(
-                            content: Text(
-                                '"${item.title}" added to ${pl.name}'),
-                            backgroundColor: AppColors.surface,
-                          ),
-                        );
-                      }
-                    },
-                  )),
-          ],
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                  color: AppColors.border,
-                  borderRadius: BorderRadius.circular(2)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            child: Row(
-              children: [
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.accent.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const Icon(Icons.movie_rounded,
-                      color: AppColors.accent, size: 22),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(item.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis),
-                      Text(item.formattedDuration,
-                          style: const TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary)),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const Divider(color: AppColors.border, height: 1),
-          _ContextOption(
-            icon: Icons.play_arrow_rounded,
-            label: 'Play',
-            color: AppColors.accent,
-            onTap: () {
-              Navigator.pop(context);
-              onPlay();
-            },
-          ),
-          _ContextOption(
-            icon: Icons.playlist_add_rounded,
-            label: 'Add to List',
-            color: AppColors.accentViolet,
-            onTap: () {
-              Navigator.pop(context);
-              _showPlaylistPicker(context, ref);
-            },
-          ),
-          _ContextOption(
-            icon: Icons.share_rounded,
-            label: 'Share',
-            color: AppColors.textSecondary,
-            onTap: () async {
-              Navigator.pop(context);
-              await Share.shareXFiles(
-                [XFile(item.filePath)],
-                text: item.title,
-              );
-            },
-          ),
-          _ContextOption(
-            icon: Icons.lock_rounded,
-            label: 'Move to Private',
-            color: AppColors.accentViolet,
-            onTap: () => _addToVault(context),
-          ),
-          _ContextOption(
-            icon: Icons.delete_outline_rounded,
-            label: 'Delete',
-            color: AppColors.error,
-            onTap: () => _confirmDelete(context),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ContextOption extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-  const _ContextOption({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: color, size: 22),
-      title: Text(label,
-          style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurface,
-              fontWeight: FontWeight.w500,
-              fontFamily: 'Inter')),
-      onTap: onTap,
-      dense: true,
-    );
-  }
-}
-
-class _VideoFoldersTab extends StatelessWidget {
-  final List<MediaItem> items;
-  const _VideoFoldersTab({required this.items});
-
-  Map<String, List<MediaItem>> _buildFolders() {
-    final map = <String, List<MediaItem>>{};
-    for (final item in items) {
-      final parts = item.filePath.split('/');
-      final folder = parts.length > 1
-          ? parts.sublist(0, parts.length - 1).join('/')
-          : '/';
-      map.putIfAbsent(folder, () => []).add(item);
-    }
-    return map;
-  }
-
-  String _folderName(String path) {
-    final parts = path.split('/');
-    return parts.lastWhere((p) => p.isNotEmpty, orElse: () => path);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const _EmptyState(
-          icon: Icons.folder_open_rounded, label: 'No video folders found');
-    }
-    final folders = _buildFolders();
-    final keys = folders.keys.toList()..sort();
-
-    return ListView.builder(
-      padding: EdgeInsets.fromLTRB(16, 12, 16,
-          MediaQuery.of(context).padding.bottom + 120),
-      itemCount: keys.length,
-      itemBuilder: (context, i) {
-        final path = keys[i];
-        final files = folders[path]!;
-        final name = _folderName(path);
-
-        return Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          child: ListTile(
-            contentPadding:
-                const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            tileColor: AppColors.surface,
-            shape: RoundedRectangleBorder(
+    return SliverList.builder(
+      itemCount: entries.length,
+      itemBuilder: (context, index) {
+        final entry = entries[index];
+        return ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+          leading: Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppColors.cardOf(context),
               borderRadius: BorderRadius.circular(14),
-              side: const BorderSide(color: AppColors.border),
+              border: Border.all(color: AppColors.borderOf(context)),
             ),
-            leading: Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppColors.accent.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: const Icon(Icons.folder_rounded,
-                  color: AppColors.accent, size: 24),
-            ),
-            title: Text(
-              name,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontFamily: 'Inter',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
-            subtitle: Text(
-              '${files.length} video${files.length == 1 ? '' : 's'}',
-              style: const TextStyle(
-                  fontSize: 11, color: AppColors.textSecondary),
-            ),
-            trailing: const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary, size: 20),
-            onTap: () => context.push(
-              '/video/folder',
-              extra: {'name': name, 'items': files},
-            ),
+            child: const Icon(Icons.folder_rounded, color: AppColors.accent),
           ),
+          title: Text(entry.key, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text('${entry.value.length} video${entry.value.length == 1 ? '' : 's'}'),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          onTap: () => context.push('/video/folder', extra: {'name': entry.key, 'items': entry.value}),
         );
       },
     );
+  }
+
+  void _playVideo(BuildContext context, List<MediaItem> queue, int index) {
+    if (queue.isEmpty || index < 0 || index >= queue.length) return;
+    HapticFeedback.lightImpact();
+    ref.read(queueProvider.notifier).setQueue(queue, startIndex: index);
+    context.push('/player/video', extra: queue[index]);
   }
 }
 
 class VideoFolderDetailPage extends ConsumerWidget {
+  const VideoFolderDetailPage({super.key, required this.name, required this.items});
   final String name;
   final List<MediaItem> items;
-  const VideoFolderDetailPage(
-      {super.key, required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final videos = items.where((item) => item.isVideo).toList();
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
         leading: IconButton(
-          icon: Icon(Icons.arrow_back_rounded,
-              color: Theme.of(context).colorScheme.onSurface),
-          onPressed: () => Navigator.pop(context),
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/'),
         ),
-        title: Text(
-          name,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 16,
-          ),
-        ),
-        actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Text(
-                '${items.length} video${items.length == 1 ? '' : 's'}',
-                style: const TextStyle(
-                    fontSize: 12, color: AppColors.textSecondary),
+        title: Text(name),
+      ),
+      body: videos.isEmpty
+          ? const Center(child: Text('No videos are available in this folder.'))
+          : ListView.builder(
+              padding: EdgeInsets.fromLTRB(12, 8, 12, MediaQuery.paddingOf(context).bottom + 24),
+              itemCount: videos.length,
+              itemBuilder: (context, index) => _VideoTile(
+                item: videos[index],
+                onTap: () {
+                  HapticFeedback.lightImpact();
+                  ref.read(queueProvider.notifier).setQueue(videos, startIndex: index);
+                  context.push('/player/video', extra: videos[index]);
+                },
               ),
             ),
-          ),
-        ],
-      ),
-      body: GridView.builder(
-        padding: EdgeInsets.fromLTRB(16, 12, 16,
-            MediaQuery.of(context).padding.bottom + 120),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: MediaQuery.of(context).size.width > 600
-              ? 16 / 10.5
-              : 16 / 11,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, i) {
-          final item = items[i];
-          return _VideoCard(
-            item: item,
-            onTap: () {
-              HapticFeedback.lightImpact();
-              ref
-                  .read(queueProvider.notifier)
-                  .setQueue(items, startIndex: i);
-              context.push('/player/video', extra: item);
-            },
-          );
-        },
-      ),
     );
   }
 }
 
-class _VideoSearchDelegate extends SearchDelegate<MediaItem?> {
-  final List<MediaItem> videos;
-  final WidgetRef ref;
-  _VideoSearchDelegate({required this.videos, required this.ref});
+class _VideoHeader extends StatelessWidget {
+  const _VideoHeader({required this.count});
+  final int count;
 
   @override
-  ThemeData appBarTheme(BuildContext context) {
-    return Theme.of(context).copyWith(
-      scaffoldBackgroundColor: AppColors.background,
-      appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.background,
-        elevation: 0,
-      ),
-      inputDecorationTheme: const InputDecorationTheme(
-        border: InputBorder.none,
-        hintStyle: TextStyle(color: AppColors.textSecondary),
-      ),
-    );
-  }
-
-  @override
-  List<Widget> buildActions(BuildContext context) => [
-        IconButton(
-          icon: const Icon(Icons.clear, color: AppColors.textSecondary),
-          onPressed: () => query = '',
-        ),
-      ];
-
-  @override
-  Widget buildLeading(BuildContext context) => IconButton(
-        icon: const Icon(Icons.arrow_back_rounded,
-            color: AppColors.textPrimary),
-        onPressed: () => close(context, null),
-      );
-
-  @override
-  Widget buildResults(BuildContext context) => _buildList(context);
-
-  @override
-  Widget buildSuggestions(BuildContext context) => _buildList(context);
-
-  Widget _buildList(BuildContext context) {
-    final q = query.toLowerCase();
-    final results = q.isEmpty
-        ? videos
-        : videos
-            .where((v) =>
-                v.title.toLowerCase().contains(q) ||
-                (v.artist?.toLowerCase().contains(q) ?? false))
-            .toList();
-
-    if (results.isEmpty) {
-      return const Center(
-        child: Text('No videos found',
-            style: TextStyle(color: AppColors.textSecondary)),
-      );
-    }
-
-    return Container(
-      color: AppColors.background,
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: MediaQuery.of(context).size.width > 600 ? 3 : 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 16 / 11,
-        ),
-        itemCount: results.length,
-        itemBuilder: (context, i) {
-          final item = results[i];
-          return _VideoCard(
-            item: item,
-            onTap: () {
-              ref
-                  .read(queueProvider.notifier)
-                  .setQueue(results, startIndex: i);
-              close(context, item);
-              context.push('/player/video', extra: item);
-            },
-          );
-        },
-      ),
-    );
-  }
-}
-
-class _IconBtn extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  const _IconBtn({required this.icon, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: AppColors.border),
-        ),
-        child: Icon(icon, color: AppColors.textSecondary, size: 18),
-      ),
-    );
-  }
-}
-
-class _EmptyState extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _EmptyState({required this.icon, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 72,
-            height: 72,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.08),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(icon, color: AppColors.accent, size: 36),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: Theme.of(context).colorScheme.onSurface,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 6),
-          const Text(
-            'Videos will appear here after scanning.',
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-              fontFamily: 'Inter',
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _VideoShimmer extends StatelessWidget {
-  const _VideoShimmer();
-
-  @override
-  Widget build(BuildContext context) {
-    return Shimmer.fromColors(
-      baseColor: Theme.of(context).brightness == Brightness.dark
-          ? AppColors.surface
-          : const Color(0xFFE8ECF0),
-      highlightColor: Theme.of(context).brightness == Brightness.dark
-          ? const Color(0xFF2A2F45)
-          : const Color(0xFFF5F7FA),
-      child: GridView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 40),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
-          crossAxisSpacing: 12,
-          mainAxisSpacing: 12,
-          childAspectRatio: 16 / 11,
-        ),
-        itemCount: 8,
-        itemBuilder: (_, __) => Container(
-          decoration: BoxDecoration(
-            color: AppColors.surface,
-            borderRadius: BorderRadius.circular(18),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _ErrorView extends StatelessWidget {
-  final String message;
-  final VoidCallback onRetry;
-  const _ErrorView({required this.message, required this.onRetry});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 10, 8),
+        child: Row(
           children: [
-            const Icon(Icons.error_outline_rounded,
-                color: AppColors.error, size: 48),
-            const SizedBox(height: 16),
-            Text(
-              'Could not load videos',
-              style: TextStyle(
-                color: Theme.of(context).colorScheme.onSurface,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
+            ClipRRect(
+              borderRadius: BorderRadius.circular(12),
+              child: Image.asset('assets/icons/play_store_512.png', width: 38, height: 38),
+            ),
+            const SizedBox(width: 11),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('Video', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -.5)),
+                  Text('$count local video${count == 1 ? '' : 's'}', style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary)),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
-            Text(
-              message,
-              style: const TextStyle(
-                  color: AppColors.textSecondary, fontSize: 12),
-              textAlign: TextAlign.center,
+            IconButton(
+              tooltip: 'Search OTYA',
+              onPressed: () {
+                HapticFeedback.selectionClick();
+                SmartSearchSheet.show(context);
+              },
+              icon: const Icon(Icons.search_rounded),
             ),
-            const SizedBox(height: 24),
-            GestureDetector(
-              onTap: onRetry,
-              child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
-                decoration: BoxDecoration(
-                  color: AppColors.accent,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
-                  'Try Again',
-                  style: TextStyle(
-                    color: Colors.black,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-              ),
+            IconButton(
+              tooltip: 'History',
+              onPressed: () => context.push('/history'),
+              icon: const Icon(Icons.history_rounded),
             ),
           ],
         ),
+      );
+}
+
+class _VideoPicker extends ConsumerWidget {
+  const _VideoPicker({required this.value});
+  final _VideoView value;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    const options = [
+      (_VideoView.videos, 'Videos'),
+      (_VideoView.folders, 'Folders'),
+      (_VideoView.playlists, 'Playlists'),
+    ];
+    return SizedBox(
+      height: 46,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        itemCount: options.length,
+        separatorBuilder: (_, __) => const SizedBox(width: 7),
+        itemBuilder: (context, index) {
+          final option = options[index];
+          return ChoiceChip(
+            selected: option.$1 == value,
+            label: Text(option.$2),
+            onSelected: (_) {
+              HapticFeedback.selectionClick();
+              ref.read(_videoViewProvider.notifier).state = option.$1;
+            },
+          );
+        },
       ),
     );
   }
+}
+
+class _VideoTile extends StatelessWidget {
+  const _VideoTile({required this.item, required this.onTap});
+  final MediaItem item;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Card(
+        margin: const EdgeInsets.symmetric(vertical: 4),
+        child: ListTile(
+          contentPadding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+          leading: _VideoThumb(item: item),
+          title: Row(
+            children: [
+              Expanded(child: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700))),
+              MediaNewIndicator(item: item),
+            ],
+          ),
+          subtitle: Text('${item.formattedDuration} · ${item.formattedSize}', maxLines: 1, overflow: TextOverflow.ellipsis),
+          trailing: const Icon(Icons.play_arrow_rounded, color: AppColors.accent),
+          onTap: onTap,
+        ),
+      );
+}
+
+class _VideoThumb extends StatefulWidget {
+  const _VideoThumb({required this.item});
+  final MediaItem item;
+
+  @override
+  State<_VideoThumb> createState() => _VideoThumbState();
+}
+
+class _VideoThumbState extends State<_VideoThumb> {
+  static const _channel = MethodChannel('com.otyaplayer.app/media_store');
+  static final Map<String, String?> _cache = <String, String?>{};
+  String? _path;
+
+  @override
+  void initState() {
+    super.initState();
+    _path = widget.item.thumbnailPath ?? _cache[widget.item.id];
+    if (_path == null) _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
+        'path': widget.item.filePath,
+        'id': widget.item.mediaStoreId ?? '',
+      }).timeout(const Duration(seconds: 5));
+      _cache[widget.item.id] = path;
+      if (mounted) setState(() => _path = path);
+    } catch (_) {
+      _cache[widget.item.id] = null;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) => ClipRRect(
+        borderRadius: BorderRadius.circular(11),
+        child: SizedBox(
+          width: 74,
+          height: 48,
+          child: _path != null && File(_path!).existsSync()
+              ? Image.file(File(_path!), fit: BoxFit.cover, cacheWidth: 240, errorBuilder: (_, __, ___) => _placeholder(context))
+              : _placeholder(context),
+        ),
+      );
+
+  Widget _placeholder(BuildContext context) => Container(
+        color: AppColors.cardOf(context),
+        alignment: Alignment.center,
+        child: const Icon(Icons.movie_rounded, color: AppColors.accent),
+      );
+}
+
+class _EmptyVideo extends StatelessWidget {
+  const _EmptyVideo();
+  @override
+  Widget build(BuildContext context) => const Center(
+        child: Padding(
+          padding: EdgeInsets.all(30),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.movie_outlined, size: 58, color: AppColors.accent),
+              SizedBox(height: 14),
+              Text('No videos found', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w900)),
+              SizedBox(height: 7),
+              Text('OTYA shows playable video discovered by Android MediaStore. Check media permissions if videos are missing.', textAlign: TextAlign.center),
+            ],
+          ),
+        ),
+      );
+}
+
+class _VideoError extends StatelessWidget {
+  const _VideoError({required this.onRetry});
+  final VoidCallback onRetry;
+  @override
+  Widget build(BuildContext context) => Center(
+        child: Padding(
+          padding: const EdgeInsets.all(28),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(Icons.error_outline_rounded, size: 50, color: AppColors.error),
+              const SizedBox(height: 12),
+              const Text('OTYA could not refresh your video library.', textAlign: TextAlign.center),
+              const SizedBox(height: 16),
+              OutlinedButton.icon(onPressed: onRetry, icon: const Icon(Icons.refresh_rounded), label: const Text('Try again')),
+            ],
+          ),
+        ),
+      );
 }
