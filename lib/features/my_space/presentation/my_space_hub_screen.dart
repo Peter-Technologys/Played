@@ -11,6 +11,7 @@ import '../../../core/services/feature_discovery_service.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/remote_control_service.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
+import '../../search/smart_search_sheet.dart';
 import 'providers/my_space_provider.dart';
 
 class _MeFeature {
@@ -81,7 +82,7 @@ class MySpaceHubScreen extends ConsumerWidget {
         key: 'tools',
         icon: Icons.tune_rounded,
         label: 'Tools',
-        action: (_) => () => _showTools(context),
+        action: (_) => () => _showTools(context, ref),
       ),
       _MeFeature(
         key: 'personalize',
@@ -129,7 +130,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                     ),
                     _TopButton(
                       icon: Icons.search_rounded,
-                      onTap: () => _showFeatureSearch(context, features),
+                      onTap: () => SmartSearchSheet.show(context),
                     ),
                     const SizedBox(width: 10),
                     GestureDetector(
@@ -223,10 +224,11 @@ class MySpaceHubScreen extends ConsumerWidget {
   }
 
   static void _showConverter(BuildContext context, WidgetRef ref) {
-    final videos = (ref.read(mediaLibraryProvider).valueOrNull ?? const <MediaItem>[])
-        .where((item) => item.isVideo)
-        .toList()
-      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    final videos =
+        (ref.read(mediaLibraryProvider).valueOrNull ?? const <MediaItem>[])
+            .where((item) => item.isVideo)
+            .toList()
+          ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
     showModalBottomSheet<void>(
       context: context,
@@ -301,7 +303,8 @@ class MySpaceHubScreen extends ConsumerWidget {
                           decoration: BoxDecoration(
                             color: Theme.of(context).scaffoldBackgroundColor,
                             borderRadius: BorderRadius.circular(14),
-                            border: Border.all(color: AppColors.borderOf(context)),
+                            border:
+                                Border.all(color: AppColors.borderOf(context)),
                           ),
                           child: Row(
                             children: [
@@ -353,7 +356,8 @@ class MySpaceHubScreen extends ConsumerWidget {
                                 width: 46,
                                 height: 46,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).scaffoldBackgroundColor,
+                                  color:
+                                      Theme.of(context).scaffoldBackgroundColor,
                                   borderRadius: BorderRadius.circular(14),
                                 ),
                                 child: const Icon(Icons.movie_outlined),
@@ -415,7 +419,8 @@ class MySpaceHubScreen extends ConsumerWidget {
                                   progress = 0;
                                 });
                                 if (output == null) {
-                                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                  ScaffoldMessenger.of(sheetContext)
+                                      .showSnackBar(
                                     const SnackBar(
                                       content: Text(
                                         'Could not extract audio from this video.',
@@ -447,7 +452,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     );
   }
 
-  static void _showTools(BuildContext context) {
+  static void _showTools(BuildContext context, WidgetRef ref) {
     _showSheet(
       context,
       title: 'Tools',
@@ -456,31 +461,32 @@ class MySpaceHubScreen extends ConsumerWidget {
         _SheetAction(
           icon: Icons.graphic_eq_rounded,
           title: 'Equalizer',
-          subtitle: 'Sound tuning and presets',
+          subtitle: 'Tune sound and use audio presets',
           onTap: () {
             Navigator.pop(context);
             context.push('/player/equalizer');
           },
         ),
-        const _SheetAction(
+        _SheetAction(
           icon: Icons.content_cut_rounded,
           title: 'Trim video',
-          subtitle: 'Open a video and choose Trim from its menu.',
-        ),
-        const _SheetAction(
-          icon: Icons.speed_rounded,
-          title: 'Speed & pitch',
-          subtitle: 'Keep playback controls close to the media using them.',
+          subtitle: 'Choose a video and create a local 30-second clip',
+          onTap: () {
+            Navigator.pop(context);
+            _showTrimPicker(context, ref);
+          },
         ),
       ],
     );
   }
 
-  static void _showFeatureSearch(
-    BuildContext context,
-    List<_MeFeature> features,
-  ) {
-    final controller = TextEditingController();
+  static void _showTrimPicker(BuildContext context, WidgetRef ref) {
+    final videos =
+        (ref.read(mediaLibraryProvider).valueOrNull ?? const <MediaItem>[])
+            .where((item) => item.isVideo)
+            .toList()
+          ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+
     showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -489,76 +495,87 @@ class MySpaceHubScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
-      builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setState) {
-          final query = controller.text.trim().toLowerCase();
-          final visible = query.isEmpty
-              ? features
-              : features
-                  .where((e) => e.label.toLowerCase().contains(query))
-                  .toList();
-          return Padding(
-            padding: EdgeInsets.fromLTRB(
-              18,
-              12,
-              18,
-              MediaQuery.of(context).viewInsets.bottom + 22,
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 42,
-                  height: 4,
-                  decoration: BoxDecoration(
-                    color: AppColors.borderOf(context),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
+      builder: (sheetContext) => SizedBox(
+        height: MediaQuery.of(sheetContext).size.height * .72,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 10),
+            Center(
+              child: Container(
+                width: 42,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppColors.borderOf(sheetContext),
+                  borderRadius: BorderRadius.circular(10),
                 ),
-                const SizedBox(height: 18),
-                TextField(
-                  controller: controller,
-                  autofocus: true,
-                  onChanged: (_) => setState(() {}),
-                  decoration: InputDecoration(
-                    hintText: 'Find a feature',
-                    prefixIcon: const Icon(Icons.search_rounded),
-                    filled: true,
-                    fillColor: Theme.of(context).scaffoldBackgroundColor,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(18),
-                      borderSide: BorderSide.none,
+              ),
+            ),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(20, 20, 20, 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Trim video',
+                    style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900),
+                  ),
+                  SizedBox(height: 5),
+                  Text(
+                    'Choose a local video to open the trim tool.',
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: AppColors.textSecondary,
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
-                Flexible(
-                  child: ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: visible.length,
-                    itemBuilder: (context, index) {
-                      final feature = visible[index];
-                      return ListTile(
-                        leading: Icon(feature.icon),
-                        title: Text(
-                          feature.label,
-                          style: const TextStyle(fontWeight: FontWeight.w700),
-                        ),
-                        trailing: const Icon(Icons.chevron_right_rounded),
-                        onTap: () {
-                          Navigator.pop(sheetContext);
-                          feature.action(context)();
-                        },
-                      );
-                    },
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
-          );
-        },
+            Divider(height: 1, color: AppColors.borderOf(sheetContext)),
+            Expanded(
+              child: videos.isEmpty
+                  ? const Center(
+                      child: Text(
+                        'No videos found.',
+                        style: TextStyle(color: AppColors.textSecondary),
+                      ),
+                    )
+                  : ListView.builder(
+                      padding: const EdgeInsets.fromLTRB(10, 8, 10, 24),
+                      itemCount: videos.length,
+                      itemBuilder: (context, index) {
+                        final item = videos[index];
+                        return ListTile(
+                          leading: const Icon(Icons.movie_outlined),
+                          title: Text(
+                            item.title,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            '${item.formattedDuration} · ${item.formattedSize}',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          trailing: const Icon(Icons.chevron_right_rounded),
+                          onTap: () {
+                            Navigator.pop(sheetContext);
+                            context.push('/tools/whatsapp', extra: item);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
-    ).whenComplete(controller.dispose);
+    );
   }
 
   static void _showSheet(
