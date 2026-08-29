@@ -1,15 +1,17 @@
 import 'dart:collection';
 import 'dart:io';
 import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../../app/theme/app_colors.dart';
 import '../../../../core/models/media_item.dart';
-import '../providers/my_space_provider.dart';
 import '../../../player/presentation/queue_screen.dart';
+import '../providers/my_space_provider.dart';
 
 /// Modern media card with real thumbnails/album art.
 /// Used across all shelves and the grid.
@@ -34,7 +36,10 @@ class _MediaCardState extends State<MediaCard>
   static final LinkedHashMap<String, String> _artCache = LinkedHashMap();
 
   static void _cacheInsert(
-      LinkedHashMap<String, String> cache, String key, String? value) {
+    LinkedHashMap<String, String> cache,
+    String key,
+    String? value,
+  ) {
     if (value == null || value.isEmpty) return;
     if (cache.length >= _kCacheMax) cache.remove(cache.keys.first);
     cache[key] = value;
@@ -47,9 +52,13 @@ class _MediaCardState extends State<MediaCard>
   @override
   void initState() {
     super.initState();
-    _press = AnimationController(vsync: this, duration: const Duration(milliseconds: 120));
-    _scale = Tween<double>(begin: 1.0, end: 0.95)
-        .animate(CurvedAnimation(parent: _press, curve: Curves.easeOut));
+    _press = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+    _scale = Tween<double>(begin: 1.0, end: 0.95).animate(
+      CurvedAnimation(parent: _press, curve: Curves.easeOut),
+    );
 
     final item = widget.item;
     if (item.isVideo) {
@@ -103,9 +112,6 @@ class _MediaCardState extends State<MediaCard>
     if (item.isVideo) {
       final key = item.filePath;
       try {
-        // Always ask native code for a thumbnail. Some MediaStore entries do
-        // not expose an ID after moves/restores, but the native implementation
-        // can still fall back to MediaMetadataRetriever using the file path.
         final path = await _channel.invokeMethod<String>('getVideoThumbnail', {
           'path': item.filePath,
           'id': item.mediaStoreId ?? '',
@@ -120,8 +126,6 @@ class _MediaCardState extends State<MediaCard>
           });
         }
       } catch (_) {
-        // Do not cache failures. A later MediaStore refresh or file move may
-        // make the same thumbnail resolvable without restarting OTYA.
         if (mounted) setState(() => _loaded = true);
       }
     } else {
@@ -164,7 +168,7 @@ class _MediaCardState extends State<MediaCard>
   Widget build(BuildContext context) {
     final isVideo = widget.item.isVideo;
     final width = widget.wide ? 160.0 : 120.0;
-    final accent = AppColors.accentViolet;
+    const accent = AppColors.accentViolet;
 
     return GestureDetector(
       onTapDown: (_) => _press.forward(),
@@ -177,7 +181,10 @@ class _MediaCardState extends State<MediaCard>
           allItems,
           startIndex: startIndex < 0 ? 0 : startIndex,
         );
-        context.push(isVideo ? '/player/video' : '/player/audio', extra: widget.item);
+        context.push(
+          isVideo ? '/player/video' : '/player/audio',
+          extra: widget.item,
+        );
       },
       onTapCancel: () => _press.reverse(),
       child: ScaleTransition(
@@ -189,30 +196,39 @@ class _MediaCardState extends State<MediaCard>
               borderRadius: BorderRadius.circular(18),
               color: AppColors.cardOf(context),
               border: Border.all(color: AppColors.borderOf(context)),
-              boxShadow: [BoxShadow(
-                color: accent.withValues(alpha: 0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              )],
+              boxShadow: [
+                BoxShadow(
+                  color: accent.withValues(alpha: 0.08),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
+                ),
+              ],
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Expanded(
                   child: ClipRRect(
-                    borderRadius: const BorderRadius.vertical(top: Radius.circular(17)),
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(17),
+                    ),
                     child: Stack(
                       fit: StackFit.expand,
                       children: [
                         _buildArtwork(isVideo, accent),
                         const Positioned(
-                          bottom: 0, left: 0, right: 0,
+                          bottom: 0,
+                          left: 0,
+                          right: 0,
                           child: SizedBox(
                             height: 36,
                             child: DecoratedBox(
                               decoration: BoxDecoration(
                                 gradient: LinearGradient(
-                                  colors: [Colors.transparent, Color(0xCC0F1117)],
+                                  colors: [
+                                    Colors.transparent,
+                                    Color(0xCC0F1117),
+                                  ],
                                   begin: Alignment.topCenter,
                                   end: Alignment.bottomCenter,
                                 ),
@@ -221,16 +237,26 @@ class _MediaCardState extends State<MediaCard>
                           ),
                         ),
                         Positioned(
-                          bottom: 6, right: 6,
+                          bottom: 6,
+                          right: 6,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.black.withValues(alpha: 0.72),
                               borderRadius: BorderRadius.circular(4),
                             ),
-                            child: Text(widget.item.formattedDuration,
-                              style: const TextStyle(fontSize: 9, color: Colors.white,
-                                fontWeight: FontWeight.w600, fontFamily: 'Inter')),
+                            child: Text(
+                              widget.item.formattedDuration,
+                              style: const TextStyle(
+                                fontSize: 9,
+                                color: Colors.white,
+                                fontWeight: FontWeight.w600,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
                           ),
                         ),
                         AnimatedBuilder(
@@ -242,11 +268,17 @@ class _MediaCardState extends State<MediaCard>
                               child: Opacity(
                                 opacity: opacity,
                                 child: Container(
-                                  width: 40, height: 40,
-                                  decoration: BoxDecoration(shape: BoxShape.circle,
-                                    color: Colors.black.withValues(alpha: 0.55)),
-                                  child: const Icon(Icons.play_arrow_rounded,
-                                    color: Colors.white, size: 24),
+                                  width: 40,
+                                  height: 40,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: Colors.black.withValues(alpha: 0.55),
+                                  ),
+                                  child: const Icon(
+                                    Icons.play_arrow_rounded,
+                                    color: Colors.white,
+                                    size: 24,
+                                  ),
                                 ),
                               ),
                             );
@@ -261,27 +293,57 @@ class _MediaCardState extends State<MediaCard>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.item.title,
-                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimaryOf(context), fontFamily: 'Inter'),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
-                      const SizedBox(height: 3),
-                      Row(children: [
-                        const Icon(Icons.schedule_rounded, size: 9, color: AppColors.textSecondary),
-                        const SizedBox(width: 3),
-                        Text(widget.item.formattedDuration,
-                          style: const TextStyle(fontSize: 9, color: AppColors.textSecondary,
-                            fontFamily: 'Inter')),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(color: accent.withValues(alpha: 0.12),
-                            borderRadius: BorderRadius.circular(3)),
-                          child: Text(isVideo ? 'VIDEO' : 'AUDIO',
-                            style: TextStyle(fontSize: 7, fontWeight: FontWeight.w700,
-                              color: accent, letterSpacing: 0.5, fontFamily: 'Inter')),
+                      Text(
+                        widget.item.title,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textPrimaryOf(context),
+                          fontFamily: 'Inter',
                         ),
-                      ]),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 3),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.schedule_rounded,
+                            size: 9,
+                            color: AppColors.textSecondary,
+                          ),
+                          const SizedBox(width: 3),
+                          Text(
+                            widget.item.formattedDuration,
+                            style: const TextStyle(
+                              fontSize: 9,
+                              color: AppColors.textSecondary,
+                              fontFamily: 'Inter',
+                            ),
+                          ),
+                          const Spacer(),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 4,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: accent.withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(3),
+                            ),
+                            child: Text(
+                              isVideo ? 'VIDEO' : 'AUDIO',
+                              style: const TextStyle(
+                                fontSize: 7,
+                                fontWeight: FontWeight.w700,
+                                color: accent,
+                                letterSpacing: 0.5,
+                                fontFamily: 'Inter',
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
                     ],
                   ),
                 ),
@@ -297,7 +359,10 @@ class _MediaCardState extends State<MediaCard>
     if (!_loaded) {
       return _ShimmerPlaceholder(accent: accent)
           .animate(onPlay: (c) => c.repeat())
-          .shimmer(duration: 1200.ms, color: accent.withValues(alpha: 0.15));
+          .shimmer(
+            duration: 1200.ms,
+            color: accent.withValues(alpha: 0.15),
+          );
     }
     final path = isVideo ? _thumbPath : _artPath;
     if (path != null && File(path).existsSync()) {
@@ -319,26 +384,40 @@ class _MediaCardState extends State<MediaCard>
         ? widget.item.title[0].toUpperCase()
         : (isVideo ? 'V' : 'M');
     return ClipRect(
-      child: Stack(fit: StackFit.expand, children: [
-        Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.accentBlue.withValues(alpha: .26),
-                AppColors.accentViolet.withValues(alpha: .28),
-                AppColors.accentPink.withValues(alpha: .22),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.accentBlue.withValues(alpha: .26),
+                  AppColors.accentViolet.withValues(alpha: .28),
+                  AppColors.accentPink.withValues(alpha: .22),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
             ),
           ),
-        ),
-        BackdropFilter(filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(color: Colors.transparent)),
-        Center(child: Text(letter,
-          style: TextStyle(fontSize: 52, fontWeight: FontWeight.w900,
-            color: Colors.white.withValues(alpha: 0.88), fontFamily: 'Inter', height: 1))),
-      ]),
+          BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+            child: Container(color: Colors.transparent),
+          ),
+          Center(
+            child: Text(
+              letter,
+              style: TextStyle(
+                fontSize: 52,
+                fontWeight: FontWeight.w900,
+                color: Colors.white.withValues(alpha: 0.88),
+                fontFamily: 'Inter',
+                height: 1,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -348,5 +427,6 @@ class _ShimmerPlaceholder extends StatelessWidget {
   const _ShimmerPlaceholder({required this.accent});
 
   @override
-  Widget build(BuildContext context) => Container(color: AppColors.cardOf(context));
+  Widget build(BuildContext context) =>
+      Container(color: AppColors.cardOf(context));
 }
