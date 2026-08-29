@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/router.dart';
 import 'apk_downloader.dart';
 import 'shared_notification_plugin.dart';
 
@@ -14,36 +15,25 @@ import 'shared_notification_plugin.dart';
 //   otya_download_progress — Download progress bar (Low, silent, ongoing)
 //   otya_download_done     — Download complete (High, tap to install)
 //   otya_announcements     — General announcements (Default importance)
-//
-// Notification IDs:
-//   2000 — Update available
-//   2001 — Download progress
-//   2002 — Download complete
-//   2003 — Announcement
 // ─────────────────────────────────────────────────────────────────────────────
 class PushNotificationService {
   PushNotificationService._();
   static final PushNotificationService instance = PushNotificationService._();
 
-  // ── Channel IDs ───────────────────────────────────────────────────────────
-  static const _chUpdates   = 'otya_updates';
-  static const _chProgress  = 'otya_download_progress';
-  static const _chDone      = 'otya_download_done';
-  static const _chAnnounce  = 'otya_announcements';
+  static const _chUpdates = 'otya_updates';
+  static const _chProgress = 'otya_download_progress';
+  static const _chDone = 'otya_download_done';
+  static const _chAnnounce = 'otya_announcements';
 
-  // ── Notification IDs ──────────────────────────────────────────────────────
-  static const int idUpdate    = 2000;
-  static const int idProgress  = 2001;
-  static const int idDone      = 2002;
-  static const int idAnnounce  = 2003;
+  static const int idUpdate = 2000;
+  static const int idProgress = 2001;
+  static const int idDone = 2002;
+  static const int idAnnounce = 2003;
 
-  // ── Payload prefixes (used to route tap actions) ──────────────────────────
   static const _prefixDownload = 'download:';
-  static const _prefixUrl      = 'url:';
+  static const _prefixUrl = 'url:';
 
   bool _initialized = false;
-
-  // Cached download metadata so the tap handler can trigger the installer.
   String? _pendingDownloadUrl;
   String? _pendingDownloadVersion;
 
@@ -54,8 +44,6 @@ class PushNotificationService {
     debugPrint('[PushNotificationService] Initialized.');
   }
 
-  // ── Tap handler ───────────────────────────────────────────────────────────
-
   /// Public entry-point called by [sharedNotificationRouter].
   void handleTap(NotificationResponse response) => _onTap(response);
 
@@ -64,65 +52,103 @@ class PushNotificationService {
     debugPrint('[PushNotif] tapped id=${response.id} payload=$payload');
 
     if (payload.startsWith(_prefixDownload)) {
-      // Tap on update or download-complete notification → start/resume install.
       final parts = payload.substring(_prefixDownload.length).split('|');
-      final url     = parts.isNotEmpty ? parts[0] : null;
+      final url = parts.isNotEmpty ? parts[0] : null;
       final version = parts.length > 1 ? parts[1] : 'latest';
       if (url != null && url.isNotEmpty) {
         _triggerDownload(url: url, version: version);
       }
-    } else if (payload.startsWith(_prefixUrl)) {
-      final rawUrl = payload.substring(_prefixUrl.length);
-      final uri = Uri.tryParse(rawUrl);
-      if (uri != null) {
-        launchUrl(uri, mode: LaunchMode.externalApplication).ignore();
+      return;
+    }
+
+    if (!payload.startsWith(_prefixUrl)) return;
+    final rawUrl = payload.substring(_prefixUrl.length);
+    final uri = Uri.tryParse(rawUrl);
+    if (uri == null) return;
+
+    if (uri.scheme == 'otya' && uri.host == 'app') {
+      final route = _canonicalRoute(uri.path);
+      if (route != null) {
+        try {
+          AppRouter.router.go(route);
+        } catch (e) {
+          debugPrint('[PushNotif] app route failed: $e');
+        }
       }
+      return;
+    }
+
+    if ({'http', 'https'}.contains(uri.scheme)) {
+      launchUrl(uri, mode: LaunchMode.externalApplication).ignore();
     }
   }
 
-  void _triggerDownload({required String url, required String version}) {
-    ApkDownloader.instance.downloadAndInstall(
-      url: url,
-      version: version,
-      onProgress: (p) =>
-          showDownloadProgress(percent: (p * 100).round()),
-      onError: (err) {
-        debugPrint('[PushNotif] Download error: $err');
-        dismissDownload();
-      },
-    ).then((_) => showDownloadComplete()).ignore();
+  String? _canonicalRoute(String raw) {
+    var route = raw.trim();
+    if (route == '/ai') route = '/support';
+    if (route == '/airdrop') route = '/transfer';
+    if (route == '/home') route = '/';
+
+    const allowed = {
+      '/',
+      '/music',
+      '/myspace',
+      '/support',
+      '/transfer',
+      '/downloads',
+      '/settings',
+      '/settings/storage',
+      '/profile',
+      '/about',
+      '/privacy',
+      '/whats-new',
+      '/playlists',
+      '/history',
+    };
+    return allowed.contains(route) ? route : null;
   }
 
-  // ── Public API ────────────────────────────────────────────────────────────
+  void _triggerDownload({required String url, required String version}) {
+    ApkDownloader.instance
+        .downloadAndInstall(
+          url: url,
+          version: version,
+          onProgress: (p) => showDownloadProgress(percent: (p * 100).round()),
+          onError: (err) {
+            debugPrint('[PushNotif] Download error: $err');
+            dismissDownload();
+          },
+        )
+        .then((_) => showDownloadComplete())
+        .ignore();
+  }
 
-  /// Shows a high-importance "New update available" notification.
-  /// Tapping it starts the APK download via [ApkDownloader].
   Future<void> showUpdateNotification({
     required String version,
     required String releaseNotes,
     required String downloadUrl,
   }) async {
     if (!_initialized) await init();
-    _pendingDownloadUrl     = downloadUrl;
+    _pendingDownloadUrl = downloadUrl;
     _pendingDownloadVersion = version;
 
     final androidDetails = AndroidNotificationDetails(
       _chUpdates,
-      'OTYA Player \u2014 Updates',
-      channelDescription: 'Alerts when a new version of OTYA Player is available',
+      'OTYA — Updates',
+      channelDescription: 'Alerts when a new OTYA version is available',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@drawable/ic_notification',
       styleInformation: BigTextStyleInformation(
         releaseNotes,
-        contentTitle: 'OTYA Player $version is available',
+        contentTitle: 'OTYA $version is available',
         summaryText: 'Tap to download',
       ),
     );
 
     await sharedNotificationsPlugin.show(
       idUpdate,
-      'Update Available \u2014 v$version',
+      'Update available — v$version',
       releaseNotes,
       NotificationDetails(android: androidDetails),
       payload: '$_prefixDownload$downloadUrl|$version',
@@ -130,14 +156,13 @@ class PushNotificationService {
     debugPrint('[PushNotif] showUpdateNotification v$version');
   }
 
-  /// Shows or updates a silent ongoing progress notification.
   Future<void> showDownloadProgress({required int percent}) async {
     if (!_initialized) await init();
 
     final androidDetails = AndroidNotificationDetails(
       _chProgress,
-      'OTYA Player \u2014 Downloading',
-      channelDescription: 'Shows APK download progress',
+      'OTYA — Downloading',
+      channelDescription: 'Shows OTYA update download progress',
       importance: Importance.low,
       priority: Priority.low,
       ongoing: true,
@@ -154,24 +179,23 @@ class PushNotificationService {
 
     await sharedNotificationsPlugin.show(
       idProgress,
-      'Downloading OTYA Player\u2026',
+      'Downloading OTYA…',
       '$percent%',
       NotificationDetails(android: androidDetails),
     );
   }
 
-  /// Dismisses the progress notification and shows a "Download complete" one.
   Future<void> showDownloadComplete() async {
     if (!_initialized) await init();
     await dismissDownload();
 
-    final url     = _pendingDownloadUrl     ?? '';
+    final url = _pendingDownloadUrl ?? '';
     final version = _pendingDownloadVersion ?? 'latest';
 
     final androidDetails = AndroidNotificationDetails(
       _chDone,
-      'OTYA Player \u2014 Download Complete',
-      channelDescription: 'Notifies when the APK download is ready to install',
+      'OTYA — Download complete',
+      channelDescription: 'Notifies when an OTYA update is ready to install',
       importance: Importance.high,
       priority: Priority.high,
       icon: '@drawable/ic_notification',
@@ -179,8 +203,8 @@ class PushNotificationService {
 
     await sharedNotificationsPlugin.show(
       idDone,
-      'Download Complete',
-      'Tap to install OTYA Player $version',
+      'Download complete',
+      'Tap to install OTYA $version',
       NotificationDetails(android: androidDetails),
       payload: '$_prefixDownload$url|$version',
     );
@@ -188,7 +212,7 @@ class PushNotificationService {
   }
 
   /// Shows a general announcement notification.
-  /// If [url] is provided, tapping opens it in the browser.
+  /// [url] may be an http(s) URL or a safe `otya://app/<route>` target.
   Future<void> showAnnouncement({
     required String title,
     required String body,
@@ -198,8 +222,8 @@ class PushNotificationService {
 
     final androidDetails = AndroidNotificationDetails(
       _chAnnounce,
-      'OTYA Player \u2014 Announcements',
-      channelDescription: 'General announcements from the OTYA Player team',
+      'OTYA — Announcements',
+      channelDescription: 'General announcements from OTYA',
       importance: Importance.defaultImportance,
       priority: Priority.defaultPriority,
       icon: '@drawable/ic_notification',
@@ -216,7 +240,6 @@ class PushNotificationService {
     debugPrint('[PushNotif] showAnnouncement: $title');
   }
 
-  /// Cancels the ongoing download-progress notification.
   Future<void> dismissDownload() async {
     if (!_initialized) return;
     await sharedNotificationsPlugin.cancel(idProgress);
