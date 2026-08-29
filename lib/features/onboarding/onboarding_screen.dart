@@ -14,45 +14,7 @@ class OnboardingOverlay extends StatefulWidget {
 }
 
 class _OnboardingOverlayState extends State<OnboardingOverlay> {
-  final _controller = PageController();
-  int _page = 0;
   bool _busy = false;
-
-  static const _pages = <_OnboardingPage>[
-    _OnboardingPage(
-      icon: Icons.play_circle_outline_rounded,
-      title: 'Your media, without the clutter',
-      body:
-          'OTYA keeps local video and music at the center. No account or internet connection is required to play files already on your device.',
-      points: [
-        'Video and Music stay easy to find',
-        'Playback continues when online services are unavailable',
-        'One compact Video · Music · Me navigation',
-      ],
-    ),
-    _OnboardingPage(
-      icon: Icons.grid_view_rounded,
-      title: 'Useful tools have a clear home',
-      body:
-          'Open Me for Transfer, Files, Private, Converter, Playlists, History, Tools, Personalize and Storage—without crowding the main player.',
-      points: [
-        'Transfer works directly on local Wi-Fi or hotspot',
-        'Downloads appear naturally in your media library',
-        'Search spans media, folders, artists, albums and playlists',
-      ],
-    ),
-    _OnboardingPage(
-      icon: Icons.shield_outlined,
-      title: 'You stay in control',
-      body:
-          'OTYA asks Android only for permissions needed by the feature you use. Private media stays in app-private storage, while Cloudflare and Firebase remain optional for online services.',
-      points: [
-        'Media access is explained before Android asks',
-        'Local playback never depends on sign-in or AI',
-        'Settings can review permissions and rescan later',
-      ],
-    ),
-  ];
 
   Future<void> _finish() async {
     if (_busy) return;
@@ -65,23 +27,6 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
     if (mounted) widget.onDone();
   }
 
-  Future<void> _next() async {
-    if (_page == _pages.length - 1) {
-      await _finish();
-      return;
-    }
-    await _controller.nextPage(
-      duration: AppDimensions.motionEmphasized,
-      curve: Curves.easeOutCubic,
-    );
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -90,130 +35,37 @@ class _OnboardingOverlayState extends State<OnboardingOverlay> {
     return Material(
       color: theme.scaffoldBackgroundColor,
       child: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(18, 8, 10, 4),
-              child: Row(
-                children: [
-                  const OtyaLogo(
-                    fontSize: 21,
-                    padding: EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-                  ),
-                  const Spacer(),
-                  TextButton(
-                    onPressed: _busy ? null : _finish,
-                    child: const Text('Skip'),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: PageView.builder(
-                controller: _controller,
-                itemCount: _pages.length,
-                onPageChanged: (index) => setState(() => _page = index),
-                itemBuilder: (context, index) => _PageContent(
-                  page: _pages[index],
-                ),
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: List.generate(
-                      _pages.length,
-                      (index) => AnimatedContainer(
-                        duration: AppDimensions.motionStandard,
-                        margin: const EdgeInsets.symmetric(horizontal: 3),
-                        width: index == _page ? 24 : 7,
-                        height: 7,
-                        decoration: BoxDecoration(
-                          color: index == _page
-                              ? scheme.primary
-                              : scheme.onSurface.withValues(alpha: .16),
-                          borderRadius: BorderRadius.circular(99),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 18),
-                  SizedBox(
-                    width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: _busy ? null : _next,
-                      icon: _busy
-                          ? const SizedBox.square(
-                              dimension: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Icon(
-                              _page == _pages.length - 1
-                                  ? Icons.check_rounded
-                                  : Icons.arrow_forward_rounded,
-                            ),
-                      label: Text(
-                        _page == _pages.length - 1
-                            ? 'Start using OTYA'
-                            : 'Continue',
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    'You can change permissions and online features later in Settings.',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _PageContent extends StatelessWidget {
-  const _PageContent({required this.page});
-
-  final _OnboardingPage page;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        return SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(24, 26, 24, 16),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           child: Center(
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 560),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  const OtyaLogo(
+                    fontSize: 22,
+                    padding: EdgeInsets.symmetric(horizontal: 11, vertical: 8),
+                  ),
+                  const Spacer(),
                   Container(
-                    width: 72,
-                    height: 72,
+                    width: 82,
+                    height: 82,
                     decoration: BoxDecoration(
                       color: scheme.primary.withValues(alpha: .12),
                       borderRadius: BorderRadius.circular(
                         AppDimensions.radiusXLarge,
                       ),
                     ),
-                    child: Icon(page.icon, size: 34, color: scheme.primary),
+                    child: Icon(
+                      Icons.play_circle_outline_rounded,
+                      size: 40,
+                      color: scheme.primary,
+                    ),
                   ),
-                  const SizedBox(height: 28),
+                  const SizedBox(height: 30),
                   Text(
-                    page.title,
+                    'Welcome to OTYA',
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.w900,
                       letterSpacing: -.8,
@@ -222,65 +74,91 @@ class _PageContent extends StatelessWidget {
                   ),
                   const SizedBox(height: 14),
                   Text(
-                    page.body,
+                    'Your videos, music and useful media tools in one private, offline-first Android app.',
                     style: theme.textTheme.bodyLarge?.copyWith(
                       color: scheme.onSurfaceVariant,
                       height: 1.55,
                     ),
                   ),
-                  const SizedBox(height: 26),
-                  ...page.points.map(
-                    (point) => Padding(
-                      padding: const EdgeInsets.only(bottom: 13),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Container(
-                            width: 24,
-                            height: 24,
-                            decoration: BoxDecoration(
-                              color: scheme.primary.withValues(alpha: .10),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Icon(
-                              Icons.check_rounded,
-                              size: 15,
-                              color: scheme.primary,
-                            ),
-                          ),
-                          const SizedBox(width: 11),
-                          Expanded(
-                            child: Text(
-                              point,
-                              style: theme.textTheme.bodyMedium?.copyWith(
-                                height: 1.4,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
+                  const SizedBox(height: 24),
+                  const _WelcomePoint(
+                    icon: Icons.video_library_outlined,
+                    text: 'Video and Music stay local and easy to find.',
+                  ),
+                  const _WelcomePoint(
+                    icon: Icons.wifi_tethering_rounded,
+                    text: 'Transfer works directly over local Wi-Fi or hotspot.',
+                  ),
+                  const _WelcomePoint(
+                    icon: Icons.lock_outline_rounded,
+                    text: 'Private and App Lock help protect what matters.',
+                  ),
+                  const Spacer(),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton.icon(
+                      onPressed: _busy ? null : _finish,
+                      icon: _busy
+                          ? const SizedBox.square(
+                              dimension: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.arrow_forward_rounded),
+                      label: const Text('Continue'),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    'Android will ask for permissions only when they are needed. You can review them later in Settings.',
+                    textAlign: TextAlign.center,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
             ),
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _OnboardingPage {
-  const _OnboardingPage({
-    required this.icon,
-    required this.title,
-    required this.body,
-    required this.points,
-  });
+class _WelcomePoint extends StatelessWidget {
+  const _WelcomePoint({required this.icon, required this.text});
 
   final IconData icon;
-  final String title;
-  final String body;
-  final List<String> points;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 13),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: Center(
+              child: Icon(icon, size: 22, color: scheme.primary),
+            ),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(top: 9),
+              child: Text(
+                text,
+                style: theme.textTheme.bodyMedium?.copyWith(height: 1.4),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
