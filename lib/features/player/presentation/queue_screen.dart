@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/new_media_tracker.dart';
 import '../../../core/services/smart_shuffle_service.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
 
@@ -35,7 +36,9 @@ class QueueNotifier extends StateNotifier<QueueState> {
   QueueNotifier() : super(const QueueState());
 
   void setQueue(List<MediaItem> items, {int startIndex = 0}) {
-    state = state.copyWith(items: items, currentIndex: startIndex);
+    final index = items.isEmpty ? 0 : startIndex.clamp(0, items.length - 1);
+    state = state.copyWith(items: items, currentIndex: index);
+    _recordCurrent();
   }
 
   void addToQueue(MediaItem item) {
@@ -44,14 +47,24 @@ class QueueNotifier extends StateNotifier<QueueState> {
 
   void removeAt(int index) {
     final updated = List<MediaItem>.from(state.items)..removeAt(index);
-    state = state.copyWith(items: updated);
+    final nextIndex = updated.isEmpty
+        ? 0
+        : state.currentIndex.clamp(0, updated.length - 1);
+    state = state.copyWith(items: updated, currentIndex: nextIndex);
   }
 
   void reorder(int oldIndex, int newIndex) {
     final updated = List<MediaItem>.from(state.items);
+    final currentId = state.current?.id;
     final item = updated.removeAt(oldIndex);
     updated.insert(newIndex, item);
-    state = state.copyWith(items: updated);
+    final currentIndex = currentId == null
+        ? state.currentIndex
+        : updated.indexWhere((entry) => entry.id == currentId);
+    state = state.copyWith(
+      items: updated,
+      currentIndex: currentIndex < 0 ? 0 : currentIndex,
+    );
   }
 
   void next() {
@@ -80,6 +93,7 @@ class QueueNotifier extends StateNotifier<QueueState> {
       nextIndex = (state.currentIndex + 1) % state.items.length;
     }
     state = state.copyWith(currentIndex: nextIndex < 0 ? 0 : nextIndex);
+    _recordCurrent();
   }
 
   void previous() {
@@ -87,11 +101,19 @@ class QueueNotifier extends StateNotifier<QueueState> {
     final prev =
         (state.currentIndex - 1 + state.items.length) % state.items.length;
     state = state.copyWith(currentIndex: prev);
+    _recordCurrent();
   }
 
   void toggleShuffle() => state = state.copyWith(shuffle: !state.shuffle);
 
   void clear() => state = const QueueState();
+
+  void _recordCurrent() {
+    final item = state.current;
+    if (item == null) return;
+    NewMediaTracker.instance.markSeen(item).ignore();
+    OtyaDatabase.instance.recordPlay(item).ignore();
+  }
 }
 
 final queueProvider =
@@ -200,13 +222,16 @@ class QueueScreen extends ConsumerWidget {
                       HapticFeedback.mediumImpact();
                       final adjusted =
                           newIndex > oldIndex ? newIndex - 1 : newIndex;
-                      ref.read(queueProvider.notifier).reorder(oldIndex, adjusted);
+                      ref
+                          .read(queueProvider.notifier)
+                          .reorder(oldIndex, adjusted);
                     },
                     proxyDecorator: (child, index, animation) => Material(
                       color: Colors.transparent,
                       elevation: 0,
                       child: ScaleTransition(
-                        scale: Tween(begin: 1.0, end: 1.02).animate(animation),
+                        scale:
+                            Tween(begin: 1.0, end: 1.02).animate(animation),
                         child: child,
                       ),
                     ),
@@ -229,8 +254,10 @@ class QueueScreen extends ConsumerWidget {
                         ),
                         child: ListTile(
                           minTileHeight: 66,
-                          contentPadding:
-                              const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 10,
+                            vertical: 3,
+                          ),
                           leading: Stack(
                             alignment: Alignment.bottomRight,
                             children: [
@@ -262,9 +289,11 @@ class QueueScreen extends ConsumerWidget {
                             item.title,
                             style: TextStyle(
                               fontSize: 13,
-                              fontWeight:
-                                  isCurrent ? FontWeight.w700 : FontWeight.w600,
-                              color: isCurrent ? AppColors.accent : cs.onSurface,
+                              fontWeight: isCurrent
+                                  ? FontWeight.w700
+                                  : FontWeight.w600,
+                              color:
+                                  isCurrent ? AppColors.accent : cs.onSurface,
                               fontFamily: 'Inter',
                             ),
                             maxLines: 1,
@@ -276,7 +305,8 @@ class QueueScreen extends ConsumerWidget {
                               item.artist ?? item.formattedDuration,
                               style: TextStyle(
                                 fontSize: 11,
-                                color: cs.onSurface.withValues(alpha: 0.50),
+                                color:
+                                    cs.onSurface.withValues(alpha: 0.50),
                                 fontFamily: 'Inter',
                               ),
                               maxLines: 1,
@@ -305,7 +335,8 @@ class QueueScreen extends ConsumerWidget {
                                 visualDensity: VisualDensity.compact,
                                 icon: Icon(
                                   Icons.close_rounded,
-                                  color: cs.onSurface.withValues(alpha: 0.42),
+                                  color:
+                                      cs.onSurface.withValues(alpha: 0.42),
                                   size: 19,
                                 ),
                                 onPressed: () {
@@ -370,7 +401,8 @@ class _HeaderAction extends StatelessWidget {
             icon,
             color: active
                 ? AppColors.accent
-                : cs.onSurface.withValues(alpha: onTap == null ? 0.22 : 0.58),
+                : cs.onSurface
+                    .withValues(alpha: onTap == null ? 0.22 : 0.58),
             size: 20,
           ),
         ),
