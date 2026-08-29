@@ -8,6 +8,7 @@ import 'package:media_kit/media_kit.dart';
 import 'app/app.dart';
 import 'core/database/otya_database.dart';
 import 'core/services/audio_handler.dart';
+import 'core/services/audio_session_service.dart';
 import 'core/services/cache_service.dart';
 import 'core/services/connectivity_service.dart';
 import 'core/services/crash_reporter.dart';
@@ -38,7 +39,8 @@ Future<void> main() async {
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
-    systemNavigationBarColor: Color(0xFF0A0A0F),
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
   ));
 
@@ -214,12 +216,32 @@ Future<void> _initBackground(
     () => PlaybackCoordinator.instance.activePlayer?.play(),
   );
 
-  unawaited(_safeBackground(
-    'call handling',
-    () => PhoneStateService.instance.setPauseDuringCalls(
-      savedSettings.pauseDuringCalls,
-    ),
-  ));
+  // Configure the shared audio session after audio_service/media_kit have loaded.
+  // This is the primary interruption + headphone-disconnect path on modern
+  // Android. Keep telephony observation as a fallback until real-device
+  // validation proves the audio-focus path is sufficient across supported OEMs.
+  var audioSessionReady = false;
+  try {
+    await AudioSessionService.instance.init(
+      pauseDuringCalls: savedSettings.pauseDuringCalls,
+    );
+    audioSessionReady = true;
+  } catch (e, st) {
+    debugPrint('[Background:audio session] Error: $e\n$st');
+    CrashReporter.instance.report(e, st);
+  }
+
+  if (!audioSessionReady && savedSettings.pauseDuringCalls) {
+    unawaited(_safeBackground(
+      'call handling fallback',
+      () => PhoneStateService.instance.setPauseDuringCalls(true),
+    ));
+  } else {
+    unawaited(_safeBackground(
+      'disable legacy call listener',
+      () => PhoneStateService.instance.setPauseDuringCalls(false),
+    ));
+  }
 
   // Firebase is optional and starts only after OTYA is already usable. App
   // Check/Analytics/Performance policy comes from Cloudflare app config. FCM
