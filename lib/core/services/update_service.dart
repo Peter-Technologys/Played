@@ -4,16 +4,15 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
-import 'api_signer.dart';
-import 'update_notification_service.dart';
+import 'push_notification_service.dart';
 
-/// Checks if a newer version of OTYA Player is available.
-/// Compares server versionCode against installed build number via package_info_plus.
+/// Checks whether a newer version of OTYA is available.
+/// Compares the server versionCode against the installed build number.
 class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
-  static const String _prefLastCheck   = 'update_last_check';
+  static const String _prefLastCheck = 'update_last_check';
   static const String _prefSkippedCode = 'update_skipped_code';
 
   bool _checkInProgress = false;
@@ -44,7 +43,6 @@ class UpdateService {
         }
       }
 
-      // /latest and /version are public (no HMAC) — used by website too
       http.Response? response;
       try {
         response = await http
@@ -53,7 +51,7 @@ class UpdateService {
       } catch (_) {}
 
       if (response == null || response.statusCode != 200) {
-        debugPrint('[UpdateService] /latest failed, trying /version fallback…');
+        debugPrint('[UpdateService] /latest failed, trying /api/version fallback…');
         try {
           response = await http
               .get(Uri.parse(Environment.apiVersionUrl))
@@ -62,44 +60,49 @@ class UpdateService {
       }
 
       if (response == null || response.statusCode != 200) {
-        debugPrint('[UpdateService] Both endpoints failed.');
+        debugPrint('[UpdateService] Both update endpoints failed.');
         return null;
       }
 
-      final data              = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
       final serverVersionCode = (data['versionCode'] as num?)?.toInt() ?? 0;
-      final serverVersion     = data['version']   as String? ?? '';
-      final changelog         = data['changelog'] as String? ?? '';
-      final rawDownloads      = data['downloads'];
-      final downloads         = (rawDownloads is Map<String, dynamic>) ? rawDownloads : <String, dynamic>{};
+      final serverVersion = data['version'] as String? ?? '';
+      final changelog = data['changelog'] as String? ?? '';
+      final rawDownloads = data['downloads'];
+      final downloads = rawDownloads is Map<String, dynamic>
+          ? rawDownloads
+          : <String, dynamic>{};
 
       if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
 
       await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
 
-      final packageInfo   = await PackageInfo.fromPlatform();
+      final packageInfo = await PackageInfo.fromPlatform();
       final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      debugPrint('[UpdateService] Installed: $installedCode  Server: $serverVersionCode');
+      debugPrint(
+        '[UpdateService] Installed: $installedCode  Server: $serverVersionCode',
+      );
 
       if (serverVersionCode <= installedCode) return null;
 
       final skippedCode = prefs.getInt(_prefSkippedCode) ?? 0;
       if (skippedCode >= serverVersionCode) return null;
 
-      final abi       = _detectAbi();
+      final abi = _detectAbi();
       final directUrl = abi == 'arm64'
           ? (downloads['arm64'] as String? ?? Environment.arm64DownloadUrl)
           : (downloads['arm32'] as String? ?? Environment.arm32DownloadUrl);
 
       return UpdateInfo(
-        version:       serverVersion,
-        versionCode:   serverVersionCode,
+        version: serverVersion,
+        versionCode: serverVersionCode,
         installedCode: installedCode,
-        changelog:     changelog,
-        downloadUrl:   downloads['auto'] as String? ?? Environment.downloadUrl,
-        directUrl:     directUrl,
-        releaseDate:   data['date'] as String? ?? '',
+        changelog: changelog,
+        downloadUrl:
+            downloads['auto'] as String? ?? Environment.downloadUrl,
+        directUrl: directUrl,
+        releaseDate: data['date'] as String? ?? '',
       );
     } catch (e) {
       debugPrint('[UpdateService] Check failed: $e');
@@ -109,9 +112,13 @@ class UpdateService {
 
   Future<void> checkAndNotify() async {
     final info = await checkForUpdate();
-    if (info != null) {
-      await UpdateNotificationService.instance.showUpdateNotification(info);
-    }
+    if (info == null) return;
+
+    await PushNotificationService.instance.showUpdateNotification(
+      version: info.version,
+      releaseNotes: info.changelog,
+      downloadUrl: info.downloadUrl,
+    );
   }
 
   Future<void> remindLater(int versionCode) async {
@@ -119,17 +126,13 @@ class UpdateService {
     await prefs.setInt(_prefSkippedCode, versionCode);
   }
 
-  // registerDevice() was removed — use DeviceService.instance.registerIfNeeded()
-  // which sends the full device payload (model, android_version, locale) using
-  // device_info_plus. UpdateService no longer handles device registration.
-
   String _detectAbi() => Environment.appArch;
 }
 
 class UpdateInfo {
   final String version;
-  final int    versionCode;
-  final int    installedCode;
+  final int versionCode;
+  final int installedCode;
   final String changelog;
   final String downloadUrl;
   final String directUrl;
