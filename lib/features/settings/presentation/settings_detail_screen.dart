@@ -130,6 +130,14 @@ class SettingsDetailScreen extends ConsumerWidget {
             ),
             const _Line(),
             _SwitchTile(
+              icon: Icons.phonelink_lock_rounded,
+              title: 'App Lock',
+              subtitle: 'Require your Android screen lock, fingerprint or face after OTYA leaves the foreground',
+              value: settings.appLockEnabled,
+              onChanged: notifier.setAppLock,
+            ),
+            const _Line(),
+            _SwitchTile(
               icon: Icons.manage_search_rounded,
               title: 'Search history',
               subtitle: 'Remember recent OTYA searches on this device',
