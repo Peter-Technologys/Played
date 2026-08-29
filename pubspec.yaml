@@ -68,12 +68,12 @@ dependencies:
   firebase_analytics: ^11.6.0
   firebase_performance: ^0.10.1+10
 
-  # Secure storage for vault key
+  # Secure storage for vault and account tokens.
   flutter_secure_storage: ^9.2.4
 
-  # Connectivity
+  # Connectivity state only. OTYA Transfer uses Dart sockets/NetworkInterface
+  # and does not scan Wi-Fi networks or require location/nearby permissions.
   connectivity_plus: ^6.1.4
-  network_info_plus: ^6.1.0
 
   # Utilities
   uuid: ^4.5.1
@@ -95,7 +95,6 @@ dependencies:
   # In-app WebView
   webview_flutter: 4.9.0
   webview_flutter_android: 3.16.9
-
 
 dev_dependencies:
   flutter_test:
