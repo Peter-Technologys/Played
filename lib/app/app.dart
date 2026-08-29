@@ -140,13 +140,15 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     final settings = ref.watch(settingsProvider);
 
     if (_checking) {
-      final startupTheme = settings.themeMode == AppThemeMode.light
-          ? AppTheme.light
-          : _darkTheme(settings.themeMode);
+      // Keep the very first visible frame consistent with the persisted theme.
+      // In particular, System must follow the device instead of being treated
+      // as Dark while local onboarding state is loading.
       return MaterialApp(
         title: 'OTYA',
         debugShowCheckedModeBanner: false,
-        theme: startupTheme,
+        theme: AppTheme.light,
+        darkTheme: _darkTheme(settings.themeMode),
+        themeMode: _materialThemeMode(settings.themeMode),
         home: Scaffold(
           body: Center(
             child: Column(
