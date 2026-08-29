@@ -17,17 +17,17 @@ import 'package:uuid/uuid.dart';
 
 import '../config/environment.dart';
 import 'api_signer.dart';
+import 'firebase_platform_service.dart';
 import 'http_client.dart';
 
-const _kDeviceId        = 'otya_device_id';
+const _kDeviceId = 'otya_device_id';
 const _kRegisteredBuild = 'otya_registered_build';
 
 class DeviceService {
   DeviceService._();
   static final DeviceService instance = DeviceService._();
 
-  final _http       = AppHttpClient.instance;
-  // Singleton — DeviceInfoPlugin is heavy; instantiate once, not per call.
+  final _http = AppHttpClient.instance;
   final _deviceInfo = DeviceInfoPlugin();
   String? _cachedDeviceId;
 
@@ -35,7 +35,7 @@ class DeviceService {
   Future<String> getDeviceId() async {
     if (_cachedDeviceId != null) return _cachedDeviceId!;
     final prefs = await SharedPreferences.getInstance();
-    String? id  = prefs.getString(_kDeviceId);
+    String? id = prefs.getString(_kDeviceId);
     if (id == null) {
       id = const Uuid().v4();
       await prefs.setString(_kDeviceId, id);
@@ -48,25 +48,24 @@ class DeviceService {
   /// Only calls the network when the build number has changed.
   Future<void> registerIfNeeded() async {
     try {
-      final prefs       = await SharedPreferences.getInstance();
+      final prefs = await SharedPreferences.getInstance();
       final packageInfo = await PackageInfo.fromPlatform();
       final currentBuild = packageInfo.buildNumber;
 
-      // Skip if already registered for this build
       if (prefs.getString(_kRegisteredBuild) == currentBuild) return;
 
-      final deviceId   = await getDeviceId();
-      String model          = 'unknown';
+      final deviceId = await getDeviceId();
+      String model = 'unknown';
       String androidVersion = 'unknown';
 
       if (Platform.isAndroid) {
         final android = await _deviceInfo.androidInfo;
-        model          = '${android.manufacturer} ${android.model}';
+        model = '${android.manufacturer} ${android.model}';
         androidVersion = android.version.release;
       }
 
       const path = '/api/device';
-      final headers = {
+      final signedHeaders = {
         ...ApiSigner.signedHeaders(
           method: 'POST',
           path: path,
@@ -74,15 +73,20 @@ class DeviceService {
         ),
         'Content-Type': 'application/json',
       };
+      // App Check is optional/non-fatal on the client, but attaching it here
+      // makes this route ready for server-side enforcement without a new APK.
+      final headers = await FirebasePlatformService.instance.protectedHeaders(
+        base: signedHeaders,
+      );
 
       final body = jsonEncode({
-        'device_id':       deviceId,
-        'model':           model,
+        'device_id': deviceId,
+        'model': model,
         'android_version': androidVersion,
-        'app_version':     packageInfo.version,
-        'app_build':       int.tryParse(currentBuild) ?? 0,
-        'arch':            _detectArch(),
-        'locale':          Platform.localeName,
+        'app_version': packageInfo.version,
+        'app_build': int.tryParse(currentBuild) ?? 0,
+        'arch': _detectArch(),
+        'locale': Platform.localeName,
       });
 
       final response = await _http.post(
@@ -106,9 +110,6 @@ class DeviceService {
   }
 
   String _detectArch() {
-    // Flutter does not expose ABI directly at runtime.
-    // For precision, pass the ABI via --dart-define at build time:
-    //   flutter build apk --dart-define=APP_ARCH=arm64
     const arch = String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
     return arch;
   }
