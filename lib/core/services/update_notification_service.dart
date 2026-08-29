@@ -2,29 +2,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' show WidgetsBinding;
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
+
 import '../../app/theme/app_colors.dart';
 import 'shared_notification_plugin.dart';
 import 'update_service.dart';
 
-/// Builds and shows high-priority update notifications.
-///
-/// Channel: "Updates" (IMPORTANCE_HIGH)
-/// Notification ID: 9001 (reserved — will not conflict with tools channel)
-///
-/// Action buttons:
-///   "Download Now" → opens Worker /download URL in browser
-///   "Later"        → dismisses (WorkManager will re-check in 24h)
+/// Builds and shows high-priority OTYA update notifications.
 class UpdateNotificationService {
   UpdateNotificationService._();
   static final UpdateNotificationService instance = UpdateNotificationService._();
 
-  static const int    _notificationId  = 9001;
-  static const String _channelId       = 'com.otyaplayer.app.updates';
-  static const String _channelName     = 'Updates';
-  static const String _channelDesc     = 'OTYA Player app update notifications';
+  static const int _notificationId = 9001;
+  static const String _channelId = 'com.otyaplayer.app.updates';
+  static const String _channelName = 'OTYA Updates';
+  static const String _channelDesc = 'OTYA app update notifications';
 
   bool _initialized = false;
-  bool _showing     = false;
+  bool _showing = false;
 
   Future<void> init() async {
     if (_initialized) return;
@@ -33,8 +27,6 @@ class UpdateNotificationService {
     debugPrint('[UpdateNotification] Initialized.');
   }
 
-  /// Shows a high-priority update notification with Download Now / Later actions.
-  /// Guards against concurrent calls so only one notification is shown at a time.
   Future<void> showUpdateNotification(UpdateInfo info) async {
     if (_showing) return;
     _showing = true;
@@ -54,13 +46,13 @@ class UpdateNotificationService {
       color: AppColors.accentViolet,
       styleInformation: BigTextStyleInformation(
         changelog,
-        contentTitle: 'OTYA Player ${info.version} is available',
+        contentTitle: 'OTYA ${info.version} is available',
         summaryText: 'Tap to download',
       ),
       actions: [
         const AndroidNotificationAction(
           'download',
-          'Download Now',
+          'Download now',
           showsUserInterface: true,
           cancelNotification: true,
         ),
@@ -72,12 +64,12 @@ class UpdateNotificationService {
       ],
       ongoing: false,
       autoCancel: true,
-      ticker: 'OTYA Player update available',
+      ticker: 'OTYA update available',
     );
 
     await sharedNotificationsPlugin.show(
       _notificationId,
-      'OTYA Player Update Available',
+      'OTYA update available',
       'Version ${info.version} — $changelog',
       NotificationDetails(android: androidDetails),
       payload: info.downloadUrl,
@@ -87,19 +79,19 @@ class UpdateNotificationService {
     debugPrint('[UpdateNotification] Shown for v${info.version}.');
   }
 
-  Future<void> dismiss() async => sharedNotificationsPlugin.cancel(_notificationId);
+  Future<void> dismiss() async =>
+      sharedNotificationsPlugin.cancel(_notificationId);
 
   /// Public entry-point called by [sharedNotificationRouter].
   void handleTap(NotificationResponse response) => _onNotificationTap(response);
 
   void _onNotificationTap(NotificationResponse response) {
     final action = response.actionId;
-    final url    = response.payload ?? '';
+    final url = response.payload ?? '';
 
     if (action == 'download' || (action == null && url.isNotEmpty)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _openUrl(url));
     }
-    // 'later' just dismisses — WorkManager will re-check in 24h
   }
 
   Future<void> _openUrl(String url) async {
