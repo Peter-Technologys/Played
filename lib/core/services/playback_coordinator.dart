@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
+import 'media_dsp_service.dart';
+
 /// Coordinates the single media player that is allowed to be active at once.
 ///
 /// Players are observed after their first registration. If a previously
@@ -65,6 +67,10 @@ class PlaybackCoordinator {
       _activePlayer = player;
       _activeType = type;
       _speedBeforeBoost = null;
+
+      // DSP is optional and local to this MediaKit player. A filter failure is
+      // never allowed to block playback or the owner switch itself.
+      unawaited(MediaDspService.instance.applySaved(player));
       debugPrint('[PlaybackCoordinator] Registered $type player');
     } finally {
       _switching = false;
@@ -79,9 +85,6 @@ class PlaybackCoordinator {
       (playing) {
         if (!playing || _activePlayer == player || _switching) return;
         final registeredType = _registeredTypes[player] ?? type;
-        // A user/system action started a non-active registered player. Treat
-        // that action as intent to switch playback owners rather than allowing
-        // two players to continue at once.
         unawaited(register(player, registeredType));
       },
       onError: (Object error, StackTrace stack) {
