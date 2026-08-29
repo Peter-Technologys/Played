@@ -8,6 +8,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../config/environment.dart';
 import 'api_signer.dart';
 import 'device_service.dart';
+import 'firebase_platform_service.dart';
 
 /// Handles Rate Us and Report a Problem.
 /// Data is posted to the PeterSmart Link backend and the email client is also
@@ -27,18 +28,13 @@ class FeedbackService {
   Future<SharedPreferences> _prefs() async =>
       _cachedPrefs ??= await SharedPreferences.getInstance();
 
-  // ── Shared helpers ────────────────────────────────────────────────────────
-
   Future<Map<String, String>> _deviceInfo() async {
     final pkg = await _pkg();
-    // DeviceService owns the stable installation UUID. Do not duplicate its
-    // SharedPreferences key here; older code used `update_device_id`, which
-    // could make feedback arrive as device "unknown".
     final deviceId = await DeviceService.instance.getDeviceId();
     return {
-      'version':     pkg.version,
+      'version': pkg.version,
       'buildNumber': pkg.buildNumber,
-      'deviceId':    deviceId,
+      'deviceId': deviceId,
     };
   }
 
@@ -47,8 +43,7 @@ class FeedbackService {
       final result = await Connectivity()
           .checkConnectivity()
           .timeout(const Duration(seconds: 3));
-      final hasNetwork = !result.contains(ConnectivityResult.none);
-      if (!hasNetwork) return false;
+      if (result.contains(ConnectivityResult.none)) return false;
       final probe = await http
           .get(Uri.parse('https://clients3.google.com/generate_204'))
           .timeout(const Duration(seconds: 5));
@@ -59,16 +54,21 @@ class FeedbackService {
   }
 
   Future<void> _postToWorker(
-      String path, Map<String, dynamic> data, String deviceId) async {
+    String path,
+    Map<String, dynamic> data,
+    String deviceId,
+  ) async {
     try {
-      final headers = {
-        ...ApiSigner.signedHeaders(
-          method: 'POST',
-          path: path,
-          deviceId: deviceId,
-        ),
-        'Content-Type': 'application/json',
-      };
+      final headers = await FirebasePlatformService.instance.protectedHeaders(
+        base: {
+          ...ApiSigner.signedHeaders(
+            method: 'POST',
+            path: path,
+            deviceId: deviceId,
+          ),
+          'Content-Type': 'application/json',
+        },
+      );
       final res = await http
           .post(
             Uri.parse('${Environment.workerUrl}$path'),
@@ -97,17 +97,15 @@ class FeedbackService {
     }
   }
 
-  // ── Rate Us ───────────────────────────────────────────────────────────────
-
   Future<bool> shouldShowRatePrompt() async {
     if (!await _hasConnection()) return false;
-    final pkg   = await _pkg();
+    final pkg = await _pkg();
     final prefs = await _prefs();
     return (prefs.getString(_prefRatePromptKey) ?? '') != pkg.version;
   }
 
   Future<void> markRatePromptShown() async {
-    final pkg   = await _pkg();
+    final pkg = await _pkg();
     final prefs = await _prefs();
     await prefs.setString(_prefRatePromptKey, pkg.version);
   }
@@ -119,15 +117,15 @@ class FeedbackService {
     final info = await _deviceInfo();
 
     _postToWorker('/api/ratings', {
-      'device_id':    info['deviceId'],
-      'app_version':  info['version'],
+      'device_id': info['deviceId'],
+      'app_version': info['version'],
       'version_code': int.tryParse(info['buildNumber']!) ?? 0,
-      'stars':        stars.clamp(1, 5),
-      'comment':      comment.trim(),
+      'stars': stars.clamp(1, 5),
+      'comment': comment.trim(),
     }, info['deviceId']!).ignore();
 
     final starEmoji = List.filled(stars.clamp(1, 5), '⭐').join();
-    final subject   = 'OTYA Player Rating — ${stars.clamp(1, 5)} stars';
+    final subject = 'OTYA Player Rating — ${stars.clamp(1, 5)} stars';
     final body =
         'Stars: $starEmoji (${stars.clamp(1, 5)}/5)\n'
         '${comment.trim().isNotEmpty ? 'Comment: ${comment.trim()}\n' : ''}\n'
@@ -136,8 +134,6 @@ class FeedbackService {
 
     await _openEmail(subject, body);
   }
-
-  // ── Report a Problem ──────────────────────────────────────────────────────
 
   Future<void> submitReport({
     required String description,
@@ -150,17 +146,15 @@ class FeedbackService {
     final cleanEmail = userEmail?.trim();
 
     _postToWorker('/api/feedback', {
-      'device_id':    info['deviceId'],
-      'app_version':  info['version'],
+      'device_id': info['deviceId'],
+      'app_version': info['version'],
       'version_code': int.tryParse(info['buildNumber']!) ?? 0,
-      'category':     cleanCategory,
-      'description':  cleanDescription,
+      'category': cleanCategory,
+      'description': cleanDescription,
       if (cleanEmail != null && cleanEmail.isNotEmpty) 'user_email': cleanEmail,
     }, info['deviceId']!).ignore();
 
-    final categoryLabel = cleanCategory.isEmpty
-        ? 'Other'
-        : cleanCategory[0].toUpperCase() + cleanCategory.substring(1);
+    final categoryLabel = cleanCategory[0].toUpperCase() + cleanCategory.substring(1);
     final subject = 'OTYA Player Problem Report — $categoryLabel';
     final body =
         'Category: $categoryLabel\n'
