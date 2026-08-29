@@ -1,39 +1,73 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
-import '../../../app/theme/app_colors.dart';
 
-// ── App Lock Provider ───────────────────────────────────────────
+import '../../app/theme/app_colors.dart';
+import 'settings_provider.dart';
 
-final appLockedProvider = StateProvider<bool>((_) => true);
-final appLockEnabledProvider = StateProvider<bool>((_) => false);
-
-// ── App Lock Gate ─────────────────────────────────────────────
-
-/// Wraps the entire app. Shows lock screen when app lock is enabled.
-class AppLockGate extends ConsumerWidget {
-  final Widget child;
+/// Application-level privacy gate.
+///
+/// [settingsProvider] is the single source of truth for whether App Lock is
+/// enabled. The unlocked state is deliberately session-only: whenever OTYA
+/// leaves the foreground it locks again, while the user's enabled preference
+/// remains persisted by [AppSettings].
+class AppLockGate extends ConsumerStatefulWidget {
   const AppLockGate({super.key, required this.child});
 
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final lockEnabled = ref.watch(appLockEnabledProvider);
-    final isLocked = ref.watch(appLockedProvider);
+  final Widget child;
 
-    if (!lockEnabled || !isLocked) return child;
+  @override
+  ConsumerState<AppLockGate> createState() => _AppLockGateState();
+}
+
+class _AppLockGateState extends ConsumerState<AppLockGate>
+    with WidgetsBindingObserver {
+  bool _unlockedForSession = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden ||
+        state == AppLifecycleState.detached) {
+      if (_unlockedForSession && mounted) {
+        setState(() => _unlockedForSession = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final enabled = ref.watch(settingsProvider.select((s) => s.appLockEnabled));
+    if (!enabled) {
+      _unlockedForSession = false;
+      return widget.child;
+    }
+    if (_unlockedForSession) return widget.child;
     return AppLockScreen(
-      onUnlocked: () =>
-          ref.read(appLockedProvider.notifier).state = false,
+      onUnlocked: () {
+        if (mounted) setState(() => _unlockedForSession = true);
+      },
     );
   }
 }
 
-// ── App Lock Screen ───────────────────────────────────────────
-
 class AppLockScreen extends StatefulWidget {
-  final VoidCallback onUnlocked;
   const AppLockScreen({super.key, required this.onUnlocked});
+
+  final VoidCallback onUnlocked;
 
   @override
   State<AppLockScreen> createState() => _AppLockScreenState();
@@ -43,37 +77,48 @@ class _AppLockScreenState extends State<AppLockScreen> {
   final LocalAuthentication _auth = LocalAuthentication();
   bool _authenticating = false;
   String? _error;
-  // PIN unlock is not configured — biometrics only.
-  // To add PIN support, integrate a secure storage solution (e.g. flutter_secure_storage)
-  // and store/retrieve the PIN hash there instead of hardcoding it.
-  bool _showPinUnavailable = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance
-        .addPostFrameCallback((_) => _authenticate());
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _authenticate());
   }
 
   Future<void> _authenticate() async {
-    setState(() { _authenticating = true; _error = null; });
+    if (_authenticating) return;
+    setState(() {
+      _authenticating = true;
+      _error = null;
+    });
     try {
+      final supported = await _auth.isDeviceSupported();
+      if (!supported) {
+        if (mounted) {
+          setState(() => _error =
+              'Device authentication is not configured. Set a screen lock in Android settings to use App Lock.');
+        }
+        return;
+      }
       final ok = await _auth.authenticate(
-        localizedReason: 'Unlock OTYA Player',
+        localizedReason: 'Unlock OTYA',
         options: const AuthenticationOptions(
-            biometricOnly: false, stickyAuth: true),
+          biometricOnly: false,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
       );
-      if (ok) { widget.onUnlocked(); }
-      else { setState(() => _error = 'Authentication failed.'); }
+      if (ok) {
+        widget.onUnlocked();
+      } else if (mounted) {
+        setState(() => _error = 'OTYA stayed locked. Try again to continue.');
+      }
     } catch (_) {
-      setState(() => _showPinUnavailable = true);
+      if (mounted) {
+        setState(() => _error =
+            'Device authentication is unavailable right now. Try again or check Android security settings.');
+      }
     } finally {
-      setState(() => _authenticating = false);
+      if (mounted) setState(() => _authenticating = false);
     }
   }
 
@@ -81,148 +126,107 @@ class _AppLockScreenState extends State<AppLockScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 32),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // Logo
-              Text('OTYA',
-                  style: TextStyle(
-                    fontSize: 36,
-                    fontWeight: FontWeight.w700,
+      body: SafeArea(
+        child: Center(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'OTYA',
+                  style: const TextStyle(
+                    fontSize: 34,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.accent,
-                    fontFamily: 'SpaceGrotesk',
-                    letterSpacing: 6,
-                  )).animate().fadeIn(duration: 500.ms),
-
-              const SizedBox(height: 48),
-
-              // Lock icon
-              Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.surface,
-                  border: Border.all(color: AppColors.accent, width: 2),
-                  boxShadow: [
-                    BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.3),
-                        blurRadius: 24,
-                        spreadRadius: 4)
-                  ],
-                ),
-                child: const Icon(Icons.lock_rounded,
-                    color: AppColors.accent, size: 36),
-              ).animate().scale(
-                    begin: const Offset(0.8, 0.8),
-                    duration: 400.ms,
-                    curve: Curves.elasticOut,
+                    fontFamily: 'Inter',
+                    letterSpacing: 5,
                   ),
-
-              const SizedBox(height: 32),
-
-              if (_showPinUnavailable) ...
-                [
+                ).animate().fadeIn(duration: 350.ms),
+                const SizedBox(height: 42),
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.surface,
+                    border: Border.all(color: AppColors.accent, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: .22),
+                        blurRadius: 24,
+                        spreadRadius: 3,
+                      ),
+                    ],
+                  ),
+                  child: const Icon(
+                    Icons.lock_rounded,
+                    color: AppColors.accent,
+                    size: 36,
+                  ),
+                ).animate().scale(
+                      begin: const Offset(.88, .88),
+                      duration: 300.ms,
+                      curve: Curves.easeOutBack,
+                    ),
+                const SizedBox(height: 24),
+                const Text(
+                  'OTYA is locked',
+                  style: TextStyle(
+                    fontSize: 21,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.textPrimary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Use your device screen lock, fingerprint or face authentication to continue.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 13,
+                    height: 1.45,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Inter',
+                  ),
+                ),
+                if (_error != null) ...[
+                  const SizedBox(height: 18),
                   Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(13),
                     decoration: BoxDecoration(
                       color: AppColors.surface,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.border),
                     ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline_rounded,
-                            color: AppColors.textSecondary, size: 18),
-                        SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            'PIN unlock not configured. Please use biometrics.',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: AppColors.textSecondary,
-                              fontFamily: 'SpaceGrotesk',
-                              height: 1.4,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  GestureDetector(
-                    onTap: _authenticate,
-                    child: Container(
-                      width: double.infinity,
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: AppColors.accent,
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.fingerprint_rounded,
-                              color: Colors.black, size: 22),
-                          SizedBox(width: 8),
-                          Text('Try Biometrics Again',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.black,
-                                fontFamily: 'SpaceGrotesk',
-                              )),
-                        ],
+                    child: Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                        color: AppColors.textSecondary,
+                        fontSize: 12.5,
+                        height: 1.4,
                       ),
                     ),
                   ),
-                ]
-              else if (_authenticating)
-                const CircularProgressIndicator(color: AppColors.accent)
-              else
-                GestureDetector(
-                  onTap: _authenticate,
-                  child: Container(
-                    width: double.infinity,
-                    height: 52,
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.fingerprint_rounded,
-                            color: Colors.black, size: 22),
-                        SizedBox(width: 8),
-                        Text('Unlock',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.black,
-                              fontFamily: 'SpaceGrotesk',
-                            )),
-                      ],
-                    ),
+                ],
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton.icon(
+                    onPressed: _authenticating ? null : _authenticate,
+                    icon: _authenticating
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.fingerprint_rounded),
+                    label: Text(_authenticating ? 'Checking…' : 'Unlock OTYA'),
                   ),
                 ),
-
-              if (_error != null) ...
-                [
-                  const SizedBox(height: 16),
-                  Text(_error!,
-                      style: const TextStyle(
-                          color: AppColors.error, fontSize: 12)),
-                ],
-
-
-            ],
+              ],
+            ),
           ),
         ),
       ),
