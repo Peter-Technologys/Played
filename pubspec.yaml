@@ -89,8 +89,11 @@ dependencies:
   dio: ^5.7.0
   open_filex: ^4.7.0
 
-  # Background audio — keeps media_kit Player alive when app is backgrounded.
+  # Background audio + app-wide audio-focus policy. audio_session is declared
+  # directly because OTYA owns interruption/headphone routing behaviour rather
+  # than relying on transitive plugin defaults.
   audio_service: ^0.18.15
+  audio_session: ^0.2.4
 
   # In-app WebView
   webview_flutter: 4.9.0
