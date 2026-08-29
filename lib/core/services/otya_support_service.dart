@@ -90,6 +90,9 @@ class OtyaSupportService {
     );
   }
 
+  /// Returns only models allowed by the server policy. The server-selected
+  /// default is moved to the first position so UI code does not accidentally
+  /// make the guest/cheapest model the default for a signed-in account.
   Future<List<OtyaAiModel>> models() async {
     final response = await _client
         .get(
@@ -103,7 +106,7 @@ class OtyaSupportService {
     }
     final raw = data['models'];
     if (raw is! List) return const <OtyaAiModel>[];
-    return raw
+    final result = raw
         .whereType<Map>()
         .map(
           (value) => OtyaAiModel.fromJson(
@@ -111,7 +114,17 @@ class OtyaSupportService {
           ),
         )
         .where((model) => model.id.isNotEmpty)
-        .toList(growable: false);
+        .toList(growable: true);
+
+    final defaultId = '${data['default_model'] ?? ''}'.trim();
+    if (defaultId.isNotEmpty) {
+      final index = result.indexWhere((model) => model.id == defaultId);
+      if (index > 0) {
+        final preferred = result.removeAt(index);
+        result.insert(0, preferred);
+      }
+    }
+    return List<OtyaAiModel>.unmodifiable(result);
   }
 
   Future<OtyaSupportReply> ask(
