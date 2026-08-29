@@ -116,7 +116,7 @@ jobs:
             --release
             --split-per-abi
             --target-platform android-arm,android-arm64
-            --dart-define=SELF_UPDATE=true
+            --dart-define=SELF_UPDATE=false
             --dart-define=WORKER_URL="$BASE_URL"
             --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
           )
