@@ -26,7 +26,7 @@ class AppSettings {
   final int maxConcurrentDownloads;
 
   const AppSettings({
-    this.themeMode = AppThemeMode.dark,
+    this.themeMode = AppThemeMode.system,
     this.autoResume = true,
     this.defaultBatterySaver = false,
     this.shuffle = false,
@@ -67,7 +67,8 @@ class AppSettings {
       AppSettings(
         themeMode: themeMode ?? this.themeMode,
         autoResume: autoResume ?? this.autoResume,
-        defaultBatterySaver: defaultBatterySaver ?? this.defaultBatterySaver,
+        defaultBatterySaver:
+            defaultBatterySaver ?? this.defaultBatterySaver,
         shuffle: shuffle ?? this.shuffle,
         nowPlayingNotification:
             nowPlayingNotification ?? this.nowPlayingNotification,
@@ -87,28 +88,24 @@ class AppSettings {
             maxConcurrentDownloads ?? this.maxConcurrentDownloads,
       );
 
-  // ── SharedPreferences keys ──
-  static const _kTheme         = 'settings_theme';
-  static const _kAutoResume    = 'settings_auto_resume';
-  static const _kBatterySaver  = 'settings_battery_saver';
-  static const _kShuffle       = 'settings_shuffle';
-  static const _kNotification  = 'settings_notification';
-  static const _kAppLock       = 'settings_app_lock';
-  static const _kHideVault     = 'settings_hide_vault';
-  static const _kLanguage      = 'settings_language';
+  static const _kTheme = 'settings_theme';
+  static const _kAutoResume = 'settings_auto_resume';
+  static const _kBatterySaver = 'settings_battery_saver';
+  static const _kShuffle = 'settings_shuffle';
+  static const _kNotification = 'settings_notification';
+  static const _kAppLock = 'settings_app_lock';
+  static const _kHideVault = 'settings_hide_vault';
+  static const _kLanguage = 'settings_language';
   static const _kPlaybackSpeed = 'settings_playback_speed';
-  static const _kAutoPip       = 'settings_auto_pip';
-  static const _kPauseCalls    = 'settings_pause_calls';
-  static const _kAutoSubtitles          = 'settings_auto_subtitles';
-  static const _kScanFolders            = 'settings_scan_folders';
-  static const _kSearchHistory          = 'search_history';
-  static const _kOrientationLocked      = 'orientation_locked';
-  static const _kContinuousPlayback     = 'continuous_playback';
+  static const _kAutoPip = 'settings_auto_pip';
+  static const _kPauseCalls = 'settings_pause_calls';
+  static const _kAutoSubtitles = 'settings_auto_subtitles';
+  static const _kScanFolders = 'settings_scan_folders';
+  static const _kSearchHistory = 'search_history';
+  static const _kOrientationLocked = 'orientation_locked';
+  static const _kContinuousPlayback = 'continuous_playback';
   static const _kMaxConcurrentDownloads = 'max_concurrent_downloads';
 
-  // BUG 6: Cache the SharedPreferences instance after first load so that
-  // save() never calls SharedPreferences.getInstance() on every settings
-  // toggle — eliminates repeated async platform channel round-trips.
   static SharedPreferences? _prefs;
 
   static Future<SharedPreferences> _getPrefs() async {
@@ -119,56 +116,53 @@ class AppSettings {
   static Future<AppSettings> load() async {
     final p = await _getPrefs();
     return AppSettings(
+      // Existing users keep their saved choice. A fresh install follows the
+      // device automatically instead of forcing OTYA into dark mode.
       themeMode: AppThemeMode.values[
-          (p.getInt(_kTheme) ?? AppThemeMode.dark.index)
+          (p.getInt(_kTheme) ?? AppThemeMode.system.index)
               .clamp(0, AppThemeMode.values.length - 1)],
-      autoResume:             p.getBool(_kAutoResume)    ?? true,
-      defaultBatterySaver:    p.getBool(_kBatterySaver)  ?? false,
-      shuffle:                p.getBool(_kShuffle)       ?? false,
-      nowPlayingNotification: p.getBool(_kNotification)  ?? true,
-      appLockEnabled:         p.getBool(_kAppLock)       ?? false,
-      hideVaultFromRecents:   p.getBool(_kHideVault)     ?? true,
-      language:               p.getString(_kLanguage)    ?? 'en',
-      playbackSpeed:          p.getDouble(_kPlaybackSpeed) ?? 1.0,
-      autoPip:                p.getBool(_kAutoPip)       ?? false,
-      pauseDuringCalls:       p.getBool(_kPauseCalls)    ?? true,
-      autoLoadSubtitles:      p.getBool(_kAutoSubtitles) ?? true,
-      scanFolders:            p.getStringList(_kScanFolders) ?? const [],
-      searchHistory:          p.getBool(_kSearchHistory)          ?? true,
-      orientationLocked:      p.getBool(_kOrientationLocked)      ?? false,
-      continuousPlayback:     p.getBool(_kContinuousPlayback)     ?? true,
-      maxConcurrentDownloads: p.getInt(_kMaxConcurrentDownloads)  ?? 2,
+      autoResume: p.getBool(_kAutoResume) ?? true,
+      defaultBatterySaver: p.getBool(_kBatterySaver) ?? false,
+      shuffle: p.getBool(_kShuffle) ?? false,
+      nowPlayingNotification: p.getBool(_kNotification) ?? true,
+      appLockEnabled: p.getBool(_kAppLock) ?? false,
+      hideVaultFromRecents: p.getBool(_kHideVault) ?? true,
+      language: p.getString(_kLanguage) ?? 'en',
+      playbackSpeed: p.getDouble(_kPlaybackSpeed) ?? 1.0,
+      autoPip: p.getBool(_kAutoPip) ?? false,
+      pauseDuringCalls: p.getBool(_kPauseCalls) ?? true,
+      autoLoadSubtitles: p.getBool(_kAutoSubtitles) ?? true,
+      scanFolders: p.getStringList(_kScanFolders) ?? const [],
+      searchHistory: p.getBool(_kSearchHistory) ?? true,
+      orientationLocked: p.getBool(_kOrientationLocked) ?? false,
+      continuousPlayback: p.getBool(_kContinuousPlayback) ?? true,
+      maxConcurrentDownloads: p.getInt(_kMaxConcurrentDownloads) ?? 2,
     );
   }
 
   Future<void> save() async {
     final p = await _getPrefs();
-    await p.setInt(_kTheme,            themeMode.index);
-    await p.setBool(_kAutoResume,       autoResume);
-    await p.setBool(_kBatterySaver,     defaultBatterySaver);
-    await p.setBool(_kShuffle,          shuffle);
-    await p.setBool(_kNotification,     nowPlayingNotification);
-    await p.setBool(_kAppLock,          appLockEnabled);
-    await p.setBool(_kHideVault,        hideVaultFromRecents);
-    await p.setString(_kLanguage,       language);
-    await p.setDouble(_kPlaybackSpeed,  playbackSpeed);
-    await p.setBool(_kAutoPip,          autoPip);
-    await p.setBool(_kPauseCalls,       pauseDuringCalls);
-    await p.setBool(_kAutoSubtitles,    autoLoadSubtitles);
+    await p.setInt(_kTheme, themeMode.index);
+    await p.setBool(_kAutoResume, autoResume);
+    await p.setBool(_kBatterySaver, defaultBatterySaver);
+    await p.setBool(_kShuffle, shuffle);
+    await p.setBool(_kNotification, nowPlayingNotification);
+    await p.setBool(_kAppLock, appLockEnabled);
+    await p.setBool(_kHideVault, hideVaultFromRecents);
+    await p.setString(_kLanguage, language);
+    await p.setDouble(_kPlaybackSpeed, playbackSpeed);
+    await p.setBool(_kAutoPip, autoPip);
+    await p.setBool(_kPauseCalls, pauseDuringCalls);
+    await p.setBool(_kAutoSubtitles, autoLoadSubtitles);
     await p.setStringList(_kScanFolders, scanFolders);
-    await p.setBool(_kSearchHistory,          searchHistory);
-    await p.setBool(_kOrientationLocked,      orientationLocked);
-    await p.setBool(_kContinuousPlayback,     continuousPlayback);
-    await p.setInt(_kMaxConcurrentDownloads,  maxConcurrentDownloads);
+    await p.setBool(_kSearchHistory, searchHistory);
+    await p.setBool(_kOrientationLocked, orientationLocked);
+    await p.setBool(_kContinuousPlayback, continuousPlayback);
+    await p.setInt(_kMaxConcurrentDownloads, maxConcurrentDownloads);
   }
 }
 
-// ── Notifier ──────────────────────────────────────────────────────────
 class SettingsNotifier extends StateNotifier<AppSettings> {
-  // The `initial` value is already the fully-loaded AppSettings from
-  // loadSettingsForStartup() called in main() before runApp(). A second
-  // AppSettings.load() call here would redundantly hit SharedPreferences
-  // again on every cold start and could briefly overwrite in-flight state.
   SettingsNotifier(AppSettings initial) : super(initial);
 
   Future<void> _update(AppSettings s) async {
@@ -176,26 +170,36 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     s.save().ignore();
   }
 
-  void setThemeMode(AppThemeMode v)       => _update(state.copyWith(themeMode: v));
-  void setAutoResume(bool v)              => _update(state.copyWith(autoResume: v));
-  void setDefaultBatterySaver(bool v)     => _update(state.copyWith(defaultBatterySaver: v));
-  void setShuffle(bool v)                 => _update(state.copyWith(shuffle: v));
-  void setNowPlayingNotification(bool v)  => _update(state.copyWith(nowPlayingNotification: v));
-  void setAppLock(bool v)                 => _update(state.copyWith(appLockEnabled: v));
-  void setHideVaultFromRecents(bool v)    => _update(state.copyWith(hideVaultFromRecents: v));
-  void setScanFolders(List<String> v)     => _update(state.copyWith(scanFolders: v));
-  void setLanguage(String v)              => _update(state.copyWith(language: v));
-  void setPlaybackSpeed(double v)         => _update(state.copyWith(playbackSpeed: v));
-  void setAutoPip(bool v)                 => _update(state.copyWith(autoPip: v));
+  void setThemeMode(AppThemeMode v) => _update(state.copyWith(themeMode: v));
+  void setAutoResume(bool v) => _update(state.copyWith(autoResume: v));
+  void setDefaultBatterySaver(bool v) =>
+      _update(state.copyWith(defaultBatterySaver: v));
+  void setShuffle(bool v) => _update(state.copyWith(shuffle: v));
+  void setNowPlayingNotification(bool v) =>
+      _update(state.copyWith(nowPlayingNotification: v));
+  void setAppLock(bool v) => _update(state.copyWith(appLockEnabled: v));
+  void setHideVaultFromRecents(bool v) =>
+      _update(state.copyWith(hideVaultFromRecents: v));
+  void setScanFolders(List<String> v) =>
+      _update(state.copyWith(scanFolders: v));
+  void setLanguage(String v) => _update(state.copyWith(language: v));
+  void setPlaybackSpeed(double v) =>
+      _update(state.copyWith(playbackSpeed: v));
+  void setAutoPip(bool v) => _update(state.copyWith(autoPip: v));
   void setPauseDuringCalls(bool v) {
     _update(state.copyWith(pauseDuringCalls: v));
     PhoneStateService.instance.setPauseDuringCalls(v);
   }
-  void setAutoLoadSubtitles(bool v)       => _update(state.copyWith(autoLoadSubtitles: v));
-  void setSearchHistory(bool v)           => _update(state.copyWith(searchHistory: v));
-  void setOrientationLocked(bool v)       => _update(state.copyWith(orientationLocked: v));
-  void setContinuousPlayback(bool v)      => _update(state.copyWith(continuousPlayback: v));
-  void setMaxConcurrentDownloads(int v)   => _update(state.copyWith(maxConcurrentDownloads: v));
+  void setAutoLoadSubtitles(bool v) =>
+      _update(state.copyWith(autoLoadSubtitles: v));
+  void setSearchHistory(bool v) =>
+      _update(state.copyWith(searchHistory: v));
+  void setOrientationLocked(bool v) =>
+      _update(state.copyWith(orientationLocked: v));
+  void setContinuousPlayback(bool v) =>
+      _update(state.copyWith(continuousPlayback: v));
+  void setMaxConcurrentDownloads(int v) =>
+      _update(state.copyWith(maxConcurrentDownloads: v));
 }
 
 final settingsProvider =
@@ -203,9 +207,6 @@ final settingsProvider =
   (_) => SettingsNotifier(const AppSettings()),
 );
 
-/// Call this in main() BEFORE runApp() to pre-load settings from disk.
-/// Returns the loaded [AppSettings] so it can be passed to [ProviderScope]
-/// as an override, ensuring the UI never flashes default values.
 Future<AppSettings> loadSettingsForStartup() async {
   try {
     return await AppSettings.load();
@@ -214,10 +215,6 @@ Future<AppSettings> loadSettingsForStartup() async {
   }
 }
 
-/// Derives a [Locale] from [settingsProvider].language.
-/// Supported language codes: en, fr, es, sw.
-/// Watches [settingsProvider] so any call to [SettingsNotifier.setLanguage]
-/// immediately propagates a new [Locale] to [MaterialApp].
 final localeProvider = Provider<Locale>((ref) {
   final language = ref.watch(settingsProvider).language;
   return Locale(language);
