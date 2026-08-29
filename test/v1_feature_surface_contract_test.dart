@@ -57,7 +57,8 @@ void main() {
 
     expect(app, contains('AppLockGate('));
     expect(settings, contains('setAppLock'));
-    expect(settings, contains("'appLockEnabled'"));
+    expect(settings, contains("_kAppLock = 'settings_app_lock'"));
+    expect(settings, contains('appLockEnabled: p.getBool(_kAppLock) ?? false'));
     expect(settingsUi, contains("title: 'App Lock'"));
     expect(gate, contains('settingsProvider.select'));
     expect(gate, contains('AppLifecycleState.paused'));
@@ -71,10 +72,11 @@ void main() {
         File('lib/core/services/vault_service.dart').readAsStringSync();
 
     expect(screen, contains('LocalAuthentication'));
-    expect(screen, contains("vault_pin_failed_attempts"));
-    expect(screen, contains("vault_pin_blocked_until_ms"));
+    expect(screen, contains('vault_pin_failed_attempts'));
+    expect(screen, contains('vault_pin_blocked_until_ms'));
     expect(screen, contains('_pinMaxAttempts = 5'));
-    expect(service, contains('_safeRestorePath'));
+    expect(service, contains('_availableRestorePath'));
+    expect(service, contains('(restored $index)'));
     expect(service, contains('Refusing path outside Private storage'));
   });
 
