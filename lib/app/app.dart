@@ -36,7 +36,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
 
-    _checkOnboarding();
+    _hydrateStartupPrivacyAndOnboarding();
     unawaited(_loadLocalVisualTheme());
 
     SchedulerBinding.instance.addPostFrameCallback((_) {
@@ -71,16 +71,21 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     );
   }
 
-  Future<void> _checkOnboarding() async {
+  Future<void> _hydrateStartupPrivacyAndOnboarding() async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final done = prefs.getBool('onboarding_done') ?? false;
-      if (mounted) {
-        setState(() {
-          _onboardingDone = done;
-          _checking = false;
-        });
-      }
+      // The branded startup frame may render immediately, but never reveal
+      // the router until App Lock's persisted value is known. This prevents a
+      // protected-content flash while settings hydrate after process launch.
+      final prefsFuture = SharedPreferences.getInstance();
+      final settingsFuture = AppSettings.load();
+      final prefs = await prefsFuture;
+      final savedSettings = await settingsFuture;
+      if (!mounted) return;
+      ref.read(settingsProvider.notifier).hydrate(savedSettings);
+      setState(() {
+        _onboardingDone = prefs.getBool('onboarding_done') ?? false;
+        _checking = false;
+      });
     } catch (_) {
       if (mounted) {
         setState(() {
