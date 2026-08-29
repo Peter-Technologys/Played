@@ -9,36 +9,28 @@ import 'package:share_plus/share_plus.dart';
 import 'package:shimmer/shimmer.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/new_media_tracker.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/queue_screen.dart';
 import '../../playlists/playlist_screen.dart' show playlistsProvider;
 import '../../../shared/widgets/album_art_thumb.dart';
+import '../../../shared/widgets/media_new_indicator.dart';
 import '../../../shared/widgets/playlists_view.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
-
-// ── Filter pill state ─────────────────────────────────────────────────────
 
 enum _MusicFilter { allSongs, playlist, folder, album, artist }
 
 final _musicFilterProvider =
     StateProvider<_MusicFilter>((_) => _MusicFilter.allSongs);
-
-// ── Now-playing highlight ─────────────────────────────────────────────────
-
 final _musicNowPlayingIdProvider = StateProvider<String?>((_) => null);
 
-// ── Sorted songs provider ─────────────────────────────────────────────────
-// Derived provider so the sort runs once when data arrives, not on every
-// build. Riverpod caches the result until mediaLibraryProvider changes.
 final _sortedSongsProvider = Provider<List<MediaItem>>((ref) {
   final items = ref.watch(mediaLibraryProvider).valueOrNull ?? [];
   final songs = items.where((e) => !e.isVideo).toList();
   songs.sort((a, b) => a.title.compareTo(b.title));
   return songs;
 });
-
-// ── Music Tab Screen ──────────────────────────────────────────────────────
 
 class MusicTabScreen extends ConsumerStatefulWidget {
   const MusicTabScreen({super.key});
@@ -51,9 +43,6 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
     with WidgetsBindingObserver, AutomaticKeepAliveClientMixin {
   late final ScrollController _scrollCtrl;
   bool _isScrolled = false;
-
-  // Approximate height of header + pills + padding — content starts below this.
-  static const double _headerHeight = 152.0;
 
   @override
   bool get wantKeepAlive => true;
@@ -72,9 +61,6 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    // A4: Debounce is now handled inside MediaLibraryNotifier.backgroundRefresh()
-    // so both VideoTabScreen and MusicTabScreen can call it directly without
-    // double-firing when both tabs are alive via AutomaticKeepAliveClientMixin.
     if (state == AppLifecycleState.resumed) {
       ref.read(mediaLibraryProvider.notifier).backgroundRefresh();
     }
@@ -89,7 +75,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // required by AutomaticKeepAliveClientMixin
+    super.build(context);
     final libraryAsync = ref.watch(mediaLibraryProvider);
     final filter = ref.watch(_musicFilterProvider);
 
@@ -97,15 +83,12 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
       body: SafeArea(
         child: Stack(
           children: [
-            // ── Scrollable content fills the whole body ───────────────
             Positioned.fill(
               child: libraryAsync.when(
                 loading: () => libraryAsync.valueOrNull != null
-                    ? _buildContent(
-                        context, libraryAsync.valueOrNull!, filter)
+                    ? _buildContent(context, libraryAsync.valueOrNull!, filter)
                     : const _MusicShimmer(),
                 error: (e, _) {
-                  // A2: Show permission recovery screen for storage errors.
                   final msg = e.toString().toLowerCase();
                   if (msg.contains('permission')) {
                     return PermissionDeniedScreen(
@@ -129,10 +112,10 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
                 ),
               ),
             ),
-
-            // ── Floating blur header + filter pills ───────────────────
             Positioned(
-              top: 0, left: 0, right: 0,
+              top: 0,
+              left: 0,
+              right: 0,
               child: ClipRect(
                 child: BackdropFilter(
                   filter: _isScrolled
@@ -164,9 +147,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
 
   Widget _buildContent(
       BuildContext context, List<MediaItem> items, _MusicFilter filter) {
-    // Use the pre-sorted provider to avoid re-sorting on every build.
     final songs = ref.watch(_sortedSongsProvider);
-
     switch (filter) {
       case _MusicFilter.allSongs:
         return _SongListView(songs: songs, scrollController: _scrollCtrl);
@@ -186,8 +167,6 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
   }
 }
 
-// ── Header ────────────────────────────────────────────────────────────────
-
 class _MusicHeader extends ConsumerWidget {
   final AsyncValue<List<MediaItem>> libraryAsync;
   const _MusicHeader({required this.libraryAsync});
@@ -201,7 +180,8 @@ class _MusicHeader extends ConsumerWidget {
         libraryAsync.isLoading && libraryAsync.valueOrNull != null;
 
     return Padding(
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 8, 16, 0),
+      padding: EdgeInsets.fromLTRB(
+          16, MediaQuery.of(context).padding.top + 8, 16, 0),
       child: Row(
         children: [
           Container(
@@ -265,7 +245,6 @@ class _MusicHeader extends ConsumerWidget {
               ],
             ),
           ),
-          // Search
           _IconBtn(
             icon: Icons.search_rounded,
             onTap: () {
@@ -280,9 +259,7 @@ class _MusicHeader extends ConsumerWidget {
                     ref
                         .read(queueProvider.notifier)
                         .setQueue(queue, startIndex: index);
-                    ref
-                        .read(_musicNowPlayingIdProvider.notifier)
-                        .state = item.id;
+                    ref.read(_musicNowPlayingIdProvider.notifier).state = item.id;
                     context.push('/player/audio', extra: item);
                   },
                 ),
@@ -294,8 +271,6 @@ class _MusicHeader extends ConsumerWidget {
     );
   }
 }
-
-// ── Filter pills ──────────────────────────────────────────────────────────
 
 class _FilterPills extends ConsumerWidget {
   final _MusicFilter current;
@@ -328,8 +303,7 @@ class _FilterPills extends ConsumerWidget {
             },
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
                 gradient: isActive
                     ? const LinearGradient(
@@ -339,9 +313,7 @@ class _FilterPills extends ConsumerWidget {
                 color: isActive ? null : AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isActive
-                      ? Colors.transparent
-                      : AppColors.border,
+                  color: isActive ? Colors.transparent : AppColors.border,
                 ),
               ),
               child: Text(
@@ -361,8 +333,6 @@ class _FilterPills extends ConsumerWidget {
   }
 }
 
-// ── Song List View ────────────────────────────────────────────────────────
-
 class _SongListView extends ConsumerWidget {
   final List<MediaItem> songs;
   final ScrollController? scrollController;
@@ -379,22 +349,13 @@ class _SongListView extends ConsumerWidget {
       controller: scrollController,
       physics: const BouncingScrollPhysics(),
       slivers: [
-        // Top space so content starts below the floating header.
-        // Use dynamic status-bar height so notch/tall-bar devices are handled
-        // correctly (128 = header content ~60dp + filter pills ~56dp + gaps ~12dp).
         SliverToBoxAdapter(
           child: SizedBox(height: MediaQuery.of(context).padding.top + 128),
         ),
-
-        // Shuffle all action bar
-        SliverToBoxAdapter(
-          child: _ShuffleBar(songs: songs),
-        ),
-
-        // Song list
+        SliverToBoxAdapter(child: _ShuffleBar(songs: songs)),
         SliverPadding(
-          padding: EdgeInsets.fromLTRB(0, 4, 0,
-              MediaQuery.of(context).padding.bottom + 120),
+          padding: EdgeInsets.fromLTRB(
+              0, 4, 0, MediaQuery.of(context).padding.bottom + 120),
           sliver: SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, i) {
@@ -407,9 +368,7 @@ class _SongListView extends ConsumerWidget {
                     ref
                         .read(queueProvider.notifier)
                         .setQueue(songs, startIndex: i);
-                    ref
-                        .read(_musicNowPlayingIdProvider.notifier)
-                        .state = item.id;
+                    ref.read(_musicNowPlayingIdProvider.notifier).state = item.id;
                     context.push('/player/audio', extra: item);
                   },
                 );
@@ -425,8 +384,6 @@ class _SongListView extends ConsumerWidget {
   }
 }
 
-// ── Shuffle bar ───────────────────────────────────────────────────────────
-
 class _ShuffleBar extends ConsumerWidget {
   final List<MediaItem> songs;
   const _ShuffleBar({required this.songs});
@@ -440,14 +397,13 @@ class _ShuffleBar extends ConsumerWidget {
           if (songs.isEmpty) return;
           HapticFeedback.lightImpact();
           final shuffled = List.of(songs)..shuffle();
+          NewMediaTracker.instance.markSeen(shuffled.first).ignore();
           ref.read(queueProvider.notifier).setQueue(shuffled);
-          ref.read(_musicNowPlayingIdProvider.notifier).state =
-              shuffled.first.id;
+          ref.read(_musicNowPlayingIdProvider.notifier).state = shuffled.first.id;
           context.push('/player/audio', extra: shuffled.first);
         },
         child: Container(
-          padding:
-              const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           decoration: BoxDecoration(
             gradient: const LinearGradient(
               colors: [AppColors.accentViolet, AppColors.accent],
@@ -466,8 +422,7 @@ class _ShuffleBar extends ConsumerWidget {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.shuffle_rounded,
-                  color: Colors.white, size: 18),
+              const Icon(Icons.shuffle_rounded, color: Colors.white, size: 18),
               const SizedBox(width: 8),
               Text(
                 'Shuffle all (${songs.length})',
@@ -486,8 +441,6 @@ class _ShuffleBar extends ConsumerWidget {
   }
 }
 
-// ── Song Row ──────────────────────────────────────────────────────────────
-
 class _SongRow extends ConsumerWidget {
   final MediaItem item;
   final int index;
@@ -501,7 +454,10 @@ class _SongRow extends ConsumerWidget {
     final isPlaying = nowPlayingId == item.id;
 
     return InkWell(
-      onTap: onTap,
+      onTap: () {
+        NewMediaTracker.instance.markSeen(item).ignore();
+        onTap();
+      },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
         decoration: BoxDecoration(
@@ -522,7 +478,6 @@ class _SongRow extends ConsumerWidget {
           ),
           child: Row(
             children: [
-              // Track number
               SizedBox(
                 width: 28,
                 child: isPlaying
@@ -538,26 +493,32 @@ class _SongRow extends ConsumerWidget {
                       ),
               ),
               const SizedBox(width: 12),
-              // Album art
               AlbumArtThumb(albumArtPath: item.albumArtPath),
               const SizedBox(width: 12),
-              // Title + artist
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(
-                      item.title,
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: isPlaying
-                            ? AppColors.accentViolet
-                            : Theme.of(context).colorScheme.onSurface,
-                        fontFamily: 'Inter',
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            item.title,
+                            style: TextStyle(
+                              fontSize: 13,
+                              fontWeight: FontWeight.w600,
+                              color: isPlaying
+                                  ? AppColors.accentViolet
+                                  : Theme.of(context).colorScheme.onSurface,
+                              fontFamily: 'Inter',
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        MediaNewIndicator(item: item),
+                      ],
                     ),
                     const SizedBox(height: 2),
                     Text(
@@ -577,7 +538,6 @@ class _SongRow extends ConsumerWidget {
                 ),
               ),
               const SizedBox(width: 8),
-              // Duration
               SizedBox(
                 width: 40,
                 child: Text(
@@ -589,7 +549,6 @@ class _SongRow extends ConsumerWidget {
                   ),
                 ),
               ),
-              // 3-dot options menu
               GestureDetector(
                 onTap: () {
                   HapticFeedback.selectionClick();
@@ -622,8 +581,6 @@ class _SongRow extends ConsumerWidget {
     );
   }
 }
-
-// ── Song options bottom sheet ─────────────────────────────────────────────
 
 class _SongOptionsSheet extends ConsumerWidget {
   final MediaItem item;
@@ -702,8 +659,7 @@ class _SongOptionsSheet extends ConsumerWidget {
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           SnackBar(
-                            content: Text(
-                                '"${item.title}" added to ${pl.name}'),
+                            content: Text('"${item.title}" added to ${pl.name}'),
                             backgroundColor: AppColors.surface,
                           ),
                         );
@@ -723,23 +679,23 @@ class _SongOptionsSheet extends ConsumerWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // Handle
           Center(
             child: Container(
-              width: 40, height: 4,
+              width: 40,
+              height: 4,
               decoration: BoxDecoration(
                   color: AppColors.border,
                   borderRadius: BorderRadius.circular(2)),
             ),
           ),
           const SizedBox(height: 12),
-          // Title row
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
             child: Row(
               children: [
                 Container(
-                  width: 44, height: 44,
+                  width: 44,
+                  height: 44,
                   decoration: BoxDecoration(
                     color: AppColors.accentViolet.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(10),
@@ -754,15 +710,20 @@ class _SongOptionsSheet extends ConsumerWidget {
                     children: [
                       Text(item.title,
                           style: TextStyle(
-                            fontSize: 14, fontWeight: FontWeight.w700,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
                             color: Theme.of(context).colorScheme.onSurface,
                             fontFamily: 'Inter',
                           ),
-                          maxLines: 1, overflow: TextOverflow.ellipsis),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                       Text(item.artist ?? 'Unknown Artist',
                           style: TextStyle(
                               fontSize: 12,
-                              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6))),
+                              color: Theme.of(context)
+                                  .colorScheme
+                                  .onSurface
+                                  .withValues(alpha: 0.6))),
                     ],
                   ),
                 ),
@@ -800,10 +761,7 @@ class _SongOptionsSheet extends ConsumerWidget {
             color: AppColors.accentGreen,
             onTap: () async {
               Navigator.pop(context);
-              await Share.shareXFiles(
-                [XFile(item.filePath)],
-                text: item.title,
-              );
+              await Share.shareXFiles([XFile(item.filePath)], text: item.title);
             },
           ),
           _OptionTile(
@@ -907,7 +865,8 @@ class _OptionTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListTile(
       leading: Container(
-        width: 36, height: 36,
+        width: 36,
+        height: 36,
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(10),
@@ -918,7 +877,8 @@ class _OptionTile extends StatelessWidget {
           style: TextStyle(
             fontSize: 14,
             color: Theme.of(context).colorScheme.onSurface,
-            fontFamily: 'Inter', fontWeight: FontWeight.w500,
+            fontFamily: 'Inter',
+            fontWeight: FontWeight.w500,
           )),
       onTap: onTap,
       contentPadding: const EdgeInsets.symmetric(horizontal: 20),
@@ -926,10 +886,6 @@ class _OptionTile extends StatelessWidget {
     );
   }
 }
-
-// AlbumArtThumb is now in lib/shared/widgets/album_art_thumb.dart
-
-// ── Mini waveform ─────────────────────────────────────────────────────────
 
 class _MiniWave extends StatelessWidget {
   const _MiniWave();
@@ -960,10 +916,6 @@ class _MiniWave extends StatelessWidget {
     );
   }
 }
-
-// PlaylistsView is now in lib/shared/widgets/playlists_view.dart
-
-// ── Folders view ──────────────────────────────────────────────────────────
 
 class _FoldersView extends ConsumerWidget {
   final List<MediaItem> songs;
@@ -998,14 +950,14 @@ class _FoldersView extends ConsumerWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
+      padding: EdgeInsets.fromLTRB(16,
+          MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final path = keys[i];
         final files = folders[path]!;
         final name = _folderName(path);
-
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
@@ -1026,22 +978,23 @@ class _FoldersView extends ConsumerWidget {
               child: const Icon(Icons.folder_rounded,
                   color: AppColors.accentViolet, size: 24),
             ),
-            title: Text(
-              name,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontFamily: 'Inter',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            title: Text(name,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontFamily: 'Inter',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             subtitle: Text(
               '${files.length} song${files.length == 1 ? '' : 's'}',
               style: TextStyle(
                   fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
@@ -1056,11 +1009,11 @@ class _FoldersView extends ConsumerWidget {
   }
 }
 
-// Public so it can be referenced from router.dart via GoRoute.
 class MusicFolderDetailPage extends ConsumerWidget {
   final String name;
   final List<MediaItem> items;
-  const MusicFolderDetailPage({super.key, required this.name, required this.items});
+  const MusicFolderDetailPage(
+      {super.key, required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1074,15 +1027,13 @@ class MusicFolderDetailPage extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          name,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 16,
-          ),
-        ),
+        title: Text(name,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+            )),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -1106,9 +1057,7 @@ class MusicFolderDetailPage extends ConsumerWidget {
             index: i,
             onTap: () {
               HapticFeedback.lightImpact();
-              ref
-                  .read(queueProvider.notifier)
-                  .setQueue(items, startIndex: i);
+              ref.read(queueProvider.notifier).setQueue(items, startIndex: i);
               context.push('/player/audio', extra: item);
             },
           );
@@ -1117,8 +1066,6 @@ class MusicFolderDetailPage extends ConsumerWidget {
     );
   }
 }
-
-// ── Albums view ───────────────────────────────────────────────────────────
 
 class _AlbumsView extends StatelessWidget {
   final List<MediaItem> songs;
@@ -1148,13 +1095,13 @@ class _AlbumsView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
+      padding: EdgeInsets.fromLTRB(16,
+          MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final album = keys[i];
         final tracks = albums[album]!;
-
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
@@ -1179,22 +1126,23 @@ class _AlbumsView extends StatelessWidget {
               child: const Icon(Icons.album_rounded,
                   color: Colors.white, size: 22),
             ),
-            title: Text(
-              album,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontFamily: 'Inter',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            title: Text(album,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontFamily: 'Inter',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             subtitle: Text(
               '${tracks.length} track${tracks.length == 1 ? '' : 's'}',
               style: TextStyle(
                   fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
@@ -1209,11 +1157,11 @@ class _AlbumsView extends StatelessWidget {
   }
 }
 
-// Public so it can be referenced from router.dart via GoRoute.
 class MusicAlbumDetailPage extends ConsumerWidget {
   final String name;
   final List<MediaItem> items;
-  const MusicAlbumDetailPage({super.key, required this.name, required this.items});
+  const MusicAlbumDetailPage(
+      {super.key, required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1227,15 +1175,13 @@ class MusicAlbumDetailPage extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          name,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 16,
-          ),
-        ),
+        title: Text(name,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+            )),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -1269,8 +1215,6 @@ class MusicAlbumDetailPage extends ConsumerWidget {
   }
 }
 
-// ── Artists view ──────────────────────────────────────────────────────────
-
 class _ArtistsView extends StatelessWidget {
   final List<MediaItem> songs;
   final ScrollController? scrollController;
@@ -1299,13 +1243,13 @@ class _ArtistsView extends StatelessWidget {
 
     return ListView.builder(
       controller: scrollController,
-      padding: EdgeInsets.fromLTRB(16, MediaQuery.of(context).padding.top + 136, 16,
+      padding: EdgeInsets.fromLTRB(16,
+          MediaQuery.of(context).padding.top + 136, 16,
           MediaQuery.of(context).padding.bottom + 90),
       itemCount: keys.length,
       itemBuilder: (context, i) {
         final artist = keys[i];
         final tracks = artists[artist]!;
-
         return Container(
           margin: const EdgeInsets.only(bottom: 10),
           child: ListTile(
@@ -1326,22 +1270,23 @@ class _ArtistsView extends StatelessWidget {
               child: const Icon(Icons.person_rounded,
                   color: AppColors.accentViolet, size: 22),
             ),
-            title: Text(
-              artist,
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: Theme.of(context).colorScheme.onSurface,
-                fontFamily: 'Inter',
-              ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
+            title: Text(artist,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: Theme.of(context).colorScheme.onSurface,
+                  fontFamily: 'Inter',
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis),
             subtitle: Text(
               '${tracks.length} song${tracks.length == 1 ? '' : 's'}',
               style: TextStyle(
                   fontSize: 11,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6)),
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: 0.6)),
             ),
             trailing: const Icon(Icons.chevron_right_rounded,
                 color: AppColors.textSecondary, size: 20),
@@ -1356,11 +1301,11 @@ class _ArtistsView extends StatelessWidget {
   }
 }
 
-// Public so it can be referenced from router.dart via GoRoute.
 class MusicArtistDetailPage extends ConsumerWidget {
   final String name;
   final List<MediaItem> items;
-  const MusicArtistDetailPage({super.key, required this.name, required this.items});
+  const MusicArtistDetailPage(
+      {super.key, required this.name, required this.items});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1374,15 +1319,13 @@ class MusicArtistDetailPage extends ConsumerWidget {
               color: Theme.of(context).colorScheme.onSurface),
           onPressed: () => Navigator.pop(context),
         ),
-        title: Text(
-          name,
-          style: TextStyle(
-            fontFamily: 'Inter',
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontSize: 16,
-          ),
-        ),
+        title: Text(name,
+            style: TextStyle(
+              fontFamily: 'Inter',
+              fontWeight: FontWeight.w700,
+              color: Theme.of(context).colorScheme.onSurface,
+              fontSize: 16,
+            )),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 16),
@@ -1415,8 +1358,6 @@ class MusicArtistDetailPage extends ConsumerWidget {
     );
   }
 }
-
-// ── Search delegate ───────────────────────────────────────────────────────
 
 class _MusicSearchDelegate extends SearchDelegate<MediaItem?> {
   final List<MediaItem> songs;
@@ -1498,8 +1439,6 @@ class _MusicSearchDelegate extends SearchDelegate<MediaItem?> {
   }
 }
 
-// ── Shared helpers ────────────────────────────────────────────────────────
-
 class _IconBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
@@ -1558,7 +1497,10 @@ class _EmptyState extends StatelessWidget {
             'Songs will appear here after scanning.',
             style: TextStyle(
               fontSize: 12,
-              color: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.6),
+              color: Theme.of(context)
+                  .colorScheme
+                  .onSurface
+                  .withValues(alpha: 0.6),
               fontFamily: 'Inter',
             ),
           ),
@@ -1663,8 +1605,8 @@ class _ErrorView extends StatelessWidget {
             GestureDetector(
               onTap: onRetry,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 24, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 decoration: BoxDecoration(
                   color: AppColors.accentViolet,
                   borderRadius: BorderRadius.circular(12),
