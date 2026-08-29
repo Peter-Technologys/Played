@@ -31,11 +31,43 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   final _service = OtyaSupportService.instance;
 
   final List<_ChatEntry> _messages = [];
+  List<OtyaAiModel> _models = const [];
+  OtyaAiModel? _selectedModel;
   bool _busy = false;
+  bool _loadingModels = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadModels();
+  }
+
+  Future<void> _loadModels() async {
+    try {
+      final models = await _service.models();
+      if (!mounted) return;
+      setState(() {
+        _models = models;
+        _selectedModel = models.isEmpty ? null : models.first;
+        _loadingModels = false;
+      });
+    } catch (_) {
+      if (mounted) setState(() => _loadingModels = false);
+    }
+  }
 
   Future<void> _ask([String? preset]) async {
     final question = (preset ?? _controller.text).trim();
     if (question.isEmpty || _busy) return;
+
+    final history = _messages
+        .map(
+          (message) => <String, String>{
+            'role': message.fromUser ? 'user' : 'assistant',
+            'content': message.text,
+          },
+        )
+        .toList(growable: false);
 
     HapticFeedback.selectionClick();
     _controller.clear();
@@ -46,9 +78,21 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
     _scrollToBottom();
 
     try {
-      final reply = await _service.ask(question);
+      final reply = await _service.ask(
+        question,
+        history: history,
+        model: _selectedModel?.id,
+      );
       if (!mounted) return;
       setState(() {
+        if (reply.modelId != null && _models.isNotEmpty) {
+          for (final candidate in _models) {
+            if (candidate.id == reply.modelId) {
+              _selectedModel = candidate;
+              break;
+            }
+          }
+        }
         _messages.add(
           _ChatEntry(
             text: reply.answer,
@@ -162,6 +206,13 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
     _scrollToBottom();
   }
 
+  void _newChat() {
+    HapticFeedback.selectionClick();
+    setState(() => _messages.clear());
+    _controller.clear();
+    _focusNode.requestFocus();
+  }
+
   void _scrollToBottom() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted || !_scrollController.hasClients) return;
@@ -192,17 +243,74 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final modelLabel = _selectedModel?.name ??
+        (_loadingModels ? 'Loading model…' : 'OTYA AI');
+
     return Scaffold(
       appBar: AppBar(
         titleSpacing: 16,
-        title: const Row(
+        title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.auto_awesome_rounded, size: 19),
-            SizedBox(width: 8),
-            Text('Ask OTYA'),
+            const Icon(Icons.auto_awesome_rounded, size: 19),
+            const SizedBox(width: 8),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('Ask OTYA'),
+                Text(
+                  modelLabel,
+                  style: TextStyle(
+                    fontSize: 10.5,
+                    fontWeight: FontWeight.w500,
+                    color: cs.onSurface.withValues(alpha: .55),
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
+        actions: [
+          if (_models.length > 1)
+            PopupMenuButton<String>(
+              tooltip: 'Choose AI model',
+              icon: const Icon(Icons.tune_rounded),
+              onSelected: (id) {
+                final model = _models.where((item) => item.id == id).firstOrNull;
+                if (model != null) setState(() => _selectedModel = model);
+              },
+              itemBuilder: (context) => _models
+                  .map(
+                    (model) => PopupMenuItem<String>(
+                      value: model.id,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            model.name,
+                            style: const TextStyle(fontWeight: FontWeight.w700),
+                          ),
+                          if (model.provider.isNotEmpty)
+                            Text(
+                              '${model.provider}${model.tier.isEmpty ? '' : ' · ${model.tier}'}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          if (_messages.isNotEmpty)
+            IconButton(
+              tooltip: 'New chat',
+              onPressed: _busy ? null : _newChat,
+              icon: const Icon(Icons.edit_square),
+            ),
+        ],
       ),
       body: SafeArea(
         child: Column(
