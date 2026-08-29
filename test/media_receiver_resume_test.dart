@@ -4,15 +4,19 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:otya_player/features/air_drop/data/media_receiver.dart';
 
 void main() {
-  test('MediaReceiver resumes from an existing partial file', () async {
+  test('MediaReceiver resumes only a matching transfer partial', () async {
     final source = List<int>.generate(4096, (index) => index % 251);
     final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
     final target = File('${temp.path}/received.bin');
     const existing = 1379;
-    await target.writeAsBytes(source.take(existing).toList(), flush: true);
 
     String? receivedRange;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final url = 'http://127.0.0.1:${server.port}/media?t=test';
+    await target.writeAsBytes(source.take(existing).toList(), flush: true);
+    await File('${target.path}.otya-transfer')
+        .writeAsString('127.0.0.1:${server.port}/media|test', flush: true);
+
     server.listen((request) async {
       receivedRange = request.headers.value(HttpHeaders.rangeHeader);
       final start = receivedRange == null
@@ -35,13 +39,47 @@ void main() {
 
     try {
       final receiver = MediaReceiver();
+      final result = await receiver.download(url: url, savePath: target.path);
+
+      expect(receivedRange, 'bytes=$existing-');
+      expect(result.path, target.path);
+      expect(await result.readAsBytes(), source);
+      expect(await File('${target.path}.otya-transfer').exists(), isFalse);
+    } finally {
+      await server.close(force: true);
+      await temp.delete(recursive: true);
+    }
+  });
+
+  test('MediaReceiver does not append a different transfer to same-name file', () async {
+    final oldBytes = List<int>.filled(700, 7);
+    final newBytes = List<int>.generate(2048, (index) => (index * 7) % 253);
+    final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
+    final target = File('${temp.path}/received.bin');
+    await target.writeAsBytes(oldBytes, flush: true);
+
+    String? receivedRange;
+    final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    server.listen((request) async {
+      receivedRange = request.headers.value(HttpHeaders.rangeHeader);
+      request.response
+        ..statusCode = HttpStatus.ok
+        ..headers.set(HttpHeaders.contentLengthHeader, newBytes.length)
+        ..add(newBytes);
+      await request.response.close();
+    });
+
+    try {
+      final receiver = MediaReceiver();
       final result = await receiver.download(
-        url: 'http://127.0.0.1:${server.port}/media?t=test',
+        url: 'http://127.0.0.1:${server.port}/media?t=new-transfer',
         savePath: target.path,
       );
 
-      expect(receivedRange, 'bytes=$existing-');
-      expect(await result.readAsBytes(), source);
+      expect(receivedRange, isNull);
+      expect(result.path, isNot(target.path));
+      expect(await target.readAsBytes(), oldBytes);
+      expect(await result.readAsBytes(), newBytes);
     } finally {
       await server.close(force: true);
       await temp.delete(recursive: true);
@@ -52,9 +90,13 @@ void main() {
     final source = List<int>.generate(2048, (index) => (index * 7) % 253);
     final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
     final target = File('${temp.path}/received.bin');
-    await target.writeAsBytes(const [1, 2, 3, 4, 5], flush: true);
 
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
+    final url = 'http://127.0.0.1:${server.port}/media?t=range-ignore';
+    await target.writeAsBytes(const [1, 2, 3, 4, 5], flush: true);
+    await File('${target.path}.otya-transfer')
+        .writeAsString('127.0.0.1:${server.port}/media|range-ignore', flush: true);
+
     server.listen((request) async {
       request.response
         ..statusCode = HttpStatus.ok
@@ -65,11 +107,9 @@ void main() {
 
     try {
       final receiver = MediaReceiver();
-      final result = await receiver.download(
-        url: 'http://127.0.0.1:${server.port}/media',
-        savePath: target.path,
-      );
+      final result = await receiver.download(url: url, savePath: target.path);
 
+      expect(result.path, target.path);
       expect(await result.readAsBytes(), source);
     } finally {
       await server.close(force: true);
