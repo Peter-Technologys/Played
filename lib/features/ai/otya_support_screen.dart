@@ -11,47 +11,72 @@ class OtyaSupportScreen extends StatefulWidget {
   State<OtyaSupportScreen> createState() => _OtyaSupportScreenState();
 }
 
+class _ChatEntry {
+  final String text;
+  final bool fromUser;
+  final bool canHandoff;
+
+  const _ChatEntry({
+    required this.text,
+    required this.fromUser,
+    this.canHandoff = false,
+  });
+}
+
 class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   final _controller = TextEditingController();
   final _emailController = TextEditingController();
+  final _scrollController = ScrollController();
+  final _focusNode = FocusNode();
   final _service = OtyaSupportService.instance;
 
-  String? _answer;
-  String? _lastQuestion;
-  String? _error;
+  final List<_ChatEntry> _messages = [];
   bool _busy = false;
-  bool _handoffAvailable = false;
 
   Future<void> _ask([String? preset]) async {
     final question = (preset ?? _controller.text).trim();
     if (question.isEmpty || _busy) return;
-    _controller.text = question;
+
     HapticFeedback.selectionClick();
+    _controller.clear();
     setState(() {
       _busy = true;
-      _error = null;
-      _answer = null;
-      _handoffAvailable = false;
-      _lastQuestion = question;
+      _messages.add(_ChatEntry(text: question, fromUser: true));
     });
+    _scrollToBottom();
+
     try {
       final reply = await _service.ask(question);
       if (!mounted) return;
       setState(() {
-        _answer = reply.answer;
-        _handoffAvailable = reply.handoffAvailable || !reply.inScope;
+        _messages.add(
+          _ChatEntry(
+            text: reply.answer,
+            fromUser: false,
+            canHandoff: reply.handoffAvailable,
+          ),
+        );
       });
     } catch (_) {
       if (!mounted) return;
-      setState(() => _error = 'Ask OTYA is unavailable right now. Your local player still works normally.');
+      setState(() {
+        _messages.add(
+          const _ChatEntry(
+            text:
+                'I cannot reach the online answer service right now. Your local music, video, files and playback still work normally.',
+            fromUser: false,
+          ),
+        );
+      });
     } finally {
-      if (mounted) setState(() => _busy = false);
+      if (mounted) {
+        setState(() => _busy = false);
+        _scrollToBottom();
+      }
     }
   }
 
-  Future<void> _handoff() async {
-    final question = _lastQuestion?.trim() ?? '';
-    if (question.isEmpty) return;
+  Future<void> _handoff(String question) async {
     final sent = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -59,14 +84,25 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       showDragHandle: true,
       backgroundColor: AppColors.cardOf(context),
       builder: (sheetContext) => Padding(
-        padding: EdgeInsets.fromLTRB(20, 8, 20, MediaQuery.viewInsetsOf(sheetContext).bottom + 24),
+        padding: EdgeInsets.fromLTRB(
+          20,
+          8,
+          20,
+          MediaQuery.viewInsetsOf(sheetContext).bottom + 24,
+        ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Talk to OTYA support', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
+            const Text(
+              'Talk to OTYA support',
+              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            ),
             const SizedBox(height: 7),
-            const Text('Enter your email. OTYA will send your question to support and create a ticket.', style: TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+            const Text(
+              'Enter your email. OTYA will send this question to PeterSmart Link support and create a ticket.',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
             const SizedBox(height: 16),
             TextField(
               controller: _emailController,
@@ -76,7 +112,10 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                 labelText: 'Email',
                 filled: true,
                 fillColor: Theme.of(sheetContext).scaffoldBackgroundColor,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(16), borderSide: BorderSide.none),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
               ),
             ),
             const SizedBox(height: 14),
@@ -91,108 +130,175 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         ),
       ),
     );
+
     if (sent != true || !mounted) return;
     final email = _emailController.text.trim();
-    if (!email.contains('@')) {
-      setState(() => _error = 'Enter a valid email address.');
+    if (!email.contains('@') || !email.contains('.')) {
+      _appendAssistant('Enter a valid email address before sending to support.');
       return;
     }
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
+
+    setState(() => _busy = true);
     try {
       final ticket = await _service.handoff(question: question, email: email);
       if (!mounted) return;
-      setState(() {
-        _answer = 'Your question was sent to OTYA support. Ticket ${ticket.id}. We can reply to $email.';
-        _handoffAvailable = false;
-      });
+      _appendAssistant(
+        'Your question was sent to OTYA support. Ticket ${ticket.id}. Support can reply to $email.',
+      );
     } catch (_) {
-      if (mounted) setState(() => _error = 'Could not send the support request. Try again when you are online.');
+      if (mounted) {
+        _appendAssistant(
+          'I could not send the support request. Try again when you are online.',
+        );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
+  }
+
+  void _appendAssistant(String text) {
+    if (!mounted) return;
+    setState(() => _messages.add(_ChatEntry(text: text, fromUser: false)));
+    _scrollToBottom();
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+      _scrollController.animateTo(
+        _scrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 260),
+        curve: Curves.easeOutCubic,
+      );
+    });
+  }
+
+  String _questionForAssistantAt(int index) {
+    for (var i = index - 1; i >= 0; i--) {
+      if (_messages[i].fromUser) return _messages[i].text;
+    }
+    return '';
   }
 
   @override
   void dispose() {
     _controller.dispose();
     _emailController.dispose();
+    _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('Ask OTYA')),
-      body: SafeArea(
-        child: ListView(
-          padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
+      appBar: AppBar(
+        titleSpacing: 16,
+        title: const Row(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Text('How can OTYA help?', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -1, color: AppColors.textPrimaryOf(context))),
-            const SizedBox(height: 8),
-            const Text('Ask about playback, music, video, files, transfer, converter, private media, themes, storage, account, updates or troubleshooting.', style: TextStyle(fontSize: 14, height: 1.45, color: AppColors.textSecondary)),
-            const SizedBox(height: 20),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: [
-                _Prompt(label: 'Videos missing', onTap: () => _ask('Why are some videos missing from OTYA?')),
-                _Prompt(label: 'Transfer help', onTap: () => _ask('How do I send or receive files with OTYA Transfer?')),
-                _Prompt(label: 'Subtitles', onTap: () => _ask('How do I add subtitles to a video?')),
-                _Prompt(label: 'Audio problem', onTap: () => _ask('Why is my music not playing correctly?')),
-              ],
+            Icon(Icons.auto_awesome_rounded, size: 19),
+            SizedBox(width: 8),
+            Text('Ask OTYA'),
+          ],
+        ),
+      ),
+      body: SafeArea(
+        child: Column(
+          children: [
+            Expanded(
+              child: _messages.isEmpty
+                  ? _Welcome(onPrompt: _ask)
+                  : ListView.builder(
+                      controller: _scrollController,
+                      keyboardDismissBehavior:
+                          ScrollViewKeyboardDismissBehavior.onDrag,
+                      padding: const EdgeInsets.fromLTRB(16, 10, 16, 28),
+                      itemCount: _messages.length + (_busy ? 1 : 0),
+                      itemBuilder: (context, index) {
+                        if (index == _messages.length) {
+                          return const _ThinkingRow();
+                        }
+                        final message = _messages[index];
+                        return _MessageRow(
+                          message: message,
+                          onCopy: message.fromUser
+                              ? null
+                              : () {
+                                  Clipboard.setData(
+                                    ClipboardData(text: message.text),
+                                  );
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    const SnackBar(
+                                      content: Text('Answer copied'),
+                                      duration: Duration(seconds: 1),
+                                    ),
+                                  );
+                                },
+                          onHandoff: message.canHandoff
+                              ? () => _handoff(
+                                    _questionForAssistantAt(index),
+                                  )
+                              : null,
+                        );
+                      },
+                    ),
             ),
-            const SizedBox(height: 22),
-            TextField(
-              controller: _controller,
-              minLines: 2,
-              maxLines: 5,
-              textInputAction: TextInputAction.newline,
-              decoration: InputDecoration(
-                hintText: 'Ask about OTYA…',
-                filled: true,
-                fillColor: AppColors.cardOf(context),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: AppColors.borderOf(context))),
-                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide(color: AppColors.borderOf(context))),
+            Container(
+              padding: EdgeInsets.fromLTRB(
+                12,
+                10,
+                12,
+                10 + MediaQuery.of(context).padding.bottom,
               ),
-            ),
-            const SizedBox(height: 10),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: _busy ? null : () => _ask(),
-                icon: _busy ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome_rounded),
-                label: Text(_busy ? 'Checking…' : 'Ask OTYA'),
-              ),
-            ),
-            if (_error != null) ...[
-              const SizedBox(height: 16),
-              Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
-            ],
-            if (_answer != null) ...[
-              const SizedBox(height: 22),
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: AppColors.cardOf(context),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.borderOf(context)),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                border: Border(
+                  top: BorderSide(color: AppColors.borderOf(context)),
                 ),
-                child: Text(_answer!, style: TextStyle(fontSize: 14, height: 1.55, color: AppColors.textPrimaryOf(context))),
               ),
-            ],
-            if (_handoffAvailable) ...[
-              const SizedBox(height: 12),
-              OutlinedButton.icon(
-                onPressed: _busy ? null : _handoff,
-                icon: const Icon(Icons.support_agent_rounded),
-                label: const Text('Talk to support'),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _controller,
+                      focusNode: _focusNode,
+                      minLines: 1,
+                      maxLines: 5,
+                      textCapitalization: TextCapitalization.sentences,
+                      keyboardType: TextInputType.multiline,
+                      textInputAction: TextInputAction.newline,
+                      decoration: InputDecoration(
+                        hintText: 'Message OTYA',
+                        filled: true,
+                        fillColor: AppColors.cardOf(context),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(22),
+                          borderSide: BorderSide.none,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  IconButton.filled(
+                    tooltip: 'Send',
+                    onPressed: _busy ? null : () => _ask(),
+                    icon: _busy
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.arrow_upward_rounded),
+                  ),
+                ],
               ),
-            ],
-            const SizedBox(height: 24),
-            const Text('Ask OTYA does not need access to your local music or video list. Never send passwords, verification codes or secret keys.', style: TextStyle(fontSize: 11.5, height: 1.4, color: AppColors.textSecondary)),
+            ),
           ],
         ),
       ),
@@ -200,15 +306,224 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   }
 }
 
-class _Prompt extends StatelessWidget {
-  final String label;
-  final VoidCallback onTap;
-  const _Prompt({required this.label, required this.onTap});
+class _Welcome extends StatelessWidget {
+  final ValueChanged<String> onPrompt;
+  const _Welcome({required this.onPrompt});
 
   @override
-  Widget build(BuildContext context) => ActionChip(
-        label: Text(label),
-        avatar: const Icon(Icons.help_outline_rounded, size: 17),
-        onPressed: onTap,
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final prompts = <(String, String)>[
+      ('Ask anything', 'Who is the president of Uganda?'),
+      ('Find help', 'How do I add subtitles to a video?'),
+      ('Transfer', 'How do I send a large video with OTYA Transfer?'),
+      ('Playback', 'Why can a video have picture but no sound?'),
+    ];
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(20, 28, 20, 36),
+      children: [
+        Container(
+          width: 52,
+          height: 52,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: .12),
+            borderRadius: BorderRadius.circular(18),
+          ),
+          child: const Icon(
+            Icons.auto_awesome_rounded,
+            color: AppColors.accent,
+            size: 25,
+          ),
+        ),
+        const SizedBox(height: 22),
+        Text(
+          'What can I help with?',
+          style: TextStyle(
+            fontSize: 29,
+            height: 1.08,
+            letterSpacing: -1,
+            fontWeight: FontWeight.w900,
+            color: cs.onSurface,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Text(
+          'Ask a general question or get help with OTYA, playback, files, transfer, converter, storage and your account.',
+          style: TextStyle(
+            fontSize: 14,
+            height: 1.5,
+            color: cs.onSurface.withValues(alpha: .62),
+          ),
+        ),
+        const SizedBox(height: 26),
+        ...prompts.map(
+          (prompt) => Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => onPrompt(prompt.$2),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  border: Border.all(color: AppColors.borderOf(context)),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            prompt.$1,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            prompt.$2,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: cs.onSurface.withValues(alpha: .62),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Icon(Icons.arrow_forward_rounded, size: 18),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 16),
+        Text(
+          'Local playback and your media library do not depend on Ask OTYA. Never send passwords, OTPs, recovery codes or secret keys.',
+          style: TextStyle(
+            fontSize: 11.5,
+            height: 1.45,
+            color: cs.onSurface.withValues(alpha: .48),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _MessageRow extends StatelessWidget {
+  final _ChatEntry message;
+  final VoidCallback? onCopy;
+  final VoidCallback? onHandoff;
+
+  const _MessageRow({
+    required this.message,
+    this.onCopy,
+    this.onHandoff,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    if (message.fromUser) {
+      return Padding(
+        padding: const EdgeInsets.fromLTRB(42, 8, 0, 12),
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
+            decoration: BoxDecoration(
+              color: cs.onSurface.withValues(alpha: .08),
+              borderRadius: BorderRadius.circular(18),
+            ),
+            child: Text(
+              message.text,
+              style: TextStyle(
+                fontSize: 14,
+                height: 1.42,
+                color: cs.onSurface,
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(2, 4, 20, 18),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Row(
+            children: [
+              Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.accent),
+              SizedBox(width: 7),
+              Text(
+                'OTYA',
+                style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
+              ),
+            ],
+          ),
+          const SizedBox(height: 9),
+          SelectableText(
+            message.text,
+            style: TextStyle(
+              fontSize: 14,
+              height: 1.58,
+              color: cs.onSurface,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Wrap(
+            spacing: 6,
+            children: [
+              if (onCopy != null)
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Copy answer',
+                  onPressed: onCopy,
+                  icon: const Icon(Icons.content_copy_rounded, size: 17),
+                ),
+              if (onHandoff != null)
+                TextButton.icon(
+                  onPressed: onHandoff,
+                  icon: const Icon(Icons.support_agent_rounded, size: 17),
+                  label: const Text('Talk to support'),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ThinkingRow extends StatelessWidget {
+  const _ThinkingRow();
+
+  @override
+  Widget build(BuildContext context) => const Padding(
+        padding: EdgeInsets.fromLTRB(2, 4, 20, 20),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.accent),
+            SizedBox(width: 10),
+            SizedBox.square(
+              dimension: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+            SizedBox(width: 9),
+            Text(
+              'Thinking…',
+              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
+            ),
+          ],
+        ),
       );
 }
