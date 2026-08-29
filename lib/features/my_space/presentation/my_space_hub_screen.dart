@@ -5,10 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
+import '../../../core/models/media_item.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/feature_discovery_service.dart';
+import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/remote_control_service.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
+import 'providers/my_space_provider.dart';
 
 class _MeFeature {
   final String key;
@@ -27,7 +30,7 @@ class _MeFeature {
 class MySpaceHubScreen extends ConsumerWidget {
   const MySpaceHubScreen({super.key});
 
-  List<_MeFeature> _features(BuildContext context) {
+  List<_MeFeature> _features(BuildContext context, WidgetRef ref) {
     final remote = RemoteControlService.instance;
     return [
       _MeFeature(
@@ -59,7 +62,7 @@ class MySpaceHubScreen extends ConsumerWidget {
         label: 'Converter',
         action: (_) => () async {
           await FeatureDiscoveryService.instance.markOpened('converter');
-          if (context.mounted) _showConverter(context);
+          if (context.mounted) _showConverter(context, ref);
         },
       ),
       _MeFeature(
@@ -99,7 +102,7 @@ class MySpaceHubScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final displayName = ref.watch(displayNameProvider);
     final photoUrl = ref.watch(photoUrlProvider);
-    final features = _features(context);
+    final features = _features(context, ref);
 
     return WallpaperScaffold(
       body: SafeArea(
@@ -164,7 +167,8 @@ class MySpaceHubScreen extends ConsumerWidget {
                   _ListRow(
                     icon: Icons.settings_rounded,
                     title: 'Settings',
-                    subtitle: 'Playback, video, audio, notifications and permissions',
+                    subtitle:
+                        'Playback, video, audio, notifications and permissions',
                     onTap: () => context.push('/settings'),
                     last: true,
                   ),
@@ -179,7 +183,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                   _ListRow(
                     icon: Icons.auto_awesome_rounded,
                     title: 'Ask OTYA',
-                    subtitle: 'Get help with OTYA features and problems',
+                    subtitle: 'Ask questions or get help with OTYA',
                     onTap: () => context.push('/support'),
                   ),
                   _ListRow(
@@ -218,31 +222,228 @@ class MySpaceHubScreen extends ConsumerWidget {
     );
   }
 
-  static void _showConverter(BuildContext context) {
-    _showSheet(
-      context,
-      title: 'Converter',
-      subtitle: 'Convert media locally without adding another main tab.',
-      children: [
-        _SheetAction(
-          icon: Icons.music_note_rounded,
-          title: 'Video → audio',
-          subtitle: 'Open a video and choose Extract audio from its menu.',
-          onTap: () {
-            Navigator.pop(context);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Open a video, tap ⋮, then choose Extract audio.'),
-              ),
-            );
-          },
-        ),
-        const _SheetAction(
-          icon: Icons.offline_bolt_rounded,
-          title: 'Works locally',
-          subtitle: 'Your media does not need to be uploaded for conversion.',
-        ),
-      ],
+  static void _showConverter(BuildContext context, WidgetRef ref) {
+    final videos = (ref.read(mediaLibraryProvider).valueOrNull ?? const <MediaItem>[])
+        .where((item) => item.isVideo)
+        .toList()
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+
+    showModalBottomSheet<void>(
+      context: context,
+      useSafeArea: true,
+      isScrollControlled: true,
+      backgroundColor: AppColors.cardOf(context),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (sheetContext) {
+        String? busyId;
+        String? resultPath;
+        double progress = 0;
+        return StatefulBuilder(
+          builder: (context, setState) => SizedBox(
+            height: MediaQuery.of(context).size.height * .78,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 10),
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: AppColors.borderOf(context),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Converter',
+                        style: TextStyle(
+                          fontSize: 22,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.textPrimaryOf(context),
+                        ),
+                      ),
+                      const SizedBox(height: 5),
+                      const Text(
+                        'Choose a video to extract its audio locally. No upload or account is required.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (busyId != null) ...[
+                        const SizedBox(height: 14),
+                        LinearProgressIndicator(
+                          value: progress > 0 ? progress : null,
+                          minHeight: 5,
+                        ),
+                        const SizedBox(height: 6),
+                        const Text(
+                          'Extracting audio…',
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                      if (resultPath != null) ...[
+                        const SizedBox(height: 14),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).scaffoldBackgroundColor,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(color: AppColors.borderOf(context)),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.check_circle_rounded,
+                                color: Color(0xFF24D789),
+                              ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  'Audio saved as ${resultPath!.split('/').last}',
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppColors.borderOf(context)),
+                Expanded(
+                  child: videos.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(28),
+                            child: Text(
+                              'No videos found. Add or download a video first.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(color: AppColors.textSecondary),
+                            ),
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(10, 8, 10, 24),
+                          itemCount: videos.length,
+                          itemBuilder: (context, index) {
+                            final item = videos[index];
+                            final active = busyId == item.id;
+                            return ListTile(
+                              enabled: busyId == null,
+                              leading: Container(
+                                width: 46,
+                                height: 46,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).scaffoldBackgroundColor,
+                                  borderRadius: BorderRadius.circular(14),
+                                ),
+                                child: const Icon(Icons.movie_outlined),
+                              ),
+                              title: Text(
+                                item.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                              subtitle: Text(
+                                '${item.formattedDuration} · ${item.formattedSize}',
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              trailing: active
+                                  ? const SizedBox.square(
+                                      dimension: 20,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                      ),
+                                    )
+                                  : const Icon(
+                                      Icons.music_note_rounded,
+                                      size: 19,
+                                    ),
+                              onTap: () async {
+                                setState(() {
+                                  busyId = item.id;
+                                  resultPath = null;
+                                  progress = .1;
+                                });
+                                final output =
+                                    await FfmpegService.instance.extractAudio(
+                                  videoPath: item.filePath,
+                                  onProgress: (value) {
+                                    if (sheetContext.mounted) {
+                                      setState(() => progress = value);
+                                    }
+                                  },
+                                );
+                                if (!sheetContext.mounted) return;
+                                if (output != null) {
+                                  await ref
+                                      .read(mediaLibraryProvider.notifier)
+                                      .backgroundRefresh();
+                                }
+                                if (!sheetContext.mounted) return;
+                                setState(() {
+                                  busyId = null;
+                                  resultPath = output;
+                                  progress = 0;
+                                });
+                                if (output == null) {
+                                  ScaffoldMessenger.of(sheetContext).showSnackBar(
+                                    const SnackBar(
+                                      content: Text(
+                                        'Could not extract audio from this video.',
+                                      ),
+                                    ),
+                                  );
+                                }
+                              },
+                            );
+                          },
+                        ),
+                ),
+                const Padding(
+                  padding: EdgeInsets.fromLTRB(20, 8, 20, 18),
+                  child: Text(
+                    'OTYA extracts the existing audio track to M4A when supported. It does not upload your video.',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      height: 1.4,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
@@ -482,13 +683,15 @@ class _FeatureTileState extends State<_FeatureTile> {
                 top: 1,
                 right: 3,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
                   decoration: BoxDecoration(
                     color: AppColors.accent,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    FeatureDiscoveryService.instance.labelFor(widget.feature.key),
+                    FeatureDiscoveryService.instance
+                        .labelFor(widget.feature.key),
                     style: const TextStyle(
                       color: Colors.white,
                       fontSize: 8,
@@ -556,23 +759,32 @@ class _ListRow extends StatelessWidget {
   Widget build(BuildContext context) => Column(
         children: [
           ListTile(
-            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
+            contentPadding:
+                const EdgeInsets.symmetric(horizontal: 16, vertical: 3),
             leading: Icon(icon, size: 22),
             title: Text(
               title,
-              style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+              style:
+                  const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
             ),
             subtitle: Text(
               subtitle,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
-              style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+              style: const TextStyle(
+                fontSize: 11,
+                color: AppColors.textSecondary,
+              ),
             ),
             trailing: const Icon(Icons.chevron_right_rounded, size: 20),
             onTap: onTap,
           ),
           if (!last)
-            Divider(height: 1, indent: 54, color: AppColors.borderOf(context)),
+            Divider(
+              height: 1,
+              indent: 54,
+              color: AppColors.borderOf(context),
+            ),
         ],
       );
 }
@@ -665,9 +877,13 @@ class _SheetAction extends StatelessWidget {
         ),
         subtitle: Text(
           subtitle,
-          style: const TextStyle(fontSize: 11, color: AppColors.textSecondary),
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppColors.textSecondary,
+          ),
         ),
-        trailing: onTap == null ? null : const Icon(Icons.chevron_right_rounded),
+        trailing:
+            onTap == null ? null : const Icon(Icons.chevron_right_rounded),
         onTap: onTap,
       );
 }
