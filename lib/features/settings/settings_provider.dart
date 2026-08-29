@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../core/services/phone_state_service.dart';
+import '../../core/services/audio_session_service.dart';
 
 /// Follow the OS setting automatically with [system].
 enum AppThemeMode { dark, amoled, light, system }
@@ -188,7 +188,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   void setAutoPip(bool v) => _update(state.copyWith(autoPip: v));
   void setPauseDuringCalls(bool v) {
     _update(state.copyWith(pauseDuringCalls: v));
-    PhoneStateService.instance.setPauseDuringCalls(v);
+    AudioSessionService.instance.setPauseDuringCalls(v).ignore();
   }
   void setAutoLoadSubtitles(bool v) =>
       _update(state.copyWith(autoLoadSubtitles: v));
