@@ -14,41 +14,74 @@ class AudioSessionService {
   AudioSessionService._();
   static final AudioSessionService instance = AudioSessionService._();
 
+  AudioSession? _session;
   StreamSubscription<AudioInterruptionEvent>? _interruptionSub;
   StreamSubscription<void>? _noisySub;
   bool _initialized = false;
+  bool _pauseDuringCalls = true;
   bool _resumeAfterInterruption = false;
   double? _volumeBeforeDuck;
 
   Future<void> init({required bool pauseDuringCalls}) async {
-    if (_initialized) return;
-    final session = await AudioSession.instance;
-    await session.configure(AudioSessionConfiguration.music());
+    if (!_initialized) {
+      final session = await AudioSession.instance;
+      _session = session;
+      await session.configure(AudioSessionConfiguration.music());
 
-    if (pauseDuringCalls) {
+      // Output becoming noisy (wired/Bluetooth audio disappears) is always
+      // handled. This avoids suddenly routing active playback to the speaker.
+      _noisySub = session.becomingNoisyEventStream.listen(
+        (_) => unawaited(_pauseForNoisyOutput()),
+        onError: (Object error, StackTrace stack) {
+          debugPrint('[AudioSession] noisy stream error: $error');
+        },
+      );
+      _initialized = true;
+    }
+
+    await setPauseDuringCalls(pauseDuringCalls);
+    debugPrint(
+      '[AudioSession] configured; pauseDuringCalls=$_pauseDuringCalls.',
+    );
+  }
+
+  Future<void> setPauseDuringCalls(bool enabled) async {
+    _pauseDuringCalls = enabled;
+    if (!_initialized) {
+      await init(pauseDuringCalls: enabled);
+      return;
+    }
+
+    if (enabled) {
+      if (_interruptionSub != null) return;
+      final session = _session ?? await AudioSession.instance;
       _interruptionSub = session.interruptionEventStream.listen(
         _handleInterruption,
         onError: (Object error, StackTrace stack) {
           debugPrint('[AudioSession] interruption stream error: $error');
         },
       );
+      return;
     }
 
-    // Output becoming noisy (wired/Bluetooth audio disappears) is always
-    // handled. This avoids suddenly routing active playback to the speaker.
-    _noisySub = session.becomingNoisyEventStream.listen(
-      (_) => unawaited(_pauseForNoisyOutput()),
-      onError: (Object error, StackTrace stack) {
-        debugPrint('[AudioSession] noisy stream error: $error');
-      },
-    );
-    _initialized = true;
-    debugPrint(
-      '[AudioSession] configured; pauseDuringCalls=$pauseDuringCalls.',
-    );
+    await _interruptionSub?.cancel();
+    _interruptionSub = null;
+    _resumeAfterInterruption = false;
+
+    final previous = _volumeBeforeDuck;
+    _volumeBeforeDuck = null;
+    final player = PlaybackCoordinator.instance.activePlayer;
+    if (previous != null && player != null) {
+      try {
+        await player.setVolume(previous);
+      } catch (error) {
+        debugPrint('[AudioSession] volume restore failed: $error');
+      }
+    }
   }
 
   void _handleInterruption(AudioInterruptionEvent event) {
+    if (!_pauseDuringCalls) return;
     final player = PlaybackCoordinator.instance.activePlayer;
     if (player == null) return;
 
@@ -105,6 +138,7 @@ class AudioSessionService {
     await _noisySub?.cancel();
     _interruptionSub = null;
     _noisySub = null;
+    _session = null;
     _initialized = false;
   }
 }
