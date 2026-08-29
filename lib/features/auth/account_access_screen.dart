@@ -63,8 +63,6 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       email: user.email,
       photoUrl: user.avatarUrl,
     );
-    // Relink the already-issued FCM token to the newly authenticated OTYA
-    // account. Failure is intentionally non-fatal for sign-in and playback.
     await FcmService.instance.syncRegistration();
     if (saveMarketingConsent) {
       await ConsentService.instance.setMarketingConsent(_marketingConsent);
@@ -190,7 +188,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               Text(
                 _twoFactorRequired
                     ? 'Confirm this sign-in with your OTYA two-step verification.'
-                    : 'One account for OTYA products, sync, verification and recovery.',
+                    : 'One secure account for verification, recovery, supported backup services and saved Ask OTYA conversations.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
@@ -375,7 +373,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               Text(
                 _twoFactorRequired
                     ? 'OTYA never asks you to share authenticator or recovery codes outside the official sign-in flow.'
-                    : 'Google and email/password both connect to your OTYA account.',
+                    : 'Google and email/password both connect to the same OTYA account. Local playback does not require sign-in.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
@@ -418,7 +416,10 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
       controller: controller,
       keyboardType: keyboardType,
       enabled: enabled,
-      decoration: InputDecoration(labelText: label, prefixIcon: Icon(icon)),
+      decoration: InputDecoration(
+        labelText: label,
+        prefixIcon: Icon(icon),
+      ),
     );
   }
 }
