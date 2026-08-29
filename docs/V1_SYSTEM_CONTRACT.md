@@ -64,11 +64,26 @@ Remote services start after the first Flutter frame and fail non-fatally.
 
 No Firestore, Realtime Database, Firebase Storage, Firebase Functions or duplicate Crashlytics backend is part of v1.
 
-## Firebase rule
+## Firebase and Google rule
 
 Cloudflare remains the OTYA control plane. The Android app must never contain Firebase service-account credentials.
 
+Verified production Firebase client identity:
+
+- project ID: `otya-player`
+- project number / messaging sender: `82776565585`
+- Android app ID: `1:82776565585:android:085cf9b4eecb76e9535570`
+- Android package: `com.otyaplayer.app`
+
+The public identifiers above may be pinned in source. The Firebase API key is supplied at build/deployment time. Firebase Admin/service-account JSON stays server-side only.
+
+Google Sign-In keeps two registered OAuth clients: the Android client for package/signing identity and the Web client as Android `serverClientId` so the ID token is intended for the OTYA backend. The backend accepts only those explicitly configured audiences and still validates Google issuer, expiry and verified email.
+
+The app uses explicit `FirebaseOptions` and therefore does not require a tracked `google-services.json`. That file remains ignored. If the build architecture later switches to the Google Services Gradle plugin, the configuration policy must be reviewed before committing any generated client file.
+
 Cloudflare may use server credentials/API access for FCM, Remote Config, Firebase identity verification and App Distribution. Device-only services such as App Check, Analytics and Performance use the minimum required client SDK and remain remotely governed through OTYA configuration.
+
+App Check uses the debug provider only in Flutter debug builds and Play Integrity in release builds. Server mode remains **monitor** until real signed-install metrics justify enforcement; offline/local playback must never depend on App Check availability.
 
 The Flutter app does **not** use the Firebase Remote Config client SDK. It reads one OTYA `/api/app-config` response from Cloudflare, which composes server-critical Cloudflare config with cached Firebase-owned client parameters.
 
@@ -83,7 +98,9 @@ There is one OTYA Search. It searches local content first:
 - playlists
 - offline OTYA help
 
-Ask OTYA is offered only after local/help results or when the user explicitly asks for help. Public Ask OTYA is product-help scoped and does not receive unrestricted D1/R2/Firebase/admin credentials.
+Ask OTYA is a friendly general-purpose assistant with extra OTYA product context. Local search/help stays first for local media tasks, and users may explicitly open Ask OTYA for broader questions. Guest users remain server-limited to the configured low-cost model; signed-in users may receive the curated model selector and persistent conversations according to server policy.
+
+Public Ask OTYA never receives private Admin AI permissions, credentials, OTPs, refresh tokens, customer lists, service-account keys or unrestricted infrastructure access. Human-required support requests use the explicit support handoff.
 
 Private Admin AI uses separately authorized, approved internal tools. Secrets, OTPs, refresh tokens and service-account keys are never exposed to the model.
 
@@ -118,7 +135,6 @@ Temporary/app-private output is not the final user result.
 
 - MediaStore APIs
 - PiP bridge
-- telephony observation
 - brightness/volume bridge
 - Android equalizer bridge
 - local media muxing
@@ -127,7 +143,7 @@ Temporary/app-private output is not the final user result.
 Flutter owns:
 
 - playback state
-- call interruption pause/resume decisions
+- audio-focus/interruption pause and resume decisions
 - updates
 - navigation
 - product state
@@ -137,15 +153,17 @@ Native update scheduling/boot receivers are not part of v1.
 
 ## Permissions
 
-Request only permissions used by current product features. OTYA must not request broad all-files, image-library, Bluetooth/location or background permissions merely because old donor features once used them.
+Request only permissions used by current product features. OTYA must not request broad all-files, image-library, Bluetooth/location, phone-state or background permissions merely because old donor features once used them.
 
-Current legitimate categories include media audio/video read access, notifications, camera for Transfer QR scanning, biometric authentication, phone state when call-pause is enabled, network/Wi-Fi access, playback foreground service and package installation for self-update builds.
+Current legitimate categories include media audio/video read access, notifications, camera for Transfer QR scanning, biometric authentication, network/Wi-Fi access, playback foreground service and package installation for self-update builds. Call/headset/audio-focus interruption behavior is owned by the Android audio session and does not require broad phone-state permission in the v1 design.
 
 ## Updates and releases
 
 Flutter `UpdateService` is the only app update owner. `/latest` is the canonical release metadata endpoint. Compatibility endpoints may adapt to it but must not become separate authorities.
 
 A release becomes valid in Cloudflare/R2/D1 first. Firebase App Distribution is only a best-effort tester mirror and may never invalidate a successful OTYA release.
+
+Normal pull-request or main-branch CI validates APKs only. Official release publishing must be a separately gated release/tag path and must never overwrite production release objects merely because CI succeeded.
 
 ## Branding and language
 
