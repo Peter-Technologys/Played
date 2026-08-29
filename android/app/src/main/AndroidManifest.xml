@@ -136,6 +136,18 @@
             android:name=".NotificationDismissReceiver"
             android:exported="false" />
 
+        <!-- Native sharing uses temporary content:// grants so large media can
+             be shared without copying the whole file into OTYA's cache first. -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.share"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/share_paths" />
+        </provider>
+
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
