@@ -1,15 +1,18 @@
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../my_space/presentation/providers/my_space_provider.dart';
-import '../../search/smart_search_sheet.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
+import '../../my_space/presentation/providers/my_space_provider.dart';
+import '../../player/presentation/mini_player.dart';
+import '../../player/presentation/queue_screen.dart';
+import '../../search/smart_search_sheet.dart';
 
 enum _DownloadFilter { all, music, video }
 
@@ -27,287 +30,168 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
   Widget build(BuildContext context) {
     final library = ref.watch(mediaLibraryProvider);
     return WallpaperScaffold(
-      body: SafeArea(
-        child: library.when(
-          loading: () => const Center(child: CircularProgressIndicator()),
-          error: (error, _) => Center(child: Text('$error')),
-          data: (items) {
-            final downloads = items.where(_isDownloaded).toList()
-              ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
-            final visible = switch (_filter) {
-              _DownloadFilter.music =>
-                downloads.where((e) => !e.isVideo).toList(),
-              _DownloadFilter.video =>
-                downloads.where((e) => e.isVideo).toList(),
-              _DownloadFilter.all => downloads,
-            };
-            return RefreshIndicator(
-              color: AppColors.accent,
-              onRefresh: () =>
-                  ref.read(mediaLibraryProvider.notifier).refresh(),
-              child: CustomScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                slivers: [
-                  SliverToBoxAdapter(child: _Header(count: downloads.length)),
-                  SliverToBoxAdapter(child: _StorageCard(items: downloads)),
-                  SliverToBoxAdapter(
-                    child: _Filters(
-                      current: _filter,
-                      onChanged: (value) => setState(() => _filter = value),
-                    ),
-                  ),
-                  if (visible.isEmpty)
-                    const SliverFillRemaining(
-                      hasScrollBody: false,
-                      child: _EmptyDownloads(),
-                    )
-                  else
-                    SliverList.builder(
-                      itemCount: visible.length,
-                      itemBuilder: (context, index) =>
-                          _DownloadTile(item: visible[index]),
-                    ),
-                  const SliverToBoxAdapter(child: SizedBox(height: 130)),
-                ],
-              ),
-            );
-          },
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/tools/folders'),
+        ),
+        title: const Text('Downloads'),
+        actions: [
+          IconButton(
+            tooltip: 'Search OTYA',
+            onPressed: () => SmartSearchSheet.show(context),
+            icon: const Icon(Icons.search_rounded),
+          ),
+        ],
+      ),
+      body: library.when(
+        loading: () {
+          final cached = library.valueOrNull;
+          return cached == null
+              ? const Center(child: CircularProgressIndicator())
+              : _body(context, cached);
+        },
+        error: (_, __) => Center(
+          child: OutlinedButton.icon(
+            onPressed: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Retry media scan'),
+          ),
+        ),
+        data: (items) => RefreshIndicator(
+          onRefresh: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+          child: _body(context, items),
         ),
       ),
     );
   }
-}
 
-class _Header extends StatelessWidget {
-  final int count;
-  const _Header({required this.count});
+  Widget _body(BuildContext context, List<MediaItem> all) {
+    final downloads = all.where(_isDownloaded).toList()
+      ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
+    final visible = switch (_filter) {
+      _DownloadFilter.music => downloads.where((item) => !item.isVideo).toList(),
+      _DownloadFilter.video => downloads.where((item) => item.isVideo).toList(),
+      _DownloadFilter.all => downloads,
+    };
 
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 16, 12, 8),
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Downloads',
-                    style: Theme.of(context)
-                        .textTheme
-                        .headlineSmall
-                        ?.copyWith(fontWeight: FontWeight.w900),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    '$count local files in your Downloads folders',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context)
-                              .colorScheme
-                              .onSurface
-                              .withValues(alpha: .55),
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            IconButton(
-              tooltip: 'Search OTYA',
-              onPressed: () => SmartSearchSheet.show(context),
-              icon: const Icon(Icons.search_rounded),
-            ),
-            IconButton(
-              tooltip: 'Open Files',
-              onPressed: () => context.push('/tools/folders'),
-              icon: const Icon(Icons.more_vert_rounded),
-            ),
-          ],
-        ),
-      );
-}
-
-class _StorageCard extends StatelessWidget {
-  final List<MediaItem> items;
-  const _StorageCard({required this.items});
-
-  String _size(int bytes) {
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-    }
-    return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bytes = items.fold<int>(0, (sum, item) => sum + item.fileSizeBytes);
-    final music = items
-        .where((e) => !e.isVideo)
-        .fold<int>(0, (sum, e) => sum + e.fileSizeBytes);
-    final video = items
-        .where((e) => e.isVideo)
-        .fold<int>(0, (sum, e) => sum + e.fileSizeBytes);
-    final total = bytes <= 0 ? 1 : bytes;
-    final musicRatio = music / total;
-    final videoRatio = video / total;
-
-    return Container(
-      margin: const EdgeInsets.fromLTRB(16, 8, 16, 14),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        color: Theme.of(context).colorScheme.surface.withValues(alpha: .82),
-        border: Border.all(color: AppColors.accent.withValues(alpha: .16)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(
-                Icons.storage_rounded,
-                color: AppColors.accent,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              const Text(
-                'Downloaded media',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
-              const Spacer(),
-              Text(
-                _size(bytes),
-                style: const TextStyle(fontWeight: FontWeight.w700),
-              ),
-            ],
-          ),
-          const SizedBox(height: 13),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(99),
-            child: SizedBox(
-              height: 7,
-              child: Row(
-                children: [
-                  if (musicRatio > 0)
-                    Expanded(
-                      flex: (musicRatio * 1000).round().clamp(1, 1000),
-                      child: const ColoredBox(color: Color(0xFF6B48FF)),
-                    ),
-                  if (videoRatio > 0)
-                    Expanded(
-                      flex: (videoRatio * 1000).round().clamp(1, 1000),
-                      child: const ColoredBox(color: Color(0xFF00CFFF)),
-                    ),
-                  if (bytes == 0)
-                    const Expanded(
-                      child: ColoredBox(color: Color(0xFF242537)),
-                    ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 10),
-          Row(
-            children: [
-              _Legend(
-                color: const Color(0xFF6B48FF),
-                text: 'Music ${_size(music)}',
-              ),
-              const SizedBox(width: 16),
-              _Legend(
-                color: const Color(0xFF00CFFF),
-                text: 'Video ${_size(video)}',
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _Legend extends StatelessWidget {
-  final Color color;
-  final String text;
-  const _Legend({required this.color, required this.text});
-
-  @override
-  Widget build(BuildContext context) => Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 7,
-            height: 7,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 5),
-          Text(text, style: Theme.of(context).textTheme.labelSmall),
-        ],
-      );
-}
-
-class _Filters extends StatelessWidget {
-  final _DownloadFilter current;
-  final ValueChanged<_DownloadFilter> onChanged;
-  const _Filters({required this.current, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
-        child: SegmentedButton<_DownloadFilter>(
+    return ListView(
+      physics: const AlwaysScrollableScrollPhysics(parent: BouncingScrollPhysics()),
+      padding: EdgeInsets.fromLTRB(14, 8, 14, MediaQuery.paddingOf(context).bottom + 24),
+      children: [
+        _Summary(downloads: downloads),
+        const SizedBox(height: 12),
+        SegmentedButton<_DownloadFilter>(
           showSelectedIcon: false,
           segments: const [
             ButtonSegment(value: _DownloadFilter.all, label: Text('All')),
             ButtonSegment(value: _DownloadFilter.music, label: Text('Music')),
             ButtonSegment(value: _DownloadFilter.video, label: Text('Video')),
           ],
-          selected: {current},
-          onSelectionChanged: (value) => onChanged(value.first),
+          selected: {_filter},
+          onSelectionChanged: (value) {
+            HapticFeedback.selectionClick();
+            setState(() => _filter = value.first);
+          },
         ),
-      );
+        const SizedBox(height: 12),
+        if (visible.isEmpty)
+          const Padding(
+            padding: EdgeInsets.symmetric(vertical: 70),
+            child: Column(
+              children: [
+                Icon(Icons.download_done_rounded, size: 55, color: AppColors.textSecondary),
+                SizedBox(height: 12),
+                Text('No downloaded media found', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800)),
+                SizedBox(height: 6),
+                Text('Playable files in Download or Downloads appear automatically in Video or Music after Android indexes them.', textAlign: TextAlign.center),
+              ],
+            ),
+          )
+        else
+          ...List.generate(visible.length, (index) {
+            final item = visible[index];
+            return _DownloadTile(
+              item: item,
+              onTap: () => _play(item, visible, index),
+            );
+          }),
+      ],
+    );
+  }
+
+  void _play(MediaItem item, List<MediaItem> visible, int index) {
+    HapticFeedback.lightImpact();
+    final sameType = visible.where((candidate) => candidate.isVideo == item.isVideo).toList();
+    final actualIndex = sameType.indexWhere((candidate) => candidate.id == item.id);
+    ref.read(queueProvider.notifier).setQueue(sameType, startIndex: actualIndex < 0 ? 0 : actualIndex);
+    if (item.isVideo) {
+      context.push('/player/video', extra: item);
+    } else {
+      ref.read(miniPlayerItemProvider.notifier).state = item;
+      context.push('/player/audio', extra: item);
+    }
+  }
+}
+
+class _Summary extends StatelessWidget {
+  const _Summary({required this.downloads});
+  final List<MediaItem> downloads;
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = downloads.fold<int>(0, (sum, item) => sum + item.fileSizeBytes);
+    final videos = downloads.where((item) => item.isVideo).length;
+    final music = downloads.length - videos;
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.cardOf(context),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.borderOf(context)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.download_rounded, color: AppColors.accent, size: 28),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('${downloads.length} downloaded media file${downloads.length == 1 ? '' : 's'}', style: const TextStyle(fontWeight: FontWeight.w800)),
+                const SizedBox(height: 2),
+                Text('$music audio · $videos video', style: const TextStyle(fontSize: 12, color: AppColors.textSecondary)),
+              ],
+            ),
+          ),
+          Text(_formatBytes(bytes), style: const TextStyle(fontWeight: FontWeight.w700)),
+        ],
+      ),
+    );
+  }
 }
 
 class _DownloadTile extends StatelessWidget {
+  const _DownloadTile({required this.item, required this.onTap});
   final MediaItem item;
-  const _DownloadTile({required this.item});
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => ListTile(
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 18, vertical: 3),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
         leading: item.isVideo
             ? _VideoThumb(item: item)
-            : AlbumArtThumb(
-                albumArtPath: item.albumArtPath,
-                size: 50,
-                borderRadius: 12,
-              ),
-        title: Text(
-          item.title,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
-        ),
-        subtitle: Text(
-          '${item.isVideo ? 'Video' : (item.artist ?? 'Music')} · ${item.formattedSize}',
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        trailing: const Icon(
-          Icons.check_circle_rounded,
-          color: Color(0xFF24D789),
-          size: 19,
-        ),
-        onTap: () => context.push(
-          item.isVideo ? '/player/video' : '/player/audio',
-          extra: item,
-        ),
+            : AlbumArtThumb(albumArtPath: item.albumArtPath, size: 48, borderRadius: 12),
+        title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
+        subtitle: Text('${item.isVideo ? 'Video' : (item.artist?.trim().isNotEmpty == true ? item.artist!.trim() : 'Audio')} · ${item.formattedSize}', maxLines: 1, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.play_arrow_rounded, color: AppColors.accent),
+        onTap: onTap,
       );
 }
 
 class _VideoThumb extends StatelessWidget {
-  final MediaItem item;
   const _VideoThumb({required this.item});
+  final MediaItem item;
 
   @override
   Widget build(BuildContext context) {
@@ -315,72 +199,30 @@ class _VideoThumb extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(12),
       child: SizedBox(
-        width: 50,
-        height: 50,
-        child: path != null && path.isNotEmpty
-            ? Image.file(
-                File(path),
-                fit: BoxFit.cover,
-                errorBuilder: (_, __, ___) => const ColoredBox(
-                  color: Color(0xFF1A1B29),
-                  child: Icon(Icons.movie_rounded, color: AppColors.accent),
-                ),
-              )
-            : const ColoredBox(
-                color: Color(0xFF1A1B29),
-                child: Icon(Icons.movie_rounded, color: AppColors.accent),
-              ),
+        width: 68,
+        height: 48,
+        child: path != null && path.isNotEmpty && File(path).existsSync()
+            ? Image.file(File(path), fit: BoxFit.cover, cacheWidth: 220, errorBuilder: (_, __, ___) => _placeholder(context))
+            : _placeholder(context),
       ),
     );
   }
-}
 
-class _EmptyDownloads extends StatelessWidget {
-  const _EmptyDownloads();
-
-  @override
-  Widget build(BuildContext context) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(30),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.accent.withValues(alpha: .12),
-                ),
-                child: const Icon(
-                  Icons.download_done_rounded,
-                  color: AppColors.accent,
-                  size: 34,
-                ),
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'No downloaded media found',
-                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              Text(
-                'Files stored in your device Download or Downloads folders will appear here automatically.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Theme.of(context)
-                      .colorScheme
-                      .onSurface
-                      .withValues(alpha: .55),
-                ),
-              ),
-            ],
-          ),
-        ),
+  Widget _placeholder(BuildContext context) => Container(
+        color: AppColors.cardOf(context),
+        alignment: Alignment.center,
+        child: const Icon(Icons.movie_rounded, color: AppColors.accent),
       );
 }
 
 bool _isDownloaded(MediaItem item) {
-  final p = item.filePath.toLowerCase();
-  return p.contains('/download/') || p.contains('/downloads/');
+  final path = item.filePath.toLowerCase().replaceAll('\\', '/');
+  return path.contains('/download/') || path.contains('/downloads/');
+}
+
+String _formatBytes(int bytes) {
+  if (bytes < 1024) return '$bytes B';
+  if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
+  if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
 }
