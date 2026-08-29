@@ -101,35 +101,11 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     if (!mounted) return;
     setState(() => _onboardingDone = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) _offerNotificationPermission();
+      if (!mounted) return;
+      unawaited(
+        NotificationService.instance.requestPermission().catchError((_) {}),
+      );
     });
-  }
-
-  Future<void> _offerNotificationPermission() async {
-    final enable = await showDialog<bool>(
-      context: context,
-      barrierDismissible: false,
-      builder: (dialogContext) => AlertDialog(
-        icon: const OtyaLogo(iconOnly: true, fontSize: 48),
-        title: const Text('Enable OTYA notifications?'),
-        content: const Text(
-          'Notifications provide Now Playing controls, completed local-task alerts, account/security messages and OTYA update notices. You can change this later in Android settings.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Not now'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Enable'),
-          ),
-        ],
-      ),
-    );
-    if (enable == true) {
-      await NotificationService.instance.requestPermission();
-    }
   }
 
   ThemeMode _materialThemeMode(AppThemeMode mode) => switch (mode) {
@@ -155,9 +131,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     final settings = ref.watch(settingsProvider);
 
     if (_checking) {
-      // Keep the very first visible frame consistent with the persisted theme.
-      // In particular, System must follow the device instead of being treated
-      // as Dark while local onboarding state is loading.
       return MaterialApp(
         title: 'OTYA',
         debugShowCheckedModeBanner: false,
@@ -227,11 +200,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           routerConfig: AppRouter.router,
           builder: (context, child) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
-            // Android 15+ enforces edge-to-edge. Keep both system bars
-            // transparent and let each screen protect only its interactive
-            // controls with MediaQuery/SafeArea insets. Painting an opaque
-            // navigation bar here recreates a heavy footer and causes jarring
-            // transitions between OTYA surfaces.
             final overlay = SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,
               statusBarIconBrightness:
@@ -253,9 +221,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
               );
             }
 
-            // Respect the user's platform text scale exactly. OTYA layouts must
-            // adapt to accessibility settings rather than silently clamping
-            // large text to a smaller value.
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: overlay,
               child: AppLockGate(
