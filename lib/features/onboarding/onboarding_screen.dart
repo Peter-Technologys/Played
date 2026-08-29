@@ -1,7 +1,25 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../shared/widgets/otya_logo.dart';
+
+final Future<Uint8List?> _ownerPortraitBytes = _loadOwnerPortrait();
+
+Future<Uint8List?> _loadOwnerPortrait() async {
+  try {
+    final encoded =
+        await rootBundle.loadString('assets/onboarding/owner_photo.b64');
+    final normalized = encoded.replaceAll(RegExp(r'\s+'), '');
+    if (normalized.isEmpty) return null;
+    return base64Decode(normalized);
+  } catch (_) {
+    return null;
+  }
+}
 
 class OnboardingOverlay extends StatefulWidget {
   const OnboardingOverlay({super.key, required this.onDone});
@@ -211,21 +229,7 @@ class _Hero extends StatelessWidget {
               ),
             ),
           ),
-          Positioned.fill(
-            child: Image.asset(
-              'assets/onboarding/owner_photo.jpg',
-              fit: BoxFit.cover,
-              alignment: const Alignment(0, -.2),
-              filterQuality: FilterQuality.medium,
-              errorBuilder: (context, error, stackTrace) => Image.asset(
-                'assets/onboarding/welcome.jpg',
-                fit: BoxFit.cover,
-                alignment: Alignment.center,
-                filterQuality: FilterQuality.medium,
-                errorBuilder: (_, __, ___) => const SizedBox.shrink(),
-              ),
-            ),
-          ),
+          const Positioned.fill(child: _OwnerPortrait()),
           const DecoratedBox(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -284,6 +288,36 @@ class _Hero extends StatelessWidget {
       ),
     );
   }
+}
+
+class _OwnerPortrait extends StatelessWidget {
+  const _OwnerPortrait();
+
+  @override
+  Widget build(BuildContext context) => FutureBuilder<Uint8List?>(
+        future: _ownerPortraitBytes,
+        builder: (context, snapshot) {
+          final bytes = snapshot.data;
+          if (bytes != null && bytes.isNotEmpty) {
+            return Image.memory(
+              bytes,
+              fit: BoxFit.cover,
+              alignment: const Alignment(0, -.12),
+              filterQuality: FilterQuality.medium,
+              gaplessPlayback: true,
+            );
+          }
+          return Image.asset(
+            'assets/onboarding/welcome.jpg',
+            fit: BoxFit.cover,
+            alignment: Alignment.center,
+            filterQuality: FilterQuality.medium,
+            errorBuilder: (_, __, ___) => const ColoredBox(
+              color: Color(0xFF050611),
+            ),
+          );
+        },
+      );
 }
 
 class _GradientWordmark extends StatelessWidget {
