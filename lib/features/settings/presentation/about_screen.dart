@@ -10,6 +10,7 @@ import '../../../core/config/environment.dart';
 import '../../../core/services/update_service.dart';
 import '../../../core/widgets/rate_us_sheet.dart';
 import '../../../core/widgets/update_dialog.dart';
+import '../../../shared/widgets/otya_logo.dart';
 
 /// Help & About stays useful even when online support is unavailable.
 class AboutScreen extends StatefulWidget {
@@ -308,30 +309,7 @@ class _AppCard extends StatelessWidget {
           ),
           child: Column(
             children: [
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.asset(
-                  'assets/icons/play_store_512.png',
-                  width: 72,
-                  height: 72,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 72,
-                    height: 72,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [AppColors.accent, AppColors.accentViolet],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    child: const Icon(
-                      Icons.play_circle_fill_rounded,
-                      color: Colors.white,
-                      size: 40,
-                    ),
-                  ),
-                ),
-              ),
+              const OtyaMark(size: 72),
               const SizedBox(height: 16),
               const Text(
                 'OTYA',
