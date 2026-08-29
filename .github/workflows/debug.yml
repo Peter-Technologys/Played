@@ -45,6 +45,8 @@ jobs:
           cache: true
       - name: Flutter pub get
         run: flutter pub get
+      - name: Generate OTYA launcher icons
+        run: dart run flutter_launcher_icons
       - name: Static analysis
         run: flutter analyze --no-fatal-warnings --no-fatal-infos
       - name: Unit and widget tests
@@ -85,6 +87,8 @@ jobs:
           fi
       - name: Flutter pub get
         run: flutter pub get
+      - name: Generate OTYA launcher icons
+        run: dart run flutter_launcher_icons
       - name: Build release APKs
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
@@ -116,9 +120,9 @@ jobs:
               --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID"
               --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
             )
-            echo "Firebase Messaging client configuration enabled."
+            echo "Firebase client configuration enabled."
           else
-            echo "WARNING: Firebase client variables incomplete; APK will build with remote push disabled."
+            echo "WARNING: Firebase client variables incomplete; APK will build with remote Firebase services disabled."
           fi
           flutter build apk "${ARGS[@]}"
       - name: Verify APKs and record checksums
