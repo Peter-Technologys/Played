@@ -1,7 +1,7 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Remembers the last playback speed used for each media item.
-/// Key: 'speed_<mediaId>'  Value: double as string
+/// Key: `speed_<mediaId>` Value: double as string.
 class SpeedMemoryService {
   SpeedMemoryService._();
   static final SpeedMemoryService instance = SpeedMemoryService._();
