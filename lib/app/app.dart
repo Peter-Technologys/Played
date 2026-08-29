@@ -14,6 +14,7 @@ import '../core/widgets/announcement_dialog.dart';
 import '../core/widgets/remote_control_gate.dart';
 import '../core/widgets/update_dialog.dart';
 import '../features/onboarding/onboarding_screen.dart';
+import '../features/settings/app_lock_screen.dart';
 import '../features/settings/settings_provider.dart';
 import '../shared/widgets/otya_logo.dart';
 import 'router.dart';
@@ -257,13 +258,15 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             // large text to a smaller value.
             return AnnotatedRegion<SystemUiOverlayStyle>(
               value: overlay,
-              child: RemoteControlGate(
-                child: Stack(
-                  children: [
-                    wrappedChild,
-                    if (!_onboardingDone)
-                      OnboardingOverlay(onDone: _completeOnboarding),
-                  ],
+              child: AppLockGate(
+                child: RemoteControlGate(
+                  child: Stack(
+                    children: [
+                      wrappedChild,
+                      if (!_onboardingDone)
+                        OnboardingOverlay(onDone: _completeOnboarding),
+                    ],
+                  ),
                 ),
               ),
             );
