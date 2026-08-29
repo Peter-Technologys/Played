@@ -1,82 +1,177 @@
 # OTYA v1 System Contract
 
-OTYA v1 is the first public product release. The previous app is a donor of proven functionality, not an architecture that must be preserved.
+This document is the ownership contract for the OTYA 1.0 rebuild. A feature is not considered complete because it compiles; its UI, behavior, error state, offline behavior, platform integration and tests must agree with this contract.
 
-## Core rule
+## Product shell
 
-One responsibility has one owner. If two implementations do the same job, compare them, migrate the useful parts into the stronger implementation, test it, then delete the duplicate.
+OTYA has three primary destinations only:
 
-## Product structure
+- **Video** — local videos, folders and playback.
+- **Music** — local songs, albums, artists, folders, playlists and background audio.
+- **Me** — the 3×3 product map plus Account, Settings, Support and About.
 
-Main navigation is exactly: **Video | Music | Me**.
+Me contains exactly:
 
-Search, Ask OTYA, Transfer, Files, Private, Converter, Playlists, History, Tools, Personalize, Storage, Account, Settings, Support, Updates and About are supporting capabilities, not extra apps.
+1. Transfer
+2. Files
+3. Private
+4. Converter
+5. Playlists
+6. History
+7. Tools
+8. Personalize
+9. Storage
+
+Downloads are a Files/local-media view, not a fourth primary destination. Ask OTYA is reached through Search/Support, not a bottom-navigation tab.
+
+## Offline-first startup
+
+Local playback and local library access are the critical path. OTYA must reach a usable local UI without waiting for:
+
+- Cloudflare
+- Firebase
+- authentication
+- Ask OTYA
+- Resend
+- remote config
+- update checks
+- seasonal/online themes
+
+Remote services start after the first Flutter frame and fail non-fatally.
 
 ## Single owners
 
-- Playback: MediaKit playback engine and one queue contract.
-- Media discovery: one Android MediaStore/local scanner.
-- Search: one OTYA Search service; Video and Music use filters on the same engine.
-- Product AI: one Ask OTYA client/backend contract.
-- Authentication/session authority: OTYA Auth on Cloudflare; local playback/scanning/transfer never require sign-in.
-- Email/password + OTP/2FA: OTYA Auth + Resend.
-- Firebase Auth: optional linked identity provider only. Firebase UID never replaces the OTYA user id or OTYA session/JWT.
-- Transfer: one OTYA Transfer engine and public vocabulary.
-- Files: one file operations service.
-- Private media: one OTYA Private/Safe service.
-- Conversion/editing: one local native media processing service.
-- Settings/preferences: one canonical settings store.
-- Themes: one appearance/theme engine.
-- Notifications: one OTYA notification router; Firebase Cloud Messaging is the Android remote-push transport.
-- Updates/releases: Flutter UpdateService + Cloudflare/R2 release workflow. Firebase App Distribution is only a downstream test-build mirror.
-- Remote configuration: Cloudflare `/api/app-config` is the app-facing control contract. Firebase Remote Config stores/mirrors only approved client presentation/experiment values behind Cloudflare.
-- App attestation: Firebase App Check with Play Integrity on Android; Cloudflare verifies `X-Firebase-AppCheck`. Enforcement starts in monitor mode and must never block local playback.
-- Product telemetry: Firebase Analytics and Firebase Performance may collect only when enabled by Cloudflare app config. Their failure is non-fatal.
-- Crash/diagnostics: OTYA CrashReporter + Cloudflare. Do not add Firebase Crashlytics while this remains the canonical crash pipeline.
-- Backend data/business logic: Cloudflare Workers + D1/KV/R2/Queues.
+| Responsibility | Canonical owner |
+| --- | --- |
+| Video/audio playback | MediaKit + OTYA playback coordinator |
+| Local media discovery | Android MediaStore through one OTYA media repository/provider |
+| Playback queue | OTYA queue provider |
+| OTYA account/session authority | Cloudflare `otya-auth` |
+| Email/password + OTP/2FA | OTYA Auth + Resend |
+| Firebase/Google identity | Linked identity behind OTYA Auth |
+| Push transport | Firebase Cloud Messaging |
+| Server push decisions | Cloudflare |
+| Canonical application/account data | D1 |
+| Sessions/rate limits/fallback config | KV |
+| Release/file objects | R2 |
+| Ask OTYA | OTYA AI/Cloudflare backend |
+| Crash diagnostics | OTYA Cloudflare CrashReporter |
+| Client experiment/presentation config | Firebase Remote Config, proxied/cached by Cloudflare |
+| Server safety config | Cloudflare |
+| Android app attestation | Firebase App Check + Cloudflare verification |
+| Android usage/performance telemetry | Firebase Analytics/Performance behind Cloudflare policy |
+| Tester APK mirror | Firebase App Distribution after the canonical OTYA release |
 
-## Firebase / Cloudflare boundary
+No Firestore, Realtime Database, Firebase Storage, Firebase Functions or duplicate Crashlytics backend is part of v1.
 
-Cloudflare is OTYA's control plane. Firebase is used only where it is stronger for Android/device services.
+## Firebase rule
 
-Server-orchestrated Firebase capabilities:
+Cloudflare remains the OTYA control plane. The Android app must never contain Firebase service-account credentials.
 
-- FCM push delivery
-- Firebase Remote Config publishing/mirroring
-- Firebase identity verification/linking
-- Firebase App Distribution test-release mirroring
+Cloudflare may use server credentials/API access for FCM, Remote Config, Firebase identity verification and App Distribution. Device-only services such as App Check, Analytics and Performance use the minimum required client SDK and remain remotely governed through OTYA configuration.
 
-Device-required Firebase capabilities:
+The Flutter app does **not** use the Firebase Remote Config client SDK. It reads one OTYA `/api/app-config` response from Cloudflare, which composes server-critical Cloudflare config with cached Firebase-owned client parameters.
 
-- App Check token creation
-- Analytics event collection
-- Performance telemetry
+## Search and AI
 
-Cloudflare remotely enables/disables the device-required capabilities through OTYA app config. Firebase/Google outages must never stop the app from opening or using local media.
+There is one OTYA Search. It searches local content first:
 
-Do not add Firestore, Realtime Database, Firebase Storage, Cloud Functions or Crashlytics while D1/R2/Workers/OTYA CrashReporter remain the stronger canonical owners. Do not add Firebase A/B Testing while OTYA keeps its existing stable rollout/experiment engine; adopting Firebase A/B later requires replacing that owner rather than running both.
+- songs and videos
+- albums
+- artists
+- folders
+- playlists
+- offline OTYA help
 
-## Offline contract
+Ask OTYA is offered only after local/help results or when the user explicitly asks for help. Public Ask OTYA is product-help scoped and does not receive unrestricted D1/R2/Firebase/admin credentials.
 
-Without internet, auth, AI or backend availability, OTYA must still start and support local media scanning, playback, playlists/history stored locally, local transfer, local tools and local settings.
+Private Admin AI uses separately authorized, approved internal tools. Secrets, OTPs, refresh tokens and service-account keys are never exposed to the model.
 
-No Firebase, Cloudflare, auth, AI, update or remote-config network operation may be required before the usable app shell is shown. Optional-service failures are isolated, timeout-safe and non-fatal.
+## Transfer
 
-## No placeholders
+OTYA Transfer is local-network only for v1. It uses direct HTTP over the current Wi-Fi/hotspot, a random one-time transfer token, streamed file IO and HTTP range resume.
 
-A feature does not appear in production UI unless its action works. Do not ship Coming Soon, fake buttons, dead routes or empty shells.
+Resume must be bound to the same transfer identity. A different transfer with the same filename must never append to unrelated partial bytes. Same-name completed files use a safe unique destination.
 
-## Deletion rule
+Transfer remains usable without an OTYA account.
 
-Do not delete a donor implementation until the replacement has tests and the relevant CI gate is green. Once the replacement is proven, remove obsolete duplicate code instead of keeping permanent compatibility wrappers for unreleased builds.
+## Private
 
-## First-release identity
+Private is local protected media. User-facing copy says **Private**, not Safe or Vault. Platform storage implementation names may remain internal.
 
-- Product name: OTYA
-- Public version line starts at 1.0.0.
-- Keep Android package/signing identity unless a release requirement proves otherwise.
-- Keep working Cloudflare resources, domains and secrets; simplify their contracts rather than recreating infrastructure without reason.
+Private authentication uses device authentication and/or local PIN fallback. Protected media must auto-lock after the configured session timeout and remain local unless the user explicitly performs a separate cloud/account action.
 
-## Release gates
+## Media tools
 
-Before v1 release verify: startup, scanning, audio/video playback, background audio, call interruption, gestures/orientation, subtitles/tracks, playlists/history, new-media discovery, transfer, files/private, converter/tools, search/help, Ask OTYA handoff, account/security, push/local notifications, App Check monitor/enforcement transition, Firebase Analytics/Performance policy, updates, offline/backend/Firebase outage states, Light/Dark/AMOLED, permissions, website mobile/desktop, admin operations, Firebase Remote Config sync, App Distribution mirror and install/update behavior.
+Converter and Trim are local operations. Android native media muxing is used instead of bundling a large FFmpeg binary.
+
+Generated media must be published to user-visible shared storage using modern MediaStore on Android 10+:
+
+- video output → `Movies/OTYA`
+- audio output → `Music/OTYA`
+
+Temporary/app-private output is not the final user result.
+
+## Android platform ownership
+
+`MainActivity` is a bridge, not a second application controller. It may own:
+
+- MediaStore APIs
+- PiP bridge
+- telephony observation
+- brightness/volume bridge
+- Android equalizer bridge
+- local media muxing
+- file operations requiring Android APIs
+
+Flutter owns:
+
+- playback state
+- call interruption pause/resume decisions
+- updates
+- navigation
+- product state
+- remote configuration behavior
+
+Native update scheduling/boot receivers are not part of v1.
+
+## Permissions
+
+Request only permissions used by current product features. OTYA must not request broad all-files, image-library, Bluetooth/location or background permissions merely because old donor features once used them.
+
+Current legitimate categories include media audio/video read access, notifications, camera for Transfer QR scanning, biometric authentication, phone state when call-pause is enabled, network/Wi-Fi access, playback foreground service and package installation for self-update builds.
+
+## Updates and releases
+
+Flutter `UpdateService` is the only app update owner. `/latest` is the canonical release metadata endpoint. Compatibility endpoints may adapt to it but must not become separate authorities.
+
+A release becomes valid in Cloudflare/R2/D1 first. Firebase App Distribution is only a best-effort tester mirror and may never invalidate a successful OTYA release.
+
+## Branding and language
+
+OTYA uses one visible product identity across launcher, startup, app headers and website. Do not create unrelated generic play marks for individual surfaces.
+
+OTYA v1 advertises only languages for which OTYA's own strings are actually translated. Partial framework localization is not a translated product.
+
+## Release gate
+
+Do not merge the v1 rebuild until all applicable gates are green:
+
+- Flutter analyze
+- unit/widget tests
+- Security workflow
+- ARM64/ARM32 release APK build and checksum verification
+- server Security
+- full Cloudflare validation
+- clean-install and upgrade testing
+- airplane-mode startup
+- local video/music playback
+- queue/background/headset/call/PiP behavior
+- gestures/subtitles/orientation
+- Search/Files/Downloads/Transfer/Private/Converter/Playlists
+- account/OTP/identity/session flows
+- FCM/App Check/config/update behavior
+- website/account/support/admin mobile + desktop
+- Cloudflare/Firebase/AI/Resend outage behavior
+
+CI success is necessary but not sufficient; device acceptance is required for platform and UX behavior.
