@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/services/otya_support_service.dart';
+import '../../shared/widgets/otya_logo.dart';
 
 class OtyaSupportScreen extends StatefulWidget {
   const OtyaSupportScreen({super.key});
@@ -12,15 +13,15 @@ class OtyaSupportScreen extends StatefulWidget {
 }
 
 class _ChatEntry {
-  final String text;
-  final bool fromUser;
-  final bool canHandoff;
-
   const _ChatEntry({
     required this.text,
     required this.fromUser,
     this.canHandoff = false,
   });
+
+  final String text;
+  final bool fromUser;
+  final bool canHandoff;
 }
 
 class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
@@ -30,8 +31,8 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   final _focusNode = FocusNode();
   final _service = OtyaSupportService.instance;
 
-  final List<_ChatEntry> _messages = [];
-  List<OtyaAiModel> _models = const [];
+  final List<_ChatEntry> _messages = <_ChatEntry>[];
+  List<OtyaAiModel> _models = const <OtyaAiModel>[];
   OtyaAiModel? _selectedModel;
   bool _busy = false;
   bool _loadingModels = true;
@@ -85,9 +86,10 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       );
       if (!mounted) return;
       setState(() {
-        if (reply.modelId != null) {
+        final modelId = reply.modelId;
+        if (modelId != null) {
           for (final candidate in _models) {
-            if (candidate.id == reply.modelId) {
+            if (candidate.id == modelId) {
               _selectedModel = candidate;
               break;
             }
@@ -107,7 +109,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         _messages.add(
           const _ChatEntry(
             text:
-                'Ask OTYA is unavailable right now. Your local music, video, files and playback still work normally.',
+                'I cannot reach Ask OTYA right now. You can keep using your music, videos, files, Transfer and other local OTYA features normally.',
             fromUser: false,
           ),
         );
@@ -139,13 +141,21 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Talk to PeterSmart Link support',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
+            const Row(
+              children: [
+                OtyaMark(size: 34),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Talk to OTYA Support',
+                    style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 7),
+            const SizedBox(height: 10),
             const Text(
-              'This OTYA question may need a human. Enter your email and the question will be sent to support with a ticket number.',
+              'If this needs a person, enter your email and OTYA will create a support ticket for you.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -166,9 +176,11 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
             const SizedBox(height: 14),
             SizedBox(
               width: double.infinity,
-              child: FilledButton(
+              height: 50,
+              child: FilledButton.icon(
                 onPressed: () => Navigator.pop(sheetContext, true),
-                child: const Text('Send to support'),
+                icon: const Icon(Icons.support_agent_rounded),
+                label: const Text('Send to support'),
               ),
             ),
           ],
@@ -179,7 +191,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
     if (sent != true || !mounted) return;
     final email = _emailController.text.trim();
     if (!email.contains('@') || !email.contains('.')) {
-      _appendAssistant('Enter a valid email address before sending to support.');
+      _appendAssistant('Please enter a valid email address before sending.');
       return;
     }
 
@@ -188,12 +200,12 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       final ticket = await _service.handoff(question: question, email: email);
       if (!mounted) return;
       _appendAssistant(
-        'PeterSmart Link support has been notified. Ticket ${ticket.id}. A reply can be sent to $email.',
+        'Done. OTYA Support received your request as ticket ${ticket.id}. A reply can be sent to $email.',
       );
     } catch (_) {
       if (mounted) {
         _appendAssistant(
-          'I could not send the support request. Try again when you are online or use the OTYA support page.',
+          'I could not send the support request right now. Please try again when you are online.',
         );
       }
     } finally {
@@ -208,6 +220,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   }
 
   void _newChat() {
+    if (_busy) return;
     HapticFeedback.selectionClick();
     setState(() => _messages.clear());
     _controller.clear();
@@ -219,7 +232,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       if (!mounted || !_scrollController.hasClients) return;
       _scrollController.animateTo(
         _scrollController.position.maxScrollExtent,
-        duration: const Duration(milliseconds: 260),
+        duration: const Duration(milliseconds: 240),
         curve: Curves.easeOutCubic,
       );
     });
@@ -245,7 +258,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final modelLabel =
-        _selectedModel?.name ?? (_loadingModels ? 'Loading…' : 'OTYA');
+        _selectedModel?.name ?? (_loadingModels ? 'Connecting…' : 'OTYA');
 
     return Scaffold(
       appBar: AppBar(
@@ -253,8 +266,8 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         title: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.auto_awesome_rounded, size: 19),
-            const SizedBox(width: 8),
+            const OtyaMark(size: 30),
+            const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -264,7 +277,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
-                    color: colors.onSurface.withValues(alpha: .55),
+                    color: colors.onSurface.withValues(alpha: .56),
                   ),
                 ),
               ],
@@ -274,7 +287,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         actions: [
           if (_models.length > 1)
             PopupMenuButton<String>(
-              tooltip: 'Choose model',
+              tooltip: 'Choose AI model',
               icon: const Icon(Icons.tune_rounded),
               onSelected: (id) {
                 for (final model in _models) {
@@ -289,7 +302,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                     (model) => PopupMenuItem<String>(
                       value: model.id,
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        padding: const EdgeInsets.symmetric(vertical: 4),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -297,26 +310,16 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                               model.name,
                               style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
-                            if (model.provider.isNotEmpty)
-                              Text(
-                                '${model.provider}${model.tier.isEmpty ? '' : ' · ${model.tier}'}',
-                                style: const TextStyle(
-                                  fontSize: 11,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            if (model.description.isNotEmpty) ...[
-                              const SizedBox(height: 2),
+                            if (model.description.isNotEmpty)
                               Text(
                                 model.description,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
-                                  fontSize: 10.5,
+                                  fontSize: 11,
                                   color: AppColors.textSecondary,
                                 ),
                               ),
-                            ],
                           ],
                         ),
                       ),
@@ -359,7 +362,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                                   );
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Answer copied'),
+                                      content: Text('Copied'),
                                       duration: Duration(seconds: 1),
                                     ),
                                   );
@@ -371,59 +374,11 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                       },
                     ),
             ),
-            Container(
-              padding: EdgeInsets.fromLTRB(
-                12,
-                10,
-                12,
-                10 + MediaQuery.of(context).padding.bottom,
-              ),
-              decoration: BoxDecoration(
-                color: colors.surface,
-                border: Border(
-                  top: BorderSide(color: AppColors.borderOf(context)),
-                ),
-              ),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      focusNode: _focusNode,
-                      minLines: 1,
-                      maxLines: 5,
-                      textCapitalization: TextCapitalization.sentences,
-                      keyboardType: TextInputType.multiline,
-                      textInputAction: TextInputAction.newline,
-                      decoration: InputDecoration(
-                        hintText: 'Message Ask OTYA',
-                        filled: true,
-                        fillColor: AppColors.cardOf(context),
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(22),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton.filled(
-                    tooltip: 'Send',
-                    onPressed: _busy ? null : () => _ask(),
-                    icon: _busy
-                        ? const SizedBox.square(
-                            dimension: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          )
-                        : const Icon(Icons.arrow_upward_rounded),
-                  ),
-                ],
-              ),
+            _Composer(
+              controller: _controller,
+              focusNode: _focusNode,
+              busy: _busy,
+              onSend: _ask,
             ),
           ],
         ),
@@ -433,41 +388,64 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
 }
 
 class _Welcome extends StatelessWidget {
-  final ValueChanged<String> onPrompt;
   const _Welcome({required this.onPrompt});
+
+  final ValueChanged<String> onPrompt;
 
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final prompts = <(String, String)>[
-      ('Ask anything', 'Explain photosynthesis in simple language.'),
-      ('Learn', 'Give me a simple plan for learning a new skill.'),
-      ('OTYA', 'How do I send a large video with OTYA Transfer?'),
-      ('Media', 'Why can a video have picture but no sound?'),
+    const prompts = <(IconData, String, String)>[
+      (
+        Icons.lightbulb_outline_rounded,
+        'Ask anything',
+        'Explain something to me in simple language.',
+      ),
+      (
+        Icons.school_outlined,
+        'Learn',
+        'Help me make a simple plan to learn a new skill.',
+      ),
+      (
+        Icons.swap_horiz_rounded,
+        'OTYA Transfer',
+        'How do I send a large video with OTYA Transfer?',
+      ),
+      (
+        Icons.play_circle_outline_rounded,
+        'Playback help',
+        'Why can a video have picture but no sound?',
+      ),
     ];
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(20, 28, 20, 36),
+      padding: const EdgeInsets.fromLTRB(20, 30, 20, 36),
       children: [
-        Container(
-          width: 52,
-          height: 52,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            color: AppColors.accent.withValues(alpha: .12),
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: const Icon(
-            Icons.auto_awesome_rounded,
-            color: AppColors.accent,
-            size: 25,
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Container(
+            width: 72,
+            height: 72,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.cardOf(context),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: AppColors.borderOf(context)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.accentViolet.withValues(alpha: .14),
+                  blurRadius: 24,
+                ),
+              ],
+            ),
+            child: const OtyaMark(size: 48),
           ),
         ),
         const SizedBox(height: 22),
         Text(
-          'What can I help with?',
+          'How can I help?',
           style: TextStyle(
-            fontSize: 29,
+            fontSize: 30,
             height: 1.08,
             letterSpacing: -1,
             fontWeight: FontWeight.w900,
@@ -476,44 +454,59 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Ask a general question, get help understanding something, or ask about OTYA playback, files, Transfer, Converter, storage, updates and your account.',
+          'Ask a question, learn something, or get help with OTYA. You can talk naturally — you do not need special commands.',
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
-            color: colors.onSurface.withValues(alpha: .62),
+            color: colors.onSurface.withValues(alpha: .64),
           ),
         ),
-        const SizedBox(height: 26),
+        const SizedBox(height: 24),
         ...prompts.map(
           (prompt) => Padding(
             padding: const EdgeInsets.only(bottom: 10),
             child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => onPrompt(prompt.$2),
+              borderRadius: BorderRadius.circular(18),
+              onTap: () => onPrompt(prompt.$3),
               child: Container(
-                padding: const EdgeInsets.all(16),
+                constraints: const BoxConstraints(minHeight: 64),
+                padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 13),
                 decoration: BoxDecoration(
+                  color: AppColors.cardOf(context).withValues(alpha: .72),
                   border: Border.all(color: AppColors.borderOf(context)),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(18),
                 ),
                 child: Row(
                   children: [
+                    Container(
+                      width: 42,
+                      height: 42,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        color: AppColors.accent.withValues(alpha: .09),
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: Icon(prompt.$1, size: 21, color: AppColors.accent),
+                    ),
+                    const SizedBox(width: 12),
                     Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            prompt.$1,
+                            prompt.$2,
                             style: const TextStyle(
-                              fontSize: 12,
+                              fontSize: 12.5,
                               fontWeight: FontWeight.w800,
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          const SizedBox(height: 3),
                           Text(
-                            prompt.$2,
+                            prompt.$3,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              fontSize: 13,
+                              fontSize: 12.5,
                               height: 1.35,
                               color: colors.onSurface.withValues(alpha: .62),
                             ),
@@ -521,7 +514,7 @@ class _Welcome extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 10),
+                    const SizedBox(width: 8),
                     const Icon(Icons.arrow_forward_rounded, size: 18),
                   ],
                 ),
@@ -529,9 +522,9 @@ class _Welcome extends StatelessWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 14),
         Text(
-          'AI can make mistakes and some current facts may have changed. Local playback never depends on Ask OTYA. Never send passwords, OTPs, recovery codes or secret keys.',
+          'Ask OTYA can make mistakes. For current or important information, verify the answer. Never share passwords, OTPs, recovery codes or secret keys.',
           style: TextStyle(
             fontSize: 11.5,
             height: 1.45,
@@ -543,16 +536,85 @@ class _Welcome extends StatelessWidget {
   }
 }
 
-class _MessageRow extends StatelessWidget {
-  final _ChatEntry message;
-  final VoidCallback? onCopy;
-  final VoidCallback? onHandoff;
+class _Composer extends StatelessWidget {
+  const _Composer({
+    required this.controller,
+    required this.focusNode,
+    required this.busy,
+    required this.onSend,
+  });
 
+  final TextEditingController controller;
+  final FocusNode focusNode;
+  final bool busy;
+  final Future<void> Function([String?]) onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Container(
+      padding: EdgeInsets.fromLTRB(
+        12,
+        10,
+        12,
+        10 + MediaQuery.paddingOf(context).bottom,
+      ),
+      decoration: BoxDecoration(
+        color: colors.surface,
+        border: Border(top: BorderSide(color: AppColors.borderOf(context))),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Expanded(
+            child: TextField(
+              controller: controller,
+              focusNode: focusNode,
+              minLines: 1,
+              maxLines: 5,
+              textCapitalization: TextCapitalization.sentences,
+              keyboardType: TextInputType.multiline,
+              textInputAction: TextInputAction.newline,
+              decoration: InputDecoration(
+                hintText: 'Message Ask OTYA',
+                filled: true,
+                fillColor: AppColors.cardOf(context),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(24),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          SizedBox.square(
+            dimension: 48,
+            child: IconButton.filled(
+              tooltip: busy ? 'OTYA is thinking' : 'Send message',
+              onPressed: busy ? null : () => onSend(),
+              icon: busy
+                  ? const OtyaMark(size: 24)
+                  : const Icon(Icons.arrow_upward_rounded),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MessageRow extends StatelessWidget {
   const _MessageRow({
     required this.message,
     this.onCopy,
     this.onHandoff,
   });
+
+  final _ChatEntry message;
+  final VoidCallback? onCopy;
+  final VoidCallback? onHandoff;
 
   @override
   Widget build(BuildContext context) {
@@ -588,8 +650,8 @@ class _MessageRow extends StatelessWidget {
         children: [
           const Row(
             children: [
-              Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.accent),
-              SizedBox(width: 7),
+              OtyaMark(size: 22),
+              SizedBox(width: 8),
               Text(
                 'OTYA',
                 style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900),
@@ -608,18 +670,21 @@ class _MessageRow extends StatelessWidget {
           const SizedBox(height: 8),
           Wrap(
             spacing: 6,
+            runSpacing: 4,
             children: [
               if (onCopy != null)
-                IconButton(
-                  visualDensity: VisualDensity.compact,
-                  tooltip: 'Copy answer',
-                  onPressed: onCopy,
-                  icon: const Icon(Icons.content_copy_rounded, size: 17),
+                SizedBox.square(
+                  dimension: 48,
+                  child: IconButton(
+                    tooltip: 'Copy answer',
+                    onPressed: onCopy,
+                    icon: const Icon(Icons.content_copy_rounded, size: 18),
+                  ),
                 ),
               if (onHandoff != null)
                 TextButton.icon(
                   onPressed: onHandoff,
-                  icon: const Icon(Icons.support_agent_rounded, size: 17),
+                  icon: const Icon(Icons.support_agent_rounded, size: 18),
                   label: const Text('Talk to support'),
                 ),
             ],
@@ -630,26 +695,73 @@ class _MessageRow extends StatelessWidget {
   }
 }
 
-class _ThinkingRow extends StatelessWidget {
+class _ThinkingRow extends StatefulWidget {
   const _ThinkingRow();
 
   @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.fromLTRB(2, 4, 20, 20),
-        child: Row(
-          children: [
-            Icon(Icons.auto_awesome_rounded, size: 16, color: AppColors.accent),
-            SizedBox(width: 10),
-            SizedBox.square(
-              dimension: 16,
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
-            SizedBox(width: 9),
-            Text(
-              'Thinking…',
-              style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
-            ),
-          ],
+  State<_ThinkingRow> createState() => _ThinkingRowState();
+}
+
+class _ThinkingRowState extends State<_ThinkingRow>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (reduceMotion) {
+      _controller.stop();
+      _controller.value = .18;
+    } else if (!_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 6, 20, 20),
+        child: Semantics(
+          liveRegion: true,
+          label: 'OTYA is thinking',
+          child: Row(
+            children: [
+              AnimatedBuilder(
+                animation: _controller,
+                builder: (context, child) {
+                  final wave = .88 + (_controller.value <= .5
+                          ? _controller.value * .24
+                          : (1 - _controller.value) * .24);
+                  return Transform.scale(scale: wave, child: child);
+                },
+                child: const OtyaMark(size: 28),
+              ),
+              const SizedBox(width: 11),
+              const Text(
+                'OTYA is thinking…',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppColors.textSecondary,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
         ),
       );
 }
