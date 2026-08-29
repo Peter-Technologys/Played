@@ -74,7 +74,10 @@ class OtyaFooter extends StatelessWidget {
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
-            color: AppColors.textSecondaryOf(context),
+            color: Theme.of(context)
+                .colorScheme
+                .onSurface
+                .withValues(alpha: .58),
             fontFamily: 'Inter',
             letterSpacing: .3,
           ),
