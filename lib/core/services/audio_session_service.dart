@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
-import 'package:media_kit/media_kit.dart';
 
 import 'playback_coordinator.dart';
 
@@ -21,17 +20,22 @@ class AudioSessionService {
   bool _resumeAfterInterruption = false;
   double? _volumeBeforeDuck;
 
-  Future<void> init() async {
+  Future<void> init({required bool pauseDuringCalls}) async {
     if (_initialized) return;
     final session = await AudioSession.instance;
     await session.configure(AudioSessionConfiguration.music());
 
-    _interruptionSub = session.interruptionEventStream.listen(
-      _handleInterruption,
-      onError: (Object error, StackTrace stack) {
-        debugPrint('[AudioSession] interruption stream error: $error');
-      },
-    );
+    if (pauseDuringCalls) {
+      _interruptionSub = session.interruptionEventStream.listen(
+        _handleInterruption,
+        onError: (Object error, StackTrace stack) {
+          debugPrint('[AudioSession] interruption stream error: $error');
+        },
+      );
+    }
+
+    // Output becoming noisy (wired/Bluetooth audio disappears) is always
+    // handled. This avoids suddenly routing active playback to the speaker.
     _noisySub = session.becomingNoisyEventStream.listen(
       (_) => unawaited(_pauseForNoisyOutput()),
       onError: (Object error, StackTrace stack) {
@@ -39,7 +43,9 @@ class AudioSessionService {
       },
     );
     _initialized = true;
-    debugPrint('[AudioSession] configured for media playback.');
+    debugPrint(
+      '[AudioSession] configured; pauseDuringCalls=$pauseDuringCalls.',
+    );
   }
 
   void _handleInterruption(AudioInterruptionEvent event) {
@@ -50,7 +56,11 @@ class AudioSessionService {
       switch (event.type) {
         case AudioInterruptionType.duck:
           _volumeBeforeDuck ??= player.state.volume;
-          unawaited(player.setVolume((player.state.volume * .35).clamp(0.0, 100.0)));
+          unawaited(
+            player.setVolume(
+              (player.state.volume * .35).clamp(0.0, 100.0),
+            ),
+          );
           break;
         case AudioInterruptionType.pause:
           _resumeAfterInterruption = player.state.playing;
