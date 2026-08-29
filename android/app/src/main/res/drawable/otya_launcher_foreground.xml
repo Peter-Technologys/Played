@@ -1,34 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="108"
-    android:viewportHeight="108">
-    <!-- OTYA master mark: one continuous O/portal built from four restrained
-         brand arcs. The geometry is deliberately simple so it survives
-         adaptive masks, small launchers and low-density screens. -->
-    <path
-        android:pathData="M54,18 A36,36 0,0 1,90,54"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FF22D3EE"
-        android:strokeWidth="13"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M90,54 A36,36 0,0 1,54,90"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFFA31A"
-        android:strokeWidth="13"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M54,90 A36,36 0,0 1,18,54"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FFFF2DAA"
-        android:strokeWidth="13"
-        android:strokeLineCap="round" />
-    <path
-        android:pathData="M18,54 A36,36 0,0 1,54,18"
-        android:fillColor="@android:color/transparent"
-        android:strokeColor="#FF6B4DFF"
-        android:strokeWidth="13"
-        android:strokeLineCap="round" />
+    android:viewportWidth="512"
+    android:viewportHeight="512">
+    <!-- Official OTYA twisted-O geometry traced from the approved brand pack. -->
+    <path android:pathData="M160,98 L138,117 L116,146 L100,179 L89,220 L108,180 L129,158 L141,150 L165,140 L186,136 L211,136 L241,142 L270,155 L292,171 L315,196 L327,216 L337,248 L338,280 L333,307 L324,329 L354,307 L373,286 L389,262 L402,231 L406,209 L405,183 L399,159 L373,120 L350,99 L330,86 L303,74 L272,67 L240,67 L211,73 L181,85 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="89" android:startY="90" android:endX="406" android:endY="300" android:startColor="#FF18D8FF" android:centerColor="#FF146BFF" android:endColor="#FF6A19FF" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M180,142 L159,147 L139,157 L116,177 L105,192 L89,232 L89,283 L102,328 L113,349 L133,376 L152,395 L174,409 L191,414 L219,414 L249,405 L276,389 L298,368 L316,338 L285,355 L267,359 L247,359 L216,348 L192,325 L181,305 L173,272 L175,239 L188,207 L209,185 L236,172 L264,169 L291,175 L273,162 L242,148 L215,142 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="90" android:startY="150" android:endX="315" android:endY="414" android:startColor="#FF146BFF" android:centerColor="#FF6A19FF" android:endColor="#FFE81CFF" />
+        </aapt:attr>
+    </path>
+    <path android:pathData="M405,164 L410,190 L408,224 L395,260 L373,293 L348,318 L321,337 L301,371 L269,399 L248,410 L226,417 L184,417 L210,428 L234,433 L256,434 L289,430 L320,420 L343,408 L382,374 L412,329 L423,298 L427,275 L428,246 L425,220 L417,190 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient android:type="linear" android:startX="190" android:startY="410" android:endX="425" android:endY="180" android:startColor="#FFE81CFF" android:centerColor="#FFFF5B58" android:endColor="#FFFFB000" />
+        </aapt:attr>
+    </path>
 </vector>
