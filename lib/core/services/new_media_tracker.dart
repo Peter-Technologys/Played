@@ -24,6 +24,7 @@ class NewMediaTracker extends ChangeNotifier {
 
   Set<String> get unseenIds => Set.unmodifiable(_unseen);
   bool isUnseen(MediaItem item) => _unseen.contains(item.id);
+  bool isPathUnseen(String path) => _unseen.contains(Uri.encodeComponent(path));
 
   Future<void> reconcile(List<MediaItem> items) async {
     _prefs ??= await SharedPreferences.getInstance();
@@ -55,9 +56,16 @@ class NewMediaTracker extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> markSeen(MediaItem item) async {
+  Future<void> markSeen(MediaItem item) => markSeenId(item.id);
+
+  /// Safe for lower-level player code that only knows the local path.
+  /// MediaScannerService uses Uri.encodeComponent(path) as the stable ID, so
+  /// this does not need a database lookup or rescan.
+  Future<void> markSeenPath(String path) => markSeenId(Uri.encodeComponent(path));
+
+  Future<void> markSeenId(String id) async {
     _prefs ??= await SharedPreferences.getInstance();
-    if (!_unseen.remove(item.id)) return;
+    if (!_unseen.remove(id)) return;
     await _prefs!.setString(_unseenKey, jsonEncode(_unseen.toList()));
     notifyListeners();
   }
