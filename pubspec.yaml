@@ -13,9 +13,16 @@ dependencies:
     sdk: flutter
 
   # Media Playback — media_kit is the single engine for audio + video.
-  # Hardware-accelerated via MediaCodec on Android. No other playback
-  # packages are used.
-  media_kit: ^1.1.11
+  # Android release builds are temporarily pinned to the reviewed upstream
+  # disposal-order fix from media-kit PR #1424. That immutable revision keeps
+  # the NativeCallable alive until mpv_terminate_destroy completes, preventing
+  # the SIGABRT seen in OTYA's Samsung Android 16 bug report. Replace this pin
+  # only after upstream ships an equivalent production fix.
+  media_kit:
+    git:
+      url: https://github.com/Priyanshu-Mallick/media-kit.git
+      ref: 9e1706898f15bcee98c125a2f4a7b88a4374dda7
+      path: media_kit
   media_kit_video: ^1.2.5
   media_kit_libs_android_video: ^1.3.2
 
