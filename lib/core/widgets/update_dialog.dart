@@ -9,26 +9,49 @@ class UpdateDialog extends StatefulWidget {
   const UpdateDialog({super.key, required this.info});
   final UpdateInfo info;
 
+  static bool _showing = false;
+
   static Future<void> checkAndShow(
     BuildContext context, {
     bool forceCheck = false,
   }) async {
+    // OTYA has more than one legitimate update trigger (startup, Settings,
+    // notification taps). Never let two triggers stack dialogs or race the APK
+    // downloader. A manual force-check while a dialog is already visible is a
+    // no-op because the visible dialog is already the actionable result.
+    if (_showing) return;
+
     final update = await UpdateService.instance.checkForUpdate(force: forceCheck);
     if (update == null || !context.mounted) {
       if (forceCheck && context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('OTYA is up to date, or the update service is unavailable.')),
+          const SnackBar(
+            content: Text(
+              'OTYA is up to date, or the update service is unavailable.',
+            ),
+          ),
         );
       }
       return;
     }
-    await showDialog<void>(
-      context: context,
-      barrierDismissible: !updateIsMandatory(update),
-      builder: (_) => UpdateDialog(info: update),
-    );
+
+    if (_showing || !context.mounted) return;
+    _showing = true;
+    try {
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: !updateIsMandatory(update),
+        builder: (_) => UpdateDialog(info: update),
+      );
+    } finally {
+      _showing = false;
+    }
   }
 
+  // OTYA does not currently hard-block the whole offline app. Minimum-version
+  // policy is enforced at online-service boundaries so local media stays
+  // usable. Keep this false until a separate offline-safe forced-update UX is
+  // explicitly implemented.
   static bool updateIsMandatory(UpdateInfo info) => false;
 
   @override
@@ -101,7 +124,11 @@ class _UpdateDialogState extends State<UpdateDialog> {
             colors: [Color(0xFF7544FF), Color(0xFF11D7FF)],
           ),
         ),
-        child: const Icon(Icons.system_update_rounded, color: Colors.white, size: 30),
+        child: const Icon(
+          Icons.system_update_rounded,
+          color: Colors.white,
+          size: 30,
+        ),
       ),
       title: Text('OTYA ${widget.info.version} is available'),
       content: ConstrainedBox(
@@ -116,7 +143,10 @@ class _UpdateDialogState extends State<UpdateDialog> {
             ),
             if (notes.isNotEmpty) ...[
               const SizedBox(height: 14),
-              const Text("What's new", style: TextStyle(fontWeight: FontWeight.w800)),
+              const Text(
+                "What's new",
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 6),
               ConstrainedBox(
                 constraints: const BoxConstraints(maxHeight: 150),
@@ -161,7 +191,9 @@ class _UpdateDialogState extends State<UpdateDialog> {
         ),
         FilledButton.icon(
           onPressed: _downloading ? null : _download,
-          icon: Icon(_error == null ? Icons.download_rounded : Icons.refresh_rounded),
+          icon: Icon(
+            _error == null ? Icons.download_rounded : Icons.refresh_rounded,
+          ),
           label: Text(_error == null ? 'Update now' : 'Retry'),
         ),
       ],
