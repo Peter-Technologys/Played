@@ -34,21 +34,28 @@ class OnlineTrack {
   final String licenseUrl;
   final String provider;
 
+  static String _text(Object? value, [String fallback = '']) {
+    final text = value?.toString().trim() ?? '';
+    return text.isEmpty ? fallback : text;
+  }
+
   factory OnlineTrack.fromJson(Map<String, dynamic> json) => OnlineTrack(
-        id: json['id'] as String? ?? '',
-        title: json['title'] as String? ?? 'Untitled',
-        artist: json['artist'] as String? ?? 'Unknown artist',
-        album: json['album'] as String? ?? '',
-        artworkUrl: json['artwork'] as String? ?? '',
+        id: _text(json['id']),
+        title: _text(json['title'], 'Untitled'),
+        artist: _text(json['artist'], 'Unknown artist'),
+        album: _text(json['album']),
+        artworkUrl: _text(json['artwork']),
         duration: Duration(
-          seconds: (json['durationSeconds'] as num?)?.round() ?? 0,
+          seconds: json['durationSeconds'] is num
+              ? (json['durationSeconds'] as num).round().clamp(0, 24 * 60 * 60)
+              : 0,
         ),
-        streamUrl: json['streamUrl'] as String? ?? '',
+        streamUrl: _text(json['streamUrl']),
         downloadAllowed: json['downloadAllowed'] == true,
-        downloadUrl: json['downloadUrl'] as String? ?? '',
-        shareUrl: json['shareUrl'] as String? ?? '',
-        licenseUrl: json['licenseUrl'] as String? ?? '',
-        provider: json['provider'] as String? ?? 'unknown',
+        downloadUrl: _text(json['downloadUrl']),
+        shareUrl: _text(json['shareUrl']),
+        licenseUrl: _text(json['licenseUrl']),
+        provider: _text(json['provider'], 'unknown'),
       );
 
   MediaItem toMediaItem() => MediaItem(
@@ -94,7 +101,7 @@ class OnlineMusicService {
       _load(query: query.trim(), limit: limit);
 
   Future<List<OnlineTrack>> _load({String query = '', int limit = 24}) async {
-    final safeLimit = limit.clamp(1, 50);
+    final safeLimit = limit.clamp(1, 50).toInt();
     final cacheKey = '${query.toLowerCase()}|$safeLimit';
     final now = DateTime.now();
     final cached = _cache[cacheKey];
@@ -124,18 +131,29 @@ class OnlineMusicService {
       );
     }
 
-    final body = jsonDecode(response.body);
+    Object? body;
+    try {
+      body = jsonDecode(response.body);
+    } catch (_) {
+      throw const OnlineMusicException(
+        'Online music is unavailable right now. Your local music still works.',
+      );
+    }
     if (body is! Map<String, dynamic> || body['ok'] != true) {
       throw const OnlineMusicException('OTYA could not load online music.');
     }
 
     final raw = body['tracks'];
     if (raw is! List) return const [];
-    final tracks = raw
-        .whereType<Map>()
-        .map((item) => OnlineTrack.fromJson(Map<String, dynamic>.from(item)))
-        .where((track) => track.id.isNotEmpty && track.streamUrl.isNotEmpty)
-        .toList(growable: false);
+    final tracks = <OnlineTrack>[];
+    for (final item in raw.whereType<Map>()) {
+      try {
+        final track = OnlineTrack.fromJson(Map<String, dynamic>.from(item));
+        if (track.id.isNotEmpty && track.streamUrl.isNotEmpty) tracks.add(track);
+      } catch (_) {
+        // Ignore one malformed provider record without losing valid results.
+      }
+    }
 
     if (_cache.length >= _maxCacheEntries) {
       final oldest = _cache.entries.reduce(
@@ -143,7 +161,7 @@ class OnlineMusicService {
       );
       _cache.remove(oldest.key);
     }
-    _cache[cacheKey] = _CachedOnlineTracks(now, tracks);
-    return tracks;
+    _cache[cacheKey] = _CachedOnlineTracks(now, List.unmodifiable(tracks));
+    return _cache[cacheKey]!.tracks;
   }
 }
