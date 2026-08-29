@@ -125,17 +125,35 @@ jobs:
             echo "WARNING: Firebase client variables incomplete; APK will build with remote Firebase services disabled."
           fi
           flutter build apk "${ARGS[@]}"
-      - name: Verify APKs and record checksums
+      - name: Verify APKs, size budget and checksums
+        env:
+          MAX_SPLIT_APK_MB: ${{ vars.MAX_SPLIT_APK_MB }}
         shell: bash
         run: |
           set -euo pipefail
+          MAX_MB="${MAX_SPLIT_APK_MB:-80}"
+          MAX_BYTES=$((MAX_MB * 1024 * 1024))
           : > build/apk-sha256.txt
+          : > build/apk-size.txt
+          echo "### OTYA split APK size" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "| ABI | Size | Budget |" >> "$GITHUB_STEP_SUMMARY"
+          echo "| --- | ---: | ---: |" >> "$GITHUB_STEP_SUMMARY"
           for APK in build/app/outputs/flutter-apk/app-arm64-v8a-release.apk build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk; do
             test -s "$APK"
-            test "$(stat -c%s "$APK")" -ge 5000000
+            BYTES="$(stat -c%s "$APK")"
+            test "$BYTES" -ge 5000000
+            if [ "$BYTES" -gt "$MAX_BYTES" ]; then
+              echo "ERROR: $APK is $BYTES bytes; split APK budget is ${MAX_MB} MiB." >&2
+              exit 1
+            fi
+            ABI="$(basename "$APK" | sed -e 's/app-//' -e 's/-release.apk//')"
+            MIB="$(awk -v b="$BYTES" 'BEGIN { printf "%.2f", b/1048576 }')"
+            printf '%s\t%s bytes\t%s MiB\n' "$ABI" "$BYTES" "$MIB" | tee -a build/apk-size.txt
+            echo "| $ABI | ${MIB} MiB | ${MAX_MB} MiB |" >> "$GITHUB_STEP_SUMMARY"
             sha256sum "$APK" | tee -a build/apk-sha256.txt
           done
-      - name: Upload APKs and checksums
+      - name: Upload APKs and verification metadata
         uses: actions/upload-artifact@v4
         with:
           name: otya-player-${{ github.sha }}
@@ -143,6 +161,7 @@ jobs:
             build/app/outputs/flutter-apk/app-arm64-v8a-release.apk
             build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk
             build/apk-sha256.txt
+            build/apk-size.txt
           retention-days: 7
           if-no-files-found: error
       - name: Remove secret material
