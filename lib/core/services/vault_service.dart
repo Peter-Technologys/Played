@@ -11,7 +11,11 @@ import '../models/vault_item.dart';
 const _kMediaChannel = MethodChannel('com.otyaplayer.app/media_store');
 
 /// Moves media into OTYA's app-private storage and restores it on demand.
-/// Metadata remains protected by the local encrypted/keystore-backed layer.
+///
+/// The file is protected by Android's application sandbox and the device's
+/// storage encryption. OTYA does not claim a second custom file-encryption
+/// layer here. `VaultItem.encryptedPath` is retained as a legacy database field
+/// name for schema compatibility until a future migration can rename it safely.
 class VaultService {
   VaultService._();
   static final VaultService instance = VaultService._();
@@ -32,7 +36,7 @@ class VaultService {
         ? vaultRoot
         : '$vaultRoot${Platform.pathSeparator}';
     if (resolved != vaultRoot && !resolved.startsWith(prefix)) {
-      throw Exception('[VaultService] Refusing path outside Private storage.');
+      throw Exception('[Private] Refusing path outside Private storage.');
     }
   }
 
@@ -117,51 +121,5 @@ class VaultService {
     } catch (_) {}
 
     debugPrint('[Private] Restored: $mediaId');
-  }
-
-  Future<void> deleteFromVault(String mediaId) async {
-    final vaultItem = OtyaDatabase.instance.getVaultItem(mediaId);
-    if (vaultItem == null) return;
-
-    await _assertWithinVault(vaultItem.encryptedPath);
-    final vaultFile = File(vaultItem.encryptedPath);
-    if (await vaultFile.exists()) {
-      // Best-effort overwrite. Flash storage may remap blocks; OTYA does not
-      // represent this as a cryptographic secure-erase guarantee.
-      try {
-        final size = await vaultFile.length();
-        const chunkSize = 1024 * 1024;
-        final raf = await vaultFile.open(mode: FileMode.write);
-        try {
-          var remaining = size;
-          final zeroChunk = List<int>.filled(chunkSize, 0);
-          while (remaining > 0) {
-            final count = remaining > chunkSize ? chunkSize : remaining;
-            await raf.writeFrom(zeroChunk, 0, count);
-            remaining -= count;
-          }
-          await raf.flush();
-        } finally {
-          await raf.close();
-        }
-      } catch (_) {}
-      await vaultFile.delete();
-    }
-
-    await OtyaDatabase.instance.removeFromVault(mediaId);
-    debugPrint('[Private] Deleted: $mediaId');
-  }
-
-  bool isLocked(String mediaId) => OtyaDatabase.instance.isInVault(mediaId);
-
-  List<VaultItem> getAllItems() => OtyaDatabase.instance.getAllVaultItems();
-
-  Future<int> getVaultSize() async {
-    var total = 0;
-    for (final item in getAllItems()) {
-      final file = File(item.encryptedPath);
-      if (await file.exists()) total += await file.length();
-    }
-    return total;
   }
 }
