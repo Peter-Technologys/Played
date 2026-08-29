@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter/services.dart';
@@ -31,10 +33,19 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   @override
   void initState() {
     super.initState();
+
+    // FIRST-PAINT RULE:
+    // Only local state is read before the app becomes usable. No Firebase,
+    // Cloudflare, auth, AI, update, announcement, or online-theme request is
+    // allowed to control startup. OTYA must open with airplane mode enabled.
     _checkOnboarding();
-    _loadVisualTheme();
-    RemoteControlService.instance.init();
+    unawaited(_loadLocalVisualTheme());
+
     SchedulerBinding.instance.addPostFrameCallback((_) {
+      // All online/remote work starts only after Flutter has produced a frame.
+      // Every task is fire-and-forget and owns its own failure handling.
+      unawaited(_startRemoteServicesAfterFirstFrame());
+
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
         try {
@@ -50,9 +61,26 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     });
   }
 
-  Future<void> _loadVisualTheme() async {
-    await CustomThemeManager.instance.load();
-    await CustomThemeManager.instance.refreshSeasonalTheme();
+  /// Loads only app-owned/local theme data. This method never needs internet.
+  Future<void> _loadLocalVisualTheme() async {
+    try {
+      await CustomThemeManager.instance.load();
+    } catch (_) {
+      // Theme failure must never prevent Video/Music/Me from opening.
+    }
+  }
+
+  /// Remote work is deliberately kept out of the critical startup path.
+  Future<void> _startRemoteServicesAfterFirstFrame() async {
+    try {
+      await RemoteControlService.instance.init();
+    } catch (_) {
+      // Cached/default configuration remains valid while offline.
+    }
+
+    // Seasonal themes are optional decoration. They must never delay startup,
+    // playback, media scanning, transfer, or local file access.
+    unawaited(CustomThemeManager.instance.refreshSeasonalTheme().catchError((_) {}));
   }
 
   Future<void> _checkOnboarding() async {
@@ -187,7 +215,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                 ),
                 const SizedBox(height: 20),
                 const Text(
-                  'OTYA PLAYER',
+                  'OTYA',
                   style: TextStyle(
                     color: AppColors.accent,
                     fontSize: 13,
@@ -228,7 +256,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             : baseDark;
 
         return MaterialApp.router(
-          title: 'OTYA Player',
+          title: 'OTYA',
           debugShowCheckedModeBanner: false,
           theme: lightTheme,
           darkTheme: darkTheme,
