@@ -23,7 +23,9 @@ dependencies:
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
-  # Encryption / Vault
+  # Private media + local authentication. OTYA Private relies on Android's app
+  # sandbox/device storage encryption; crypto is used for local integrity/data
+  # helpers rather than claiming a second custom file-encryption layer.
   crypto: ^3.0.5
   local_auth: ^2.3.0
 
@@ -68,7 +70,7 @@ dependencies:
   firebase_analytics: ^11.6.0
   firebase_performance: ^0.10.1+10
 
-  # Secure storage for vault and account tokens.
+  # Secure storage for Private/account secrets and local PIN/session state.
   flutter_secure_storage: ^9.2.4
 
   # Connectivity state only. OTYA Transfer uses Dart sockets/NetworkInterface
@@ -80,14 +82,10 @@ dependencies:
   json_annotation: ^4.9.0
   cupertino_icons: ^1.0.8
 
-  # Sharing, URL launching, PIN storage
+  # Sharing, external update/support links, PIN/preferences storage.
   share_plus: ^10.1.4
   url_launcher: ^6.3.1
   shared_preferences: ^2.3.5
-
-  # APK in-app download + install
-  dio: ^5.7.0
-  open_filex: ^4.7.0
 
   # Background audio + app-wide audio-focus policy. audio_session is declared
   # directly because OTYA owns interruption/headphone routing behaviour rather
