@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/services/otya_support_service.dart';
+import '../../shared/widgets/otya_brand_mark.dart';
 
 class OtyaSupportScreen extends StatefulWidget {
   const OtyaSupportScreen({super.key});
@@ -130,9 +131,17 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         child: ListView(
           padding: const EdgeInsets.fromLTRB(18, 12, 18, 32),
           children: [
-            Text('How can OTYA help?', style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -1, color: AppColors.textPrimaryOf(context))),
+            Center(
+              child: OtyaBrandMark(
+                size: 94,
+                animate: _busy,
+                state: _busy ? OtyaBrandState.thinking : OtyaBrandState.idle,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text('How can OTYA help?', textAlign: TextAlign.center, style: TextStyle(fontSize: 28, fontWeight: FontWeight.w900, letterSpacing: -1, color: AppColors.textPrimaryOf(context))),
             const SizedBox(height: 8),
-            const Text('Ask about playback, music, video, files, transfer, converter, private media, themes, storage, account, updates or troubleshooting.', style: TextStyle(fontSize: 14, height: 1.45, color: AppColors.textSecondary)),
+            const Text('Ask about playback, music, video, files, transfer, converter, private media, themes, storage, account, updates or troubleshooting.', textAlign: TextAlign.center, style: TextStyle(fontSize: 14, height: 1.45, color: AppColors.textSecondary)),
             const SizedBox(height: 20),
             Wrap(
               spacing: 8,
@@ -163,8 +172,13 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
               width: double.infinity,
               child: FilledButton.icon(
                 onPressed: _busy ? null : () => _ask(),
-                icon: _busy ? const SizedBox.square(dimension: 16, child: CircularProgressIndicator(strokeWidth: 2)) : const Icon(Icons.auto_awesome_rounded),
-                label: Text(_busy ? 'Checking…' : 'Ask OTYA'),
+                icon: _busy
+                    ? const SizedBox.square(
+                        dimension: 24,
+                        child: OtyaBrandMark(size: 24, animate: true, state: OtyaBrandState.thinking),
+                      )
+                    : const Icon(Icons.auto_awesome_rounded),
+                label: Text(_busy ? 'OTYA is thinking…' : 'Ask OTYA'),
               ),
             ),
             if (_error != null) ...[
