@@ -1,0 +1,55 @@
+import 'dart:io';
+
+import 'package:flutter_test/flutter_test.dart';
+
+String read(String path) => File(path).readAsStringSync();
+
+void main() {
+  test('verified Firebase Android identifiers stay pinned', () {
+    final firebase = read('lib/core/services/firebase_platform_service.dart');
+    final environment = read('lib/core/config/environment.dart');
+
+    expect(firebase, contains('1:82776565585:android:085cf9b4eecb76e9535570'));
+    expect(firebase, contains("defaultValue: '82776565585'"));
+    expect(firebase, contains("defaultValue: 'otya-player'"));
+    expect(environment, contains("appPackageId = 'com.otyaplayer.app'"));
+  });
+
+  test('App Check uses debug provider only for debug and Play Integrity otherwise', () {
+    final firebase = read('lib/core/services/firebase_platform_service.dart');
+    final httpClient = read('lib/core/services/http_client.dart');
+
+    expect(
+      firebase,
+      contains('kDebugMode ? AndroidProvider.debug : AndroidProvider.playIntegrity'),
+    );
+    expect(httpClient, contains("request.headers['X-Firebase-AppCheck']"));
+  });
+
+  test('Google backend ID tokens prefer Web OAuth client id', () {
+    final google = read('lib/core/services/google_account_service.dart');
+    final workflow = read('.github/workflows/debug.yml');
+
+    expect(google, contains("String.fromEnvironment(\n    'GOOGLE_WEB_CLIENT_ID'"));
+    expect(google, contains('serverClientId: _clientId.isEmpty ? null : _clientId'));
+    expect(
+      workflow,
+      contains('82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'),
+    );
+    expect(workflow, contains('--dart-define=GOOGLE_WEB_CLIENT_ID'));
+  });
+
+  test('Firebase startup remains after runApp and service credentials stay out of app', () {
+    final main = read('lib/main.dart');
+    final gitignore = read('.gitignore');
+
+    final runAppIndex = main.indexOf('runApp(');
+    final backgroundIndex = main.indexOf('unawaited(_initBackground');
+    expect(runAppIndex, greaterThanOrEqualTo(0));
+    expect(backgroundIndex, greaterThan(runAppIndex));
+
+    expect(gitignore, contains('*firebase-adminsdk*.json'));
+    expect(gitignore, contains('service-account*.json'));
+    expect(gitignore, contains('google-services.json'));
+  });
+}
