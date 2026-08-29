@@ -566,7 +566,7 @@ class _MediaKitGestureWrapperState extends State<MediaKitGestureWrapper> {
 
   void _onDoubleTapDown(TapDownDetails d) {
     final isLeft = d.localPosition.dx < context.size!.width / 2;
-    final delta  = const Duration(seconds: 10);
+    const delta = Duration(seconds: 10);
     final newPos = isLeft
         ? _clampDuration(_position - delta, Duration.zero, _duration)
         : _clampDuration(_position + delta, Duration.zero, _duration);

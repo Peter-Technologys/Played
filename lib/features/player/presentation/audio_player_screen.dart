@@ -839,26 +839,34 @@ class _AlbumArtState extends State<_AlbumArt> {
   Future<void> _resolve() async {
     final path = widget.albumArtPath;
     if (path == null) {
-      if (mounted) setState(() {
-        _resolvedPath = null;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _resolvedPath = null;
+          _loading = false;
+        });
+      }
       return;
     }
     if (!path.startsWith('albumid:')) {
-      if (mounted) setState(() {
-        _resolvedPath = path;
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _resolvedPath = path;
+          _loading = false;
+        });
+      }
       return;
     }
 
-    if (mounted) setState(() => _loading = true);
+    if (mounted) {
+      setState(() => _loading = true);
+    }
     final resolved = await AlbumArtService.instance.resolve(path);
-    if (mounted) setState(() {
-      _resolvedPath = resolved;
-      _loading = false;
-    });
+    if (mounted) {
+      setState(() {
+        _resolvedPath = resolved;
+        _loading = false;
+      });
+    }
   }
 
   @override

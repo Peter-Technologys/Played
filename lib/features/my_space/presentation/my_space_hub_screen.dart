@@ -228,6 +228,9 @@ class MySpaceHubScreen extends ConsumerWidget {
     required Future<String?> Function(MediaItem item, void Function(double) progress) run,
     required Future<void> Function() onFinished,
   }) async {
+    String? busyId;
+    String? result;
+    double progress = 0;
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
@@ -236,9 +239,6 @@ class MySpaceHubScreen extends ConsumerWidget {
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (sheetContext) => StatefulBuilder(
         builder: (context, setState) {
-          String? busyId;
-          String? result;
-          double progress = 0;
           return SizedBox(
             height: MediaQuery.sizeOf(sheetContext).height * .78,
             child: Column(

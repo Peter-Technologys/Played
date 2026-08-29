@@ -143,7 +143,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   String get size {
     final bytes = widget.mediaItem.fileSizeBytes;
-    if (bytes == null || bytes == 0) return 'Unknown';
+    if (bytes == 0) return 'Unknown';
     if (bytes < 1024 * 1024) {
       return '${(bytes / 1024).toStringAsFixed(1)} KB';
     }
