@@ -27,11 +27,12 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Notifications and direct APK updates. Call/audio interruptions are
-         handled through Android audio focus; OTYA does not read phone state. -->
+    <!-- Notifications. Call/audio interruptions are handled through Android
+         audio focus; OTYA does not read phone state. OTYA also does not request
+         package-installer permission: updates hand off to the official HTTPS
+         destination so Play-distributed builds remain policy-safe. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
     <queries>
         <intent>
@@ -79,9 +80,7 @@
             android:hardwareAccelerated="true"
             android:windowSoftInputMode="adjustResize"
             android:supportsPictureInPicture="true"
-            android:resizeableActivity="true"
-            android:maxAspectRatio="2.4"
-            android:minAspectRatio="1.0">
+            android:resizeableActivity="true">
 
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
