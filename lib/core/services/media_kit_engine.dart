@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import '../../app/theme/app_colors.dart';
+import 'new_media_tracker.dart';
 import 'playback_coordinator.dart';
 
 
@@ -75,6 +76,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
   // Subscriptions
   StreamSubscription? _trackSub;
   StreamSubscription? _errorSub;
+  StreamSubscription? _playingSub;
 
   @override
   void initState() {
@@ -98,6 +100,14 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
           enableHardwareAcceleration: true,
         ),
       );
+
+      // A media item is considered seen only after real playback starts.
+      // This keeps NEW intact when a user merely browses or opens a failed file.
+      _playingSub = _player!.stream.playing.listen((playing) {
+        if (playing) {
+          unawaited(NewMediaTracker.instance.markSeenPath(widget.filePath));
+        }
+      });
 
       // Listen for track changes (fires after media opens)
       _trackSub = _player!.stream.tracks.listen(_onTracksChanged);
@@ -221,8 +231,10 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
   void dispose() {
     // Cancel subscriptions BEFORE disposing the player so their callbacks
     // cannot fire after the player is torn down (avoids setState-after-dispose).
+    _playingSub?.cancel();
     _trackSub?.cancel();
     _errorSub?.cancel();
+    _playingSub = null;
     _trackSub = null;
     _errorSub = null;
     // Unregister from coordinator before disposing so the coordinator does not
