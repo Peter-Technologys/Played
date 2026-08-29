@@ -36,8 +36,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   void initState() {
     super.initState();
 
-    // Only local state is allowed to affect first paint. Network services begin
-    // after Flutter has already produced a usable frame.
     _checkOnboarding();
     unawaited(_loadLocalVisualTheme());
 
@@ -102,10 +100,14 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     setState(() => _onboardingDone = true);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      unawaited(
-        NotificationService.instance.requestPermission().catchError((_) {}),
-      );
+      unawaited(_requestNotificationPermissionSafely());
     });
+  }
+
+  Future<void> _requestNotificationPermissionSafely() async {
+    try {
+      await NotificationService.instance.requestPermission();
+    } catch (_) {}
   }
 
   ThemeMode _materialThemeMode(AppThemeMode mode) => switch (mode) {
