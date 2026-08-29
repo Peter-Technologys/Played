@@ -9,6 +9,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../app/router.dart';
 import '../config/environment.dart';
 import 'auth_service.dart';
 import 'device_service.dart';
@@ -17,9 +18,9 @@ import 'push_notification_service.dart';
 /// Build-time Firebase client configuration.
 ///
 /// Firebase is used ONLY as the Android push transport. OTYA identity, data,
-/// support, AI and notification business logic remain on the Cloudflare
-/// backend. Missing Firebase values disable remote push without blocking local
-/// media playback or app startup.
+/// support and notification business logic remain on the Cloudflare backend.
+/// Missing Firebase values disable remote push without blocking local media
+/// playback or app startup.
 abstract final class OtyaFirebaseConfig {
   static const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const appId = String.fromEnvironment('FIREBASE_APP_ID');
@@ -51,9 +52,8 @@ Future<void> otyaFirebaseBackgroundHandler(RemoteMessage message) async {
   } catch (e) {
     debugPrint('[FCM:bg] Firebase init skipped: $e');
   }
-  // Messages containing a notification payload are displayed by Android while
-  // the app is backgrounded/terminated. Data is intentionally not processed
-  // destructively here; OTYA handles user actions after the app is opened.
+  // Android can display a notification payload while OTYA is backgrounded.
+  // OTYA processes navigation only after the user opens the app.
   debugPrint('[FCM:bg] message=${message.messageId}');
 }
 
@@ -63,6 +63,26 @@ class FcmService {
 
   static const _keyFcmToken = 'fcm_token';
   bool _initialized = false;
+
+  /// Public destinations that a backend notification is allowed to open.
+  /// This is intentionally an allow-list: a remote push must not be able to
+  /// navigate to arbitrary internal/admin/debug screens.
+  static const Set<String> _allowedRoutes = {
+    '/',
+    '/music',
+    '/myspace',
+    '/support',
+    '/transfer',
+    '/downloads',
+    '/settings',
+    '/settings/storage',
+    '/profile',
+    '/about',
+    '/privacy',
+    '/whats-new',
+    '/playlists',
+    '/history',
+  };
 
   Future<void> init() async {
     if (_initialized) return;
@@ -195,13 +215,56 @@ class FcmService {
     await PushNotificationService.instance.showAnnouncement(
       title: title,
       body: body,
-      url: message.data['url']?.toString(),
+      url: _notificationTarget(message),
     );
   }
 
+  String? _notificationTarget(RemoteMessage message) {
+    final route = _canonicalRoute(message.data['route']?.toString());
+    if (route != null) return 'otya://app$route';
+    return message.data['url']?.toString();
+  }
+
+  String? _canonicalRoute(String? raw) {
+    if (raw == null || raw.trim().isEmpty) return null;
+    var route = raw.trim();
+
+    // Preserve old notification payloads after the product rename/migration.
+    if (route == '/ai') route = '/support';
+    if (route == '/airdrop') route = '/transfer';
+    if (route == '/home') route = '/';
+
+    return _allowedRoutes.contains(route) ? route : null;
+  }
+
   Future<void> _handleOpenedMessage(RemoteMessage message) async {
+    final route = _canonicalRoute(message.data['route']?.toString());
+    if (route != null) {
+      try {
+        AppRouter.router.go(route);
+        return;
+      } catch (e) {
+        debugPrint('[FCM] in-app notification route failed: $e');
+      }
+    }
+
     final rawUrl = message.data['url']?.toString();
     if (rawUrl == null || rawUrl.isEmpty) return;
+
+    // Compatibility for local-notification payloads that contain an OTYA URI.
+    final appUri = Uri.tryParse(rawUrl);
+    if (appUri != null && appUri.scheme == 'otya' && appUri.host == 'app') {
+      final appRoute = _canonicalRoute(appUri.path);
+      if (appRoute != null) {
+        try {
+          AppRouter.router.go(appRoute);
+        } catch (e) {
+          debugPrint('[FCM] OTYA URI route failed: $e');
+        }
+      }
+      return;
+    }
+
     final uri = Uri.tryParse(rawUrl);
     if (uri == null || !{'https', 'http'}.contains(uri.scheme)) return;
     try {
