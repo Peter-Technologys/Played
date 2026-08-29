@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
+import '../../../shared/widgets/otya_logo.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
@@ -225,10 +226,7 @@ class _Header extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(16, 12, 10, 8),
         child: Row(
           children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(12),
-              child: Image.asset('assets/icons/play_store_512.png', width: 38, height: 38),
-            ),
+            const OtyaMark(size: 38),
             const SizedBox(width: 11),
             Expanded(
               child: Column(
