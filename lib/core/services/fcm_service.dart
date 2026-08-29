@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
 
-import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -13,42 +12,13 @@ import '../../app/router.dart';
 import '../config/environment.dart';
 import 'auth_service.dart';
 import 'device_service.dart';
+import 'firebase_platform_service.dart';
 import 'push_notification_service.dart';
-
-/// Build-time Firebase client configuration.
-///
-/// Firebase is used ONLY as the Android push transport. OTYA identity, data,
-/// support and notification business logic remain on the Cloudflare backend.
-/// Missing Firebase values disable remote push without blocking local media
-/// playback or app startup.
-abstract final class OtyaFirebaseConfig {
-  static const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
-  static const appId = String.fromEnvironment('FIREBASE_APP_ID');
-  static const messagingSenderId =
-      String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
-  static const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
-
-  static bool get configured =>
-      apiKey.isNotEmpty &&
-      appId.isNotEmpty &&
-      messagingSenderId.isNotEmpty &&
-      projectId.isNotEmpty;
-
-  static FirebaseOptions get options => const FirebaseOptions(
-        apiKey: apiKey,
-        appId: appId,
-        messagingSenderId: messagingSenderId,
-        projectId: projectId,
-      );
-}
 
 @pragma('vm:entry-point')
 Future<void> otyaFirebaseBackgroundHandler(RemoteMessage message) async {
-  if (!OtyaFirebaseConfig.configured) return;
   try {
-    if (Firebase.apps.isEmpty) {
-      await Firebase.initializeApp(options: OtyaFirebaseConfig.options);
-    }
+    await FirebasePlatformService.instance.ensureInitialized();
   } catch (e) {
     debugPrint('[FCM:bg] Firebase init skipped: $e');
   }
@@ -98,9 +68,7 @@ class FcmService {
     }
 
     try {
-      if (Firebase.apps.isEmpty) {
-        await Firebase.initializeApp(options: OtyaFirebaseConfig.options);
-      }
+      if (!await FirebasePlatformService.instance.ensureInitialized()) return;
       FirebaseMessaging.onBackgroundMessage(otyaFirebaseBackgroundHandler);
 
       final messaging = FirebaseMessaging.instance;
@@ -159,13 +127,14 @@ class FcmService {
       final deviceId = await DeviceService.instance.getDeviceId();
       final packageInfo = await PackageInfo.fromPlatform();
       final accessToken = await AuthService.instance.getValidToken();
-      final headers = <String, String>{
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-      if (accessToken != null && accessToken.isNotEmpty) {
-        headers['Authorization'] = 'Bearer $accessToken';
-      }
+      final headers = await FirebasePlatformService.instance.protectedHeaders(
+        base: <String, String>{
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          if (accessToken != null && accessToken.isNotEmpty)
+            'Authorization': 'Bearer $accessToken',
+        },
+      );
 
       final response = await http
           .post(
