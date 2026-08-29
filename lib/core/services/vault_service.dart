@@ -42,6 +42,34 @@ class VaultService {
     }
   }
 
+  /// Never overwrite a different file that appeared at the original location
+  /// while an item was inside OTYA Private.
+  static Future<String> _availableRestorePath(String originalPath) async {
+    if (!await File(originalPath).exists()) return originalPath;
+
+    final separator = Platform.pathSeparator;
+    final lastSeparator = originalPath.lastIndexOf(separator);
+    final directory = lastSeparator >= 0
+        ? originalPath.substring(0, lastSeparator + 1)
+        : '';
+    final fileName = lastSeparator >= 0
+        ? originalPath.substring(lastSeparator + 1)
+        : originalPath;
+    final dot = fileName.lastIndexOf('.');
+    final stem = dot > 0 ? fileName.substring(0, dot) : fileName;
+    final extension = dot > 0 ? fileName.substring(dot) : '';
+
+    for (var index = 1; index <= 9999; index++) {
+      final candidate = '$directory$stem (restored $index)$extension';
+      if (!await File(candidate).exists()) return candidate;
+    }
+
+    throw FileSystemException(
+      'Could not find a safe restore filename',
+      originalPath,
+    );
+  }
+
   Future<Directory> get _vaultDir async {
     final base = await getApplicationDocumentsDirectory();
     final dir = Directory('${base.path}/.vault');
@@ -130,13 +158,13 @@ class VaultService {
       );
     } catch (_) {}
 
-    debugPrint('[Private] Locked: ${item.title}');
+    debugPrint('[Private] Item moved into app-private storage.');
     return vaultItem;
   }
 
   Future<void> unlockItem(String mediaId) async {
     final vaultItem = OtyaDatabase.instance.getVaultItem(mediaId);
-    if (vaultItem == null) throw Exception('Private item not found: $mediaId');
+    if (vaultItem == null) throw Exception('Private item not found.');
 
     await _assertWithinVault(vaultItem.encryptedPath);
     final vaultFile = File(vaultItem.encryptedPath);
@@ -147,26 +175,35 @@ class VaultService {
       );
     }
 
-    final original = File(vaultItem.originalPath);
-    await original.parent.create(recursive: true);
-    final restored = await vaultFile.copy(vaultItem.originalPath);
+    final restorePath = await _availableRestorePath(vaultItem.originalPath);
+    final restoredFile = File(restorePath);
+    await restoredFile.parent.create(recursive: true);
+    final restored = await vaultFile.copy(restorePath);
     if (!await restored.exists()) {
-      throw FileSystemException('Could not restore media', vaultItem.originalPath);
+      throw FileSystemException('Could not restore media', restorePath);
+    }
+
+    try {
+      await vaultFile.delete();
+    } catch (_) {
+      // Preserve the Private copy as the source of truth if the move cannot be
+      // completed atomically. Remove the newly restored duplicate when possible.
+      try {
+        if (await restoredFile.exists()) await restoredFile.delete();
+      } catch (_) {}
+      rethrow;
     }
 
     await OtyaDatabase.instance.removeFromVault(mediaId);
-    try {
-      await vaultFile.delete();
-    } catch (_) {}
 
     try {
       await _kMediaChannel.invokeMethod<void>(
         'triggerScan',
-        {'path': vaultItem.originalPath},
+        {'path': restorePath},
       );
     } catch (_) {}
 
-    debugPrint('[Private] Restored: $mediaId');
+    debugPrint('[Private] Item restored from app-private storage.');
   }
 
   /// Permanently removes only the app-private copy and its metadata. Refuse to
@@ -181,6 +218,6 @@ class VaultService {
       await file.delete();
     }
     await OtyaDatabase.instance.removeFromVault(mediaId);
-    debugPrint('[Private] Permanently deleted: $mediaId');
+    debugPrint('[Private] Protected item permanently deleted.');
   }
 }
