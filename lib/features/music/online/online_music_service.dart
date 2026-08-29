@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../../../core/config/environment.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/remote_control_service.dart';
 
 class OnlineTrack {
   const OnlineTrack({
@@ -101,6 +102,10 @@ class OnlineMusicService {
       _load(query: query.trim(), limit: limit);
 
   Future<List<OnlineTrack>> _load({String query = '', int limit = 24}) async {
+    if (!RemoteControlService.instance.featureEnabled('onlineMusic', fallback: true)) {
+      return const [];
+    }
+
     final safeLimit = limit.clamp(1, 50).toInt();
     final cacheKey = '${query.toLowerCase()}|$safeLimit';
     final now = DateTime.now();
