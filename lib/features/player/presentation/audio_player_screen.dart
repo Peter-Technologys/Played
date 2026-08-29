@@ -20,6 +20,7 @@ import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';
+import '../../../core/services/new_media_tracker.dart';
 import '../../../core/services/sleep_detection_service.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../../core/utils/duration_formatter.dart';
@@ -130,6 +131,9 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
       state = state.copyWith(isPlaying: playing);
+      if (playing && _currentItemId != null) {
+        unawaited(NewMediaTracker.instance.markSeenId(_currentItemId!));
+      }
       _updateNotification();
     });
 
