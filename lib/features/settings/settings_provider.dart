@@ -116,11 +116,10 @@ class AppSettings {
 
   static Future<AppSettings> load() async {
     final p = await _getPrefs();
+    final themeIndex = (p.getInt(_kTheme) ?? AppThemeMode.system.index)
+        .clamp(0, AppThemeMode.values.length - 1);
     return AppSettings(
-      themeMode: AppThemeMode.values[
-        (p.getInt(_kTheme) ?? AppThemeMode.system.index)
-            .clamp(0, AppThemeMode.values.length - 1),
-      ],
+      themeMode: AppThemeMode.values[themeIndex],
       autoResume: p.getBool(_kAutoResume) ?? true,
       defaultBatterySaver: p.getBool(_kBatterySaver) ?? false,
       shuffle: p.getBool(_kShuffle) ?? false,
