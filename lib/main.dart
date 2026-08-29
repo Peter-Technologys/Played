@@ -35,12 +35,17 @@ Future<void> main() async {
     DeviceOrientation.landscapeRight,
   ]);
 
+  // Android 15+ is edge-to-edge by default when targeting API 35. Explicitly
+  // opt into the same behavior on older supported Android versions so OTYA has
+  // one predictable inset model instead of two visually different shells.
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
     statusBarColor: Colors.transparent,
     statusBarIconBrightness: Brightness.light,
     systemNavigationBarColor: Colors.transparent,
     systemNavigationBarDividerColor: Colors.transparent,
     systemNavigationBarIconBrightness: Brightness.light,
+    systemNavigationBarContrastEnforced: false,
   ));
 
   FlutterError.onError = (details) {
