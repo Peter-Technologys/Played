@@ -76,7 +76,7 @@ jobs:
           distribution: temurin
           java-version: "17"
           cache: gradle
-      - name: Decode release keystore when available
+      - name: Prepare signing mode
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         shell: bash
@@ -84,6 +84,13 @@ jobs:
           set -euo pipefail
           if [ -n "$KEYSTORE_BASE64" ]; then
             printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+            echo "OTYA_ALLOW_DEBUG_SIGNING=false" >> "$GITHUB_ENV"
+            echo "OTYA_SIGNING_MODE=release" >> "$GITHUB_ENV"
+            echo "Production signing material is available for this CI artifact."
+          else
+            echo "OTYA_ALLOW_DEBUG_SIGNING=true" >> "$GITHUB_ENV"
+            echo "OTYA_SIGNING_MODE=ci-debug" >> "$GITHUB_ENV"
+            echo "WARNING: No production keystore secret is available. This CI artifact will be debug-signed and MUST NOT be published."
           fi
       - name: Flutter pub get
         run: flutter pub get
@@ -135,7 +142,12 @@ jobs:
           MAX_BYTES=$((MAX_MB * 1024 * 1024))
           : > build/apk-sha256.txt
           : > build/apk-size.txt
-          echo "### OTYA split APK size" >> "$GITHUB_STEP_SUMMARY"
+          echo "### OTYA split APK verification" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "Signing mode: **${OTYA_SIGNING_MODE:-unknown}**" >> "$GITHUB_STEP_SUMMARY"
+          if [ "${OTYA_SIGNING_MODE:-}" = "ci-debug" ]; then
+            echo "> This is a CI validation artifact only. Do not publish it." >> "$GITHUB_STEP_SUMMARY"
+          fi
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "| ABI | Size | Budget |" >> "$GITHUB_STEP_SUMMARY"
           echo "| --- | ---: | ---: |" >> "$GITHUB_STEP_SUMMARY"
