@@ -11,15 +11,25 @@ import 'remote_control_service.dart';
 
 /// Build-time public Firebase client configuration.
 ///
-/// These values identify the Firebase Android app. Privileged Firebase service
-/// account credentials never belong in the APK; they stay in Cloudflare/GitHub
-/// secrets and are used only by OTYA's server-side control plane.
+/// The project/app identifiers below are public Firebase client metadata and
+/// are pinned to OTYA's verified Android app so release builds cannot silently
+/// drift to another Firebase project. The API key is still supplied at build
+/// time. Privileged Firebase service-account credentials never belong in the
+/// APK; they stay only on OTYA's server-side control plane.
 abstract final class OtyaFirebaseConfig {
   static const apiKey = String.fromEnvironment('FIREBASE_API_KEY');
-  static const appId = String.fromEnvironment('FIREBASE_APP_ID');
-  static const messagingSenderId =
-      String.fromEnvironment('FIREBASE_MESSAGING_SENDER_ID');
-  static const projectId = String.fromEnvironment('FIREBASE_PROJECT_ID');
+  static const appId = String.fromEnvironment(
+    'FIREBASE_APP_ID',
+    defaultValue: '1:82776565585:android:085cf9b4eecb76e9535570',
+  );
+  static const messagingSenderId = String.fromEnvironment(
+    'FIREBASE_MESSAGING_SENDER_ID',
+    defaultValue: '82776565585',
+  );
+  static const projectId = String.fromEnvironment(
+    'FIREBASE_PROJECT_ID',
+    defaultValue: 'otya-player',
+  );
 
   static bool get configured =>
       apiKey.isNotEmpty &&
