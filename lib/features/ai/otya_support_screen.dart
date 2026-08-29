@@ -85,7 +85,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       );
       if (!mounted) return;
       setState(() {
-        if (reply.modelId != null && _models.isNotEmpty) {
+        if (reply.modelId != null) {
           for (final candidate in _models) {
             if (candidate.id == reply.modelId) {
               _selectedModel = candidate;
@@ -107,7 +107,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         _messages.add(
           const _ChatEntry(
             text:
-                'I cannot reach the online answer service right now. Your local music, video, files and playback still work normally.',
+                'Ask OTYA is unavailable right now. Your local music, video, files and playback still work normally.',
             fromUser: false,
           ),
         );
@@ -121,6 +121,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   }
 
   Future<void> _handoff(String question) async {
+    _emailController.clear();
     final sent = await showModalBottomSheet<bool>(
       context: context,
       isScrollControlled: true,
@@ -139,12 +140,12 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Talk to OTYA support',
+              'Talk to PeterSmart Link support',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
             ),
             const SizedBox(height: 7),
             const Text(
-              'Enter your email. OTYA will send this question to PeterSmart Link support and create a ticket.',
+              'Ask OTYA only answers OTYA questions. Enter your email and this question will be sent to support with a ticket number.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -153,7 +154,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
               keyboardType: TextInputType.emailAddress,
               autofillHints: const [AutofillHints.email],
               decoration: InputDecoration(
-                labelText: 'Email',
+                labelText: 'Reply email',
                 filled: true,
                 fillColor: Theme.of(sheetContext).scaffoldBackgroundColor,
                 border: OutlineInputBorder(
@@ -187,12 +188,12 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       final ticket = await _service.handoff(question: question, email: email);
       if (!mounted) return;
       _appendAssistant(
-        'Your question was sent to OTYA support. Ticket ${ticket.id}. Support can reply to $email.',
+        'PeterSmart Link support has been notified. Ticket ${ticket.id}. A reply can be sent to $email.',
       );
     } catch (_) {
       if (mounted) {
         _appendAssistant(
-          'I could not send the support request. Try again when you are online.',
+          'I could not send the support request. Try again when you are online or use the OTYA support page.',
         );
       }
     } finally {
@@ -242,9 +243,9 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
     final modelLabel = _selectedModel?.name ??
-        (_loadingModels ? 'Loading model…' : 'OTYA AI');
+        (_loadingModels ? 'Loading…' : 'OTYA');
 
     return Scaffold(
       appBar: AppBar(
@@ -263,7 +264,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                   style: TextStyle(
                     fontSize: 10.5,
                     fontWeight: FontWeight.w500,
-                    color: cs.onSurface.withValues(alpha: .55),
+                    color: colors.onSurface.withValues(alpha: .55),
                   ),
                 ),
               ],
@@ -273,13 +274,17 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         actions: [
           if (_models.length > 1)
             PopupMenuButton<String>(
-              tooltip: 'Choose AI model',
+              tooltip: 'Choose model',
               icon: const Icon(Icons.tune_rounded),
               onSelected: (id) {
-                final model = _models.where((item) => item.id == id).firstOrNull;
-                if (model != null) setState(() => _selectedModel = model);
+                for (final model in _models) {
+                  if (model.id == id) {
+                    setState(() => _selectedModel = model);
+                    break;
+                  }
+                }
               },
-              itemBuilder: (context) => _models
+              itemBuilder: (_) => _models
                   .map(
                     (model) => PopupMenuItem<String>(
                       value: model.id,
@@ -361,7 +366,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                 10 + MediaQuery.of(context).padding.bottom,
               ),
               decoration: BoxDecoration(
-                color: cs.surface,
+                color: colors.surface,
                 border: Border(
                   top: BorderSide(color: AppColors.borderOf(context)),
                 ),
@@ -379,7 +384,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        hintText: 'Message OTYA',
+                        hintText: 'Ask about OTYA',
                         filled: true,
                         fillColor: AppColors.cardOf(context),
                         contentPadding: const EdgeInsets.symmetric(
@@ -420,12 +425,12 @@ class _Welcome extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
     final prompts = <(String, String)>[
-      ('Ask anything', 'Who is the president of Uganda?'),
-      ('Find help', 'How do I add subtitles to a video?'),
-      ('Transfer', 'How do I send a large video with OTYA Transfer?'),
       ('Playback', 'Why can a video have picture but no sound?'),
+      ('Subtitles', 'How do I add subtitles to a video?'),
+      ('Transfer', 'How do I send a large video with OTYA Transfer?'),
+      ('Converter', 'How do I extract audio from a video in OTYA?'),
     ];
 
     return ListView(
@@ -447,22 +452,22 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Text(
-          'What can I help with?',
+          'How can I help with OTYA?',
           style: TextStyle(
             fontSize: 29,
             height: 1.08,
             letterSpacing: -1,
             fontWeight: FontWeight.w900,
-            color: cs.onSurface,
+            color: colors.onSurface,
           ),
         ),
         const SizedBox(height: 10),
         Text(
-          'Ask a general question or get help with OTYA, playback, files, transfer, converter, storage and your account.',
+          'Ask about OTYA playback, music, video, files, Transfer, Converter, Private, Tools, storage, updates, account or troubleshooting. For unrelated questions, Ask OTYA can connect you with PeterSmart Link support.',
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
-            color: cs.onSurface.withValues(alpha: .62),
+            color: colors.onSurface.withValues(alpha: .62),
           ),
         ),
         const SizedBox(height: 26),
@@ -497,7 +502,7 @@ class _Welcome extends StatelessWidget {
                             style: TextStyle(
                               fontSize: 13,
                               height: 1.35,
-                              color: cs.onSurface.withValues(alpha: .62),
+                              color: colors.onSurface.withValues(alpha: .62),
                             ),
                           ),
                         ],
@@ -517,7 +522,7 @@ class _Welcome extends StatelessWidget {
           style: TextStyle(
             fontSize: 11.5,
             height: 1.45,
-            color: cs.onSurface.withValues(alpha: .48),
+            color: colors.onSurface.withValues(alpha: .48),
           ),
         ),
       ],
@@ -538,7 +543,7 @@ class _MessageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
+    final colors = Theme.of(context).colorScheme;
     if (message.fromUser) {
       return Padding(
         padding: const EdgeInsets.fromLTRB(42, 8, 0, 12),
@@ -547,7 +552,7 @@ class _MessageRow extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.symmetric(horizontal: 15, vertical: 11),
             decoration: BoxDecoration(
-              color: cs.onSurface.withValues(alpha: .08),
+              color: colors.onSurface.withValues(alpha: .08),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Text(
@@ -555,7 +560,7 @@ class _MessageRow extends StatelessWidget {
               style: TextStyle(
                 fontSize: 14,
                 height: 1.42,
-                color: cs.onSurface,
+                color: colors.onSurface,
               ),
             ),
           ),
@@ -584,7 +589,7 @@ class _MessageRow extends StatelessWidget {
             style: TextStyle(
               fontSize: 14,
               height: 1.58,
-              color: cs.onSurface,
+              color: colors.onSurface,
             ),
           ),
           const SizedBox(height: 8),
