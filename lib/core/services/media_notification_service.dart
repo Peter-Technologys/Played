@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 
 import 'album_art_service.dart';
@@ -48,10 +49,39 @@ class MediaNotificationService {
     return dir;
   }
 
+  Future<Uri?> _cacheRemoteArtwork(Uri uri, String id) async {
+    final key = '$id|$uri';
+    if (_lastArtworkKey == key && _lastArtworkUri != null) {
+      return _lastArtworkUri;
+    }
+    try {
+      final response = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (response.statusCode != 200 || response.bodyBytes.isEmpty) return null;
+      if (response.bodyBytes.length > 5 * 1024 * 1024) return null;
+      final contentType = response.headers['content-type'] ?? '';
+      final ext = contentType.contains('png') ? 'png' : 'jpg';
+      final dir = await _artworkDir();
+      final target = File('${dir.path}/now_playing_${id.hashCode}.$ext');
+      await target.writeAsBytes(response.bodyBytes, flush: true);
+      final artUri = Uri.file(target.path);
+      _lastArtworkKey = key;
+      _lastArtworkUri = artUri;
+      return artUri;
+    } catch (e) {
+      debugPrint('[MediaNotification] remote artwork unavailable: $e');
+      return null;
+    }
+  }
+
   Future<Uri?> _stableArtUri(String? albumArtPath, String id) async {
     if (albumArtPath == null || albumArtPath.isEmpty) return null;
     final resolved = await AlbumArtService.instance.resolve(albumArtPath);
     if (resolved == null || resolved.isEmpty) return null;
+
+    final parsed = Uri.tryParse(resolved);
+    if (parsed != null && (parsed.scheme == 'https' || parsed.scheme == 'http')) {
+      return _cacheRemoteArtwork(parsed, id);
+    }
 
     final source = File(resolved);
     if (!await source.exists()) return null;
