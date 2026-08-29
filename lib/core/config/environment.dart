@@ -1,39 +1,31 @@
 abstract class Environment {
   // Production-safe default. CI can still override this with
   // --dart-define=WORKER_URL=https://... for staging or another environment.
-  // A localhost fallback caused release builds without injected variables to
-  // silently point at a server that does not exist on the user's phone.
+  // Local playback must never depend on this URL being reachable.
   static const String workerUrl = String.fromEnvironment(
     'WORKER_URL',
     defaultValue: 'https://petersmartlink.com',
   );
 
-  static const String umbrellaName = 'OTYA';
-  static const String productName = 'OTYA Player';
+  static const String appName = 'OTYA';
+  static const String appPackageId = 'com.otyaplayer.app';
 
-  static const String apiSyncUrl      = '$workerUrl/api/sync';
-  static const String apiCrashUrl     = '$workerUrl/api/crash-report';
-  static const String checkUpdateUrl  = '$workerUrl/check-update';
-  static const String apiVersionUrl   = '$workerUrl/api/version';
-  static const String apiDeviceUrl    = '$workerUrl/api/device';
-  static const String apiPlaylistsUrl = '$workerUrl/api/playlists';
-  static const String apiHistoryUrl   = '$workerUrl/api/history';
-  static const String apiProUrl       = '$workerUrl/api/pro';
-  static const String apiFeedbackUrl  = '$workerUrl/api/feedback';
-
+  // Canonical online API endpoints. Keep this list small: each online job has
+  // one owner, while local playback/scanning continue without these services.
+  static const String apiCrashUrl = '$workerUrl/api/crash-report';
+  static const String checkUpdateUrl = '$workerUrl/check-update';
+  static const String apiVersionUrl = '$workerUrl/api/version';
+  static const String apiDeviceUrl = '$workerUrl/api/device';
+  static const String apiFeedbackUrl = '$workerUrl/api/feedback';
   static const String latestUrl = '$workerUrl/latest';
 
   static const String arm64DownloadUrl = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl = '$workerUrl/apk/arm32';
-  static const String downloadUrl      = '$workerUrl/download/otya-player';
+  static const String downloadUrl = '$workerUrl/download/otya-player';
 
-  static const String appName      = productName;
-  static const String appPackageId = 'com.otyaplayer.app';
   static const String supportEmail = 'support@petersmartlink.com';
-  static const String websiteUrl   = workerUrl;
-  static const String docsUrl      = '$workerUrl/docs';
-  // Compatibility alias for older call sites while the UI migrates to "Docs".
-  static const String documentsUrl = docsUrl;
+  static const String websiteUrl = workerUrl;
+  static const String docsUrl = '$workerUrl/docs';
   static const String downloadPageUrl = '$workerUrl/download/otya-player';
 
   /// Self-installing APK updates are opt-in. Keep disabled by default so a
