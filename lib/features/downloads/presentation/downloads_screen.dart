@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
+import '../../search/smart_search_sheet.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 
@@ -34,13 +35,16 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
             final downloads = items.where(_isDownloaded).toList()
               ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
             final visible = switch (_filter) {
-              _DownloadFilter.music => downloads.where((e) => !e.isVideo).toList(),
-              _DownloadFilter.video => downloads.where((e) => e.isVideo).toList(),
+              _DownloadFilter.music =>
+                downloads.where((e) => !e.isVideo).toList(),
+              _DownloadFilter.video =>
+                downloads.where((e) => e.isVideo).toList(),
               _DownloadFilter.all => downloads,
             };
             return RefreshIndicator(
               color: AppColors.accent,
-              onRefresh: () => ref.read(mediaLibraryProvider.notifier).refresh(),
+              onRefresh: () =>
+                  ref.read(mediaLibraryProvider.notifier).refresh(),
               child: CustomScrollView(
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
@@ -60,7 +64,8 @@ class _DownloadsScreenState extends ConsumerState<DownloadsScreen> {
                   else
                     SliverList.builder(
                       itemCount: visible.length,
-                      itemBuilder: (context, index) => _DownloadTile(item: visible[index]),
+                      itemBuilder: (context, index) =>
+                          _DownloadTile(item: visible[index]),
                     ),
                   const SliverToBoxAdapter(child: SizedBox(height: 130)),
                 ],
@@ -86,18 +91,36 @@ class _Header extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Downloads',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.w900)),
+                  Text(
+                    'Downloads',
+                    style: Theme.of(context)
+                        .textTheme
+                        .headlineSmall
+                        ?.copyWith(fontWeight: FontWeight.w900),
+                  ),
                   const SizedBox(height: 2),
-                  Text('$count local files in your Downloads folders',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .55),
-                          )),
+                  Text(
+                    '$count local files in your Downloads folders',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context)
+                              .colorScheme
+                              .onSurface
+                              .withValues(alpha: .55),
+                        ),
+                  ),
                 ],
               ),
             ),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.search_rounded)),
-            IconButton(onPressed: () => context.push('/tools/folders'), icon: const Icon(Icons.more_vert_rounded)),
+            IconButton(
+              tooltip: 'Search OTYA',
+              onPressed: () => SmartSearchSheet.show(context),
+              icon: const Icon(Icons.search_rounded),
+            ),
+            IconButton(
+              tooltip: 'Open Files',
+              onPressed: () => context.push('/tools/folders'),
+              icon: const Icon(Icons.more_vert_rounded),
+            ),
           ],
         ),
       );
@@ -109,15 +132,21 @@ class _StorageCard extends StatelessWidget {
 
   String _size(int bytes) {
     if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    if (bytes < 1024 * 1024 * 1024) return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    if (bytes < 1024 * 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+    }
     return '${(bytes / (1024 * 1024 * 1024)).toStringAsFixed(2)} GB';
   }
 
   @override
   Widget build(BuildContext context) {
     final bytes = items.fold<int>(0, (sum, item) => sum + item.fileSizeBytes);
-    final music = items.where((e) => !e.isVideo).fold<int>(0, (sum, e) => sum + e.fileSizeBytes);
-    final video = items.where((e) => e.isVideo).fold<int>(0, (sum, e) => sum + e.fileSizeBytes);
+    final music = items
+        .where((e) => !e.isVideo)
+        .fold<int>(0, (sum, e) => sum + e.fileSizeBytes);
+    final video = items
+        .where((e) => e.isVideo)
+        .fold<int>(0, (sum, e) => sum + e.fileSizeBytes);
     final total = bytes <= 0 ? 1 : bytes;
     final musicRatio = music / total;
     final videoRatio = video / total;
@@ -135,11 +164,21 @@ class _StorageCard extends StatelessWidget {
         children: [
           Row(
             children: [
-              const Icon(Icons.storage_rounded, color: AppColors.accent, size: 20),
+              const Icon(
+                Icons.storage_rounded,
+                color: AppColors.accent,
+                size: 20,
+              ),
               const SizedBox(width: 8),
-              const Text('Downloaded media', style: TextStyle(fontWeight: FontWeight.w800)),
+              const Text(
+                'Downloaded media',
+                style: TextStyle(fontWeight: FontWeight.w800),
+              ),
               const Spacer(),
-              Text(_size(bytes), style: const TextStyle(fontWeight: FontWeight.w700)),
+              Text(
+                _size(bytes),
+                style: const TextStyle(fontWeight: FontWeight.w700),
+              ),
             ],
           ),
           const SizedBox(height: 13),
@@ -160,7 +199,9 @@ class _StorageCard extends StatelessWidget {
                       child: const ColoredBox(color: Color(0xFF00CFFF)),
                     ),
                   if (bytes == 0)
-                    const Expanded(child: ColoredBox(color: Color(0xFF242537))),
+                    const Expanded(
+                      child: ColoredBox(color: Color(0xFF242537)),
+                    ),
                 ],
               ),
             ),
@@ -168,9 +209,15 @@ class _StorageCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              _Legend(color: const Color(0xFF6B48FF), text: 'Music ${_size(music)}'),
+              _Legend(
+                color: const Color(0xFF6B48FF),
+                text: 'Music ${_size(music)}',
+              ),
               const SizedBox(width: 16),
-              _Legend(color: const Color(0xFF00CFFF), text: 'Video ${_size(video)}'),
+              _Legend(
+                color: const Color(0xFF00CFFF),
+                text: 'Video ${_size(video)}',
+              ),
             ],
           ),
         ],
@@ -188,7 +235,11 @@ class _Legend extends StatelessWidget {
   Widget build(BuildContext context) => Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(width: 7, height: 7, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+          Container(
+            width: 7,
+            height: 7,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
           const SizedBox(width: 5),
           Text(text, style: Theme.of(context).textTheme.labelSmall),
         ],
@@ -222,16 +273,35 @@ class _DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => ListTile(
-        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 3),
-        leading: item.isVideo ? _VideoThumb(item: item) : AlbumArtThumb(albumArtPath: item.albumArtPath, size: 50, borderRadius: 12),
-        title: Text(item.title,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700)),
-        subtitle: Text('${item.isVideo ? 'Video' : (item.artist ?? 'Music')} · ${item.formattedSize}',
-            maxLines: 1, overflow: TextOverflow.ellipsis),
-        trailing: const Icon(Icons.check_circle_rounded, color: Color(0xFF24D789), size: 19),
-        onTap: () => context.push(item.isVideo ? '/player/video' : '/player/audio', extra: item),
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 18, vertical: 3),
+        leading: item.isVideo
+            ? _VideoThumb(item: item)
+            : AlbumArtThumb(
+                albumArtPath: item.albumArtPath,
+                size: 50,
+                borderRadius: 12,
+              ),
+        title: Text(
+          item.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700),
+        ),
+        subtitle: Text(
+          '${item.isVideo ? 'Video' : (item.artist ?? 'Music')} · ${item.formattedSize}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: const Icon(
+          Icons.check_circle_rounded,
+          color: Color(0xFF24D789),
+          size: 19,
+        ),
+        onTap: () => context.push(
+          item.isVideo ? '/player/video' : '/player/audio',
+          extra: item,
+        ),
       );
 }
 
@@ -248,11 +318,14 @@ class _VideoThumb extends StatelessWidget {
         width: 50,
         height: 50,
         child: path != null && path.isNotEmpty
-            ? Image.file(File(path), fit: BoxFit.cover,
+            ? Image.file(
+                File(path),
+                fit: BoxFit.cover,
                 errorBuilder: (_, __, ___) => const ColoredBox(
-                      color: Color(0xFF1A1B29),
-                      child: Icon(Icons.movie_rounded, color: AppColors.accent),
-                    ))
+                  color: Color(0xFF1A1B29),
+                  child: Icon(Icons.movie_rounded, color: AppColors.accent),
+                ),
+              )
             : const ColoredBox(
                 color: Color(0xFF1A1B29),
                 child: Icon(Icons.movie_rounded, color: AppColors.accent),
@@ -279,15 +352,27 @@ class _EmptyDownloads extends StatelessWidget {
                   shape: BoxShape.circle,
                   color: AppColors.accent.withValues(alpha: .12),
                 ),
-                child: const Icon(Icons.download_done_rounded, color: AppColors.accent, size: 34),
+                child: const Icon(
+                  Icons.download_done_rounded,
+                  color: AppColors.accent,
+                  size: 34,
+                ),
               ),
               const SizedBox(height: 16),
-              const Text('No downloaded media found', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800)),
+              const Text(
+                'No downloaded media found',
+                style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
+              ),
               const SizedBox(height: 6),
               Text(
                 'Files stored in your device Download or Downloads folders will appear here automatically.',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .55)),
+                style: TextStyle(
+                  color: Theme.of(context)
+                      .colorScheme
+                      .onSurface
+                      .withValues(alpha: .55),
+                ),
               ),
             ],
           ),
