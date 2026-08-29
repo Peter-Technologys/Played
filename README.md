@@ -1,83 +1,106 @@
 <div align="center">
 
-<img src="assets/icons/play_store_512.png" alt="OTYA Player" width="112" height="112" />
+<img src="assets/branding/otya_mark.svg" alt="OTYA" width="112" height="112" />
 
 # OTYA Player
 
-**Private. Powerful. Offline-first media.**
+**Video · Music · Transfer · Private · Ask OTYA**
 
-Private production source repository for OTYA Player by PeterSmart Link.
+A polished, offline-first Android media experience by PeterSmart Link.
 
-[OTYA](https://petersmartlink.com) · [Documents](https://petersmartlink.com/documents) · [Download](https://petersmartlink.com/download/otya-player) · [Security](SECURITY.md)
+[OTYA](https://petersmartlink.com/otya-player) · [Ask OTYA](https://petersmartlink.com/ask) · [Docs](https://petersmartlink.com/docs) · [Download](https://petersmartlink.com/download/otya-player) · [Security](SECURITY.md)
 
-![Version](https://img.shields.io/badge/OTYA-1.7.0-6C5CE7)
 ![Platform](https://img.shields.io/badge/Platform-Android-3DDC84?logo=android)
-![Status](https://img.shields.io/badge/Status-Production-2EA44F)
+![Target](https://img.shields.io/badge/Android-API%2036-3DDC84)
+![Status](https://img.shields.io/badge/Status-v1%20rebuild-6A19FF)
 ![License](https://img.shields.io/badge/License-Proprietary-critical)
 
 </div>
 
 ---
 
-## Repository purpose
+## What OTYA is
 
-This is the private production source repository for OTYA Player. It is intended for authorized development, CI/CD, security review and release engineering only.
+OTYA Player is built around three primary destinations:
 
-Public product information, downloads, support notices and customer documentation should be published through the official OTYA website rather than exposing internal source or infrastructure details from this repository.
-
-## OTYA Player
-
-OTYA Player is designed around local-first playback: music and videos remain usable without a network connection, while the shared OTYA account, recovery, updates and optional online services connect securely to the OTYA backend when needed.
-
-| Experience | Highlights |
+| Area | Purpose |
 |---|---|
-| **Home** | Recent local media, quick access and media discovery |
-| **Music** | Songs, albums, artists, folders and playlists |
-| **Video** | Local video library, thumbnails, folders and playback |
-| **My Space** | Tools, account, settings and personal media utilities |
-| **Audio Player** | Queue, shuffle, repeat, speed control, EQ, lyrics, sleep timer and background playback |
-| **Video Player** | Hardware-accelerated playback, subtitles, PiP, aspect controls, battery saver and gestures |
-| **Beam** | Local Wi-Fi / hotspot file transfer designed to work without mobile data |
-| **Safe** | Private media protection with device authentication, biometric unlock and PIN fallback |
-| **Playlists** | Create, organize and play personal collections |
-| **Themes** | Light, Dark, AMOLED and System appearance choices |
-| **Account** | Shared OTYA authentication with email verification and password recovery |
-| **OTYA AI** | Optional assistant available from Settings and Support; never required for local playback |
-| **Google & Drive** | Google identity sign-in and explicit opt-in private recovery backup |
-| **Updates** | Secure version checks and signed Android release delivery |
+| **Video** | Local video library, folders, playlists, resume, subtitles, tracks, gestures, PiP, aspect controls, trim and audio extraction |
+| **Music** | Songs, albums, artists, folders, playlists, queue, favorites, shuffle/repeat, lyrics, EQ, sleep timer, Drive Mode and background playback |
+| **Me** | Transfer, Files, Private, Converter, Playlists, History, Tools, Personalize and Storage |
 
-## Privacy and security principles
+OTYA is offline-first. Local scanning, playback, queueing, Private and Transfer must remain useful without Cloudflare, Firebase, authentication, AI, Resend or update services.
 
-- Core local playback must not depend on a permanently available backend or AI service.
-- Production secrets must never be committed or bundled into Flutter.
-- The shared OTYA account provides identity across products, while product-specific private data remains separately scoped.
-- Google Drive recovery is explicit and user-initiated.
-- Recovery data must not upload a user's raw media library or Safe/private media.
+## Ask OTYA
+
+Ask OTYA is the user-facing assistant for help, learning and product guidance. It is optional and must never block local playback.
+
+- branded OTYA thinking state rather than a generic spinner
+- conversational follow-up questions
+- suggested prompts and New Chat
+- copy/retry and human-support handoff
+- no Admin or private infrastructure capabilities
+
+The private owner/admin experience is a separate product surface: **OTYA Command Center**.
+
+## Privacy and security
+
+- Core playback is local-first and does not require a permanent backend connection.
+- Production secrets, signing material, Firebase Admin credentials and infrastructure tokens must never be bundled into Flutter.
+- Private media uses app-private storage with device authentication and secure PIN fallback.
+- Failed Private PIN attempts use persistent encrypted throttling.
+- External writes from private Admin AI require explicit approval.
+- Large media sharing uses Android `content://` access rather than exposing raw file URIs.
 - Production releases must be signed and fail closed when signing credentials are missing.
-- Security reports must use the private process documented in [SECURITY.md](SECURITY.md).
 
-## Release line
+## Android quality bar
 
-OTYA Player `1.7.0+11` is the current release line in this repository.
+OTYA targets Android API 36 and is being validated for:
 
-Release builds are produced by GitHub Actions, verified with checksums, and distributed through the official OTYA release infrastructure.
+- edge-to-edge layouts and responsive phone/tablet navigation
+- 48dp minimum interactive touch targets
+- adaptive + monochrome/themed launcher icon support
+- audio focus, headset/call interruptions and background audio
+- PiP, notifications and media controls
+- Android 10–16 media/notification permission behavior
+- real-device startup, crash and ANR testing
 
-## Public access
+## Brand system
 
-Official public surfaces:
+The canonical identity is the approved **twisted OTYA O**. The same geometry is used for the Android launcher, Flutter UI, Ask OTYA thinking state, website and documentation surfaces.
 
-- OTYA: **https://petersmartlink.com**
-- Documents: **https://petersmartlink.com/documents**
-- OTYA AI: **https://petersmartlink.com/ai**
+Do not introduce a generic play triangle, plain ring, alternate O shape or a second competing logo.
+
+Canonical repository artwork: `assets/branding/otya_mark.svg`.
+
+## Current release gate
+
+The `v1-rebuild` branch remains the integration branch until all of these are complete:
+
+1. source-complete feature surface
+2. zero-issue Flutter analysis
+3. all unit/widget tests passing
+4. release APK/AAB compile and verification
+5. real signed build
+6. clean-install physical-device testing
+7. startup/crash/ANR verification
+8. Video/Music/player/Transfer/Private/App Lock acceptance
+9. Firebase/FCM/App Check/account acceptance
+10. offline/outage behavior verification
+
+Do not merge, tag or publish a production release before the complete gate passes.
+
+## Public surfaces
+
+- OTYA Player: **https://petersmartlink.com/otya-player**
+- Ask OTYA: **https://petersmartlink.com/ask**
+- Docs: **https://petersmartlink.com/docs**
 - Download: **https://petersmartlink.com/download/otya-player**
-
-Do not publish source archives, internal deployment instructions, backend credentials, signing material, private endpoints or infrastructure inventories as customer documentation.
+- Support: **support@petersmartlink.com**
 
 ## Source and licensing
 
-OTYA Player is proprietary software. The current source, application design, backend integration code, release infrastructure, branding and project materials may not be copied, redistributed, modified or commercially reused without written permission from PeterSmart Link, except where third-party components are separately licensed.
-
-Historical copies previously distributed under another license remain governed by the license that accompanied those specific copies. See [LICENSE](LICENSE) for the current repository terms.
+OTYA Player is proprietary software. Source code, application design, backend integration code, release infrastructure, branding and project materials may not be copied, redistributed or commercially reused without written permission from PeterSmart Link, except where third-party components are separately licensed.
 
 ---
 
@@ -85,6 +108,6 @@ Historical copies previously distributed under another license remain governed b
 
 **OTYA · PeterSmart Link**
 
-Private production source. Public information lives on the official website.
+One product identity across app, website, AI, Admin, email and release surfaces.
 
 </div>
