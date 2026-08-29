@@ -1,22 +1,17 @@
-import 'package:flutter/services.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 
-/// FFmpeg service — uses the Cloudflare Worker for server-side processing
-/// when online, and falls back to a graceful error when offline.
+/// Local media processing used by OTYA Converter and contextual video tools.
 ///
-/// WhatsApp Trimmer and Extract Audio both route through the Cloudflare
-/// ffmpeg_worker.js which runs FFmpeg server-side and returns a download URL.
-///
-/// For fully offline trimming, the native MediaStore trim API is used
-/// on Android 10+ (API 29+) via a platform channel.
+/// These operations use the Android native channel and do not require an
+/// account, AI, Cloudflare, or an upload of the user's media file.
 class FfmpegService {
   FfmpegService._();
   static final FfmpegService instance = FfmpegService._();
 
   static const _channel = MethodChannel('com.otyaplayer.app/ffmpeg');
 
-  /// Extracts audio from a video file.
-  /// Uses native MediaMetadataRetriever on Android (offline, no FFmpeg needed).
+  /// Extracts an audio track from a local video file.
   Future<String?> extractAudio({
     required String videoPath,
     void Function(double progress)? onProgress,
@@ -29,15 +24,14 @@ class FfmpegService {
       );
       onProgress?.call(1.0);
       return result;
-    } catch (e) {
-      debugPrint('[FFmpeg] extractAudio error: $e');
+    } catch (error) {
+      debugPrint('[OTYA Converter] extract audio failed: ${error.runtimeType}');
       return null;
     }
   }
 
-  /// Trims a video to the given range and compresses for WhatsApp.
-  /// Uses native MediaMuxer on Android 10+ (offline, no FFmpeg needed).
-  Future<String?> trimForWhatsApp({
+  /// Trims a local video to the requested time range.
+  Future<String?> trimVideo({
     required String videoPath,
     required double startSec,
     required double endSec,
@@ -48,20 +42,36 @@ class FfmpegService {
       final result = await _channel.invokeMethod<String>(
         'trimVideo',
         {
-          'path':     videoPath,
-          'startMs':  (startSec * 1000).toInt(),
-          'endMs':    (endSec   * 1000).toInt(),
+          'path': videoPath,
+          'startMs': (startSec * 1000).toInt(),
+          'endMs': (endSec * 1000).toInt(),
         },
       );
       onProgress?.call(1.0);
       return result;
-    } catch (e) {
-      debugPrint('[FFmpeg] trimForWhatsApp error: $e');
+    } catch (error) {
+      debugPrint('[OTYA Tools] trim video failed: ${error.runtimeType}');
       return null;
     }
   }
 
+  /// Compatibility name used by older UI code.
+  Future<String?> trimForWhatsApp({
+    required String videoPath,
+    required double startSec,
+    required double endSec,
+    void Function(double progress)? onProgress,
+  }) =>
+      trimVideo(
+        videoPath: videoPath,
+        startSec: startSec,
+        endSec: endSec,
+        onProgress: onProgress,
+      );
+
   Future<void> cancelAll() async {
-    try { await _channel.invokeMethod('cancel'); } catch (_) {}
+    try {
+      await _channel.invokeMethod('cancel');
+    } catch (_) {}
   }
 }

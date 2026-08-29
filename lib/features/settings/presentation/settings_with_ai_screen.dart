@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../../app/theme/app_colors.dart';
 import 'settings_detail_screen.dart';
 
-/// Keeps OTYA Player media-first while making AI an optional helper from Settings.
+/// Keeps settings focused on configuration while offering OTYA help nearby.
 class SettingsWithAiScreen extends StatelessWidget {
   const SettingsWithAiScreen({super.key});
 
@@ -26,20 +26,20 @@ class SettingsWithAiScreen extends StatelessWidget {
               ),
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                onTap: () => context.push('/ai'),
+                onTap: () => context.push('/support'),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       const Icon(
-                        Icons.auto_awesome_outlined,
+                        Icons.help_outline_rounded,
                         color: AppColors.accent,
                         size: 17,
                       ),
                       const SizedBox(width: 7),
                       Text(
-                        'OTYA AI',
+                        'Ask OTYA',
                         style: TextStyle(
                           color: Theme.of(context).colorScheme.onSurface,
                           fontSize: 12.5,
