@@ -155,9 +155,11 @@ class SettingsDetailScreen extends ConsumerWidget {
                 if (!context.mounted) return;
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(
-                    content: Text(granted
-                        ? 'Notifications are enabled.'
-                        : 'Notification permission was not granted.'),
+                    content: Text(
+                      granted
+                          ? 'Notifications are enabled.'
+                          : 'Notification permission was not granted.',
+                    ),
                   ),
                 );
               },
@@ -355,17 +357,21 @@ class _SpeedTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) => ListTile(
         leading: const Icon(Icons.speed_rounded, color: AppColors.accent),
-        title: const Text('Default playback speed',
-            style: TextStyle(fontWeight: FontWeight.w700)),
+        title: const Text(
+          'Default playback speed',
+          style: TextStyle(fontWeight: FontWeight.w700),
+        ),
         subtitle: const Text('Used when a player starts a new session'),
         trailing: DropdownButton<double>(
           value: speeds.contains(value) ? value : 1.0,
           underline: const SizedBox.shrink(),
           items: speeds
-              .map((speed) => DropdownMenuItem(
-                    value: speed,
-                    child: Text('${speed}×'),
-                  ))
+              .map(
+                (speed) => DropdownMenuItem(
+                  value: speed,
+                  child: Text('$speed×'),
+                ),
+              )
               .toList(growable: false),
           onChanged: (next) {
             if (next == null) return;
