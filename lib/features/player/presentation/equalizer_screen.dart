@@ -1,476 +1,276 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../../app/theme/app_colors.dart';
 
-// Native channel for Android's built-in Equalizer AudioEffect.
-const _eqChannel = MethodChannel('com.otyaplayer.app/equalizer');
+import '../../../app/theme/app_dimensions.dart';
+import '../../../core/services/media_dsp_service.dart';
+import '../../../core/services/playback_coordinator.dart';
 
-// ── Provider ───────────────────────────────────────────────
-
-class EqBand {
-  final String label;
-  final double gain;
-  const EqBand({required this.label, required this.gain});
-  EqBand copyWith({double? gain}) =>
-      EqBand(label: label, gain: gain ?? this.gain);
-}
-
-class EqState {
-  final List<EqBand> bands;
-  final String preset;
-  const EqState({required this.bands, required this.preset});
-  EqState copyWith({List<EqBand>? bands, String? preset}) =>
-      EqState(bands: bands ?? this.bands, preset: preset ?? this.preset);
-}
-
-class EqNotifier extends StateNotifier<EqState> {
-  EqNotifier()
-      : super(EqState(
-          preset: 'Flat',
-          bands: const [
-            EqBand(label: '60Hz', gain: 0),
-            EqBand(label: '230Hz', gain: 0),
-            EqBand(label: '910Hz', gain: 0),
-            EqBand(label: '3.6kHz', gain: 0),
-            EqBand(label: '14kHz', gain: 0),
-          ],
-        )) {
-    // Load the last-used preset from SharedPreferences on startup.
-    Future.microtask(() async {
-      try {
-        final prefs = await SharedPreferences.getInstance();
-        final lastPreset = prefs.getString('otya_eq_last_preset');
-        if (lastPreset != null && _presets.containsKey(lastPreset)) {
-          applyPreset(lastPreset);
-        }
-      } catch (_) {}
-    });
-  }
-
-  static const Map<String, List<double>> _presets = {
-    'Flat':          [0, 0, 0, 0, 0],
-    'Bass Boost':    [8, 5, 0, -2, -3],
-    'Rock':          [5, 3, -1, 3, 5],
-    'Pop':           [2, 1, 0, 2, 3],
-    'Classical':     [4, 3, -2, 3, 4],
-    'Jazz':          [3, 2, 0, 2, 4],
-    'Hip-Hop':       [6, 4, 0, 2, 1],
-    'Vocal Clarity': [0, -2, 4, 5, 3],
-    'Night Mode':    [-4, -2, 0, -3, -5],
-  };
-
-  void setBand(int index, double gain) {
-    final updated = List<EqBand>.from(state.bands);
-    updated[index] = updated[index].copyWith(gain: gain);
-    state = state.copyWith(bands: updated, preset: 'Custom');
-    _applyToNative(updated);
-  }
-
-  void applyPreset(String name) {
-    final gains = _presets[name];
-    if (gains == null) return;
-    final updated = List.generate(
-      state.bands.length,
-      (i) => state.bands[i].copyWith(gain: gains[i]),
-    );
-    state = state.copyWith(bands: updated, preset: name);
-    _applyToNative(updated);
-    _savePreset(name);
-  }
-
-  /// Saves the current custom band settings as a named preset.
-  Future<void> saveCustomPreset(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    final gains = state.bands.map((b) => b.gain).toList();
-    await prefs.setString(
-      'otya_eq_custom_$name',
-      gains.map((g) => g.toString()).join(','),
-    );
-    state = state.copyWith(preset: name);
-  }
-
-  /// Loads all custom preset names saved by the user.
-  Future<List<String>> loadCustomPresetNames() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getKeys()
-        .where((k) => k.startsWith('otya_eq_custom_'))
-        .map((k) => k.substring('otya_eq_custom_'.length))
-        .toList();
-  }
-
-  /// Applies a custom preset by name from SharedPreferences.
-  Future<void> applyCustomPreset(String name) async {
-    final prefs = await SharedPreferences.getInstance();
-    final raw = prefs.getString('otya_eq_custom_$name');
-    if (raw == null) return;
-    final gains = raw.split(',').map(double.parse).toList();
-    if (gains.length != state.bands.length) return;
-    final updated = List.generate(
-      state.bands.length,
-      (i) => state.bands[i].copyWith(gain: gains[i]),
-    );
-    state = state.copyWith(bands: updated, preset: name);
-    _applyToNative(updated);
-  }
-
-  Future<void> _savePreset(String name) async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString('otya_eq_last_preset', name);
-    } catch (_) {}
-  }
-
-  /// Sends band gains (in dB) to the Android Equalizer AudioEffect
-  /// via the native method channel. The native side converts to millibels.
-  Future<void> _applyToNative(List<EqBand> bands) async {
-    try {
-      await _eqChannel.invokeMethod('setBands', {
-        'gains': bands.map((b) => b.gain).toList(),
-      });
-    } catch (e) {
-      debugPrint('[EQ] Native call failed: $e');
-    }
-  }
-
-  List<String> get presetNames => _presets.keys.toList();
-}
-
-final eqProvider =
-    StateNotifierProvider<EqNotifier, EqState>((_) => EqNotifier());
-
-// ── Equalizer Screen ───────────────────────────────────────────────
-
-class EqualizerScreen extends ConsumerStatefulWidget {
+/// OTYA Sound Tuner.
+///
+/// Equalization is applied inside the active MediaKit/libmpv player. It does
+/// not use Android's deprecated session-0/global Equalizer effect and therefore
+/// cannot intentionally retune audio from other apps.
+class EqualizerScreen extends StatefulWidget {
   const EqualizerScreen({super.key});
 
   @override
-  ConsumerState<EqualizerScreen> createState() => _EqualizerScreenState();
+  State<EqualizerScreen> createState() => _EqualizerScreenState();
 }
 
-class _EqualizerScreenState extends ConsumerState<EqualizerScreen> {
-  List<String> _customPresets = [];
+class _EqualizerScreenState extends State<EqualizerScreen> {
+  final _dsp = MediaDspService.instance;
+
+  List<double> _gains = List<double>.filled(MediaDspService.frequencies.length, 0);
+  String _preset = 'Flat';
+  String? _status;
+  bool _loading = true;
+  bool _applying = false;
 
   @override
   void initState() {
     super.initState();
-    _loadCustomPresets();
+    _load();
   }
 
-  Future<void> _loadCustomPresets() async {
-    final notifier = ref.read(eqProvider.notifier);
-    final names = await notifier.loadCustomPresetNames();
-    if (mounted) setState(() => _customPresets = names);
+  Future<void> _load() async {
+    final gains = await _dsp.loadGains();
+    final preset = await _dsp.loadPreset();
+    if (!mounted) return;
+    setState(() {
+      _gains = gains;
+      _preset = preset;
+      _loading = false;
+    });
   }
 
-  Future<void> _showSavePresetDialog() async {
-    final controller = TextEditingController();
-    final name = await showDialog<String>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: Theme.of(context).colorScheme.surface,
-        title: Text('Save Preset',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.onSurface,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-            )),
-        content: TextField(
-          controller: controller,
-          autofocus: true,
-          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
-          decoration: const InputDecoration(
-            hintText: 'Preset name',
-            hintStyle: TextStyle(color: AppColors.textSecondary),
-            enabledBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.border)),
-            focusedBorder: UnderlineInputBorder(
-                borderSide: BorderSide(color: AppColors.accent)),
-          ),
-          onSubmitted: (v) => Navigator.pop(context, v),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel',
-                style: TextStyle(color: AppColors.textSecondary)),
-          ),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, controller.text),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.accent),
-            child: const Text('Save',
-                style: TextStyle(
-                    color: Colors.black, fontWeight: FontWeight.w700)),
-          ),
-        ],
-      ),
-    );
-    if (name != null && name.trim().isNotEmpty) {
-      final notifier = ref.read(eqProvider.notifier);
-      await notifier.saveCustomPreset(name.trim());
-      await _loadCustomPresets();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Preset saved')),
-        );
-      }
+  Future<void> _apply({String? preset}) async {
+    if (_applying) return;
+    setState(() {
+      _applying = true;
+      _status = null;
+    });
+
+    final name = preset ?? 'Custom';
+    await _dsp.save(gains: _gains, preset: name);
+
+    final player = PlaybackCoordinator.instance.activePlayer;
+    if (player == null) {
+      if (!mounted) return;
+      setState(() {
+        _preset = name;
+        _applying = false;
+        _status = 'Saved. Start playing music or video to hear this tuning.';
+      });
+      return;
     }
+
+    final applied = await _dsp.apply(player, _gains);
+    if (!mounted) return;
+    setState(() {
+      _preset = name;
+      _applying = false;
+      _status = applied
+          ? 'Applied to the active OTYA player.'
+          : 'Sound tuning is unavailable for this playback engine.';
+    });
+  }
+
+  Future<void> _choosePreset(String name) async {
+    final values = MediaDspService.presets[name];
+    if (values == null) return;
+    setState(() {
+      _gains = List<double>.from(values);
+      _preset = name;
+    });
+    await _apply(preset: name);
+  }
+
+  void _setBand(int index, double value) {
+    setState(() {
+      final next = List<double>.from(_gains);
+      next[index] = value;
+      _gains = next;
+      _preset = 'Custom';
+      _status = null;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    final eq = ref.watch(eqProvider);
-    final notifier = ref.read(eqProvider.notifier);
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_rounded, color: AppColors.textPrimary),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text('Sound Tuner',
-            style: TextStyle(
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontSize: 18,
-            )),
+        title: const Text('Sound Tuner'),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Center(
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text(eq.preset,
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: AppColors.accent,
-                      fontWeight: FontWeight.w600,
-                      fontFamily: 'Inter',
-                    )),
-              ),
-            ),
+          TextButton(
+            onPressed: _loading || _applying
+                ? null
+                : () => _choosePreset('Flat'),
+            child: const Text('Reset'),
           ),
         ],
       ),
-      body: Column(
-        children: [
-          SizedBox(
-            height: 48,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              children: [
-                // Built-in presets
-                ...notifier.presetNames.map((name) {
-                  final active = eq.preset == name;
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      notifier.applyPreset(name);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: active ? AppColors.accent : Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: active ? AppColors.accent : AppColors.borderOf(context),
-                        ),
-                      ),
-                      child: Text(name,
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: active ? Colors.black : AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          )),
+      body: SafeArea(
+        top: false,
+        child: _loading
+            ? const Center(child: CircularProgressIndicator())
+            : ListView(
+                padding: const EdgeInsets.fromLTRB(
+                  AppDimensions.space16,
+                  AppDimensions.space8,
+                  AppDimensions.space16,
+                  AppDimensions.space32,
+                ),
+                children: [
+                  Text(
+                    'Tune OTYA, not your whole phone',
+                    style: theme.textTheme.headlineSmall?.copyWith(
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: -.5,
                     ),
-                  );
-                }),
-                // Custom presets
-                ..._customPresets.map((name) {
-                  final active = eq.preset == name;
-                  return GestureDetector(
-                    onTap: () {
-                      HapticFeedback.selectionClick();
-                      notifier.applyCustomPreset(name);
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      margin: const EdgeInsets.only(right: 8),
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  ),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Five-band EQ runs inside the active OTYA player. Your preset is remembered and reapplied when playback changes.',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.45,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: MediaDspService.presets.keys.map((name) {
+                      return ChoiceChip(
+                        label: Text(name),
+                        selected: _preset == name,
+                        onSelected: _applying
+                            ? null
+                            : (selected) {
+                                if (selected) _choosePreset(name);
+                              },
+                      );
+                    }).toList(growable: false),
+                  ),
+                  const SizedBox(height: 20),
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                      child: Column(
+                        children: List.generate(_gains.length, (index) {
+                          final value = _gains[index];
+                          return Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 6),
+                            child: Row(
+                              children: [
+                                SizedBox(
+                                  width: 62,
+                                  child: Text(
+                                    MediaDspService.labels[index],
+                                    style: const TextStyle(
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: Slider(
+                                    value: value,
+                                    min: -10,
+                                    max: 10,
+                                    divisions: 40,
+                                    label: '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)} dB',
+                                    onChanged: _applying
+                                        ? null
+                                        : (next) => _setBand(index, next),
+                                    onChangeEnd: _applying
+                                        ? null
+                                        : (_) => _apply(),
+                                  ),
+                                ),
+                                SizedBox(
+                                  width: 58,
+                                  child: Text(
+                                    '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}',
+                                    textAlign: TextAlign.end,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                      color: scheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        }),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  if (_status != null)
+                    Container(
+                      padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: active
-                            ? AppColors.accentViolet
-                            : Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(
-                          color: active
-                              ? AppColors.accentViolet
-                              : AppColors.borderOf(context),
+                        color: scheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(
+                          AppDimensions.radiusMedium,
                         ),
                       ),
                       child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(Icons.star_rounded,
-                              size: 12,
-                              color: active ? Colors.white : AppColors.accentViolet),
-                          const SizedBox(width: 4),
-                          Text(name,
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                                color: active ? Colors.white : AppColors.textSecondary,
-                                fontFamily: 'Inter',
-                              )),
+                          Icon(
+                            Icons.tune_rounded,
+                            size: 19,
+                            color: scheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _status!,
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                height: 1.4,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                  );
-                }),
-              ],
-            ),
-          ),
-          const SizedBox(height: 32),
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: List.generate(eq.bands.length, (i) {
-                  final band = eq.bands[i];
-                  return _BandSlider(
-                    band: band,
-                    onChanged: (v) {
-                      HapticFeedback.selectionClick();
-                      notifier.setBand(i, v);
-                    },
-                  );
-                }),
-              ),
-            ),
-          ),
-          const SizedBox(height: 32),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 32),
-            child: Row(
-              children: [
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () {
-                      HapticFeedback.mediumImpact();
-                      notifier.applyPreset('Flat');
-                    },
-                    child: Container(
-                      height: 52,
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: AppColors.borderOf(context)),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text('Reset to Flat',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          )),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                TextButton(
-                  onPressed: _showSavePresetDialog,
-                  style: TextButton.styleFrom(
-                    backgroundColor: AppColors.accentViolet.withValues(alpha: 0.12),
-                    shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14)),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 14),
-                  ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
+                  const SizedBox(height: 18),
+                  Row(
                     children: [
-                      Icon(Icons.save_rounded,
-                          color: AppColors.accentViolet, size: 18),
-                      SizedBox(width: 6),
-                      Text('Save Preset',
-                          style: TextStyle(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.accentViolet,
-                            fontFamily: 'Inter',
-                          )),
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _applying ? null : _apply,
+                          icon: _applying
+                              ? const SizedBox.square(
+                                  dimension: 18,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.graphic_eq_rounded),
+                          label: Text(_applying ? 'Applying…' : 'Apply tuning'),
+                        ),
+                      ),
                     ],
                   ),
-                ),
-              ],
-            ),
-          ),
-        ],
+                  const SizedBox(height: 12),
+                  Text(
+                    'Tip: extreme boosts can distort already-loud recordings. OTYA limits each band to ±10 dB.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ],
+              ),
       ),
-    );
-  }
-}
-
-class _BandSlider extends StatelessWidget {
-  final EqBand band;
-  final ValueChanged<double> onChanged;
-  const _BandSlider({required this.band, required this.onChanged});
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          '${band.gain > 0 ? '+' : ''}${band.gain.toStringAsFixed(0)}dB',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.w600,
-            color: band.gain == 0 ? AppColors.textSecondary : AppColors.accent,
-            fontFamily: 'Inter',
-          ),
-        ),
-        const SizedBox(height: 8),
-        Expanded(
-          child: RotatedBox(
-            quarterTurns: -1,
-            child: SliderTheme(
-              data: SliderThemeData(
-                trackHeight: 4,
-                activeTrackColor: AppColors.accent,
-                inactiveTrackColor: AppColors.borderOf(context),
-                thumbColor: AppColors.accent,
-                overlayColor: AppColors.accent.withValues(alpha: 0.15),
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 8),
-              ),
-              child: Slider(
-                value: band.gain,
-                min: -12,
-                max: 12,
-                onChanged: onChanged,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(band.label,
-            style: const TextStyle(fontSize: 10, color: AppColors.textSecondary)),
-      ],
     );
   }
 }
