@@ -44,22 +44,32 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       unawaited(_startRemoteServicesAfterFirstFrame());
       Future.delayed(const Duration(seconds: 2), () {
         if (!mounted) return;
-        try { AnnouncementDialog.showIfPending(context); } catch (_) {}
+        try {
+          AnnouncementDialog.showIfPending(context);
+        } catch (_) {}
       });
       Future.delayed(const Duration(seconds: 4), () {
         if (!mounted) return;
-        try { UpdateDialog.checkAndShow(context); } catch (_) {}
+        try {
+          UpdateDialog.checkAndShow(context);
+        } catch (_) {}
       });
     });
   }
 
   Future<void> _loadLocalVisualTheme() async {
-    try { await CustomThemeManager.instance.load(); } catch (_) {}
+    try {
+      await CustomThemeManager.instance.load();
+    } catch (_) {}
   }
 
   Future<void> _startRemoteServicesAfterFirstFrame() async {
-    try { await RemoteControlService.instance.init(); } catch (_) {}
-    unawaited(CustomThemeManager.instance.refreshSeasonalTheme().catchError((_) {}));
+    try {
+      await RemoteControlService.instance.init();
+    } catch (_) {}
+    unawaited(
+      CustomThemeManager.instance.refreshSeasonalTheme().catchError((_) {}),
+    );
   }
 
   Future<void> _checkOnboarding() async {
@@ -116,7 +126,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         ],
       ),
     );
-    if (enable == true) await NotificationService.instance.requestPermission();
+    if (enable == true) {
+      await NotificationService.instance.requestPermission();
+    }
   }
 
   ThemeMode _materialThemeMode(AppThemeMode mode) => switch (mode) {
@@ -129,7 +141,9 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     if (mode == AppThemeMode.amoled) {
       return AppTheme.dark.copyWith(
         scaffoldBackgroundColor: Colors.black,
-        appBarTheme: AppTheme.dark.appBarTheme.copyWith(backgroundColor: Colors.black),
+        appBarTheme: AppTheme.dark.appBarTheme.copyWith(
+          backgroundColor: Colors.black,
+        ),
       );
     }
     return AppTheme.dark;
@@ -185,7 +199,8 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       ]),
       builder: (context, _) {
         final themeManager = CustomThemeManager.instance;
-        final hasArtwork = themeManager.hasImageWallpaper || themeManager.storyTheme != null;
+        final hasArtwork =
+            themeManager.hasImageWallpaper || themeManager.storyTheme != null;
         final baseLight = AppTheme.light;
         final baseDark = _darkTheme(settings.themeMode);
         final lightTheme = hasArtwork
@@ -211,11 +226,21 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           routerConfig: AppRouter.router,
           builder: (context, child) {
             final isDark = Theme.of(context).brightness == Brightness.dark;
+            // Android 15+ enforces edge-to-edge. Keep both system bars
+            // transparent and let each screen protect only its interactive
+            // controls with MediaQuery/SafeArea insets. Painting an opaque
+            // navigation bar here recreates a heavy footer and causes jarring
+            // transitions between OTYA surfaces.
             final overlay = SystemUiOverlayStyle(
               statusBarColor: Colors.transparent,
-              statusBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
-              systemNavigationBarColor: Theme.of(context).scaffoldBackgroundColor,
-              systemNavigationBarIconBrightness: isDark ? Brightness.light : Brightness.dark,
+              statusBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              statusBarBrightness: isDark ? Brightness.dark : Brightness.light,
+              systemNavigationBarColor: Colors.transparent,
+              systemNavigationBarDividerColor: Colors.transparent,
+              systemNavigationBarIconBrightness:
+                  isDark ? Brightness.light : Brightness.dark,
+              systemNavigationBarContrastEnforced: false,
             );
 
             Widget wrappedChild = child ?? const SizedBox.shrink();
@@ -236,7 +261,8 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                 child: Stack(
                   children: [
                     wrappedChild,
-                    if (!_onboardingDone) OnboardingOverlay(onDone: _completeOnboarding),
+                    if (!_onboardingDone)
+                      OnboardingOverlay(onDone: _completeOnboarding),
                   ],
                 ),
               ),
