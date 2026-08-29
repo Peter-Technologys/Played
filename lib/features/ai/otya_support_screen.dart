@@ -145,7 +145,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
             ),
             const SizedBox(height: 7),
             const Text(
-              'Ask OTYA only answers OTYA questions. Enter your email and this question will be sent to support with a ticket number.',
+              'This OTYA question may need a human. Enter your email and the question will be sent to support with a ticket number.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -244,8 +244,8 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final modelLabel = _selectedModel?.name ??
-        (_loadingModels ? 'Loading…' : 'OTYA');
+    final modelLabel =
+        _selectedModel?.name ?? (_loadingModels ? 'Loading…' : 'OTYA');
 
     return Scaffold(
       appBar: AppBar(
@@ -288,22 +288,37 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                   .map(
                     (model) => PopupMenuItem<String>(
                       value: model.id,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            model.name,
-                            style: const TextStyle(fontWeight: FontWeight.w700),
-                          ),
-                          if (model.provider.isNotEmpty)
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 3),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
                             Text(
-                              '${model.provider}${model.tier.isEmpty ? '' : ' · ${model.tier}'}',
-                              style: const TextStyle(
-                                fontSize: 11,
-                                color: AppColors.textSecondary,
-                              ),
+                              model.name,
+                              style: const TextStyle(fontWeight: FontWeight.w700),
                             ),
-                        ],
+                            if (model.provider.isNotEmpty)
+                              Text(
+                                '${model.provider}${model.tier.isEmpty ? '' : ' · ${model.tier}'}',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            if (model.description.isNotEmpty) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                model.description,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 10.5,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   )
@@ -350,9 +365,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                                   );
                                 },
                           onHandoff: message.canHandoff
-                              ? () => _handoff(
-                                    _questionForAssistantAt(index),
-                                  )
+                              ? () => _handoff(_questionForAssistantAt(index))
                               : null,
                         );
                       },
@@ -384,7 +397,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
                       keyboardType: TextInputType.multiline,
                       textInputAction: TextInputAction.newline,
                       decoration: InputDecoration(
-                        hintText: 'Ask about OTYA',
+                        hintText: 'Message Ask OTYA',
                         filled: true,
                         fillColor: AppColors.cardOf(context),
                         contentPadding: const EdgeInsets.symmetric(
@@ -427,10 +440,10 @@ class _Welcome extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
     final prompts = <(String, String)>[
-      ('Playback', 'Why can a video have picture but no sound?'),
-      ('Subtitles', 'How do I add subtitles to a video?'),
-      ('Transfer', 'How do I send a large video with OTYA Transfer?'),
-      ('Converter', 'How do I extract audio from a video in OTYA?'),
+      ('Ask anything', 'Explain photosynthesis in simple language.'),
+      ('Learn', 'Give me a simple plan for learning a new skill.'),
+      ('OTYA', 'How do I send a large video with OTYA Transfer?'),
+      ('Media', 'Why can a video have picture but no sound?'),
     ];
 
     return ListView(
@@ -452,7 +465,7 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 22),
         Text(
-          'How can I help with OTYA?',
+          'What can I help with?',
           style: TextStyle(
             fontSize: 29,
             height: 1.08,
@@ -463,7 +476,7 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Ask about OTYA playback, music, video, files, Transfer, Converter, Private, Tools, storage, updates, account or troubleshooting. For unrelated questions, Ask OTYA can connect you with PeterSmart Link support.',
+          'Ask a general question, get help understanding something, or ask about OTYA playback, files, Transfer, Converter, storage, updates and your account.',
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
@@ -518,7 +531,7 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 16),
         Text(
-          'Local playback and your media library do not depend on Ask OTYA. Never send passwords, OTPs, recovery codes or secret keys.',
+          'AI can make mistakes and some current facts may have changed. Local playback never depends on Ask OTYA. Never send passwords, OTPs, recovery codes or secret keys.',
           style: TextStyle(
             fontSize: 11.5,
             height: 1.45,
