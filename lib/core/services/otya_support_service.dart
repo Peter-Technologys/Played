@@ -12,12 +12,43 @@ class OtyaSupportReply {
   final String answer;
   final bool inScope;
   final bool handoffAvailable;
+  final String? modelId;
+  final String? modelName;
 
   const OtyaSupportReply({
     required this.answer,
     required this.inScope,
     required this.handoffAvailable,
+    this.modelId,
+    this.modelName,
   });
+}
+
+class OtyaAiModel {
+  final String id;
+  final String name;
+  final String provider;
+  final String tier;
+  final String description;
+  final bool guest;
+
+  const OtyaAiModel({
+    required this.id,
+    required this.name,
+    required this.provider,
+    required this.tier,
+    required this.description,
+    required this.guest,
+  });
+
+  factory OtyaAiModel.fromJson(Map<String, dynamic> json) => OtyaAiModel(
+        id: '${json['id'] ?? ''}',
+        name: '${json['name'] ?? json['id'] ?? 'OTYA'}',
+        provider: '${json['provider'] ?? ''}',
+        tier: '${json['tier'] ?? ''}',
+        description: '${json['description'] ?? ''}',
+        guest: json['guest'] == true,
+      );
 }
 
 class OtyaSupportTicket {
@@ -52,11 +83,47 @@ class OtyaSupportService {
     final token = await AuthService.instance.getValidToken();
     return {
       'Content-Type': 'application/json',
-      if (token != null) 'Authorization': 'Bearer $token',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
     };
   }
 
-  Future<OtyaSupportReply> ask(String question) async {
+  Future<List<OtyaAiModel>> models() async {
+    final response = await _client
+        .get(
+          _uri.replace(queryParameters: const {'models': '1'}),
+          headers: await _headers(),
+        )
+        .timeout(_timeout);
+    final data = _decode(response);
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      throw StateError(_error(data, 'AI models are unavailable right now.'));
+    }
+    final raw = data['models'];
+    if (raw is! List) return const <OtyaAiModel>[];
+    return raw
+        .whereType<Map>()
+        .map(
+          (value) => OtyaAiModel.fromJson(
+            value.map((key, value) => MapEntry('$key', value)),
+          ),
+        )
+        .where((model) => model.id.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<OtyaSupportReply> ask(
+    String question, {
+    List<Map<String, String>> history = const <Map<String, String>>[],
+    String? model,
+  }) async {
+    final safeHistory = history
+        .where((entry) {
+          final role = entry['role'];
+          final content = entry['content']?.trim() ?? '';
+          return (role == 'user' || role == 'assistant') && content.isNotEmpty;
+        })
+        .toList(growable: false);
+
     final response = await _client
         .post(
           _uri,
@@ -64,7 +131,9 @@ class OtyaSupportService {
           body: jsonEncode({
             'message': question.trim(),
             'guest_id': await _guestId(),
-            'surface': 'android-support',
+            'surface': 'android-assistant',
+            if (safeHistory.isNotEmpty) 'history': safeHistory,
+            if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
           }),
         )
         .timeout(_timeout);
@@ -78,6 +147,8 @@ class OtyaSupportService {
           : '${data['answer']}'.trim(),
       inScope: data['scope'] != 'outside-otya',
       handoffAvailable: data['handoff_available'] == true,
+      modelId: data['model']?.toString(),
+      modelName: data['model_name']?.toString(),
     );
   }
 
@@ -91,10 +162,10 @@ class OtyaSupportService {
           headers: await _headers(),
           body: jsonEncode({
             'message': question.trim(),
-            'email': email.trim(),
+            'contact_email': email.trim(),
             'guest_id': await _guestId(),
-            'surface': 'android-support',
-            'handoff': true,
+            'surface': 'android-assistant',
+            'request_handoff': true,
           }),
         )
         .timeout(_timeout);
@@ -102,7 +173,7 @@ class OtyaSupportService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(_error(data, 'Could not contact OTYA support.'));
     }
-    return OtyaSupportTicket('${data['ticket_id'] ?? 'OTYA'}');
+    return OtyaSupportTicket('${data['ticket'] ?? 'OTYA'}');
   }
 
   Map<String, dynamic> _decode(http.Response response) {
