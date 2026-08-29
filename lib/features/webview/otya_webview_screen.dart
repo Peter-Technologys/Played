@@ -121,7 +121,8 @@ class _OtyaWebViewScreenState extends State<OtyaWebViewScreen> {
     }
 
     final token = await AuthService.instance.getValidToken();
-    final workerHost = Uri.tryParse(Environment.workerUrl)?.host.toLowerCase() ?? '';
+    final workerHost =
+        Uri.tryParse(Environment.workerUrl)?.host.toLowerCase() ?? '';
 
     if (token != null && uri.host.toLowerCase() == workerHost) {
       await _controller.loadRequest(
@@ -188,7 +189,9 @@ class _OtyaWebViewScreenState extends State<OtyaWebViewScreen> {
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         final handled = await _handleBack();
-        if (!handled && mounted) Navigator.of(context).pop();
+        if (!handled && context.mounted) {
+          Navigator.of(context).pop();
+        }
       },
       child: Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
@@ -201,7 +204,9 @@ class _OtyaWebViewScreenState extends State<OtyaWebViewScreen> {
             icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 20),
             onPressed: () async {
               final handled = await _handleBack();
-              if (!handled && mounted) Navigator.of(context).pop();
+              if (!handled && context.mounted) {
+                Navigator.of(context).pop();
+              }
             },
           ),
           title: Text(
@@ -247,7 +252,10 @@ class _OtyaWebViewScreenState extends State<OtyaWebViewScreen> {
               Material(
                 color: AppColors.error.withValues(alpha: 0.12),
                 child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 8,
+                  ),
                   child: Row(
                     children: [
                       const Icon(
@@ -320,7 +328,8 @@ class _OtyaWebViewScreenState extends State<OtyaWebViewScreen> {
             Text(
               offline
                   ? 'Connect to Wi-Fi or mobile data and try again.'
-                  : (_errorDescription ?? 'Check your connection and try again.'),
+                  : (_errorDescription ??
+                      'Check your connection and try again.'),
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 13,
