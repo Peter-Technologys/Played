@@ -3,7 +3,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../app/theme/app_colors.dart';
 import '../core/models/media_item.dart';
 import '../core/services/remote_control_service.dart';
 import '../core/widgets/update_dialog.dart';
@@ -211,7 +210,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this folder.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this folder.',
+              ),
             );
           }
           return _fadePage(
@@ -274,7 +275,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this folder.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this folder.',
+              ),
             );
           }
           return _fadePage(
@@ -319,7 +322,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this video.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this video.',
+              ),
             );
           }
           return _slideUpPage(
@@ -339,7 +344,9 @@ class AppRouter {
               return _fadePage(
                 context: c,
                 state: s,
-                child: const _RouteErrorScreen(message: 'Could not open this song.'),
+                child: const _RouteErrorScreen(
+                  message: 'Could not open this song.',
+                ),
               );
             }
             return _slideUpPage(
@@ -355,7 +362,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this song.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this song.',
+              ),
             );
           }
           return _slideUpPage(
@@ -378,7 +387,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this folder.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this folder.',
+              ),
             );
           }
           return _fadePage(
@@ -399,7 +410,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this album.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this album.',
+              ),
             );
           }
           return _fadePage(
@@ -420,7 +433,9 @@ class AppRouter {
             return _fadePage(
               context: c,
               state: s,
-              child: const _RouteErrorScreen(message: 'Could not open this artist.'),
+              child: const _RouteErrorScreen(
+                message: 'Could not open this artist.',
+              ),
             );
           }
           return _fadePage(
@@ -482,6 +497,7 @@ class _MainShell extends ConsumerStatefulWidget {
 
 class _MainShellState extends ConsumerState<_MainShell> {
   static const _routes = ['/', '/music', '/myspace'];
+  static const _wideBreakpoint = 600.0;
 
   @override
   void initState() {
@@ -496,137 +512,116 @@ class _MainShellState extends ConsumerState<_MainShell> {
     GoRouter.of(context).go(_routes[index]);
   }
 
+  int _currentIndex(BuildContext context) {
+    final location = GoRouterState.of(context).matchedLocation;
+    if (location.startsWith('/music')) return 1;
+    if (location.startsWith('/myspace')) return 2;
+    return 0;
+  }
+
+  Widget _miniPlayer() => Consumer(
+        builder: (context, ref, _) {
+          final hasMini = ref.watch(miniPlayerItemProvider) != null;
+          return hasMini
+              ? const RepaintBoundary(child: MiniPlayer())
+              : const SizedBox.shrink();
+        },
+      );
+
   @override
   Widget build(BuildContext context) {
-    final location = GoRouterState.of(context).matchedLocation;
-    final currentIndex = location.startsWith('/music')
-        ? 1
-        : location.startsWith('/myspace')
-            ? 2
-            : 0;
+    final currentIndex = _currentIndex(context);
 
-    final dark = Theme.of(context).brightness == Brightness.dark;
-    return Scaffold(
-      body: widget.child,
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Consumer(
-            builder: (context, ref, _) {
-              final hasMini = ref.watch(miniPlayerItemProvider) != null;
-              return hasMini
-                  ? const RepaintBoundary(child: MiniPlayer())
-                  : const SizedBox.shrink();
-            },
-          ),
-          Container(
-            decoration: BoxDecoration(
-              color: dark ? const Color(0xFF0F1015) : Colors.white,
-              border: Border(
-                top: BorderSide(color: AppColors.borderOf(context), width: .7),
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              minimum: const EdgeInsets.only(bottom: 2),
-              child: SizedBox(
-                height: 56,
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.video_library_rounded,
-                        label: 'Video',
-                        isActive: currentIndex == 0,
-                        onTap: () => _onTap(0),
-                      ),
-                    ),
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.library_music_rounded,
-                        label: 'Music',
-                        isActive: currentIndex == 1,
-                        onTap: () => _onTap(1),
-                      ),
-                    ),
-                    Expanded(
-                      child: _NavItem(
-                        icon: Icons.person_rounded,
-                        label: 'Me',
-                        isActive: currentIndex == 2,
-                        onTap: () => _onTap(2),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _NavItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final bool isActive;
-  final VoidCallback onTap;
-
-  const _NavItem({
-    required this.icon,
-    required this.label,
-    required this.isActive,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) => Semantics(
-        button: true,
-        selected: isActive,
-        label: label,
-        child: InkWell(
-          onTap: onTap,
-          child: Center(
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 160),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 5),
-              decoration: BoxDecoration(
-                color: isActive
-                    ? AppColors.accent.withValues(alpha: .10)
-                    : Colors.transparent,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final wide = constraints.maxWidth >= _wideBreakpoint;
+        if (wide) {
+          return Scaffold(
+            body: SafeArea(
+              child: Row(
                 children: [
-                  Icon(
-                    icon,
-                    size: 20,
-                    color: isActive
-                        ? AppColors.accent
-                        : AppColors.textSecondary,
+                  NavigationRail(
+                    selectedIndex: currentIndex,
+                    labelType: NavigationRailLabelType.all,
+                    minWidth: 80,
+                    onDestinationSelected: _onTap,
+                    leading: Padding(
+                      padding: const EdgeInsets.only(bottom: 18),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(12),
+                        child: Image.asset(
+                          'assets/icons/play_store_512.png',
+                          width: 40,
+                          height: 40,
+                        ),
+                      ),
+                    ),
+                    destinations: const [
+                      NavigationRailDestination(
+                        icon: Icon(Icons.video_library_outlined),
+                        selectedIcon: Icon(Icons.video_library_rounded),
+                        label: Text('Video'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.library_music_outlined),
+                        selectedIcon: Icon(Icons.library_music_rounded),
+                        label: Text('Music'),
+                      ),
+                      NavigationRailDestination(
+                        icon: Icon(Icons.person_outline_rounded),
+                        selectedIcon: Icon(Icons.person_rounded),
+                        label: Text('Me'),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 9.5,
-                      height: 1,
-                      fontWeight: isActive ? FontWeight.w800 : FontWeight.w600,
-                      color: isActive
-                          ? AppColors.accent
-                          : AppColors.textSecondary,
+                  const VerticalDivider(width: 1),
+                  Expanded(
+                    child: Column(
+                      children: [
+                        Expanded(child: widget.child),
+                        _miniPlayer(),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
+          );
+        }
+
+        return Scaffold(
+          body: widget.child,
+          bottomNavigationBar: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _miniPlayer(),
+              NavigationBar(
+                selectedIndex: currentIndex,
+                onDestinationSelected: _onTap,
+                destinations: const [
+                  NavigationDestination(
+                    icon: Icon(Icons.video_library_outlined),
+                    selectedIcon: Icon(Icons.video_library_rounded),
+                    label: 'Video',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.library_music_outlined),
+                    selectedIcon: Icon(Icons.library_music_rounded),
+                    label: 'Music',
+                  ),
+                  NavigationDestination(
+                    icon: Icon(Icons.person_outline_rounded),
+                    selectedIcon: Icon(Icons.person_rounded),
+                    label: 'Me',
+                  ),
+                ],
+              ),
+            ],
           ),
-        ),
-      );
+        );
+      },
+    );
+  }
 }
 
 class _RouteErrorScreen extends StatelessWidget {
