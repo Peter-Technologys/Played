@@ -1,249 +1,371 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../app/theme/app_colors.dart';
-import '../../player/presentation/audio_player_screen.dart';
-import '../../player/presentation/mini_player.dart';
-import '../../player/presentation/queue_screen.dart';
 
-/// Full-screen car mode — large buttons, no distractions.
-class CarModeScreen extends ConsumerWidget {
+import '../../../app/theme/app_colors.dart';
+import '../../../app/theme/app_dimensions.dart';
+import 'audio_player_screen.dart';
+import 'mini_player.dart';
+import 'queue_screen.dart';
+
+/// Distraction-reduced large playback controls.
+///
+/// This is an in-app accessibility/convenience surface, not an Android Auto
+/// interface. System UI changes are lifecycle-owned and always restored when
+/// the route exits, including Android back/system gestures.
+class CarModeScreen extends ConsumerStatefulWidget {
   const CarModeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final ps       = ref.watch(audioPlayerProvider);
-    final item     = ref.watch(miniPlayerItemProvider);
-    // Shuffle state is owned by QueueNotifier — single source of truth.
-    final isShuffle = ref.watch(queueProvider.select((q) => q.shuffle));
+  ConsumerState<CarModeScreen> createState() => _CarModeScreenState();
+}
 
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+class _CarModeScreenState extends ConsumerState<CarModeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        unawaited(
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky),
+        );
+      }
+    });
+  }
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          children: [
-            // Header
-            Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-              child: Row(
+  @override
+  void dispose() {
+    unawaited(SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge));
+    super.dispose();
+  }
+
+  Future<void> _close() async {
+    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    if (mounted) Navigator.of(context).pop();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final playerState = ref.watch(audioPlayerProvider);
+    final item = ref.watch(miniPlayerItemProvider);
+    final isShuffle = ref.watch(queueProvider.select((queue) => queue.shuffle));
+    final progress = playerState.duration.inMilliseconds > 0
+        ? (playerState.position.inMilliseconds /
+                playerState.duration.inMilliseconds)
+            .clamp(0.0, 1.0)
+        : 0.0;
+
+    return PopScope(
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) {
+          unawaited(
+            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge),
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF08090C),
+        body: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final wide = constraints.maxWidth >= 700;
+              final content = _PlaybackContent(
+                title: item?.title ?? 'Nothing playing',
+                artist: item?.artist != null && item!.artist != '<unknown>'
+                    ? item.artist!
+                    : 'Unknown artist',
+                progress: progress,
+                isPlaying: playerState.isPlaying,
+                isShuffle: isShuffle,
+                repeat: playerState.repeat,
+                onSeek: (value) {
+                  final duration = playerState.duration.inMilliseconds;
+                  ref.read(audioPlayerProvider.notifier).seek(
+                        Duration(
+                          milliseconds: (value * duration).round(),
+                        ),
+                      );
+                },
+                onPrevious: () =>
+                    ref.read(audioPlayerProvider.notifier).skipPrevious(),
+                onToggle: () =>
+                    ref.read(audioPlayerProvider.notifier).togglePlay(),
+                onNext: () =>
+                    ref.read(audioPlayerProvider.notifier).skipNext(),
+                onShuffle: () =>
+                    ref.read(audioPlayerProvider.notifier).toggleShuffle(),
+                onRepeat: () =>
+                    ref.read(audioPlayerProvider.notifier).cycleRepeat(),
+                onQueue: () => showModalBottomSheet<void>(
+                  context: context,
+                  useSafeArea: true,
+                  isScrollControlled: true,
+                  builder: (_) => const QueueScreen(),
+                ),
+              );
+
+              return Column(
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-                      Navigator.of(context).pop();
-                    },
-                    child: Container(
-                      width: 44, height: 44,
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1A1A),
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(Icons.close_rounded,
-                          color: Colors.white70, size: 22),
-                    ),
-                  ),
-                  const Spacer(),
-                  const Row(
-                    children: [
-                      Icon(Icons.directions_car_rounded,
-                          color: AppColors.accent, size: 18),
-                      SizedBox(width: 6),
-                      Text('DRIVE MODE',
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(12, 8, 16, 0),
+                    child: Row(
+                      children: [
+                        IconButton.filledTonal(
+                          tooltip: 'Exit large controls',
+                          onPressed: _close,
+                          icon: const Icon(Icons.close_rounded),
+                        ),
+                        const Spacer(),
+                        const Icon(
+                          Icons.touch_app_rounded,
+                          size: 18,
+                          color: AppColors.accent,
+                        ),
+                        const SizedBox(width: 7),
+                        const Text(
+                          'LARGE CONTROLS',
                           style: TextStyle(
-                            fontSize: 12, fontWeight: FontWeight.w700,
-                            color: AppColors.accent, letterSpacing: 1.5,
-                          )),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-
-            const Spacer(),
-
-            // Album art placeholder
-            Container(
-              width: 160, height: 160,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    AppColors.accent.withValues(alpha: 0.2),
-                    AppColors.accentViolet.withValues(alpha: 0.3),
-                  ],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(24),
-                boxShadow: [
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.3),
-                    blurRadius: 40, spreadRadius: 4,
-                  ),
-                ],
-              ),
-              child: const Icon(Icons.music_note_rounded,
-                  color: AppColors.accent, size: 72),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Track info
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: Column(
-                children: [
-                  Text(
-                    item?.title ?? 'Nothing playing',
-                    style: const TextStyle(
-                      fontSize: 24, fontWeight: FontWeight.w800,
-                      color: Colors.white, fontFamily: 'Inter',
-                    ),
-                    textAlign: TextAlign.center,
-                    maxLines: 2, overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    item?.artist != null && item!.artist != '<unknown>'
-                        ? item.artist!
-                        : 'Unknown Artist',
-                    style: const TextStyle(fontSize: 16, color: Colors.white54),
-                    textAlign: TextAlign.center,
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 40),
-
-            // Progress bar
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 32),
-              child: SliderTheme(
-                data: SliderThemeData(
-                  trackHeight: 6,
-                  activeTrackColor: AppColors.accent,
-                  inactiveTrackColor: Colors.white12,
-                  thumbColor: AppColors.accent,
-                  overlayColor: AppColors.accent.withValues(alpha: 0.2),
-                  thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                ),
-                child: Slider(
-                  value: ps.duration.inMilliseconds > 0
-                      ? (ps.position.inMilliseconds / ps.duration.inMilliseconds)
-                          .clamp(0.0, 1.0)
-                      : 0.0,
-                  onChanged: (v) => ref.read(audioPlayerProvider.notifier).seek(
-                      Duration(milliseconds: (v * ps.duration.inMilliseconds).toInt())),
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 32),
-
-            // Large controls
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _CarBtn(
-                    icon: Icons.skip_previous_rounded, size: 56,
-                    onTap: () => ref.read(audioPlayerProvider.notifier).skipPrevious(),
-                  ),
-                  _CarBtn(
-                    icon: ps.isPlaying
-                        ? Icons.pause_circle_filled_rounded
-                        : Icons.play_circle_filled_rounded,
-                    size: 88, color: AppColors.accent,
-                    onTap: () => ref.read(audioPlayerProvider.notifier).togglePlay(),
-                  ),
-                  _CarBtn(
-                    icon: Icons.skip_next_rounded, size: 56,
-                    onTap: () => ref.read(audioPlayerProvider.notifier).skipNext(),
-                  ),
-                ],
-              ),
-            ),
-
-            const Spacer(),
-
-            // Bottom row
-            Padding(
-              padding: const EdgeInsets.fromLTRB(32, 0, 32, 32),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _CarSmallBtn(
-                    icon: Icons.shuffle_rounded, active: isShuffle,
-                    onTap: () => ref.read(audioPlayerProvider.notifier).toggleShuffle(),
-                  ),
-                  _CarSmallBtn(
-                    icon: ps.repeat == RepeatState.one
-                        ? Icons.repeat_one_rounded
-                        : Icons.repeat_rounded,
-                    active: ps.repeat != RepeatState.off,
-                    onTap: () => ref.read(audioPlayerProvider.notifier).cycleRepeat(),
-                  ),
-                  _CarSmallBtn(
-                    icon: Icons.queue_music_rounded, active: false,
-                    onTap: () => showModalBottomSheet(
-                      context: context,
-                      useSafeArea: true,
-                      backgroundColor: AppColors.surface,
-                      isScrollControlled: true,
-                      shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(24))),
-                      builder: (_) => const QueueScreen(),
+                            color: AppColors.accent,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            letterSpacing: 1.25,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
+                  Expanded(
+                    child: wide
+                        ? Center(
+                            child: ConstrainedBox(
+                              constraints: const BoxConstraints(maxWidth: 720),
+                              child: content,
+                            ),
+                          )
+                        : content,
+                  ),
                 ],
-              ),
-            ),
-          ],
+              );
+            },
+          ),
         ),
       ),
     );
   }
 }
 
-class _CarBtn extends StatelessWidget {
-  final IconData icon;
-  final double size;
-  final Color color;
-  final VoidCallback onTap;
-  const _CarBtn({
-    required this.icon, required this.size,
-    required this.onTap, this.color = Colors.white,
+class _PlaybackContent extends StatelessWidget {
+  const _PlaybackContent({
+    required this.title,
+    required this.artist,
+    required this.progress,
+    required this.isPlaying,
+    required this.isShuffle,
+    required this.repeat,
+    required this.onSeek,
+    required this.onPrevious,
+    required this.onToggle,
+    required this.onNext,
+    required this.onShuffle,
+    required this.onRepeat,
+    required this.onQueue,
   });
-  @override
-  Widget build(BuildContext context) =>
-      GestureDetector(onTap: onTap, child: Icon(icon, color: color, size: size));
-}
 
-class _CarSmallBtn extends StatelessWidget {
-  final IconData icon;
-  final bool active;
-  final VoidCallback onTap;
-  const _CarSmallBtn({required this.icon, required this.active, required this.onTap});
+  final String title;
+  final String artist;
+  final double progress;
+  final bool isPlaying;
+  final bool isShuffle;
+  final RepeatState repeat;
+  final ValueChanged<double> onSeek;
+  final VoidCallback onPrevious;
+  final VoidCallback onToggle;
+  final VoidCallback onNext;
+  final VoidCallback onShuffle;
+  final VoidCallback onRepeat;
+  final VoidCallback onQueue;
+
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 64, height: 64,
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.accent.withValues(alpha: 0.15)
-              : const Color(0xFF1A1A1A),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-              color: active ? AppColors.accent : Colors.white12),
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
+      child: Column(
+        children: [
+          const Spacer(),
+          Container(
+            width: 132,
+            height: 132,
+            decoration: BoxDecoration(
+              color: const Color(0xFF14161D),
+              borderRadius: BorderRadius.circular(AppDimensions.radiusXLarge),
+              border: Border.all(color: Colors.white10),
+            ),
+            child: const Icon(
+              Icons.music_note_rounded,
+              color: AppColors.accent,
+              size: 54,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Text(
+            title,
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -.45,
+            ),
+          ),
+          const SizedBox(height: 7),
+          Text(
+            artist,
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white60,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 28),
+          Semantics(
+            label: 'Playback position',
+            child: Slider(
+              value: progress,
+              onChanged: onSeek,
+            ),
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _LargeControl(
+                tooltip: 'Previous',
+                icon: Icons.skip_previous_rounded,
+                onPressed: onPrevious,
+              ),
+              const SizedBox(width: 22),
+              _LargeControl(
+                tooltip: isPlaying ? 'Pause' : 'Play',
+                icon: isPlaying
+                    ? Icons.pause_rounded
+                    : Icons.play_arrow_rounded,
+                primary: true,
+                onPressed: onToggle,
+              ),
+              const SizedBox(width: 22),
+              _LargeControl(
+                tooltip: 'Next',
+                icon: Icons.skip_next_rounded,
+                onPressed: onNext,
+              ),
+            ],
+          ),
+          const Spacer(),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _SecondaryControl(
+                tooltip: 'Shuffle',
+                icon: Icons.shuffle_rounded,
+                active: isShuffle,
+                onPressed: onShuffle,
+              ),
+              _SecondaryControl(
+                tooltip: repeat == RepeatState.one
+                    ? 'Repeat one'
+                    : 'Repeat',
+                icon: repeat == RepeatState.one
+                    ? Icons.repeat_one_rounded
+                    : Icons.repeat_rounded,
+                active: repeat != RepeatState.off,
+                onPressed: onRepeat,
+              ),
+              _SecondaryControl(
+                tooltip: 'Queue',
+                icon: Icons.queue_music_rounded,
+                active: false,
+                onPressed: onQueue,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _LargeControl extends StatelessWidget {
+  const _LargeControl({
+    required this.tooltip,
+    required this.icon,
+    required this.onPressed,
+    this.primary = false,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final VoidCallback onPressed;
+  final bool primary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox.square(
+        dimension: primary ? 88 : 72,
+        child: IconButton.filled(
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor:
+                primary ? AppColors.accent : const Color(0xFF1B1D25),
+            foregroundColor: primary ? Colors.white : Colors.white,
+          ),
+          iconSize: primary ? 46 : 38,
+          icon: Icon(icon),
         ),
-        child: Icon(icon,
-            color: active ? AppColors.accent : Colors.white54, size: 28),
+      ),
+    );
+  }
+}
+
+class _SecondaryControl extends StatelessWidget {
+  const _SecondaryControl({
+    required this.tooltip,
+    required this.icon,
+    required this.active,
+    required this.onPressed,
+  });
+
+  final String tooltip;
+  final IconData icon;
+  final bool active;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: SizedBox.square(
+        dimension: 64,
+        child: IconButton.filledTonal(
+          onPressed: onPressed,
+          style: IconButton.styleFrom(
+            backgroundColor: active
+                ? AppColors.accent.withValues(alpha: .18)
+                : const Color(0xFF171920),
+            foregroundColor: active ? AppColors.accent : Colors.white70,
+            side: BorderSide(
+              color: active ? AppColors.accent : Colors.white10,
+            ),
+          ),
+          icon: Icon(icon),
+        ),
       ),
     );
   }
