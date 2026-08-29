@@ -17,7 +17,6 @@ import 'core/services/fcm_service.dart';
 import 'core/services/firebase_platform_service.dart';
 import 'core/services/media_notification_service.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/phone_state_service.dart';
 import 'core/services/pip_service.dart';
 import 'core/services/playback_coordinator.dart';
 import 'core/services/push_notification_service.dart';
@@ -216,32 +215,16 @@ Future<void> _initBackground(
     () => PlaybackCoordinator.instance.activePlayer?.play(),
   );
 
-  // Configure the shared audio session after audio_service/media_kit have loaded.
-  // This is the primary interruption + headphone-disconnect path on modern
-  // Android. Keep telephony observation as a fallback until real-device
-  // validation proves the audio-focus path is sufficient across supported OEMs.
-  var audioSessionReady = false;
-  try {
-    await AudioSessionService.instance.init(
+  // Configure shared audio focus only after audio_service/media_kit have loaded.
+  // The audio session is OTYA's single interruption owner on modern Android;
+  // call interruptions are optional, while unplugged/Bluetooth-loss safety is
+  // always active.
+  await _safeBackground(
+    'audio session',
+    () => AudioSessionService.instance.init(
       pauseDuringCalls: savedSettings.pauseDuringCalls,
-    );
-    audioSessionReady = true;
-  } catch (e, st) {
-    debugPrint('[Background:audio session] Error: $e\n$st');
-    CrashReporter.instance.report(e, st);
-  }
-
-  if (!audioSessionReady && savedSettings.pauseDuringCalls) {
-    unawaited(_safeBackground(
-      'call handling fallback',
-      () => PhoneStateService.instance.setPauseDuringCalls(true),
-    ));
-  } else {
-    unawaited(_safeBackground(
-      'disable legacy call listener',
-      () => PhoneStateService.instance.setPauseDuringCalls(false),
-    ));
-  }
+    ),
+  );
 
   // Firebase is optional and starts only after OTYA is already usable. App
   // Check/Analytics/Performance policy comes from Cloudflare app config. FCM
