@@ -68,10 +68,4 @@ class FfmpegService {
         endSec: endSec,
         onProgress: onProgress,
       );
-
-  Future<void> cancelAll() async {
-    try {
-      await _channel.invokeMethod('cancel');
-    } catch (_) {}
-  }
 }
