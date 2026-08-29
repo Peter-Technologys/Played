@@ -50,11 +50,17 @@ class _AppLockGateState extends ConsumerState<AppLockGate>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<bool>(
+      settingsProvider.select((settings) => settings.appLockEnabled),
+      (previous, enabled) {
+        if (!enabled && _unlockedForSession && mounted) {
+          setState(() => _unlockedForSession = false);
+        }
+      },
+    );
+
     final enabled = ref.watch(settingsProvider.select((s) => s.appLockEnabled));
-    if (!enabled) {
-      _unlockedForSession = false;
-      return widget.child;
-    }
+    if (!enabled) return widget.child;
     if (_unlockedForSession) return widget.child;
     return AppLockScreen(
       onUnlocked: () {
