@@ -16,22 +16,15 @@ class GoogleAccountService {
   static final GoogleAccountService instance = GoogleAccountService._();
 
   /// Android Google Sign-In uses the Web OAuth client as serverClientId so the
-  /// returned ID token is intended for OTYA's backend. The Android OAuth client
-  /// remains registered in Google/Firebase against package + signing SHA.
+  /// returned ID token is intended for OTYA's backend. This client ID is public
+  /// application configuration, not a secret, so a safe production default is
+  /// embedded to prevent otherwise-valid builds from disabling Google sign-in.
+  /// CI can still override it with --dart-define when required.
   static const String _webClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
-    defaultValue: '',
+    defaultValue:
+        '82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com',
   );
-
-  /// Temporary compatibility for older CI/local builds. New production builds
-  /// must define GOOGLE_WEB_CLIENT_ID explicitly.
-  static const String _legacyClientId = String.fromEnvironment(
-    'GOOGLE_CLIENT_ID',
-    defaultValue: '',
-  );
-
-  static String get _clientId =>
-      _webClientId.isNotEmpty ? _webClientId : _legacyClientId;
 
   static const String _driveAppDataScope =
       'https://www.googleapis.com/auth/drive.appdata';
@@ -41,13 +34,13 @@ class GoogleAccountService {
       'email',
       'profile',
     ],
-    serverClientId: _clientId.isEmpty ? null : _clientId,
+    serverClientId: _webClientId,
   );
 
   GoogleSignInAccount? _account;
   String? _driveAccessToken;
 
-  bool get isConfigured => _clientId.isNotEmpty;
+  bool get isConfigured => _webClientId.isNotEmpty;
   String? get email => _account?.email;
   bool get hasGoogleSession => _account != null;
 
@@ -56,13 +49,6 @@ class GoogleAccountService {
     bool privacyAccepted = false,
     bool marketingConsent = false,
   }) async {
-    if (!isConfigured) {
-      return const AuthResult(
-        ok: false,
-        error: 'Google Sign-In is not configured for this build yet.',
-      );
-    }
-
     try {
       final account = await _google.signIn();
       if (account == null) {
@@ -118,7 +104,7 @@ class GoogleAccountService {
     if (details.contains('10') ||
         details.contains('developer_error') ||
         details.contains('developer error')) {
-      return 'Google Sign-In is not configured for this signed OTYA build yet. Please update the app or contact support.';
+      return 'Google could not verify this signed OTYA build. Check the Android OAuth package name and SHA fingerprint for this signing key.';
     }
     if (code.contains('sign_in_failed')) {
       return 'Google could not verify this OTYA installation. Please update the app and try again.';
@@ -127,7 +113,6 @@ class GoogleAccountService {
   }
 
   Future<bool> restoreSession() async {
-    if (!isConfigured) return false;
     try {
       final account = await _google.signInSilently();
       if (account == null) return false;
