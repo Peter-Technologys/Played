@@ -5,25 +5,30 @@
     android:height="108dp"
     android:viewportWidth="512"
     android:viewportHeight="512">
-    <!-- Static Otya identity. The launcher never animates. -->
-    <path android:pathData="M160,98 L138,117 L116,146 L100,179 L89,220 L108,180 L129,158 L141,150 L165,140 L186,136 L211,136 L241,142 L270,155 L292,171 L315,196 L327,216 L337,248 L338,280 L333,307 L324,329 L354,307 L373,286 L389,262 L402,231 L406,209 L405,183 L399,159 L373,120 L350,99 L330,86 L303,74 L272,67 L240,67 L211,73 L181,85 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="89" android:startY="90" android:endX="406" android:endY="300" android:startColor="#FFFFFFFF" android:centerColor="#FFE8E8EA" android:endColor="#FFFFFFFF" />
-        </aapt:attr>
-    </path>
-    <path android:pathData="M180,142 L159,147 L139,157 L116,177 L105,192 L89,232 L89,283 L102,328 L113,349 L133,376 L152,395 L174,409 L191,414 L219,414 L249,405 L276,389 L298,368 L316,338 L285,355 L267,359 L247,359 L216,348 L192,325 L181,305 L173,272 L175,239 L188,207 L209,185 L236,172 L264,169 L291,175 L273,162 L242,148 L215,142 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="90" android:startY="150" android:endX="315" android:endY="414" android:startColor="#FFE6E6E8" android:centerColor="#FFFFFFFF" android:endColor="#FFBFC0C5" />
-        </aapt:attr>
-    </path>
-    <!-- Official resting balls: blue, red and yellow. -->
-    <path android:fillColor="#FF2979FF" android:strokeColor="#CCFFFFFF" android:strokeWidth="3" android:pathData="M292,310 A18,18 0,1 0,328,310 A18,18 0,1 0,292,310" />
-    <path android:fillColor="#FFFF3B30" android:strokeColor="#CCFFFFFF" android:strokeWidth="3" android:pathData="M316,292 A19,19 0,1 0,354,292 A19,19 0,1 0,316,292" />
-    <path android:fillColor="#FFFFD60A" android:strokeColor="#CC111216" android:strokeWidth="3" android:pathData="M338,267 A18,18 0,1 0,374,267 A18,18 0,1 0,338,267" />
-    <!-- Painted last so the resting balls tuck beneath the overlap. -->
-    <path android:pathData="M405,164 L410,190 L408,224 L395,260 L373,293 L348,318 L321,337 L301,371 L269,399 L248,410 L226,417 L184,417 L210,428 L234,433 L256,434 L289,430 L320,420 L343,408 L382,374 L412,329 L423,298 L427,275 L428,246 L425,220 L417,190 Z">
-        <aapt:attr name="android:fillColor">
-            <gradient android:type="linear" android:startX="190" android:startY="410" android:endX="425" android:endY="180" android:startColor="#FFBFC0C5" android:centerColor="#FFFFFFFF" android:endColor="#FFE5E5E7" />
-        </aapt:attr>
-    </path>
+    <!-- Android masks adaptive icons differently on each launcher. Keep the
+         complete Otya mark comfortably inside the central safe zone. -->
+    <group
+        android:pivotX="256"
+        android:pivotY="256"
+        android:scaleX="0.72"
+        android:scaleY="0.72">
+        <path android:pathData="M160,98 L138,117 L116,146 L100,179 L89,220 L108,180 L129,158 L141,150 L165,140 L186,136 L211,136 L241,142 L270,155 L292,171 L315,196 L327,216 L337,248 L338,280 L333,307 L324,329 L354,307 L373,286 L389,262 L402,231 L406,209 L405,183 L399,159 L373,120 L350,99 L330,86 L303,74 L272,67 L240,67 L211,73 L181,85 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="89" android:startY="90" android:endX="406" android:endY="300" android:startColor="#FFFFFFFF" android:centerColor="#FFE8E8EA" android:endColor="#FFFFFFFF" />
+            </aapt:attr>
+        </path>
+        <path android:pathData="M180,142 L159,147 L139,157 L116,177 L105,192 L89,232 L89,283 L102,328 L113,349 L133,376 L152,395 L174,409 L191,414 L219,414 L249,405 L276,389 L298,368 L316,338 L285,355 L267,359 L247,359 L216,348 L192,325 L181,305 L173,272 L175,239 L188,207 L209,185 L236,172 L264,169 L291,175 L273,162 L242,148 L215,142 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="90" android:startY="150" android:endX="315" android:endY="414" android:startColor="#FFE6E6E8" android:centerColor="#FFFFFFFF" android:endColor="#FFBFC0C5" />
+            </aapt:attr>
+        </path>
+        <path android:fillColor="#FF2979FF" android:strokeColor="#CCFFFFFF" android:strokeWidth="3" android:pathData="M292,310 A18,18 0,1 0,328,310 A18,18 0,1 0,292,310" />
+        <path android:fillColor="#FFFF3B30" android:strokeColor="#CCFFFFFF" android:strokeWidth="3" android:pathData="M316,292 A19,19 0,1 0,354,292 A19,19 0,1 0,316,292" />
+        <path android:fillColor="#FFFFD60A" android:strokeColor="#CC111216" android:strokeWidth="3" android:pathData="M338,267 A18,18 0,1 0,374,267 A18,18 0,1 0,338,267" />
+        <path android:pathData="M405,164 L410,190 L408,224 L395,260 L373,293 L348,318 L321,337 L301,371 L269,399 L248,410 L226,417 L184,417 L210,428 L234,433 L256,434 L289,430 L320,420 L343,408 L382,374 L412,329 L423,298 L427,275 L428,246 L425,220 L417,190 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient android:type="linear" android:startX="190" android:startY="410" android:endX="425" android:endY="180" android:startColor="#FFBFC0C5" android:centerColor="#FFFFFFFF" android:endColor="#FFE5E5E7" />
+            </aapt:attr>
+        </path>
+    </group>
 </vector>
