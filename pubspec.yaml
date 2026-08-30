@@ -104,6 +104,17 @@ dependencies:
   webview_flutter: 4.9.0
   webview_flutter_android: 3.16.9
 
+# media_kit_video's published package declares media_kit from pub.dev. OTYA
+# intentionally uses the reviewed immutable Git revision above for the Android
+# disposal-order crash fix. Override transitive resolution to that exact same
+# revision so every MediaKit consumer uses one source/version graph.
+dependency_overrides:
+  media_kit:
+    git:
+      url: https://github.com/Priyanshu-Mallick/media-kit.git
+      ref: 9e1706898f15bcee98c125a2f4a7b88a4374dda7
+      path: media_kit
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
