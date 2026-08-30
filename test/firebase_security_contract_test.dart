@@ -28,7 +28,7 @@ void main() {
 
   test('Google backend ID tokens prefer Web OAuth client id', () {
     final google = read('lib/core/services/google_account_service.dart');
-    final workflow = read('.github/workflows/debug.yml');
+    final workflow = read('.github/workflows/test-apk.yml');
 
     expect(google, contains("String.fromEnvironment(\n    'GOOGLE_WEB_CLIENT_ID'"));
     expect(google, contains('serverClientId: _clientId.isEmpty ? null : _clientId'));
@@ -44,9 +44,23 @@ void main() {
     final gitignore = read('.gitignore');
 
     final runAppIndex = main.indexOf('runApp(');
-    final backgroundIndex = main.indexOf('unawaited(_initBackground');
+    final bootstrapScheduleIndex =
+        main.indexOf('unawaited(_bootstrapAfterFirstFrame(settingsNotifier))');
+    final bootstrapFunctionIndex =
+        main.indexOf('Future<void> _bootstrapAfterFirstFrame');
+    final backgroundIndex = main.indexOf(
+      'await _initBackground(savedSettings, databaseReady);',
+      bootstrapFunctionIndex,
+    );
+    final firebaseIndex = main.indexOf(
+      'FirebasePlatformService.instance.initOptionalServices',
+    );
+
     expect(runAppIndex, greaterThanOrEqualTo(0));
-    expect(backgroundIndex, greaterThan(runAppIndex));
+    expect(bootstrapScheduleIndex, greaterThan(runAppIndex));
+    expect(bootstrapFunctionIndex, greaterThan(runAppIndex));
+    expect(backgroundIndex, greaterThan(bootstrapFunctionIndex));
+    expect(firebaseIndex, greaterThan(backgroundIndex));
 
     expect(gitignore, contains('*firebase-adminsdk*.json'));
     expect(gitignore, contains('service-account*.json'));
