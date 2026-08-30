@@ -1,16 +1,18 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
 
-/// Canonical in-app OTYA brand lockup.
+/// Canonical in-app Otya brand lockup.
 ///
-/// The symbol geometry is shared with the approved OTYA brand pack. Visible
-/// product branding must never fall back to a generic play mark or plain ring.
+/// The O symbol is the first letter of the name, so the horizontal lockup is
+/// always the mark followed by lowercase `tya` — never a duplicated O.
 class OtyaLogo extends StatelessWidget {
   const OtyaLogo({
     super.key,
     this.fontSize = 30,
-    this.letterSpacing = 2.4,
+    this.letterSpacing = -.6,
     this.borderRadius = 16,
     this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     this.iconOnly = false,
@@ -36,14 +38,15 @@ class OtyaLogo extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           mark,
-          SizedBox(width: fontSize * .34),
+          SizedBox(width: fontSize * .08),
           Text(
-            'TYA',
+            'tya',
             style: TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w900,
+              fontWeight: FontWeight.w700,
               color: AppColors.textPrimaryOf(context),
               fontFamily: 'Inter',
               letterSpacing: letterSpacing,
@@ -56,29 +59,128 @@ class OtyaLogo extends StatelessWidget {
   }
 }
 
-/// Official OTYA twisted-O symbol.
+/// Official static Otya mark.
 ///
-/// These three lobes are traced from the approved master symbol supplied in
-/// the OTYA brand pack. The canvas is 512x512 to keep the geometry identical
-/// across Flutter and Android vector resources.
+/// The logo never spins in normal UI. The three resting balls are part of the
+/// static identity. [OtyaThinkingMark] is the only animated variant.
 class OtyaMark extends StatelessWidget {
   const OtyaMark({super.key, this.size = 52});
 
   final double size;
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        label: 'OTYA',
-        image: true,
-        child: SizedBox.square(
-          dimension: size,
-          child: CustomPaint(painter: const _OtyaMarkPainter()),
+  Widget build(BuildContext context) {
+    final darkSurface = Theme.of(context).brightness == Brightness.dark;
+    return Semantics(
+      label: 'Otya',
+      image: true,
+      child: SizedBox.square(
+        dimension: size,
+        child: CustomPaint(
+          painter: _OtyaMarkPainter(
+            darkSurface: darkSurface,
+            thinkingProgress: null,
+          ),
         ),
-      );
+      ),
+    );
+  }
+}
+
+/// The Ask Otya thinking state.
+///
+/// The O itself stays fixed. Only the blue, red and yellow balls travel around
+/// the curved inner route. When [thinking] becomes false the widget returns to
+/// the exact static mark rather than leaving the balls in an arbitrary place.
+class OtyaThinkingMark extends StatefulWidget {
+  const OtyaThinkingMark({
+    super.key,
+    this.size = 52,
+    this.thinking = true,
+    this.duration = const Duration(milliseconds: 1800),
+  });
+
+  final double size;
+  final bool thinking;
+  final Duration duration;
+
+  @override
+  State<OtyaThinkingMark> createState() => _OtyaThinkingMarkState();
+}
+
+class _OtyaThinkingMarkState extends State<OtyaThinkingMark>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(vsync: this, duration: widget.duration);
+    if (widget.thinking) _controller.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant OtyaThinkingMark oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.duration != widget.duration) {
+      _controller.duration = widget.duration;
+    }
+    if (widget.thinking && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!widget.thinking && _controller.isAnimating) {
+      _controller.stop();
+      _controller.value = 0;
+    }
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    if (reduceMotion) {
+      _controller.stop();
+      _controller.value = 0;
+    } else if (widget.thinking && !_controller.isAnimating) {
+      _controller.repeat();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final darkSurface = Theme.of(context).brightness == Brightness.dark;
+    return Semantics(
+      label: widget.thinking ? 'Otya is thinking' : 'Otya',
+      image: true,
+      child: SizedBox.square(
+        dimension: widget.size,
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (context, _) => CustomPaint(
+            painter: _OtyaMarkPainter(
+              darkSurface: darkSurface,
+              thinkingProgress: widget.thinking ? _controller.value : null,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _OtyaMarkPainter extends CustomPainter {
-  const _OtyaMarkPainter();
+  const _OtyaMarkPainter({
+    required this.darkSurface,
+    required this.thinkingProgress,
+  });
+
+  final bool darkSurface;
+  final double? thinkingProgress;
 
   static Path _topLobe() => Path()
     ..moveTo(160, 98)
@@ -183,6 +285,10 @@ class _OtyaMarkPainter extends CustomPainter {
     ..lineTo(417, 190)
     ..close();
 
+  Color get _front => darkSurface ? const Color(0xFFFCFCFC) : const Color(0xFF101114);
+  Color get _mid => darkSurface ? const Color(0xFFE4E4E7) : const Color(0xFF25262B);
+  Color get _shade => darkSurface ? const Color(0xFFBFC0C5) : const Color(0xFF44464D);
+
   @override
   void paint(Canvas canvas, Size size) {
     final scale = size.shortestSide / 512;
@@ -196,36 +302,86 @@ class _OtyaMarkPainter extends CustomPainter {
     canvas.drawPath(
       top,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF18D8FF), Color(0xFF146BFF), Color(0xFF6A19FF)],
+          colors: [_front, _mid, _front],
         ).createShader(const Rect.fromLTWH(70, 55, 360, 300)),
     );
     canvas.drawPath(
       left,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF146BFF), Color(0xFF6A19FF), Color(0xFFE81CFF)],
+          colors: [_mid, _front, _shade],
         ).createShader(const Rect.fromLTWH(70, 130, 270, 310)),
     );
+
+    // Balls live inside the O. In normal branding they are fixed in the
+    // approved resting position. During Ask Otya thinking they move together
+    // around the full curved route while the O itself remains completely still.
+    if (thinkingProgress == null) {
+      _drawBall(canvas, const Offset(310, 310), 18, darkSurface ? const Color(0xFF202124) : const Color(0xFFF4F4F5));
+      _drawBall(canvas, const Offset(335, 292), 19, darkSurface ? Colors.white : const Color(0xFF15161A));
+      _drawBall(canvas, const Offset(356, 267), 18, darkSurface ? const Color(0xFF202124) : const Color(0xFFF4F4F5));
+    } else {
+      final baseAngle = thinkingProgress! * math.pi * 2 + .68;
+      const colors = <Color>[
+        Color(0xFF2979FF), // blue
+        Color(0xFFFF3B30), // red
+        Color(0xFFFFD60A), // yellow
+      ];
+      for (var i = 0; i < colors.length; i++) {
+        final angle = baseAngle - i * .19;
+        final point = Offset(
+          256 + math.cos(angle) * 112,
+          256 + math.sin(angle) * 126,
+        );
+        _drawBall(canvas, point, 17, colors[i]);
+      }
+    }
+
+    // The right lobe is intentionally painted last so the balls disappear
+    // behind the overlap for part of their journey, making the route feel like
+    // it passes through the ribbon instead of floating on top of it.
     canvas.drawPath(
       right,
       Paint()
-        ..shader = const LinearGradient(
+        ..shader = LinearGradient(
           begin: Alignment.bottomLeft,
           end: Alignment.topRight,
-          colors: [Color(0xFFE81CFF), Color(0xFFFF5B58), Color(0xFFFFB000)],
+          colors: [_shade, _front, _mid],
         ).createShader(const Rect.fromLTWH(170, 150, 280, 300)),
     );
 
     canvas.restore();
   }
 
+  void _drawBall(Canvas canvas, Offset center, double radius, Color color) {
+    final shadow = Paint()
+      ..color = Colors.black.withValues(alpha: .26)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 5);
+    canvas.drawCircle(center.translate(2, 4), radius, shadow);
+
+    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(
+      center,
+      radius,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-.35, -.45),
+          radius: .95,
+          colors: [Colors.white.withValues(alpha: .9), color, Color.lerp(color, Colors.black, .28)!],
+          stops: const [0, .34, 1],
+        ).createShader(rect),
+    );
+  }
+
   @override
-  bool shouldRepaint(covariant _OtyaMarkPainter oldDelegate) => false;
+  bool shouldRepaint(covariant _OtyaMarkPainter oldDelegate) =>
+      oldDelegate.darkSurface != darkSurface ||
+      oldDelegate.thinkingProgress != thinkingProgress;
 }
 
 class OtyaFooter extends StatelessWidget {
@@ -235,7 +391,7 @@ class OtyaFooter extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
-          'OTYA · PeterSmart Link',
+          'Otya · PeterSmart Link',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
