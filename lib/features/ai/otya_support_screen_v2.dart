@@ -633,12 +633,12 @@ class _ThinkingRow extends StatelessWidget {
   const _ThinkingRow();
 
   @override
-  Widget build(BuildContext context) => const Padding(
-        padding: EdgeInsets.fromLTRB(2, 6, 20, 20),
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(2, 6, 20, 20),
         child: Semantics(
           liveRegion: true,
           label: 'OTYA is thinking',
-          child: Row(
+          child: const Row(
             children: [
               OtyaThinkingMark(size: 30),
               SizedBox(width: 11),
