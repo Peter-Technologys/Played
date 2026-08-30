@@ -285,9 +285,26 @@ class _OtyaMarkPainter extends CustomPainter {
     ..lineTo(417, 190)
     ..close();
 
-  Color get _front => darkSurface ? const Color(0xFFFCFCFC) : const Color(0xFF101114);
-  Color get _mid => darkSurface ? const Color(0xFFE4E4E7) : const Color(0xFF25262B);
-  Color get _shade => darkSurface ? const Color(0xFFBFC0C5) : const Color(0xFF44464D);
+  static Path _topLeftSeam() => Path()
+    ..moveTo(107, 180)
+    ..cubicTo(150, 121, 236, 120, 292, 171);
+
+  static Path _topRightSeam() => Path()
+    ..moveTo(324, 329)
+    ..cubicTo(350, 295, 383, 267, 402, 231);
+
+  static Path _lowerSeam() => Path()
+    ..moveTo(184, 417)
+    ..cubicTo(236, 414, 278, 390, 316, 338);
+
+  Color get _front =>
+      darkSurface ? const Color(0xFFFCFCFC) : const Color(0xFF101114);
+  Color get _mid =>
+      darkSurface ? const Color(0xFFE4E4E7) : const Color(0xFF25262B);
+  Color get _shade =>
+      darkSurface ? const Color(0xFFBFC0C5) : const Color(0xFF44464D);
+  Color get _seam =>
+      darkSurface ? const Color(0xFF090A0D) : const Color(0xFF020306);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -318,19 +335,46 @@ class _OtyaMarkPainter extends CustomPainter {
         ).createShader(const Rect.fromLTWH(70, 130, 270, 310)),
     );
 
+    // Thin contour seams stay fixed on the O in both static and thinking states.
+    // They visually separate the interlocking ribbon sections without changing
+    // the brand colours or making the entire mark rotate.
+    final seamPaint = Paint()
+      ..color = _seam.withValues(alpha: darkSurface ? .92 : .82)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 5.5
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+    canvas.drawPath(_topLeftSeam(), seamPaint);
+    canvas.drawPath(_lowerSeam(), seamPaint);
+
     // Balls live inside the O. In normal branding they are fixed in the
     // approved resting position. During Ask Otya thinking they move together
     // around the full curved route while the O itself remains completely still.
     if (thinkingProgress == null) {
-      _drawBall(canvas, const Offset(310, 310), 18, darkSurface ? const Color(0xFF202124) : const Color(0xFFF4F4F5));
-      _drawBall(canvas, const Offset(335, 292), 19, darkSurface ? Colors.white : const Color(0xFF15161A));
-      _drawBall(canvas, const Offset(356, 267), 18, darkSurface ? const Color(0xFF202124) : const Color(0xFFF4F4F5));
+      _drawBall(
+        canvas,
+        const Offset(310, 310),
+        18,
+        darkSurface ? const Color(0xFF202124) : const Color(0xFFF4F4F5),
+      );
+      _drawBall(
+        canvas,
+        const Offset(335, 292),
+        19,
+        darkSurface ? Colors.white : const Color(0xFF15161A),
+      );
+      _drawBall(
+        canvas,
+        const Offset(356, 267),
+        18,
+        darkSurface ? const Color(0xFF202124) : const Color(0xFFF4F4F5),
+      );
     } else {
       final baseAngle = thinkingProgress! * math.pi * 2 + .68;
       const colors = <Color>[
-        Color(0xFF2979FF), // blue
-        Color(0xFFFF3B30), // red
-        Color(0xFFFFD60A), // yellow
+        Color(0xFF2979FF),
+        Color(0xFFFF3B30),
+        Color(0xFFFFD60A),
       ];
       for (var i = 0; i < colors.length; i++) {
         final angle = baseAngle - i * .19;
@@ -354,6 +398,7 @@ class _OtyaMarkPainter extends CustomPainter {
           colors: [_shade, _front, _mid],
         ).createShader(const Rect.fromLTWH(170, 150, 280, 300)),
     );
+    canvas.drawPath(_topRightSeam(), seamPaint);
 
     canvas.restore();
   }
@@ -372,7 +417,11 @@ class _OtyaMarkPainter extends CustomPainter {
         ..shader = RadialGradient(
           center: const Alignment(-.35, -.45),
           radius: .95,
-          colors: [Colors.white.withValues(alpha: .9), color, Color.lerp(color, Colors.black, .28)!],
+          colors: [
+            Colors.white.withValues(alpha: .9),
+            color,
+            Color.lerp(color, Colors.black, .28)!,
+          ],
           stops: const [0, .34, 1],
         ).createShader(rect),
     );
@@ -391,7 +440,7 @@ class OtyaFooter extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 8),
         child: Text(
-          'Otya · PeterSmart Link',
+          'Otya',
           textAlign: TextAlign.center,
           style: TextStyle(
             fontSize: 11,
