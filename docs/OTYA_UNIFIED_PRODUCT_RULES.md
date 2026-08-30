@@ -12,21 +12,51 @@ OTYA has exactly three persistent destinations:
 
 Secondary capabilities must not become permanent bottom-navigation tabs.
 
+## Feature-placement rule
+
+Show a capability where the user naturally needs it, not merely where there is room for another button.
+
+- Everyday destinations stay visible.
+- Media-specific actions belong on the selected song/video/file or inside its player.
+- Short tasks prefer a bottom sheet/dialog over a dedicated full screen.
+- Advanced utilities stay organized under Tools or Settings.
+- Background/security/infrastructure behavior should normally be invisible until it needs user attention.
+- Do not expose the same capability as multiple equal home destinations.
+
 ## Me hierarchy
 
-Me uses a compact 3×3 feature grid:
+Me is a personal/control area, not a nine-tile feature launcher.
+
+Strong primary shortcuts:
 
 - Transfer
 - Files
 - Private
-- Converter
-- Playlists
-- History
-- Tools
-- Personalize
-- Storage
 
-Account/profile is opened from the top-right avatar. Configuration lives below the grid as normal Settings / Help / About rows.
+Secondary capabilities are grouped beneath them instead of competing as equal tiles:
+
+- Activity: History and relevant downloaded/recent activity.
+- Tools: Converter, Trim, Storage analysis and similar utilities.
+- Account & Settings: account, playback/privacy/device settings and Personalize.
+- Help & Product: Ask OTYA and About.
+
+Playlists primarily belong in Music. Personalize and Storage primarily belong in Settings. Converter/Trim remain available in Tools but should also appear contextually on suitable media.
+
+## Music and online enrichment
+
+Music remains a local-library destination: Songs, Albums, Artists, Folders, Playlists and Now Playing.
+
+Online music must not turn OTYA into a streaming-first application.
+
+- Global/local Music Search runs locally first.
+- When `onlineMusic` is enabled and internet/provider access succeeds, online tracks may be appended below local results.
+- Provider failure/offline state must not replace local Search with an error.
+- A permanent Online Music tab/screen is not a primary navigation concept.
+- A small discovery row may appear only when online content is actually available and useful; it disappears cleanly offline.
+- Online tracks use the normal OTYA playback/queue experience.
+- Download is shown only when the provider explicitly permits downloading and supplies a valid download URL. Non-downloadable tracks show no Download action.
+- Downloaded tracks become normal local music and should be discoverable through the regular library after media indexing.
+- Jamendo/OAuth/provider details must not become required knowledge for ordinary users.
 
 ## Transfer
 
@@ -34,21 +64,38 @@ Transfer is one capability group. Send, receive, nearby discovery, QR pairing, c
 
 ## AI
 
-AI is an optional intelligence layer, not a permanent app tab. Local search runs first. Online answers may appear inline in Search and Help. A longer conversation is a fallback when a user explicitly continues.
+AI is an optional intelligence layer, not a permanent app tab. Local Search runs first. Ask OTYA may help with OTYA features and general questions while online, but it must never become required for finding or playing local media.
+
+Ask OTYA product knowledge must match current OTYA behavior, including Online Music: local-first, Jamendo login optional, provider outages non-fatal, and downloads only when provider-authorized.
+
+## Notifications and errors
+
+OTYA should not feel noisy or technical.
+
+- Playback uses Android media-session controls and the same Now Playing experience for local and online tracks.
+- Pressing Play must not trigger an ordinary notification-permission prompt.
+- Downloads/Transfer may show useful progress/completion outside the app when work continues in background.
+- Optional online failures should usually collapse quietly; lack of internet is not an OTYA failure.
+- Recoverable problems use designed inline states or contextual retry actions.
+- User-facing messages never expose URLs, provider payloads, stack traces, tokens or raw HTTP errors.
 
 ## Offline boundary
 
-The following must remain useful without Cloudflare, sign-in or internet:
+The following must remain useful without Cloudflare, Firebase, Jamendo, sign-in or internet:
 
+- app startup
 - local video and music playback
 - media scanning
 - playlists/history stored locally
 - themes and core settings
-- local search
-- local device-to-device transfer
+- local Search
+- local device-to-device Transfer
 - local file/private-media operations
+- downloaded media
 
-Remote configuration, account services, online AI, update metadata and notifications may enhance the experience but must not block the offline core.
+Remote configuration, account services, online music, online AI, update metadata and cloud notifications may enhance the experience but must not block the offline core.
+
+Remote config is loaded after first paint and can use cached state. Any remote feature switch must have a safe local fallback.
 
 ## NEW states
 
@@ -58,9 +105,10 @@ Newly discovered media is tracked only on-device. The first scan establishes a b
 
 ## UI discipline
 
-- one icon language
-- no rainbow dashboard tiles
+- one canonical OTYA mark/logo language everywhere
+- no rainbow dashboard tiles competing with media artwork
 - media artwork supplies most of the color
-- consistent bottom sheets, menus, spacing and typography
+- consistent bottom sheets, menus, spacing, typography, loading/empty/error states and touch targets
 - new capabilities reuse existing navigation and player flows where possible
-- do not add a full screen when a sheet or contextual action is sufficient
+- do not add a full screen when a contextual action, sheet or organized section is sufficient
+- avoid duplicate entry points unless one is a clearly useful contextual shortcut
