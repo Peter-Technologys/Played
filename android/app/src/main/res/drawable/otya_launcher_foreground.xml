@@ -16,10 +16,10 @@
             <gradient android:type="linear" android:startX="90" android:startY="150" android:endX="315" android:endY="414" android:startColor="#FFE6E6E8" android:centerColor="#FFFFFFFF" android:endColor="#FFBFC0C5" />
         </aapt:attr>
     </path>
-    <!-- Resting balls: dark, white, dark. -->
-    <path android:fillColor="#FF202124" android:pathData="M292,310 A18,18 0,1 0,328,310 A18,18 0,1 0,292,310" />
-    <path android:fillColor="#FFFFFFFF" android:pathData="M316,292 A19,19 0,1 0,354,292 A19,19 0,1 0,316,292" />
-    <path android:fillColor="#FF202124" android:pathData="M338,267 A18,18 0,1 0,374,267 A18,18 0,1 0,338,267" />
+    <!-- Official resting balls: blue, red and yellow. -->
+    <path android:fillColor="#FF2979FF" android:strokeColor="#CCFFFFFF" android:strokeWidth="3" android:pathData="M292,310 A18,18 0,1 0,328,310 A18,18 0,1 0,292,310" />
+    <path android:fillColor="#FFFF3B30" android:strokeColor="#CCFFFFFF" android:strokeWidth="3" android:pathData="M316,292 A19,19 0,1 0,354,292 A19,19 0,1 0,316,292" />
+    <path android:fillColor="#FFFFD60A" android:strokeColor="#CC111216" android:strokeWidth="3" android:pathData="M338,267 A18,18 0,1 0,374,267 A18,18 0,1 0,338,267" />
     <!-- Painted last so the resting balls tuck beneath the overlap. -->
     <path android:pathData="M405,164 L410,190 L408,224 L395,260 L373,293 L348,318 L321,337 L301,371 L269,399 L248,410 L226,417 L184,417 L210,428 L234,433 L256,434 L289,430 L320,420 L343,408 L382,374 L412,329 L423,298 L427,275 L428,246 L425,220 L417,190 Z">
         <aapt:attr name="android:fillColor">
