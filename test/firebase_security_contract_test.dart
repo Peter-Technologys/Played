@@ -31,7 +31,11 @@ void main() {
     final workflow = read('.github/workflows/test-apk.yml');
 
     expect(google, contains("String.fromEnvironment(\n    'GOOGLE_WEB_CLIENT_ID'"));
-    expect(google, contains('serverClientId: _clientId.isEmpty ? null : _clientId'));
+    expect(google, contains('serverClientId: _webClientId'));
+    expect(
+      google,
+      contains('82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'),
+    );
     expect(
       workflow,
       contains('82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'),
