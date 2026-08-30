@@ -20,6 +20,18 @@ abstract class Environment {
   static const String onlineMusicUrl = '$workerUrl/api/music/jamendo';
   static const String latestUrl = '$workerUrl/latest';
 
+  // Spotify's client ID is public application configuration, not a secret.
+  // Keep client secrets server-side only. The redirect URI must be allowlisted
+  // in the Spotify developer dashboard before OAuth can be enabled.
+  static const String spotifyClientId = String.fromEnvironment(
+    'SPOTIFY_CLIENT_ID',
+    defaultValue: '',
+  );
+  static const String spotifyRedirectUri = String.fromEnvironment(
+    'SPOTIFY_REDIRECT_URI',
+    defaultValue: 'https://petersmartlink.com/auth/spotify/callback',
+  );
+
   static const String arm64DownloadUrl = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl = '$workerUrl/apk/arm32';
   static const String downloadUrl = '$workerUrl/download/otya-player';
