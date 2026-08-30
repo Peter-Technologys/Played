@@ -16,6 +16,7 @@ import '../core/widgets/update_dialog.dart';
 import '../features/onboarding/onboarding_screen.dart';
 import '../features/settings/app_lock_screen.dart';
 import '../features/settings/settings_provider.dart';
+import '../l10n/generated/app_localizations.dart';
 import '../shared/widgets/otya_logo.dart';
 import 'router.dart';
 import 'theme/app_colors.dart';
@@ -73,9 +74,6 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
   Future<void> _hydrateStartupPrivacyAndOnboarding() async {
     try {
-      // The branded startup frame may render immediately, but never reveal
-      // the router until App Lock's persisted value is known. This prevents a
-      // protected-content flash while settings hydrate after process launch.
       final prefsFuture = SharedPreferences.getInstance();
       final settingsFuture = AppSettings.load();
       final prefs = await prefsFuture;
@@ -144,6 +142,13 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         theme: AppTheme.light,
         darkTheme: _darkTheme(settings.themeMode),
         themeMode: _materialThemeMode(settings.themeMode),
+        supportedLocales: AppLocalizations.supportedLocales,
+        localizationsDelegates: const [
+          AppLocalizations.delegate,
+          GlobalMaterialLocalizations.delegate,
+          GlobalWidgetsLocalizations.delegate,
+          GlobalCupertinoLocalizations.delegate,
+        ],
         home: Scaffold(
           body: Center(
             child: Column(
@@ -192,14 +197,14 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
             : baseDark;
 
         return MaterialApp.router(
-          title: 'OTYA',
+          onGenerateTitle: (context) => AppLocalizations.of(context).appName,
           debugShowCheckedModeBanner: false,
           theme: lightTheme,
           darkTheme: darkTheme,
           themeMode: _materialThemeMode(settings.themeMode),
-          locale: const Locale('en'),
-          supportedLocales: const [Locale('en')],
+          supportedLocales: AppLocalizations.supportedLocales,
           localizationsDelegates: const [
+            AppLocalizations.delegate,
             GlobalMaterialLocalizations.delegate,
             GlobalWidgetsLocalizations.delegate,
             GlobalCupertinoLocalizations.delegate,
