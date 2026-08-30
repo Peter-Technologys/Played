@@ -1,0 +1,131 @@
+name: Release APK — direct install
+
+on:
+  push:
+    branches: [v1-rebuild]
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'assets/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - '.github/workflows/release-apk.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: release-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PUB_ENVIRONMENT: bot.github
+  GRADLE_OPTS: "-Dorg.gradle.daemon=false -Dorg.gradle.parallel=true -Xmx4g"
+
+jobs:
+  release_apk:
+    name: Validate and build signed ARM64 release APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    steps:
+      - name: Checkout exact current head
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: "3.32.x"
+          channel: stable
+          cache: true
+
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Run code generation
+        run: dart run build_runner build --delete-conflicting-outputs
+
+      - name: Flutter analysis
+        run: flutter analyze --no-fatal-infos
+
+      - name: Flutter tests
+        run: flutter test
+
+      - name: Verify required release configuration
+        env:
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY GitHub variable is missing"; exit 1; }
+          test -n "$KEYSTORE_BASE64" || { echo "ERROR: KEYSTORE_BASE64 secret is missing"; exit 1; }
+          test -n "$STORE_PASSWORD" || { echo "ERROR: STORE_PASSWORD secret is missing"; exit 1; }
+          test -n "$KEY_ALIAS" || { echo "ERROR: KEY_ALIAS secret is missing"; exit 1; }
+          test -n "$KEY_PASSWORD" || { echo "ERROR: KEY_PASSWORD secret is missing"; exit 1; }
+
+      - name: Prepare Otya signing key
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+          test -s android/app/keystore.jks || { echo "ERROR: decoded keystore is empty"; exit 1; }
+
+      - name: Build optimized ARM64 release APK
+        env:
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          flutter build apk --release \
+            --target-platform android-arm64 \
+            --dart-define=SELF_UPDATE=true \
+            --dart-define=GOOGLE_WEB_CLIENT_ID="82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com" \
+            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
+            --dart-define=FIREBASE_APP_ID="1:82776565585:android:085cf9b4eecb76e9535570" \
+            --dart-define=FIREBASE_MESSAGING_SENDER_ID="82776565585" \
+            --dart-define=FIREBASE_PROJECT_ID="otya-player"
+
+      - name: Verify APK and signing certificate
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK=build/app/outputs/flutter-apk/app-release.apk
+          test -f "$APK" || { echo "ERROR: release APK not found"; exit 1; }
+          test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK suspiciously small"; exit 1; }
+          sha256sum "$APK" | tee build/release-apk-sha256.txt
+          keytool -printcert -jarfile "$APK" | tee build/release-apk-signing-cert.txt
+          cp "$APK" build/OTYA-arm64-release.apk
+
+      - name: Upload signed release APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: otya-arm64-release-apk
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            build/OTYA-arm64-release.apk
+            build/release-apk-sha256.txt
+            build/release-apk-signing-cert.txt
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/app/keystore.jks
