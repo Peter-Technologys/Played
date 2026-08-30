@@ -10,14 +10,12 @@
     <uses-permission android:name="android.permission.READ_MEDIA_VIDEO" />
     <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
 
-    <!-- Network access for OTYA services and same-Wi-Fi/hotspot Transfer.
-         Current Transfer uses normal local sockets and QR pairing; it does not
-         scan nearby Wi-Fi networks or require device location. -->
+    <!-- Network access for Otya services and same-Wi-Fi/hotspot Transfer. -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
-    <!-- QR pairing and OTYA Private. -->
+    <!-- QR pairing and Otya Private. -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.USE_FINGERPRINT" />
@@ -27,10 +25,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.WAKE_LOCK" />
 
-    <!-- Notifications. Call/audio interruptions are handled through Android
-         audio focus; OTYA does not read phone state. OTYA also does not request
-         package-installer permission: updates hand off to the official HTTPS
-         destination so Play-distributed builds remain policy-safe. -->
+    <!-- Notifications. Otya does not request package-installer permission. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.VIBRATE" />
 
@@ -137,7 +132,7 @@
             android:exported="false" />
 
         <!-- Native sharing uses temporary content:// grants so large media can
-             be shared without copying the whole file into OTYA's cache first. -->
+             be shared without copying the whole file into Otya's cache first. -->
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.share"
@@ -148,15 +143,10 @@
                 android:resource="@xml/share_paths" />
         </provider>
 
-        <provider
-            android:name="androidx.startup.InitializationProvider"
-            android:authorities="${applicationId}.androidx-startup"
-            android:exported="false"
-            tools:node="merge">
-            <meta-data
-                android:name="androidx.work.WorkManagerInitializer"
-                android:value="androidx.startup" />
-        </provider>
+        <!-- Do not register a WorkManager initializer here. The v1 rebuild does
+             not ship the old native UpdateCheckWorker; update state is owned by
+             Flutter. A stale initializer caused a ClassNotFoundException before
+             Flutter could start. -->
 
         <meta-data
             android:name="flutterEmbedding"
