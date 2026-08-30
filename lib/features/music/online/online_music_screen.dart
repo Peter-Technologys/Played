@@ -8,6 +8,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../shared/widgets/otya_logo.dart';
 import 'online_music_service.dart';
+import 'spotify_service.dart';
 
 class OnlineMusicScreen extends StatefulWidget {
   const OnlineMusicScreen({super.key});
@@ -42,6 +43,18 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
     });
   }
 
+  Future<void> _searchSpotify() async {
+    HapticFeedback.selectionClick();
+    final opened = await SpotifyService.instance.openSearch(
+      _searchController.text.trim(),
+    );
+    if (!opened && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open Spotify right now.')),
+      );
+    }
+  }
+
   void _play(OnlineTrack track) {
     HapticFeedback.lightImpact();
     final item = MediaItem(
@@ -64,7 +77,8 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
     if (!track.downloadAllowed || track.downloadUrl.isEmpty) return;
     HapticFeedback.selectionClick();
     final uri = Uri.tryParse(track.downloadUrl);
-    if (uri == null || !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+    if (uri == null ||
+        !await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Could not start this download.')),
@@ -104,7 +118,7 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
                 hintText: 'Search songs or artists',
                 prefixIcon: const Icon(Icons.search_rounded),
                 suffixIcon: IconButton(
-                  tooltip: 'Search',
+                  tooltip: 'Search OTYA online music',
                   onPressed: _search,
                   icon: const Icon(Icons.arrow_forward_rounded),
                 ),
@@ -115,11 +129,41 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               children: [
-                const Icon(Icons.public_rounded, size: 17, color: AppColors.textSecondary),
+                Expanded(
+                  child: _SourceCard(
+                    icon: Icons.public_rounded,
+                    title: 'Independent',
+                    subtitle: 'Jamendo · play here',
+                    onTap: _search,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _SourceCard(
+                    icon: Icons.graphic_eq_rounded,
+                    title: 'Spotify',
+                    subtitle: 'Search & listen online',
+                    onTap: _searchSpotify,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  Icons.info_outline_rounded,
+                  size: 17,
+                  color: AppColors.textSecondary,
+                ),
                 const SizedBox(width: 7),
                 Expanded(
                   child: Text(
-                    'Independent music provided by Jamendo. Downloads appear only when the artist allows them.',
+                    'Jamendo tracks play in OTYA and can show downloads when the artist permits them. Spotify stays a separate connected source and does not expose Spotify songs as downloadable files.',
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: AppColors.textSecondary,
                         ),
@@ -146,7 +190,9 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
                 }
                 final tracks = snapshot.data ?? const <OnlineTrack>[];
                 if (tracks.isEmpty) {
-                  return const Center(child: Text('No tracks found. Try another search.'));
+                  return const Center(
+                    child: Text('No tracks found. Try another search.'),
+                  );
                 }
                 return ListView.separated(
                   padding: const EdgeInsets.fromLTRB(12, 4, 12, 28),
@@ -157,7 +203,8 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
                     return _OnlineTrackTile(
                       track: track,
                       onPlay: () => _play(track),
-                      onDownload: track.downloadAllowed ? () => _download(track) : null,
+                      onDownload:
+                          track.downloadAllowed ? () => _download(track) : null,
                     );
                   },
                 );
@@ -168,6 +215,66 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
       ),
     );
   }
+}
+
+class _SourceCard extends StatelessWidget {
+  const _SourceCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: AppColors.cardOf(context),
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(16),
+          child: Container(
+            constraints: const BoxConstraints(minHeight: 72),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: AppColors.borderOf(context)),
+            ),
+            child: Row(
+              children: [
+                Icon(icon, color: AppColors.accent),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.w800),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 class _OnlineTrackTile extends StatelessWidget {
@@ -184,7 +291,8 @@ class _OnlineTrackTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final minutes = track.duration.inMinutes;
-    final seconds = track.duration.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final seconds =
+        track.duration.inSeconds.remainder(60).toString().padLeft(2, '0');
     return ListTile(
       minTileHeight: 68,
       contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -195,19 +303,29 @@ class _OnlineTrackTile extends StatelessWidget {
           child: track.artworkUrl.isEmpty
               ? const ColoredBox(
                   color: AppColors.surfaceElevated,
-                  child: Icon(Icons.music_note_rounded, color: AppColors.accent),
+                  child: Icon(
+                    Icons.music_note_rounded,
+                    color: AppColors.accent,
+                  ),
                 )
               : CachedNetworkImage(
                   imageUrl: track.artworkUrl,
                   fit: BoxFit.cover,
                   errorWidget: (_, __, ___) => const ColoredBox(
                     color: AppColors.surfaceElevated,
-                    child: Icon(Icons.music_note_rounded, color: AppColors.accent),
+                    child: Icon(
+                      Icons.music_note_rounded,
+                      color: AppColors.accent,
+                    ),
                   ),
                 ),
         ),
       ),
-      title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+      title: Text(
+        track.title,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
       subtitle: Text(
         '${track.artist}${minutes > 0 ? ' · $minutes:$seconds' : ''}',
         maxLines: 1,
