@@ -61,9 +61,33 @@ jobs:
           set -euo pipefail
           test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY GitHub variable is missing"; exit 1; }
 
+      - name: Prepare stable Android signing for Google Sign-In
+        id: signing
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -n "${KEYSTORE_BASE64:-}" ] && [ -n "${STORE_PASSWORD:-}" ] && [ -n "${KEY_ALIAS:-}" ] && [ -n "${KEY_PASSWORD:-}" ]; then
+            printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+            test -s android/app/keystore.jks || { echo "ERROR: decoded keystore is empty"; exit 1; }
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Stable Otya signing key prepared for the test APK."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "WARNING: release signing secrets are incomplete. The APK will use the runner debug certificate; Google Sign-In may reject that build unless its SHA is registered."
+          fi
+
       - name: Build non-publishing ARM64 test APK
         env:
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          KEYSTORE_PATH: ${{ steps.signing.outputs.available == 'true' && format('{0}/android/app/keystore.jks', github.workspace) || '' }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
         shell: bash
         run: |
           set -euo pipefail
@@ -76,7 +100,7 @@ jobs:
             --dart-define=FIREBASE_MESSAGING_SENDER_ID="82776565585" \
             --dart-define=FIREBASE_PROJECT_ID="otya-player"
 
-      - name: Verify APK
+      - name: Verify APK and signing certificate
         shell: bash
         run: |
           set -euo pipefail
@@ -84,6 +108,7 @@ jobs:
           test -f "$APK" || { echo "ERROR: test APK not found"; exit 1; }
           test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK suspiciously small"; exit 1; }
           sha256sum "$APK" | tee build/test-apk-sha256.txt
+          keytool -printcert -jarfile "$APK" | tee build/test-apk-signing-cert.txt
 
       - name: Upload installable test APK
         uses: actions/upload-artifact@v4
@@ -94,3 +119,8 @@ jobs:
           path: |
             build/app/outputs/flutter-apk/app-debug.apk
             build/test-apk-sha256.txt
+            build/test-apk-signing-cert.txt
+
+      - name: Remove signing material
+        if: always()
+        run: rm -f android/app/keystore.jks
