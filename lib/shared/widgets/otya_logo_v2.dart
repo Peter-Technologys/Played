@@ -5,38 +5,39 @@ import 'package:flutter/material.dart';
 import '../../app/theme/app_colors.dart';
 
 /// Canonical Otya lockup. The mark itself is the first letter of `otya`.
+///
+/// The lockup is deliberately borderless: it behaves like lettering printed
+/// directly on the surface, never like an image pasted inside a card.
 class OtyaLogo extends StatelessWidget {
   const OtyaLogo({
     super.key,
     this.fontSize = 30,
     this.letterSpacing = -.6,
     this.borderRadius = 16,
-    this.padding = const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    this.padding = EdgeInsets.zero,
     this.iconOnly = false,
   });
 
   final double fontSize;
   final double letterSpacing;
+  // Retained for source compatibility with older call sites. Otya branding no
+  // longer paints its own box/background/border.
   final double borderRadius;
   final EdgeInsets padding;
   final bool iconOnly;
 
   @override
   Widget build(BuildContext context) {
-    final mark = OtyaMark(size: fontSize * 1.18);
+    final mark = OtyaMark(size: fontSize * 1.22);
     if (iconOnly) return mark;
-    return Container(
+    return Padding(
       padding: padding,
-      decoration: BoxDecoration(
-        color: AppColors.cardOf(context).withValues(alpha: .82),
-        borderRadius: BorderRadius.circular(borderRadius),
-        border: Border.all(color: AppColors.borderOf(context)),
-      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           mark,
-          SizedBox(width: fontSize * .08),
+          SizedBox(width: fontSize * .035),
           Text(
             'tya',
             style: TextStyle(
