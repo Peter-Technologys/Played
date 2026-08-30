@@ -152,10 +152,13 @@ void main() {
     ).readAsStringSync();
     expect(source, contains('Message Ask OTYA'));
     expect(source, contains('ScrollController'));
-    expect(source, contains('Choose model'));
+    expect(source, contains('Choose AI model'));
     expect(source, contains('New chat'));
-    expect(source, contains('Talk to PeterSmart Link support'));
-    expect(source, contains('Your local music, video, files and playback still work normally'));
+    expect(source, contains('Talk to OTYA Support'));
+    expect(
+      source,
+      contains('keep using your music, videos, files, Transfer and other local OTYA features normally'),
+    );
   });
 
   test('Account keeps Google, password, consent, recovery and 2FA flows', () {
