@@ -1,8 +1,5 @@
 #!/usr/bin/env bash
-# Publishes immutable OTYA release APKs to Cloudflare R2, then starts the
-# durable Cloudflare release Workflow and waits for a terminal result.
-# Canonical version metadata is published by the backend Workflow only after
-# it has verified both APKs and accepted the release version code.
+# Publishes signed Otya APKs to Cloudflare R2, then starts the release workflow.
 
 set -euo pipefail
 
@@ -46,7 +43,7 @@ awk '/^## \[/{found++} found==1{print} found==2{exit}' CHANGELOG.md \
   | tail -n +2 | head -40 | tr '\n' ' ' \
   | sed 's/  */ /g; s/^[[:space:]]*//; s/[[:space:]]*$//' > "$CHANGELOG_FILE"
 CHANGELOG=$(cat "$CHANGELOG_FILE")
-[ -n "$CHANGELOG" ] || CHANGELOG="Bug fixes and improvements"
+[ -n "$CHANGELOG" ] || CHANGELOG="Fixes and improvements"
 
 MIN_SDK=$(grep 'minSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+' || echo 24)
 TARGET_SDK=$(grep 'targetSdk' android/app/build.gradle | grep -v '//' | head -1 | grep -oP '\d+' || echo 36)
@@ -61,26 +58,23 @@ upload_and_verify() {
     --content-type application/vnd.android.package-archive \
     --cache-control "$CACHE_CONTROL"
   REMOTE_SIZE=$(aws s3 ls "s3://${R2_BUCKET}/${DEST_KEY}" --endpoint-url "$R2_ENDPOINT" | awk '{print $3}')
-  [ "$REMOTE_SIZE" = "$LOCAL_SIZE" ] || { echo "ERROR: Upload size mismatch for $DEST_KEY"; exit 1; }
+  [ "$REMOTE_SIZE" = "$LOCAL_SIZE" ] || {
+    echo "ERROR: Upload size mismatch for $DEST_KEY"
+    return 1
+  }
 }
 
-ARM64_VERSIONED="releases/${RAW_TAG}/OTYA-Player-${RAW_TAG}-arm64.apk"
-ARM32_VERSIONED="releases/${RAW_TAG}/OTYA-Player-${RAW_TAG}-arm32.apk"
+ARM64_VERSIONED="releases/${RAW_TAG}/Otya-arm64.apk"
+ARM32_VERSIONED="releases/${RAW_TAG}/Otya-arm32.apk"
 
-# Upload immutable candidate artifacts first. These keys are not canonical
-# release pointers, so a later validation failure cannot replace /latest.
 upload_and_verify "$ARM64_APK" "$ARM64_VERSIONED" "public, max-age=31536000, immutable"
 upload_and_verify "$ARM32_APK" "$ARM32_VERSIONED" "public, max-age=31536000, immutable"
 
-# Start the durable backend release workflow. It re-verifies the R2 artifacts,
-# enforces monotonic Android version codes, safely updates D1/KV, publishes the
-# canonical R2 version.json, writes analytics and emits the deduplicated update
-# notification. The shell script never writes version.json itself.
 export RAW_TAG VERSION VERSION_CODE MIN_SDK TARGET_SDK WORKER_URL CHANGELOG_FILE ARM64_VERSIONED ARM32_VERSIONED OTYA_STORE_ADMIN_TOKEN
 WORKFLOW_ID=$(python3 - <<'PYEOF'
 import json, os, sys, urllib.request, urllib.error
 with open(os.environ['CHANGELOG_FILE']) as f:
-    changelog = f.read().strip() or 'Bug fixes and improvements'
+    changelog = f.read().strip() or 'Fixes and improvements'
 payload = {
     'tag': os.environ['RAW_TAG'],
     'version': os.environ['VERSION'],
@@ -117,7 +111,7 @@ print(instance_id)
 PYEOF
 )
 
-echo "Cloudflare release workflow instance: $WORKFLOW_ID"
+echo "Release workflow: $WORKFLOW_ID"
 export WORKFLOW_ID
 
 python3 - <<'PYEOF'
@@ -138,34 +132,30 @@ for attempt in range(60):
         continue
     workflow = data.get('workflow') or {}
     status = workflow.get('status')
-    print(f'Workflow status: {status}')
+    print(f'Release status: {status}')
     if status == 'complete':
         output = workflow.get('output')
         if isinstance(output, dict) and output.get('ok') is False:
-            sys.stderr.write('ERROR: workflow completed with unsuccessful output\n')
+            sys.stderr.write('ERROR: release finished with an error\n')
             sys.exit(1)
         sys.exit(0)
     if status in terminal_fail:
         error = workflow.get('error') or {}
-        sys.stderr.write('ERROR: release workflow failed: ' + str(error.get('message') or status) + '\n')
+        sys.stderr.write('ERROR: release failed: ' + str(error.get('message') or status) + '\n')
         sys.exit(1)
     time.sleep(5)
-sys.stderr.write('ERROR: release workflow did not finish within the polling window\n')
+sys.stderr.write('ERROR: release did not finish in time\n')
 sys.exit(1)
 PYEOF
 
-# Legacy aliases are compatibility conveniences only. Publish them after the
-# canonical release has completed so an aborted candidate can never replace a
-# "latest" raw R2 object. Failure here is reported as a warning because the
-# canonical /apk routes use the versioned keys from version.json.
-if ! upload_and_verify "$ARM64_APK" "OtyaPlayer-arm64.apk" "public, max-age=300, must-revalidate"; then
-  echo "WARNING: canonical release succeeded but the legacy arm64 alias could not be refreshed"
+if ! upload_and_verify "$ARM64_APK" "Otya-arm64.apk" "public, max-age=300, must-revalidate"; then
+  echo "WARNING: Otya arm64 shortcut was not refreshed"
 fi
-if ! upload_and_verify "$ARM32_APK" "OtyaPlayer-arm32.apk" "public, max-age=300, must-revalidate"; then
-  echo "WARNING: canonical release succeeded but the legacy arm32 alias could not be refreshed"
+if ! upload_and_verify "$ARM32_APK" "Otya-arm32.apk" "public, max-age=300, must-revalidate"; then
+  echo "WARNING: Otya arm32 shortcut was not refreshed"
 fi
 
 echo "====================================================="
-echo " OTYA Player ${RAW_TAG} published and workflow verified"
+echo " Otya ${RAW_TAG} is ready"
 echo " Download: ${WORKER_URL}/download/otya-player"
 echo "====================================================="
