@@ -44,10 +44,20 @@ class NotificationService {
     }
   }
 
+  bool _isSafePayload(Uri uri) {
+    if (uri.scheme == 'file') return uri.path.isNotEmpty;
+    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
+    if (uri.host.isEmpty || uri.userInfo.isNotEmpty) return false;
+    return true;
+  }
+
   Future<void> _openPayload(String payload) async {
     try {
       final uri = Uri.tryParse(payload);
-      if (uri == null) return;
+      if (uri == null || !_isSafePayload(uri)) {
+        debugPrint('[Notifications] Ignored unsafe payload.');
+        return;
+      }
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       }
@@ -62,6 +72,7 @@ class NotificationService {
     required String body,
     required int progress,
   }) async {
+    final safeProgress = progress.clamp(0, 100).toInt();
     final androidDetails = AndroidNotificationDetails(
       'com.otyaplayer.app.tools.progress',
       'OTYA Player Tools — Progress',
@@ -70,7 +81,7 @@ class NotificationService {
       priority: Priority.low,
       showProgress: true,
       maxProgress: 100,
-      progress: progress,
+      progress: safeProgress,
       onlyAlertOnce: true,
       ongoing: true,
     );
