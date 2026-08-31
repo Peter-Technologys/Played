@@ -153,6 +153,10 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     final locale = ref.watch(localeProvider);
     final settings = ref.watch(settingsProvider);
 
+    // Android already presents the platform splash screen. Do not show a
+    // second branded logo/spinner while we read a tiny local preference: it
+    // makes launch feel slower and can flash outdated brand artwork. Keep this
+    // frame visually continuous with the platform launch background instead.
     if (_checking) {
       final startupTheme = settings.themeMode == AppThemeMode.light
           ? AppTheme.light
@@ -160,51 +164,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
       return MaterialApp(
         debugShowCheckedModeBanner: false,
         theme: startupTheme,
-        home: Scaffold(
-          body: Center(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.accent,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.28),
-                        blurRadius: 24,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.play_arrow_rounded,
-                    color: Colors.white,
-                    size: 44,
-                  ),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'OTYA PLAYER',
-                  style: TextStyle(
-                    color: AppColors.accent,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    letterSpacing: 4,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-                const SizedBox(height: 32),
-                const CircularProgressIndicator(
-                  color: AppColors.accent,
-                  strokeWidth: 2,
-                ),
-              ],
-            ),
-          ),
-        ),
+        home: const Scaffold(body: SizedBox.expand()),
       );
     }
 
