@@ -10,7 +10,7 @@
          launchers while keeping the complete OTYA mark inside a dark badge. -->
     <path
         android:fillColor="#FF080B12"
-        android:pathData="M256,16 A240,240 0,1 1,255.9,16 Z" />
+        android:pathData="M256,16 A240,240 0,1 1,256,496 A240,240 0,1 1,256,16 Z" />
     <group
         android:pivotX="256"
         android:pivotY="256"
