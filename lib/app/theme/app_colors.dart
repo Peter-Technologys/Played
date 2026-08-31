@@ -1,74 +1,68 @@
 import 'package:flutter/material.dart';
 
-/// Canonical OTYA visual system.
+/// Canonical Otya visual system.
 ///
-/// OTYA uses a deep neutral foundation so local artwork remains the focus.
-/// The cyan → blue → violet → pink → orange spectrum is the single branded
-/// accent family used by the O mark, onboarding and selected controls.
+/// Otya uses a deep neutral foundation with one strong product blue. The
+/// blue/red/yellow trio belongs to the Otya identity and Otya AI. Older violet,
+/// pink, cyan and orange names remain as compatibility aliases so existing
+/// screens do not invent a second brand palette while they are migrated.
 abstract class AppColors {
-  static const Color background = Color(0xFF050611);
-  static const Color surface = Color(0xFF0B0D1C);
-  static const Color surfaceElevated = Color(0xFF11152A);
-  static const Color surfaceHighlight = Color(0xFF191E38);
-  static const Color border = Color(0xFF252B4A);
-  static const Color borderSubtle = Color(0xFF181D35);
+  static const Color background = Color(0xFF080B12);
+  static const Color surface = Color(0xFF0E131D);
+  static const Color surfaceElevated = Color(0xFF141B27);
+  static const Color surfaceHighlight = Color(0xFF1B2534);
+  static const Color border = Color(0xFF283444);
+  static const Color borderSubtle = Color(0xFF1B2635);
 
-  static const Color accent = Color(0xFF7B4DFF);
-  static const Color accentViolet = Color(0xFF8D2BFF);
-  static const Color accentPink = Color(0xFFFF2EC4);
-  static const Color accentBlue = Color(0xFF3478FF);
-  static const Color accentCyan = Color(0xFF16C7FF);
-  static const Color accentOrange = Color(0xFFFF8C1E);
+  // Core Otya identity.
+  static const Color brandBlue = Color(0xFF2979FF);
+  static const Color brandRed = Color(0xFFFF3B30);
+  static const Color brandYellow = Color(0xFFFFD60A);
 
-  static const Color accentGreen = Color(0xFF41E57A);
-  static const Color accentAmber = Color(0xFFFFD34A);
+  static const Color accent = brandBlue;
+  static const Color accentBlue = brandBlue;
+  static const Color accentCyan = Color(0xFF4A93FF);
+  static const Color accentViolet = Color(0xFF2367E6);
+  static const Color accentPink = brandRed;
+  static const Color accentOrange = Color(0xFFFF8A32);
 
-  static const Color glowBlue = Color(0x333478FF);
-  static const Color glowViolet = Color(0x3D8D2BFF);
+  static const Color accentGreen = Color(0xFF39D98A);
+  static const Color accentAmber = brandYellow;
+
+  static const Color glowBlue = Color(0x332979FF);
+  static const Color glowViolet = Color(0x262979FF);
 
   static const LinearGradient accentGradient = LinearGradient(
-    colors: [
-      Color(0xFF16C7FF),
-      Color(0xFF3478FF),
-      Color(0xFF8D2BFF),
-      Color(0xFFFF2EC4),
-      Color(0xFFFF8C1E),
-    ],
+    colors: [Color(0xFF4A93FF), brandBlue, Color(0xFF1767E8)],
     begin: Alignment.centerLeft,
     end: Alignment.centerRight,
   );
 
   static const LinearGradient accentGradientDiag = LinearGradient(
-    colors: [
-      Color(0xFF16C7FF),
-      Color(0xFF3478FF),
-      Color(0xFF8D2BFF),
-      Color(0xFFFF2EC4),
-      Color(0xFFFF8C1E),
-    ],
+    colors: [Color(0xFF4A93FF), brandBlue, Color(0xFF1767E8)],
     begin: Alignment.bottomLeft,
     end: Alignment.topRight,
   );
 
   static const LinearGradient cardGradient = LinearGradient(
-    colors: [Color(0xFF0C0F20), Color(0xFF12162C)],
+    colors: [Color(0xFF0E131D), Color(0xFF141B27)],
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,
   );
 
   static const LinearGradient darkOverlay = LinearGradient(
-    colors: [Colors.transparent, Color(0xF2050611)],
+    colors: [Colors.transparent, Color(0xF2080B12)],
     begin: Alignment.topCenter,
     end: Alignment.bottomCenter,
   );
 
-  static const Color textPrimary = Color(0xFFF7F7FB);
-  static const Color textSecondary = Color(0xFFB4B7C9);
-  static const Color textMuted = Color(0xFF777C94);
+  static const Color textPrimary = Color(0xFFF7F9FC);
+  static const Color textSecondary = Color(0xFFB3BDCC);
+  static const Color textMuted = Color(0xFF7F8A9B);
 
-  static const Color error = Color(0xFFFF5E7A);
-  static const Color success = Color(0xFF41E57A);
-  static const Color warning = Color(0xFFFFD34A);
+  static const Color error = Color(0xFFFF5B52);
+  static const Color success = Color(0xFF39D98A);
+  static const Color warning = brandYellow;
 
   static Color backgroundOf(BuildContext context) =>
       Theme.of(context).scaffoldBackgroundColor;
@@ -82,7 +76,7 @@ abstract class AppColors {
   static Color borderOf(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
           ? border
-          : const Color(0xFFE5E5E8);
+          : const Color(0xFFE2E7EE);
 
   static Color cardOf(BuildContext context) =>
       Theme.of(context).brightness == Brightness.dark
