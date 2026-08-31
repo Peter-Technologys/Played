@@ -6,7 +6,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
 import 'push_notification_service.dart';
 
-/// Checks whether a newer version of OTYA is available.
+enum UpdateCheckState {
+  idle,
+  checking,
+  current,
+  updateAvailable,
+  unavailable,
+  skipped,
+}
+
+/// Checks whether a newer version of Otya is available.
 /// Compares the server versionCode against the installed build number.
 class UpdateService {
   UpdateService._();
@@ -15,13 +24,21 @@ class UpdateService {
   static const String _prefLastCheck = 'update_last_check';
 
   bool _checkInProgress = false;
+  UpdateCheckState _lastState = UpdateCheckState.idle;
+  String? _lastError;
 
+  UpdateCheckState get lastState => _lastState;
+  String? get lastError => _lastError;
   String get downloadUrl => Environment.downloadUrl;
 
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
-    if (!Environment.selfUpdateEnabled) return null;
-    if (_checkInProgress) return null;
+    if (_checkInProgress) {
+      _lastState = UpdateCheckState.checking;
+      return null;
+    }
     _checkInProgress = true;
+    _lastState = UpdateCheckState.checking;
+    _lastError = null;
     try {
       return await _doCheckForUpdate(force: force);
     } finally {
@@ -38,6 +55,7 @@ class UpdateService {
         final now = DateTime.now().millisecondsSinceEpoch;
         if (now - lastCheck < const Duration(hours: 24).inMilliseconds) {
           debugPrint('[UpdateService] Skipping check — checked within 24h.');
+          _lastState = UpdateCheckState.skipped;
           return null;
         }
       }
@@ -59,11 +77,21 @@ class UpdateService {
       }
 
       if (response == null || response.statusCode != 200) {
-        debugPrint('[UpdateService] Both update endpoints failed.');
+        _lastState = UpdateCheckState.unavailable;
+        _lastError = response == null
+            ? 'Otya could not reach the update service.'
+            : 'Update service returned HTTP ${response.statusCode}.';
+        debugPrint('[UpdateService] Both update endpoints failed: $_lastError');
         return null;
       }
 
-      final data = jsonDecode(response.body) as Map<String, dynamic>;
+      final decoded = jsonDecode(response.body);
+      if (decoded is! Map<String, dynamic>) {
+        _lastState = UpdateCheckState.unavailable;
+        _lastError = 'Update service returned invalid data.';
+        return null;
+      }
+      final data = decoded;
       final serverVersionCode = (data['versionCode'] as num?)?.toInt() ?? 0;
       final serverVersion = data['version'] as String? ?? '';
       final changelog = data['changelog'] as String? ?? '';
@@ -72,7 +100,11 @@ class UpdateService {
           ? rawDownloads
           : <String, dynamic>{};
 
-      if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
+      if (serverVersionCode <= 0 || serverVersion.isEmpty) {
+        _lastState = UpdateCheckState.unavailable;
+        _lastError = 'Update service returned incomplete version data.';
+        return null;
+      }
 
       await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
 
@@ -83,26 +115,29 @@ class UpdateService {
         '[UpdateService] Installed: $installedCode  Server: $serverVersionCode',
       );
 
-      if (serverVersionCode <= installedCode) return null;
+      if (serverVersionCode <= installedCode) {
+        _lastState = UpdateCheckState.current;
+        return null;
+      }
 
       final abi = _detectAbi();
       final directUrl = abi == 'arm64'
           ? (downloads['arm64'] as String? ?? Environment.arm64DownloadUrl)
           : (downloads['arm32'] as String? ?? Environment.arm32DownloadUrl);
 
+      _lastState = UpdateCheckState.updateAvailable;
       return UpdateInfo(
         version: serverVersion,
         versionCode: serverVersionCode,
         installedCode: installedCode,
         changelog: changelog,
-        // Notifications and in-app update actions must use the APK that matches
-        // the installed application ABI. The server's legacy `auto` URL can be
-        // arm64-biased and is therefore not safe as the device download target.
         downloadUrl: directUrl,
         directUrl: directUrl,
         releaseDate: data['date'] as String? ?? '',
       );
     } catch (e) {
+      _lastState = UpdateCheckState.unavailable;
+      _lastError = 'Update check failed: ${e.runtimeType}';
       debugPrint('[UpdateService] Check failed: $e');
       return null;
     }
