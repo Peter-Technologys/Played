@@ -1,7 +1,7 @@
 name: otya_player
 description: OTYA — a private, reliable Android media experience for video, music, transfer, files and local tools.
 publish_to: 'none'
-version: 1.7.0+11
+version: 1.0.0+1
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
