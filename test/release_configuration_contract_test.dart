@@ -103,6 +103,22 @@ void main() {
       expect(env, contains("String.fromEnvironment(\n    'SPOTIFY_REDIRECT_URI'"));
     });
 
+    test('update notifications use the ABI-specific APK target', () {
+      final updateService =
+          File('lib/core/services/update_service.dart').readAsStringSync();
+
+      expect(updateService, contains("final abi = _detectAbi();"));
+      expect(updateService, contains("downloads['arm64']"));
+      expect(updateService, contains("downloads['arm32']"));
+      expect(updateService, contains('downloadUrl: directUrl'));
+      expect(
+        updateService,
+        isNot(contains("downloadUrl:\n            downloads['auto']")),
+        reason: 'The server legacy auto URL may resolve to arm64. Device update '
+            'notifications must use the APK matching the installed app ABI.',
+      );
+    });
+
     test('localization generation remains enabled', () {
       final pubspec = File('pubspec.yaml').readAsStringSync();
       final l10n = File('l10n.yaml').readAsStringSync();
