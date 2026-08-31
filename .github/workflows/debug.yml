@@ -36,7 +36,7 @@ jobs:
     timeout-minutes: 25
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -63,7 +63,7 @@ jobs:
           sudo rm -rf /usr/share/dotnet /usr/local/share/powershell /usr/local/share/swift || true
           sudo apt-get clean -y || true
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
         with:
@@ -71,7 +71,7 @@ jobs:
           channel: stable
           cache: true
       - name: Set up Java 17
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -134,7 +134,7 @@ jobs:
             sha256sum "$APK" | tee -a build/apk-sha256.txt
           done
       - name: Upload APKs and checksums
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: otya-player-${{ github.sha }}
           path: |
