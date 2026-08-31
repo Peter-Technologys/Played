@@ -103,6 +103,25 @@ void main() {
       expect(env, contains("String.fromEnvironment(\n    'SPOTIFY_REDIRECT_URI'"));
     });
 
+    test('rebuild keeps the approved 1.7 upgrade-safe build identity', () {
+      final pubspec = File('pubspec.yaml').readAsStringSync();
+      final match = RegExp(r'^version:\s*(\d+)\.(\d+)\.(\d+)\+(\d+)\s*$', multiLine: true)
+          .firstMatch(pubspec);
+
+      expect(match, isNotNull, reason: 'pubspec.yaml must declare an Android build number.');
+      final major = int.parse(match!.group(1)!);
+      final minor = int.parse(match.group(2)!);
+      final patch = int.parse(match.group(3)!);
+      final build = int.parse(match.group(4)!);
+
+      expect([major, minor, patch], [1, 7, 0]);
+      expect(
+        build,
+        greaterThan(10),
+        reason: 'Production 1.5.0 used build 8 and the approved 1.6 line reached build 10; rebuilds must remain upgradeable.',
+      );
+    });
+
     test('update notifications use the ABI-specific APK target', () {
       final updateService =
           File('lib/core/services/update_service.dart').readAsStringSync();
