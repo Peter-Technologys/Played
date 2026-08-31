@@ -4,7 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/environment.dart';
-import 'api_signer.dart';
 import 'update_notification_service.dart';
 
 /// Checks if a newer version of OTYA Player is available.
