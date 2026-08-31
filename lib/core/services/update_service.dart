@@ -13,7 +13,6 @@ class UpdateService {
   static final UpdateService instance = UpdateService._();
 
   static const String _prefLastCheck = 'update_last_check';
-  static const String _prefSkippedCode = 'update_skipped_code';
 
   bool _checkInProgress = false;
 
@@ -86,9 +85,6 @@ class UpdateService {
 
       if (serverVersionCode <= installedCode) return null;
 
-      final skippedCode = prefs.getInt(_prefSkippedCode) ?? 0;
-      if (skippedCode >= serverVersionCode) return null;
-
       final abi = _detectAbi();
       final directUrl = abi == 'arm64'
           ? (downloads['arm64'] as String? ?? Environment.arm64DownloadUrl)
@@ -121,9 +117,12 @@ class UpdateService {
     );
   }
 
+  /// Defer this update prompt. The regular 24-hour check window remains the
+  /// authority, so choosing Later never suppresses the same release forever.
   Future<void> remindLater(int versionCode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefSkippedCode, versionCode);
+    await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
+    debugPrint('[UpdateService] Remind later for build $versionCode.');
   }
 
   String _detectAbi() => Environment.appArch;
