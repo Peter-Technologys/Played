@@ -19,6 +19,7 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
     _cancelSubscriptions();
     _player = player;
     _subscribeToPlayer(player);
+    _updatePlaybackState();
     debugPrint('[OtyaAudioHandler] Player attached.');
   }
 
@@ -121,7 +122,7 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
       id: id,
       title: title,
       artist: artist,
-      album: 'OTYA Player',
+      album: 'Otya',
       artUri: artUri,
       duration: duration ?? _player?.state.duration,
     ));
@@ -188,17 +189,48 @@ class AudioHandlerSingleton {
 
   OtyaAudioHandler? _handler;
   Player? _pendingPlayer;
+  MediaItem? _pendingMediaItem;
+  bool? _pendingPlaying;
 
   OtyaAudioHandler? get handler => _handler;
 
   set handler(OtyaAudioHandler? h) {
     _handler = h;
-    final pending = _pendingPlayer;
-    if (h != null && pending != null) {
+    if (h == null) return;
+
+    final pendingPlayer = _pendingPlayer;
+    if (pendingPlayer != null) {
       _pendingPlayer = null;
-      h.attachPlayer(pending);
+      h.attachPlayer(pendingPlayer);
     }
-    debugPrint('[AudioHandlerSingleton] Handler set: ${h != null}');
+
+    final pendingItem = _pendingMediaItem;
+    if (pendingItem != null) {
+      _pendingMediaItem = null;
+      h.mediaItem.add(
+        pendingItem.copyWith(
+          duration: pendingItem.duration ?? pendingPlayer?.state.duration,
+        ),
+      );
+    }
+
+    final pendingPlaying = _pendingPlaying;
+    if (pendingPlaying != null) {
+      _pendingPlaying = null;
+      final current = h.playbackState.value;
+      h.playbackState.add(current.copyWith(
+        playing: pendingPlaying,
+        controls: [
+          MediaControl.skipToPrevious,
+          MediaControl.rewind,
+          pendingPlaying ? MediaControl.pause : MediaControl.play,
+          MediaControl.fastForward,
+          MediaControl.skipToNext,
+        ],
+        androidCompactActionIndices: const [0, 2, 4],
+      ));
+    }
+    debugPrint('[AudioHandlerSingleton] Handler ready; queued Now Playing state flushed.');
   }
 
   void attachPlayer(Player player) {
@@ -211,8 +243,70 @@ class AudioHandlerSingleton {
     h.attachPlayer(player);
   }
 
+  void setMediaItem({
+    required String id,
+    required String title,
+    required String artist,
+    Uri? artUri,
+    Duration? duration,
+  }) {
+    final h = _handler;
+    if (h != null) {
+      h.updateMediaItemFromParts(
+        id: id,
+        title: title,
+        artist: artist,
+        artUri: artUri,
+        duration: duration,
+      );
+      return;
+    }
+    _pendingMediaItem = MediaItem(
+      id: id,
+      title: title,
+      artist: artist,
+      album: 'Otya',
+      artUri: artUri,
+      duration: duration,
+    );
+    debugPrint('[AudioHandlerSingleton] Queued Now Playing metadata until handler is ready.');
+  }
+
+  void setPlaying(bool isPlaying) {
+    final h = _handler;
+    if (h == null) {
+      _pendingPlaying = isPlaying;
+      return;
+    }
+    final current = h.playbackState.value;
+    h.playbackState.add(current.copyWith(
+      playing: isPlaying,
+      controls: [
+        MediaControl.skipToPrevious,
+        MediaControl.rewind,
+        isPlaying ? MediaControl.pause : MediaControl.play,
+        MediaControl.fastForward,
+        MediaControl.skipToNext,
+      ],
+      androidCompactActionIndices: const [0, 2, 4],
+    ));
+  }
+
+  void clearMediaItem() {
+    _pendingMediaItem = null;
+    _pendingPlaying = false;
+    final h = _handler;
+    if (h == null) return;
+    h.mediaItem.add(null);
+    h.playbackState.add(h.playbackState.value.copyWith(
+      playing: false,
+      controls: const [],
+    ));
+  }
+
   void detachPlayer({bool disposePlayer = false}) {
     _pendingPlayer = null;
+    _pendingPlaying = false;
     _handler?.detachPlayer(disposePlayer: disposePlayer);
   }
 }

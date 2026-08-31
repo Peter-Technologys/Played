@@ -31,25 +31,15 @@ Future<void> main() async {
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    FlutterError.onError = (details) {
-      FlutterError.presentError(details);
-      debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
-      CrashReporter.instance.report(
-        details.exception,
-        details.stack ?? StackTrace.empty,
-      );
-    };
-
-    PlatformDispatcher.instance.onError = (error, stack) {
-      debugPrint('[PlatformError] $error\n$stack');
-      CrashReporter.instance.report(error, stack);
-      return true;
-    };
+    // Install one crash pipeline before the first frame. The old startup code
+    // installed a second pair of Flutter/platform handlers and CrashReporter
+    // later chained back into them, which could upload the same failure twice.
+    await CrashReporter.instance.init();
 
     final settingsNotifier = SettingsNotifier(const AppSettings());
 
     // First paint must not wait on SharedPreferences, SQLite, MediaKit,
-    // AudioService, Firebase or any other plugin-backed service. Render OTYA
+    // AudioService, Firebase or any other plugin-backed service. Render Otya
     // immediately with safe local defaults, then hydrate after the first frame.
     runApp(
       ProviderScope(
@@ -109,6 +99,8 @@ Future<void> _initBackground(
   AppSettings savedSettings,
   bool databaseReady,
 ) async {
+  // Playback platform comes first so a song started immediately after launch
+  // gets a real Android MediaSession/foreground-service notification.
   await _safeBackground('playback platform', _initPlaybackPlatform);
   await _safeBackground('notifications', _initNotifications);
   await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
@@ -144,7 +136,6 @@ Future<void> _initBackground(
     FirebasePlatformService.instance.initOptionalServices,
   );
   unawaited(_safeBackground('FCM', FcmService.instance.init));
-  unawaited(_safeBackground('crash reporter', CrashReporter.instance.init));
 }
 
 Future<void> _initPlaybackPlatform() async {
@@ -170,11 +161,11 @@ Future<void> _initPlaybackPlatform() async {
     builder: () => OtyaAudioHandler(),
     config: AudioServiceConfig(
       androidNotificationChannelId: 'com.otyaplayer.app.audio',
-      androidNotificationChannelName: 'OTYA — Now Playing',
+      androidNotificationChannelName: 'Otya — Now Playing',
       androidNotificationOngoing: true,
       androidStopForegroundOnPause: false,
       androidNotificationIcon: 'drawable/ic_notification',
-      notificationColor: const Color(0xFF8B5CF6),
+      notificationColor: const Color(0xFF2979FF),
       androidShowNotificationBadge: false,
       preloadArtwork: true,
     ),
