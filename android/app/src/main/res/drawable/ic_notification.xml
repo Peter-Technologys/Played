@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  FCM small-notification icon — must be a monochrome white vector on a
-  transparent background (Android notification icon guidelines).
-  Size: 24 × 24 dp  |  viewportWidth/Height: 24
+  Android notification small icon: monochrome only.
+  This is the micro OTYA mark, not a play button and not the multicolor AI mark.
 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="24dp"
@@ -10,33 +9,25 @@
     android:viewportWidth="24"
     android:viewportHeight="24">
 
-    <!--
-      Play-circle outline:
-        • Outer circle ring
-        • Filled play triangle
-      Both paths use #FFFFFFFF so the icon renders correctly as a
-      white silhouette in the status bar and notification shade.
-    -->
-
-    <!-- Outer circle -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M12,2
-            C6.477,2 2,6.477 2,12
-            C2,17.523 6.477,22 12,22
-            C17.523,22 22,17.523 22,12
-            C22,6.477 17.523,2 12,2
-            Z
-            M12,20
-            C7.582,20 4,16.418 4,12
-            C4,7.582 7.582,4 12,4
-            C16.418,4 20,7.582 20,12
-            C20,16.418 16.418,20 12,20
-            Z" />
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.0"
+        android:strokeLineCap="round"
+        android:pathData="M5.0,8.0 C7.2,3.8 13.0,2.7 17.1,5.4 C20.3,7.5 21.5,11.6 19.9,15.0" />
 
-    <!-- Play triangle -->
     <path
-        android:fillColor="#FFFFFFFF"
-        android:pathData="M10,8.5 L16,12 L10,15.5 Z" />
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.0"
+        android:strokeLineCap="round"
+        android:pathData="M19.0,16.2 C16.8,20.2 11.3,21.4 7.2,18.9 C3.7,16.7 2.4,12.2 4.3,8.7" />
 
+    <!-- short crossing strokes preserve the twisted-O character at 24dp -->
+    <path
+        android:fillColor="@android:color/transparent"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.1"
+        android:strokeLineCap="round"
+        android:pathData="M7.2,7.2 L9.1,9.1 M14.9,14.9 L16.8,16.8" />
 </vector>
