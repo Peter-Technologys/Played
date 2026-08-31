@@ -7,6 +7,7 @@ void main() {
     final handler = File('lib/core/services/audio_handler.dart').readAsStringSync();
     final notifications = File('lib/core/services/media_notification_service.dart')
         .readAsStringSync();
+    final main = File('lib/main.dart').readAsStringSync();
 
     expect(handler, contains('MediaItem? _pendingMediaItem'));
     expect(handler, contains('bool? _pendingPlaying'));
@@ -14,6 +15,8 @@ void main() {
     expect(notifications, contains('AudioHandlerSingleton.instance.setMediaItem'));
     expect(notifications, contains('AudioHandlerSingleton.instance.setPlaying'));
     expect(handler, isNot(contains("album: 'OTYA Player'")));
+    expect(main, contains("androidNotificationChannelName: 'Otya — Now Playing'"));
+    expect(main, contains('notificationColor: const Color(0xFF2979FF)'));
   });
 
   test('crash reporting is installed once before the first frame', () {
