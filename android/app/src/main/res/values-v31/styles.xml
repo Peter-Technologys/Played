@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!--
+      Android 12+ system splash. The OS owns the launch transition; OTYA supplies
+      only a solid background and a safe-zone-compliant foreground mark.
+    -->
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowSplashScreenBackground">#04060D</item>
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
+        <item name="android:windowSplashScreenIconBackgroundColor">#04060D</item>
+        <item name="android:windowBackground">@color/background</item>
+        <item name="android:windowFullscreen">false</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:navigationBarColor">#04060D</item>
+        <item name="android:statusBarColor">#04060D</item>
+        <item name="android:windowAnimationStyle">@null</item>
+    </style>
+</resources>
