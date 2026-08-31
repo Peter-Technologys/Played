@@ -1,14 +1,14 @@
-name: Test APK — current head
+name: Test Otya
 
 on:
   push:
-    branches: [v1-rebuild]
+    branches: [main]
   pull_request:
-    branches: [v1-rebuild]
+    branches: [main]
   workflow_dispatch:
 
 concurrency:
-  group: test-apk-${{ github.ref }}
+  group: test-otya-${{ github.ref }}
   cancel-in-progress: true
 
 permissions:
@@ -20,11 +20,11 @@ env:
 
 jobs:
   validate_and_build:
-    name: Analyze, test and build installable APK
+    name: Check and build Otya
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
-      - name: Checkout exact current head
+      - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -46,24 +46,24 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Run code generation
+      - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Flutter analysis
+      - name: Check code
         run: flutter analyze --no-fatal-infos
 
-      - name: Flutter tests
+      - name: Run tests
         run: flutter test
 
-      - name: Verify Firebase test configuration
+      - name: Check Firebase settings
         env:
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY GitHub variable is missing"; exit 1; }
+          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY is missing"; exit 1; }
 
-      - name: Prepare stable Android signing for Google Sign-In
+      - name: Prepare signing key
         id: signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
@@ -75,15 +75,14 @@ jobs:
           set -euo pipefail
           if [ -n "${KEYSTORE_BASE64:-}" ] && [ -n "${STORE_PASSWORD:-}" ] && [ -n "${KEY_ALIAS:-}" ] && [ -n "${KEY_PASSWORD:-}" ]; then
             printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-            test -s android/app/keystore.jks || { echo "ERROR: decoded keystore is empty"; exit 1; }
+            test -s android/app/keystore.jks || { echo "ERROR: signing key is empty"; exit 1; }
             echo "available=true" >> "$GITHUB_OUTPUT"
-            echo "Stable Otya signing key prepared for the test APK."
           else
             echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "WARNING: release signing secrets are incomplete. The APK will use the runner debug certificate; Google Sign-In may reject that build unless its SHA is registered."
+            echo "WARNING: release signing is not available for this test build"
           fi
 
-      - name: Build non-publishing ARM64 test APK
+      - name: Build test APK
         env:
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
           KEYSTORE_PATH: ${{ steps.signing.outputs.available == 'true' && format('{0}/android/app/keystore.jks', github.workspace) || '' }}
@@ -101,28 +100,29 @@ jobs:
             --dart-define=FIREBASE_APP_ID="1:82776565585:android:085cf9b4eecb76e9535570" \
             --dart-define=FIREBASE_MESSAGING_SENDER_ID="82776565585" \
             --dart-define=FIREBASE_PROJECT_ID="otya-player"
+          cp build/app/outputs/flutter-apk/app-debug.apk build/Otya-test.apk
 
-      - name: Verify APK and signing certificate
+      - name: Verify test APK
         shell: bash
         run: |
           set -euo pipefail
-          APK=build/app/outputs/flutter-apk/app-debug.apk
-          test -f "$APK" || { echo "ERROR: test APK not found"; exit 1; }
-          test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK suspiciously small"; exit 1; }
-          sha256sum "$APK" | tee build/test-apk-sha256.txt
-          keytool -printcert -jarfile "$APK" | tee build/test-apk-signing-cert.txt
+          APK=build/Otya-test.apk
+          test -f "$APK" || { echo "ERROR: Otya test APK not found"; exit 1; }
+          test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK is too small"; exit 1; }
+          sha256sum "$APK" | tee build/Otya-test-checksum.txt
+          keytool -printcert -jarfile "$APK" | tee build/Otya-test-signing.txt
 
-      - name: Upload installable test APK
+      - name: Save Otya test APK
         uses: actions/upload-artifact@v4
         with:
-          name: otya-current-head-test-apk
+          name: Otya-test
           if-no-files-found: error
           retention-days: 7
           path: |
-            build/app/outputs/flutter-apk/app-debug.apk
-            build/test-apk-sha256.txt
-            build/test-apk-signing-cert.txt
+            build/Otya-test.apk
+            build/Otya-test-checksum.txt
+            build/Otya-test-signing.txt
 
-      - name: Remove signing material
+      - name: Remove signing key
         if: always()
         run: rm -f android/app/keystore.jks
