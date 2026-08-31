@@ -25,30 +25,27 @@ import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
 
 Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-
-  FlutterError.onError = (details) {
-    FlutterError.presentError(details);
-    debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
-    CrashReporter.instance.report(
-      details.exception,
-      details.stack ?? StackTrace.empty,
-    );
-    if (kDebugMode) {
-      _showCrashOverlay('Flutter Error', '${details.summary}\n\n${details.stack}');
-    }
-  };
-
-  PlatformDispatcher.instance.onError = (error, stack) {
-    debugPrint('[PlatformError] $error\n$stack');
-    CrashReporter.instance.report(error, stack);
-    if (kDebugMode) {
-      _showCrashOverlay('Platform Error', '$error\n\n$stack');
-    }
-    return true;
-  };
-
+  // Flutter records the zone in which the binding is initialized and requires
+  // runApp to execute in that same zone. Keeping both inside one guarded zone
+  // prevents the startup "Zone mismatch" loop seen in device bugreports.
   await runZonedGuarded(() async {
+    WidgetsFlutterBinding.ensureInitialized();
+
+    FlutterError.onError = (details) {
+      FlutterError.presentError(details);
+      debugPrint('[FlutterError] ${details.summary}\n${details.stack}');
+      CrashReporter.instance.report(
+        details.exception,
+        details.stack ?? StackTrace.empty,
+      );
+    };
+
+    PlatformDispatcher.instance.onError = (error, stack) {
+      debugPrint('[PlatformError] $error\n$stack');
+      CrashReporter.instance.report(error, stack);
+      return true;
+    };
+
     final settingsNotifier = SettingsNotifier(const AppSettings());
 
     // First paint must not wait on SharedPreferences, SQLite, MediaKit,
@@ -67,11 +64,12 @@ Future<void> main() async {
       unawaited(_bootstrapAfterFirstFrame(settingsNotifier));
     });
   }, (error, stack) {
+    // Never call runApp from a zone error callback. Replacing the root widget
+    // from here can recursively trigger the same startup error and leave the
+    // Android splash visible indefinitely. Log/report instead; the app's normal
+    // UI remains the only root widget tree.
     debugPrint('[ZoneError] $error\n$stack');
     CrashReporter.instance.report(error, stack);
-    if (kDebugMode) {
-      _showCrashOverlay('Startup Crash', '$error\n\n$stack');
-    }
   });
 }
 
@@ -94,59 +92,6 @@ Future<void> _bootstrapAfterFirstFrame(SettingsNotifier settingsNotifier) async 
   }
 
   await _initBackground(savedSettings, databaseReady);
-}
-
-void _showCrashOverlay(String title, String details) {
-  if (!kDebugMode) return;
-  runApp(
-    MaterialApp(
-      debugShowCheckedModeBanner: false,
-      home: Scaffold(
-        backgroundColor: const Color(0xFF1A0000),
-        body: SafeArea(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(Icons.bug_report, color: Color(0xFFFF4444), size: 40),
-                const SizedBox(height: 8),
-                Text(
-                  'OTYA CRASH: $title',
-                  style: const TextStyle(
-                    color: Color(0xFFFF4444),
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF2A0000),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SelectableText(
-                    details,
-                    style: const TextStyle(
-                      color: Color(0xFFFFCCCC),
-                      fontSize: 11,
-                      fontFamily: 'monospace',
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'This diagnostic screen is debug-only.',
-                  style: TextStyle(color: Color(0xFFAAAAAA), fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    ),
-  );
 }
 
 Future<bool> _initDatabase() async {
