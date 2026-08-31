@@ -8,8 +8,9 @@ import 'shared_notification_plugin.dart';
 /// Push/announcement notification owner for OTYA.
 ///
 /// Update notifications never download or install an APK inside the app. A tap
-/// opens only an HTTPS destination in the external browser, preserving the same
-/// Play-safe update contract as the in-app update dialog.
+/// opens only an HTTPS destination on an official PeterSmart Link host in the
+/// external browser, preserving the same Play-safe update contract as the
+/// in-app update dialog.
 class PushNotificationService {
   PushNotificationService._();
   static final PushNotificationService instance = PushNotificationService._();
@@ -22,6 +23,10 @@ class PushNotificationService {
 
   static const _prefixUpdate = 'update:';
   static const _prefixUrl = 'url:';
+  static const _officialUpdateHosts = <String>{
+    'petersmartlink.com',
+    'www.petersmartlink.com',
+  };
 
   bool _initialized = false;
 
@@ -34,6 +39,13 @@ class PushNotificationService {
 
   void handleTap(NotificationResponse response) => _onTap(response);
 
+  bool _isOfficialUpdateUri(Uri? uri) {
+    if (uri == null || uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
+      return false;
+    }
+    return _officialUpdateHosts.contains(uri.host.toLowerCase());
+  }
+
   void _onTap(NotificationResponse response) {
     final payload = response.payload ?? '';
     debugPrint('[PushNotif] tapped id=${response.id} payload=$payload');
@@ -41,8 +53,10 @@ class PushNotificationService {
     if (payload.startsWith(_prefixUpdate)) {
       final rawUrl = payload.substring(_prefixUpdate.length).trim();
       final uri = Uri.tryParse(rawUrl);
-      if (uri != null && uri.scheme == 'https') {
-        launchUrl(uri, mode: LaunchMode.externalApplication).ignore();
+      if (_isOfficialUpdateUri(uri)) {
+        launchUrl(uri!, mode: LaunchMode.externalApplication).ignore();
+      } else if (rawUrl.isNotEmpty) {
+        debugPrint('[PushNotif] blocked untrusted update URL.');
       }
       return;
     }
@@ -102,7 +116,11 @@ class PushNotificationService {
     if (!_initialized) await init();
 
     final uri = Uri.tryParse(downloadUrl);
-    final safeUrl = uri != null && uri.scheme == 'https' ? uri.toString() : '';
+    final safeUrl = _isOfficialUpdateUri(uri) ? uri!.toString() : '';
+    if (downloadUrl.isNotEmpty && safeUrl.isEmpty) {
+      debugPrint('[PushNotif] rejected untrusted update destination.');
+    }
+
     final androidDetails = AndroidNotificationDetails(
       _chUpdates,
       'OTYA — Updates',
