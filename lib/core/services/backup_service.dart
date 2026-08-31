@@ -12,6 +12,10 @@ import 'http_client.dart';
 
 const _kAuthBase = 'https://petersmartlink.com/auth';
 const _kBackupSchemaVersion = 1;
+const _kBackupPayloadType = 'otya_recovery_snapshot';
+const _kMaxPlaylists = 5000;
+const _kMaxMediaIdsPerPlaylist = 50000;
+const _kMaxPlaylistNameLength = 240;
 
 class BackupService {
   BackupService._();
@@ -99,7 +103,7 @@ class BackupService {
 
     return {
       'schema_version': _kBackupSchemaVersion,
-      'payload_type': 'otya_recovery_snapshot',
+      'payload_type': _kBackupPayloadType,
       'created_at': DateTime.now().toUtc().toIso8601String(),
       'playlists': playlists,
       'eq_presets': <dynamic>[],
@@ -107,10 +111,13 @@ class BackupService {
     };
   }
 
-  Future<int> restoreFromData(Map<String, dynamic> data) async {
+  List<Playlist> _parsePlaylists(Map<String, dynamic> data) {
     final schemaVersion = data['schema_version'] ?? data['version'];
     if (schemaVersion is! int || schemaVersion != _kBackupSchemaVersion) {
       throw Exception('This backup version is not supported by this OTYA build.');
+    }
+    if (data['payload_type'] != _kBackupPayloadType) {
+      throw Exception('This is not an OTYA recovery snapshot.');
     }
 
     final rawPlaylists = data['playlists'];
@@ -118,27 +125,76 @@ class BackupService {
       throw Exception('The Drive backup is damaged or incomplete.');
     }
 
-    final playlists = rawPlaylists as List<dynamic>? ?? const [];
-    debugPrint('[BackupService] Restoring ${playlists.length} playlists');
-    var restored = 0;
+    final rows = rawPlaylists as List<dynamic>? ?? const [];
+    if (rows.length > _kMaxPlaylists) {
+      throw Exception('The Drive backup contains too many playlists.');
+    }
 
-    for (final raw in playlists) {
-      if (raw is! Map<String, dynamic>) continue;
+    final parsed = <Playlist>[];
+    for (final raw in rows) {
+      if (raw is! Map<String, dynamic>) {
+        throw Exception('The Drive backup contains an invalid playlist.');
+      }
+
       final id = raw['id'];
       final name = raw['name'];
-      if (id is! String || id.isEmpty || name is! String || name.isEmpty) continue;
+      final rawMediaIds = raw['mediaIds'];
+      if (id is! String || id.trim().isEmpty || id.length > 240) {
+        throw Exception('The Drive backup contains an invalid playlist ID.');
+      }
+      if (name is! String ||
+          name.trim().isEmpty ||
+          name.length > _kMaxPlaylistNameLength) {
+        throw Exception('The Drive backup contains an invalid playlist name.');
+      }
+      if (rawMediaIds != null && rawMediaIds is! List) {
+        throw Exception('The Drive backup contains invalid playlist media.');
+      }
+
+      final mediaRows = rawMediaIds as List<dynamic>? ?? const [];
+      if (mediaRows.length > _kMaxMediaIdsPerPlaylist) {
+        throw Exception('A restored playlist contains too many media items.');
+      }
+      final mediaIds = <String>[];
+      for (final value in mediaRows) {
+        if (value is! String || value.isEmpty || value.length > 512) {
+          throw Exception('The Drive backup contains an invalid media reference.');
+        }
+        mediaIds.add(value);
+      }
+
+      final createdRaw = raw['createdAt'];
+      final updatedRaw = raw['updatedAt'];
+      if (createdRaw != null && createdRaw is! String) {
+        throw Exception('The Drive backup contains an invalid creation date.');
+      }
+      if (updatedRaw != null && updatedRaw is! String) {
+        throw Exception('The Drive backup contains an invalid update date.');
+      }
 
       final now = DateTime.now();
-      final playlist = Playlist(
-        id: id,
-        name: name,
-        mediaIds: List<String>.from(raw['mediaIds'] as List? ?? const []),
-        createdAt: DateTime.tryParse(raw['createdAt'] as String? ?? '') ?? now,
-        updatedAt: DateTime.tryParse(raw['updatedAt'] as String? ?? '') ?? now,
+      parsed.add(
+        Playlist(
+          id: id,
+          name: name,
+          mediaIds: mediaIds,
+          createdAt: DateTime.tryParse(createdRaw as String? ?? '') ?? now,
+          updatedAt: DateTime.tryParse(updatedRaw as String? ?? '') ?? now,
+        ),
       );
-      await OtyaDatabase.instance.savePlaylist(playlist);
-      restored++;
     }
-    return restored;
+    return parsed;
+  }
+
+  Future<int> restoreFromData(Map<String, dynamic> data) async {
+    // Validate the complete snapshot before writing anything. A corrupt row can
+    // therefore never leave the user's database in a partially restored state.
+    final playlists = _parsePlaylists(data);
+    debugPrint('[BackupService] Restoring ${playlists.length} playlists');
+
+    for (final playlist in playlists) {
+      await OtyaDatabase.instance.savePlaylist(playlist);
+    }
+    return playlists.length;
   }
 }
