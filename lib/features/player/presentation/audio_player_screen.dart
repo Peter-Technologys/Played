@@ -174,48 +174,54 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     }
   }
 
-  Future<void> _loadCurrent(
+  Future<bool> _loadCurrent(
     MediaItem item, {
+    required int generation,
     required double speed,
     Duration? savedPosition,
   }) async {
-    _loadGeneration++;
-    final generation = _loadGeneration;
+    bool isCurrent() =>
+        _loadGeneration == generation && _currentItemId == item.id;
 
     try {
+      if (!isCurrent()) return false;
       if (_player.state.playing) await _player.pause();
-      if (_loadGeneration != generation) return;
+      if (!isCurrent()) return false;
 
       try {
         await _player.open(Media(item.filePath), play: false);
       } catch (error) {
         debugPrint('[AudioPlayer] player.open failed: $error\nPath: ${item.filePath}');
-        if (_loadGeneration == generation && mounted) {
+        if (isCurrent() && mounted) {
           state = state.copyWith(isLoading: false);
         }
-        return;
+        return false;
       }
 
-      if (_loadGeneration != generation) return;
+      if (!isCurrent()) return false;
       await _player.setRate(speed);
-      if (_loadGeneration != generation) return;
+      if (!isCurrent()) return false;
 
       if (savedPosition != null && savedPosition.inSeconds > 0) {
         await _player.seek(savedPosition);
       }
-      if (_loadGeneration != generation) return;
+      if (!isCurrent()) return false;
 
       await PlaybackCoordinator.instance.register(_player, 'audio');
+      if (!isCurrent()) return false;
       await _player.play();
+      return isCurrent();
     } catch (error) {
       debugPrint('[AudioPlayer] load failed: $error');
-      if (_loadGeneration == generation && mounted) {
+      if (isCurrent() && mounted) {
         state = state.copyWith(isLoading: false);
       }
+      return false;
     }
   }
 
   Future<void> load(MediaItem item, {AppSettings? settings}) async {
+    final generation = ++_loadGeneration;
     _currentItemId = item.id;
     if (mounted) {
       state = state.copyWith(
@@ -232,16 +238,33 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     _updateNotification();
 
     final saved = OtyaDatabase.instance.getSeekPosition(item.id);
-    final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
-    final speed = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
 
     try {
-      await _loadCurrent(item, speed: speed, savedPosition: saved);
+      final savedSpeed = await SpeedMemoryService.instance.getSpeed(item.id);
+      if (_loadGeneration != generation || _currentItemId != item.id) return;
+      final speed = savedSpeed ?? settings?.playbackSpeed ?? state.speed;
+
+      final loaded = await _loadCurrent(
+        item,
+        generation: generation,
+        speed: speed,
+        savedPosition: saved,
+      );
+      if (!loaded ||
+          _loadGeneration != generation ||
+          _currentItemId != item.id) {
+        return;
+      }
+
       if (mounted) state = state.copyWith(speed: speed, isLoading: false);
       OtyaDatabase.instance.recordPlay(item).ignore();
     } catch (error) {
       debugPrint('[AudioPlayer] load error: $error');
-      if (mounted) state = state.copyWith(isLoading: false);
+      if (_loadGeneration == generation &&
+          _currentItemId == item.id &&
+          mounted) {
+        state = state.copyWith(isLoading: false);
+      }
     }
   }
 
@@ -291,8 +314,10 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   Future<void> skipForward() =>
       _player.seek(state.position + const Duration(seconds: 10));
 
-  Future<void> skipBack() =>
-      _player.seek(state.position - const Duration(seconds: 10));
+  Future<void> skipBack() {
+    final target = state.position - const Duration(seconds: 10);
+    return _player.seek(target.isNegative ? Duration.zero : target);
+  }
 
   void skipNext() {
     if (_container == null) return;
