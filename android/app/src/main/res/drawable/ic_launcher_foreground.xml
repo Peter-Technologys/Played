@@ -5,7 +5,7 @@
     android:height="108dp"
     android:viewportWidth="512"
     android:viewportHeight="512">
-    <group android:pivotX="256" android:pivotY="256" android:scaleX="0.76" android:scaleY="0.76">
+    <group android:pivotX="256" android:pivotY="256" android:scaleX="0.90" android:scaleY="0.90">
         <path android:pathData="M160,98 L138,117 L116,146 L100,179 L89,220 L108,180 L129,158 L141,150 L165,140 L186,136 L211,136 L241,142 L270,155 L292,171 L315,196 L327,216 L337,248 L338,280 L333,307 L324,329 L354,307 L373,286 L389,262 L402,231 L406,209 L405,183 L399,159 L373,120 L350,99 L330,86 L303,74 L272,67 L240,67 L211,73 L181,85 Z">
             <aapt:attr name="android:fillColor"><gradient android:type="linear" android:startX="89" android:startY="90" android:endX="406" android:endY="300" android:startColor="#FFFFFFFF" android:centerColor="#FFE8E8EA" android:endColor="#FFFFFFFF" /></aapt:attr>
         </path>
