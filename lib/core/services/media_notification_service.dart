@@ -1,6 +1,5 @@
 import 'dart:io';
 
-import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
@@ -106,14 +105,13 @@ class MediaNotificationService {
   }) async {
     if (!_initialized) await init();
     final artUri = await _stableArtUri(albumArtPath, id);
-    final handler = AudioHandlerSingleton.instance.handler;
-    handler?.updateMediaItemFromParts(
+    AudioHandlerSingleton.instance.setMediaItem(
       id: id,
       title: title,
       artist: artist,
       artUri: artUri,
     );
-    await updatePlayState(isPlaying);
+    AudioHandlerSingleton.instance.setPlaying(isPlaying);
   }
 
   Future<void> showWithBitmap({
@@ -135,43 +133,22 @@ class MediaNotificationService {
     } catch (e) {
       debugPrint('[MediaNotification] bitmap cache failed: $e');
     }
-    final handler = AudioHandlerSingleton.instance.handler;
-    handler?.updateMediaItemFromParts(
+    AudioHandlerSingleton.instance.setMediaItem(
       id: id,
       title: title,
       artist: artist,
       artUri: artUri,
     );
-    await updatePlayState(isPlaying);
+    AudioHandlerSingleton.instance.setPlaying(isPlaying);
   }
 
   Future<void> updatePlayState(bool isPlaying) async {
-    final handler = AudioHandlerSingleton.instance.handler;
-    if (handler == null) return;
-    final current = handler.playbackState.value;
-    handler.playbackState.add(current.copyWith(
-      playing: isPlaying,
-      controls: [
-        MediaControl.skipToPrevious,
-        MediaControl.rewind,
-        isPlaying ? MediaControl.pause : MediaControl.play,
-        MediaControl.fastForward,
-        MediaControl.skipToNext,
-      ],
-      androidCompactActionIndices: const [0, 2, 4],
-    ));
+    AudioHandlerSingleton.instance.setPlaying(isPlaying);
   }
 
   Future<void> dismiss() async {
     _lastArtworkKey = null;
     _lastArtworkUri = null;
-    final handler = AudioHandlerSingleton.instance.handler;
-    handler?.mediaItem.add(null);
-    if (handler != null) {
-      handler.playbackState.add(handler.playbackState.value.copyWith(
-        playing: false,
-        controls: const [],
-      ));
-    }
+    AudioHandlerSingleton.instance.clearMediaItem();
   }
 }
