@@ -1,5 +1,7 @@
 /// Canonical Otya brand components.
 ///
-/// The implementation lives in [otya_logo_v2.dart]. Keeping this stable entry
-/// point prevents individual screens from drifting to old logo variants.
-export 'otya_logo_v2.dart';
+/// Product branding keeps the folded O mark from [otya_logo_v2.dart]. Otya AI
+/// uses the separate three-ball identity from [otya_ai_mark.dart]. Existing
+/// thinking call sites keep working through the compatibility export below.
+export 'otya_logo_v2.dart' hide OtyaThinkingMark;
+export 'otya_ai_mark.dart' show OtyaAiMark, OtyaThinkingMark;
