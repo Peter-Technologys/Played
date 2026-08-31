@@ -1,76 +1,86 @@
 import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
+/// Otya typography follows the Material 3 hierarchy while keeping Inter as the
+/// product typeface. Large titles are intentionally stronger and body copy is
+/// slightly more open for modern Android readability.
 abstract class AppTextStyles {
-  static const String _bodyFont = 'Inter';
+  static const String _font = 'Inter';
 
-  // ── Display / Headline / Title — Inter ───────────────────────────────────
-
-  /// Large display heading — Inter, 26sp
-  static TextStyle get heading1 => const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 26,
+  static TextStyle get display => const TextStyle(
+        fontFamily: _font,
+        fontSize: 40,
+        height: 1.05,
         fontWeight: FontWeight.w800,
+        letterSpacing: -1.2,
         color: AppColors.textPrimary,
-        letterSpacing: -0.5,
       );
 
-  /// Section heading — Inter, 18sp
+  static TextStyle get heading1 => const TextStyle(
+        fontFamily: _font,
+        fontSize: 32,
+        height: 1.08,
+        fontWeight: FontWeight.w800,
+        letterSpacing: -0.9,
+        color: AppColors.textPrimary,
+      );
+
   static TextStyle get heading2 => const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 18,
-        fontWeight: FontWeight.w700,
+        fontFamily: _font,
+        fontSize: 24,
+        height: 1.15,
+        fontWeight: FontWeight.w750,
+        letterSpacing: -0.45,
         color: AppColors.textPrimary,
       );
 
-  /// Sub-heading — Inter, 15sp
   static TextStyle get heading3 => const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 15,
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      );
-
-  /// Screen title (AppBar / tab header) — Inter, 20sp
-  static TextStyle get title => const TextStyle(
-        fontFamily: 'Inter',
-        fontSize: 20,
+        fontFamily: _font,
+        fontSize: 18,
+        height: 1.2,
         fontWeight: FontWeight.w700,
-        color: AppColors.textPrimary,
         letterSpacing: -0.2,
+        color: AppColors.textPrimary,
       );
 
-  // ── Body / Sub-text — Inter ───────────────────────────────────────────────
+  static TextStyle get title => const TextStyle(
+        fontFamily: _font,
+        fontSize: 22,
+        height: 1.15,
+        fontWeight: FontWeight.w750,
+        letterSpacing: -0.35,
+        color: AppColors.textPrimary,
+      );
 
   static const TextStyle body = TextStyle(
-    fontFamily: _bodyFont,
-    fontSize: 14,
+    fontFamily: _font,
+    fontSize: 16,
     fontWeight: FontWeight.w400,
     color: AppColors.textPrimary,
     height: 1.5,
   );
 
   static const TextStyle bodySmall = TextStyle(
-    fontFamily: _bodyFont,
-    fontSize: 12,
+    fontFamily: _font,
+    fontSize: 14,
     fontWeight: FontWeight.w400,
     color: AppColors.textSecondary,
-    height: 1.4,
+    height: 1.45,
   );
 
   static const TextStyle label = TextStyle(
-    fontFamily: _bodyFont,
-    fontSize: 11,
-    fontWeight: FontWeight.w600,
+    fontFamily: _font,
+    fontSize: 12,
+    fontWeight: FontWeight.w650,
     color: AppColors.textSecondary,
-    letterSpacing: 0.8,
+    letterSpacing: 0.2,
   );
 
   static const TextStyle button = TextStyle(
-    fontFamily: _bodyFont,
-    fontSize: 15,
+    fontFamily: _font,
+    fontSize: 14,
     fontWeight: FontWeight.w700,
-    color: Colors.black,
-    letterSpacing: 0.2,
+    color: Colors.white,
+    letterSpacing: 0.1,
   );
 }
