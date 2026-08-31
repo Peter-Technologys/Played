@@ -181,10 +181,27 @@ class VaultService {
 
     final restorePath = await _availableRestorePath(vaultItem.originalPath);
     final restoredFile = File(restorePath);
-    await restoredFile.parent.create(recursive: true);
-    final restored = await vaultFile.copy(restorePath);
-    if (!await restored.exists()) {
-      throw FileSystemException('Could not restore media', restorePath);
+
+    try {
+      await restoredFile.parent.create(recursive: true);
+      final restored = await vaultFile.copy(restorePath);
+      if (!await restored.exists()) {
+        throw FileSystemException('Could not restore media', restorePath);
+      }
+    } on FileSystemException catch (error) {
+      // Android scoped storage can reject direct writes to public media paths
+      // even when the file was previously readable. Never delete the Private
+      // source or its database record in that case: the protected copy remains
+      // recoverable and the UI can retry after a platform-safe restore path is
+      // available/authorized.
+      debugPrint('[Private] Restore target is not writable: $error');
+      try {
+        if (await restoredFile.exists()) await restoredFile.delete();
+      } catch (_) {}
+      throw FileSystemException(
+        'OTYA could not restore this item to its original folder. The Private copy was kept safely.',
+        restorePath,
+      );
     }
 
     try {
@@ -198,7 +215,20 @@ class VaultService {
       rethrow;
     }
 
-    await OtyaDatabase.instance.removeFromVault(mediaId);
+    try {
+      await OtyaDatabase.instance.removeFromVault(mediaId);
+    } catch (_) {
+      // The file has already moved out of Private. Recreate the protected copy
+      // before surfacing the metadata failure so the user is never left with a
+      // database record pointing to a missing protected file.
+      try {
+        if (await restoredFile.exists()) {
+          await restoredFile.copy(vaultItem.encryptedPath);
+          await restoredFile.delete();
+        }
+      } catch (_) {}
+      rethrow;
+    }
 
     try {
       await _kMediaChannel.invokeMethod<void>(
