@@ -46,5 +46,23 @@ void main() {
 
       expect(selected, '${temp.path}${Platform.pathSeparator}song (restored 2).flac');
     });
+
+    test('source contract keeps the Private copy on scoped-storage write failure', () {
+      final source = File(
+        'lib/core/services/vault_service.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('on FileSystemException catch (error)'));
+      expect(
+        source,
+        contains('The Private copy was kept safely.'),
+      );
+      expect(
+        source,
+        contains('await restoredFile.copy(vaultItem.encryptedPath);'),
+        reason: 'A metadata-removal failure must restore the protected source '
+            'before surfacing the error.',
+      );
+    });
   });
 }
