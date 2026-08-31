@@ -124,6 +124,8 @@ class AuthService {
   String? _userAvatar;
   bool _isVerified = false;
   bool _loaded = false;
+  Future<String?>? _refreshInFlight;
+  int _sessionGeneration = 0;
 
   static const _networkError =
       'Could not reach OTYA right now. Check your connection and try again.';
@@ -154,6 +156,7 @@ class AuthService {
       );
     }
     if (refreshToken != null) {
+      if (_refreshToken != refreshToken) _sessionGeneration++;
       _refreshToken = refreshToken;
       await _secureStorage.write(
         key: _kSecureRefreshToken,
@@ -184,6 +187,7 @@ class AuthService {
   }
 
   Future<void> _clearPersisted() async {
+    _sessionGeneration++;
     await _secureStorage.delete(key: _kSecureAccessToken);
     await _secureStorage.delete(key: _kSecureRefreshToken);
     _accessToken = null;
@@ -219,6 +223,19 @@ class AuthService {
     if (accessToken == null) return null;
     if (!_isTokenExpired(accessToken)) return accessToken;
 
+    final existingRefresh = _refreshInFlight;
+    if (existingRefresh != null) return existingRefresh;
+
+    final refresh = _refreshAccessToken();
+    _refreshInFlight = refresh;
+    try {
+      return await refresh;
+    } finally {
+      if (identical(_refreshInFlight, refresh)) _refreshInFlight = null;
+    }
+  }
+
+  Future<String?> _refreshAccessToken() async {
     final refreshToken = _refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) {
       // An expired access token with no refresh token cannot become a valid
@@ -228,6 +245,7 @@ class AuthService {
       return null;
     }
 
+    final generation = _sessionGeneration;
     try {
       final res = await _client
           .post(
@@ -236,6 +254,13 @@ class AuthService {
             body: jsonEncode({'refresh_token': refreshToken}),
           )
           .timeout(_timeout);
+
+      // Logout, account replacement, or any refresh-token change while the
+      // request was in flight invalidates this response. Never resurrect a
+      // session after the user has signed out.
+      if (generation != _sessionGeneration || _refreshToken != refreshToken) {
+        return null;
+      }
 
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
