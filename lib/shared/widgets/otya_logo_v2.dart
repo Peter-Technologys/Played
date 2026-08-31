@@ -38,7 +38,7 @@ class OtyaLogo extends StatelessWidget {
             'tya',
             style: TextStyle(
               fontSize: fontSize,
-              fontWeight: FontWeight.w750,
+              fontWeight: FontWeight.w700,
               color: AppColors.textPrimaryOf(context),
               fontFamily: 'Inter',
               letterSpacing: letterSpacing,
@@ -117,23 +117,4 @@ class _OtyaProductPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _OtyaProductPainter oldDelegate) => false;
-}
-
-class OtyaFooter extends StatelessWidget {
-  const OtyaFooter({super.key});
-
-  @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.only(bottom: 8),
-        child: Text(
-          'Otya',
-          textAlign: TextAlign.center,
-          style: TextStyle(
-            fontSize: 11,
-            color: Theme.of(context).colorScheme.onSurface.withValues(alpha: .58),
-            fontFamily: 'Inter',
-            letterSpacing: .3,
-          ),
-        ),
-      );
 }
