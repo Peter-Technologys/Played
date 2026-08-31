@@ -95,8 +95,10 @@ class UpdateService {
         versionCode: serverVersionCode,
         installedCode: installedCode,
         changelog: changelog,
-        downloadUrl:
-            downloads['auto'] as String? ?? Environment.downloadUrl,
+        // Notifications and in-app update actions must use the APK that matches
+        // the installed application ABI. The server's legacy `auto` URL can be
+        // arm64-biased and is therefore not safe as the device download target.
+        downloadUrl: directUrl,
         directUrl: directUrl,
         releaseDate: data['date'] as String? ?? '',
       );
