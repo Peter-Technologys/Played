@@ -13,8 +13,7 @@ class UpdateService {
   UpdateService._();
   static final UpdateService instance = UpdateService._();
 
-  static const String _prefLastCheck   = 'update_last_check';
-  static const String _prefSkippedCode = 'update_skipped_code';
+  static const String _prefLastCheck = 'update_last_check';
 
   bool _checkInProgress = false;
 
@@ -66,40 +65,39 @@ class UpdateService {
         return null;
       }
 
-      final data              = jsonDecode(response.body) as Map<String, dynamic>;
+      final data = jsonDecode(response.body) as Map<String, dynamic>;
       final serverVersionCode = (data['versionCode'] as num?)?.toInt() ?? 0;
-      final serverVersion     = data['version']   as String? ?? '';
-      final changelog         = data['changelog'] as String? ?? '';
-      final rawDownloads      = data['downloads'];
-      final downloads         = (rawDownloads is Map<String, dynamic>) ? rawDownloads : <String, dynamic>{};
+      final serverVersion = data['version'] as String? ?? '';
+      final changelog = data['changelog'] as String? ?? '';
+      final rawDownloads = data['downloads'];
+      final downloads = (rawDownloads is Map<String, dynamic>)
+          ? rawDownloads
+          : <String, dynamic>{};
 
       if (serverVersionCode == 0 || serverVersion.isEmpty) return null;
 
       await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
 
-      final packageInfo   = await PackageInfo.fromPlatform();
+      final packageInfo = await PackageInfo.fromPlatform();
       final installedCode = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       debugPrint('[UpdateService] Installed: $installedCode  Server: $serverVersionCode');
 
       if (serverVersionCode <= installedCode) return null;
 
-      final skippedCode = prefs.getInt(_prefSkippedCode) ?? 0;
-      if (skippedCode >= serverVersionCode) return null;
-
-      final abi       = _detectAbi();
+      final abi = _detectAbi();
       final directUrl = abi == 'arm64'
           ? (downloads['arm64'] as String? ?? Environment.arm64DownloadUrl)
           : (downloads['arm32'] as String? ?? Environment.arm32DownloadUrl);
 
       return UpdateInfo(
-        version:       serverVersion,
-        versionCode:   serverVersionCode,
+        version: serverVersion,
+        versionCode: serverVersionCode,
         installedCode: installedCode,
-        changelog:     changelog,
-        downloadUrl:   downloads['auto'] as String? ?? Environment.downloadUrl,
-        directUrl:     directUrl,
-        releaseDate:   data['date'] as String? ?? '',
+        changelog: changelog,
+        downloadUrl: downloads['auto'] as String? ?? Environment.downloadUrl,
+        directUrl: directUrl,
+        releaseDate: data['date'] as String? ?? '',
       );
     } catch (e) {
       debugPrint('[UpdateService] Check failed: $e');
@@ -114,9 +112,13 @@ class UpdateService {
     }
   }
 
+  /// Defers the current update prompt without permanently suppressing that
+  /// version. The normal 24-hour check interval decides when it can be shown
+  /// again. "Not Now" must not behave like "Skip this version".
   Future<void> remindLater(int versionCode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_prefSkippedCode, versionCode);
+    await prefs.setInt(_prefLastCheck, DateTime.now().millisecondsSinceEpoch);
+    debugPrint('[UpdateService] Deferred update $versionCode for the normal check interval.');
   }
 
   // registerDevice() was removed — use DeviceService.instance.registerIfNeeded()
@@ -128,8 +130,8 @@ class UpdateService {
 
 class UpdateInfo {
   final String version;
-  final int    versionCode;
-  final int    installedCode;
+  final int versionCode;
+  final int installedCode;
   final String changelog;
   final String downloadUrl;
   final String directUrl;
