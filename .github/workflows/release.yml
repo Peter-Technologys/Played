@@ -1,5 +1,5 @@
-# OTYA Player — GitHub Actions Release Pipeline
-# Production releases are signed only with the configured release keystore.
+# Otya release pipeline
+# Public files use one simple product name: Otya.
 
 name: Release
 
@@ -27,7 +27,7 @@ env:
 
 jobs:
   build_and_publish:
-    name: Build, verify and publish signed release
+    name: Build and publish Otya
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: production
@@ -35,7 +35,7 @@ jobs:
       contents: write
 
     steps:
-      - name: Resolve release tag
+      - name: Get release version
         id: release
         shell: bash
         run: |
@@ -65,14 +65,14 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
 
-      - name: Verify release tag exists
+      - name: Check release tag
         shell: bash
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
           git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null || {
-            echo "ERROR: release tag $RELEASE_TAG does not exist in the repository"
+            echo "ERROR: release tag $RELEASE_TAG does not exist"
             exit 1
           }
 
@@ -105,10 +105,10 @@ jobs:
           pip install awscli --quiet
           flutter pub get
 
-      - name: Run code generation
+      - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Static analysis
+      - name: Check code
         shell: bash
         run: |
           set -euo pipefail
@@ -118,15 +118,15 @@ jobs:
       - name: Run tests
         run: flutter test
 
-      - name: Decode release keystore
+      - name: Load signing key
         shell: bash
         run: |
           set -euo pipefail
-          test -n '${{ secrets.KEYSTORE_BASE64 }}' || { echo "ERROR: Release keystore secret is missing"; exit 1; }
+          test -n '${{ secrets.KEYSTORE_BASE64 }}' || { echo "ERROR: Release signing key is missing"; exit 1; }
           printf '%s' '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/app/keystore.jks
-          test -s android/app/keystore.jks || { echo "ERROR: Release keystore is empty"; exit 1; }
+          test -s android/app/keystore.jks || { echo "ERROR: Release signing key is empty"; exit 1; }
 
-      - name: Build signed direct-download APKs
+      - name: Build APKs
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -139,7 +139,7 @@ jobs:
           test -n "$STORE_PASSWORD" || { echo "ERROR: STORE_PASSWORD is missing"; exit 1; }
           test -n "$KEY_ALIAS" || { echo "ERROR: KEY_ALIAS is missing"; exit 1; }
           test -n "$KEY_PASSWORD" || { echo "ERROR: KEY_PASSWORD is missing"; exit 1; }
-          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY GitHub variable is missing"; exit 1; }
+          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY is missing"; exit 1; }
 
           GOOGLE_WEB_CLIENT_ID='82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'
           FIREBASE_APP_ID='1:82776565585:android:085cf9b4eecb76e9535570'
@@ -153,14 +153,14 @@ jobs:
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
           )
 
-          rm -rf build/app/outputs/flutter-apk build/app/outputs/bundle
+          rm -rf build/app/outputs/flutter-apk build/app/outputs/bundle build/release
           flutter build apk --release --split-per-abi \
             --target-platform android-arm,android-arm64 \
             --split-debug-info=build/debug-info \
             --dart-define=SELF_UPDATE=true \
             "${COMMON_DEFINES[@]}"
 
-      - name: Build signed Google Play app bundle
+      - name: Build Play Store bundle
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -183,42 +183,54 @@ jobs:
             --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
             --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
 
-      - name: Verify release outputs
+      - name: Name and verify Otya files
         id: artifacts
         shell: bash
         run: |
           set -euo pipefail
           APK_DIR=build/app/outputs/flutter-apk
-          AAB=build/app/outputs/bundle/release/app-release.aab
-          ARM64="$APK_DIR/app-arm64-v8a-release.apk"
-          ARM32="$APK_DIR/app-armeabi-v7a-release.apk"
+          RAW_AAB=build/app/outputs/bundle/release/app-release.aab
+          RAW_ARM64="$APK_DIR/app-arm64-v8a-release.apk"
+          RAW_ARM32="$APK_DIR/app-armeabi-v7a-release.apk"
+          OUT=build/release
+          mkdir -p "$OUT"
 
-          test -f "$ARM64" || { echo "ERROR: arm64 APK not found"; exit 1; }
-          test -f "$ARM32" || { echo "ERROR: arm32 APK not found"; exit 1; }
-          test -f "$AAB" || { echo "ERROR: Android App Bundle not found"; exit 1; }
-          [ "$(stat -c%s "$ARM64")" -gt 5000000 ] || { echo "ERROR: arm64 APK suspiciously small"; exit 1; }
-          [ "$(stat -c%s "$ARM32")" -gt 5000000 ] || { echo "ERROR: arm32 APK suspiciously small"; exit 1; }
-          [ "$(stat -c%s "$AAB")" -gt 5000000 ] || { echo "ERROR: AAB suspiciously small"; exit 1; }
+          test -f "$RAW_ARM64" || { echo "ERROR: arm64 APK not found"; exit 1; }
+          test -f "$RAW_ARM32" || { echo "ERROR: arm32 APK not found"; exit 1; }
+          test -f "$RAW_AAB" || { echo "ERROR: app bundle not found"; exit 1; }
 
-          sha256sum "$ARM64" "$ARM32" "$AAB" | tee build/release-sha256.txt
+          cp "$RAW_ARM64" "$OUT/Otya-arm64.apk"
+          cp "$RAW_ARM32" "$OUT/Otya-arm32.apk"
+          cp "$RAW_AAB" "$OUT/Otya.aab"
+
+          ARM64="$OUT/Otya-arm64.apk"
+          ARM32="$OUT/Otya-arm32.apk"
+          AAB="$OUT/Otya.aab"
+
+          [ "$(stat -c%s "$ARM64")" -gt 5000000 ] || { echo "ERROR: arm64 APK is too small"; exit 1; }
+          [ "$(stat -c%s "$ARM32")" -gt 5000000 ] || { echo "ERROR: arm32 APK is too small"; exit 1; }
+          [ "$(stat -c%s "$AAB")" -gt 5000000 ] || { echo "ERROR: app bundle is too small"; exit 1; }
+
+          sha256sum "$ARM64" "$ARM32" "$AAB" | tee "$OUT/checksums.txt"
           echo "arm64=$ARM64" >> "$GITHUB_OUTPUT"
           echo "arm32=$ARM32" >> "$GITHUB_OUTPUT"
           echo "aab=$AAB" >> "$GITHUB_OUTPUT"
+          echo "checksums=$OUT/checksums.txt" >> "$GITHUB_OUTPUT"
 
-      - name: Upload verified release artifacts
+      - name: Save Otya release files
         uses: actions/upload-artifact@v4
         with:
-          name: otya-${{ steps.release.outputs.tag }}
+          name: Otya-${{ steps.release.outputs.tag }}
           if-no-files-found: error
           retention-days: 30
           path: |
             ${{ steps.artifacts.outputs.arm64 }}
             ${{ steps.artifacts.outputs.arm32 }}
             ${{ steps.artifacts.outputs.aab }}
-            build/release-sha256.txt
+            ${{ steps.artifacts.outputs.checksums }}
             build/flutter-analyze-release.log
 
-      - name: Publish APKs to Cloudflare R2
+      - name: Publish Otya APKs
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
           AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
@@ -235,18 +247,19 @@ jobs:
           ARM32_APK: ${{ steps.artifacts.outputs.arm32 }}
         run: bash scripts/publish_r2.sh
 
-      - name: Create GitHub Release
+      - name: Create Otya release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.release.outputs.tag }}
+          name: Otya ${{ steps.release.outputs.tag }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
             ${{ steps.artifacts.outputs.arm64 }}
             ${{ steps.artifacts.outputs.arm32 }}
             ${{ steps.artifacts.outputs.aab }}
-            build/release-sha256.txt
+            ${{ steps.artifacts.outputs.checksums }}
 
-      - name: Remove secret material
+      - name: Remove signing key
         if: always()
         run: rm -f android/app/keystore.jks
