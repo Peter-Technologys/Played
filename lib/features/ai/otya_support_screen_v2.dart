@@ -109,7 +109,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         _messages.add(
           const _ChatEntry(
             text:
-                'I cannot reach Ask OTYA right now. You can keep using your music, videos, files, Transfer and other local OTYA features normally.',
+                'I cannot reach Next right now. You can keep using your music, videos, files, Transfer and other local Otya features normally.',
             fromUser: false,
           ),
         );
@@ -143,11 +143,11 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
           children: [
             const Row(
               children: [
-                OtyaMark(size: 34),
+                OtyaAiMark(size: 34),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Talk to OTYA Support',
+                    'Ask Otya Support',
                     style: TextStyle(fontSize: 21, fontWeight: FontWeight.w800),
                   ),
                 ),
@@ -155,7 +155,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
             ),
             const SizedBox(height: 10),
             const Text(
-              'If this needs a person, enter your email and OTYA will create a support ticket for you.',
+              'If this needs a person, Next can create an Otya Support ticket for you.',
               style: TextStyle(fontSize: 13, color: AppColors.textSecondary),
             ),
             const SizedBox(height: 16),
@@ -200,7 +200,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
       final ticket = await _service.handoff(question: question, email: email);
       if (!mounted) return;
       _appendAssistant(
-        'Done. OTYA Support received your request as ticket ${ticket.id}. A reply can be sent to $email.',
+        'Done. Otya Support received your request as ticket ${ticket.id}. A reply can be sent to $email.',
       );
     } catch (_) {
       if (mounted) {
@@ -257,8 +257,8 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;
-    final modelLabel =
-        _selectedModel?.name ?? (_loadingModels ? 'Connecting…' : 'OTYA');
+    final modelLabel = _selectedModel?.name ??
+        (_loadingModels ? 'Connecting…' : 'Ready');
 
     return Scaffold(
       appBar: AppBar(
@@ -269,12 +269,12 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
             if (_busy)
               const OtyaThinkingMark(size: 30)
             else
-              const OtyaMark(size: 30),
+              const OtyaAiMark(size: 30),
             const SizedBox(width: 10),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Ask OTYA'),
+                const Text('Next'),
                 Text(
                   _busy ? 'Thinking…' : modelLabel,
                   style: TextStyle(
@@ -290,7 +290,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         actions: [
           if (_models.length > 1)
             PopupMenuButton<String>(
-              tooltip: 'Choose AI model',
+              tooltip: 'Choose Next model',
               icon: const Icon(Icons.tune_rounded),
               onSelected: _busy
                   ? null
@@ -403,7 +403,7 @@ class _Welcome extends StatelessWidget {
     const prompts = <(IconData, String, String)>[
       (Icons.lightbulb_outline_rounded, 'Ask anything', 'Explain something to me in simple language.'),
       (Icons.school_outlined, 'Learn', 'Help me make a simple plan to learn a new skill.'),
-      (Icons.swap_horiz_rounded, 'OTYA Transfer', 'How do I send a large video with OTYA Transfer?'),
+      (Icons.swap_horiz_rounded, 'Otya Transfer', 'How do I send a large video with Otya Transfer?'),
       (Icons.play_circle_outline_rounded, 'Playback help', 'Why can a video have picture but no sound?'),
     ];
 
@@ -421,12 +421,12 @@ class _Welcome extends StatelessWidget {
               borderRadius: BorderRadius.circular(24),
               border: Border.all(color: AppColors.borderOf(context)),
             ),
-            child: const OtyaMark(size: 48),
+            child: const OtyaAiMark(size: 48),
           ),
         ),
         const SizedBox(height: 22),
         Text(
-          'How can I help?',
+          'How can Next help?',
           style: TextStyle(
             fontSize: 30,
             height: 1.08,
@@ -437,7 +437,7 @@ class _Welcome extends StatelessWidget {
         ),
         const SizedBox(height: 10),
         Text(
-          'Ask a question, learn something, or get help with OTYA. You can talk naturally — you do not need special commands.',
+          'Ask Next a question, learn something, or get help with Otya. You can talk naturally — you do not need special commands.',
           style: TextStyle(
             fontSize: 14,
             height: 1.5,
@@ -533,10 +533,11 @@ class _Composer extends StatelessWidget {
               keyboardType: TextInputType.multiline,
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText: 'Message Ask OTYA',
+                hintText: 'Message Next',
                 filled: true,
                 fillColor: AppColors.cardOf(context),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(24),
                   borderSide: BorderSide.none,
@@ -548,7 +549,7 @@ class _Composer extends StatelessWidget {
           SizedBox.square(
             dimension: 48,
             child: IconButton.filled(
-              tooltip: busy ? 'OTYA is thinking' : 'Send message',
+              tooltip: busy ? 'Next is thinking' : 'Send message',
               onPressed: busy ? null : () => onSend(),
               icon: busy
                   ? const OtyaThinkingMark(size: 24)
@@ -595,9 +596,9 @@ class _MessageRow extends StatelessWidget {
         children: [
           const Row(
             children: [
-              OtyaMark(size: 22),
+              OtyaAiMark(size: 22),
               SizedBox(width: 8),
-              Text('OTYA', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
+              Text('Next', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w900)),
             ],
           ),
           const SizedBox(height: 9),
@@ -637,13 +638,13 @@ class _ThinkingRow extends StatelessWidget {
         padding: const EdgeInsets.fromLTRB(2, 6, 20, 20),
         child: Semantics(
           liveRegion: true,
-          label: 'OTYA is thinking',
+          label: 'Next is thinking',
           child: const Row(
             children: [
               OtyaThinkingMark(size: 30),
               SizedBox(width: 11),
               Text(
-                'OTYA is thinking…',
+                'Next is thinking…',
                 style: TextStyle(
                   fontSize: 13,
                   color: AppColors.textSecondary,
