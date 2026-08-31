@@ -25,11 +25,14 @@ void main() {
     expect(adaptive, contains('@drawable/otya_launcher_foreground'));
     expect(adaptive, contains('@color/otya_launcher_background'));
 
-    // Blue, red and yellow are the three Otya identity balls.
+    // Otya product identity is the blue media O. The blue/red/yellow three-ball
+    // triangle is reserved for Next and must not leak into the launcher mark.
+    expect(foreground, contains('#FF68A6FF'));
     expect(foreground, contains('#FF2979FF'));
-    expect(foreground, contains('#FFFF3B30'));
-    expect(foreground, contains('#FFFFD60A'));
-    expect(foreground, contains('android:scaleX="0.90"'));
-    expect(foreground, contains('android:scaleY="0.90"'));
+    expect(foreground, contains('#FF1767E8'));
+    expect(foreground, isNot(contains('#FFFF3B30')));
+    expect(foreground, isNot(contains('#FFFFD60A')));
+    expect(foreground, contains('android:fillType="evenOdd"'));
+    expect(foreground, contains('M248,216 L358,256 L248,296 Z'));
   });
 }

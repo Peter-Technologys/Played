@@ -2,11 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Canonical Next identity: only the blue, red and yellow balls.
+/// Canonical Next identity: three equal balls in an equilateral triangle.
 ///
-/// The larger folded O belongs to the Otya product/app identity. Next uses
-/// these three balls everywhere; they stay still while idle and travel the same
-/// curved loop only while Next is working.
+/// Idle: blue upper-left, red upper-right, yellow lower-center.
+/// Thinking: the whole triangle rotates as one formation, so the three balls
+/// stay equally spaced instead of chasing each other in a line.
 class OtyaAiMark extends StatelessWidget {
   const OtyaAiMark({super.key, this.size = 52});
 
@@ -18,19 +18,17 @@ class OtyaAiMark extends StatelessWidget {
         image: true,
         child: SizedBox.square(
           dimension: size,
-          child: const CustomPaint(painter: _OtyaAiPainter()),
+          child: const CustomPaint(painter: _NextPainter()),
         ),
       );
 }
 
-/// Backward-compatible thinking widget used by existing assistant surfaces.
-/// It intentionally renders the Next identity rather than the large Otya mark.
 class OtyaThinkingMark extends StatefulWidget {
   const OtyaThinkingMark({
     super.key,
     this.size = 52,
     this.thinking = true,
-    this.duration = const Duration(milliseconds: 1650),
+    this.duration = const Duration(milliseconds: 1500),
   });
 
   final double size;
@@ -92,7 +90,7 @@ class _OtyaThinkingMarkState extends State<OtyaThinkingMark>
           child: AnimatedBuilder(
             animation: _controller,
             builder: (_, __) => CustomPaint(
-              painter: _OtyaAiPainter(
+              painter: _NextPainter(
                 progress: widget.thinking ? _controller.value : null,
               ),
             ),
@@ -101,8 +99,8 @@ class _OtyaThinkingMarkState extends State<OtyaThinkingMark>
       );
 }
 
-class _OtyaAiPainter extends CustomPainter {
-  const _OtyaAiPainter({this.progress});
+class _NextPainter extends CustomPainter {
+  const _NextPainter({this.progress});
 
   final double? progress;
 
@@ -113,57 +111,45 @@ class _OtyaAiPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide * .14;
-    final routeX = size.width * .31;
-    final routeY = size.height * .22;
+    final ballRadius = size.shortestSide * .115;
+    final orbit = size.shortestSide * .255;
+    final rotation = progress == null ? 0.0 : progress! * math.pi * 2;
 
-    if (progress == null) {
-      _ball(canvas, Offset(size.width * .25, size.height * .58), radius, _blue);
-      _ball(canvas, Offset(size.width * .50, size.height * .36), radius, _red);
-      _ball(canvas, Offset(size.width * .75, size.height * .58), radius, _yellow);
-      return;
-    }
-
-    final base = progress! * math.pi * 2;
+    // Exact 120-degree spacing: an equilateral triangle at every frame.
+    const baseAngles = <double>[
+      -5 * math.pi / 6,
+      -math.pi / 6,
+      math.pi / 2,
+    ];
     const colors = [_blue, _red, _yellow];
-    for (var i = 0; i < colors.length; i++) {
-      final angle = base - i * .34;
+
+    for (var i = 0; i < 3; i++) {
+      final angle = baseAngles[i] + rotation;
       final point = Offset(
-        center.dx + math.cos(angle) * routeX,
-        center.dy + math.sin(angle) * routeY,
+        center.dx + math.cos(angle) * orbit,
+        center.dy + math.sin(angle) * orbit,
       );
-      _ball(canvas, point, radius, colors[i]);
+      _ball(canvas, point, ballRadius, colors[i]);
     }
   }
 
   void _ball(Canvas canvas, Offset center, double radius, Color color) {
     canvas.drawCircle(
-      center.translate(radius * .12, radius * .22),
-      radius,
+      center.translate(0, radius * .20),
+      radius * 1.04,
       Paint()
-        ..color = Colors.black.withValues(alpha: .18)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * .28),
+        ..color = Colors.black.withValues(alpha: .16)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * .34),
     );
-
-    final rect = Rect.fromCircle(center: center, radius: radius);
+    canvas.drawCircle(center, radius, Paint()..color = color);
     canvas.drawCircle(
-      center,
-      radius,
-      Paint()
-        ..shader = RadialGradient(
-          center: const Alignment(-.35, -.45),
-          radius: .95,
-          colors: [
-            Colors.white.withValues(alpha: .88),
-            color,
-            Color.lerp(color, Colors.black, .22)!,
-          ],
-          stops: const [0, .28, 1],
-        ).createShader(rect),
+      center.translate(-radius * .28, -radius * .30),
+      radius * .22,
+      Paint()..color = Colors.white.withValues(alpha: .34),
     );
   }
 
   @override
-  bool shouldRepaint(covariant _OtyaAiPainter oldDelegate) =>
+  bool shouldRepaint(covariant _NextPainter oldDelegate) =>
       oldDelegate.progress != progress;
 }
