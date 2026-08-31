@@ -146,18 +146,18 @@ void main() {
     expect(downloads, contains("context.push('/player/audio'"));
   });
 
-  test('Ask OTYA remains a real conversational surface', () {
+  test('Next remains a real conversational surface', () {
     final source = File(
       'lib/features/ai/otya_support_screen.dart',
     ).readAsStringSync();
-    expect(source, contains('Message Ask OTYA'));
+    expect(source, contains('Message Next'));
     expect(source, contains('ScrollController'));
-    expect(source, contains('Choose AI model'));
+    expect(source, contains('Choose Next model'));
     expect(source, contains('New chat'));
-    expect(source, contains('Talk to OTYA Support'));
+    expect(source, contains('Ask Otya Support'));
     expect(
       source,
-      contains('keep using your music, videos, files, Transfer and other local OTYA features normally'),
+      contains('keep using your music, videos, files, Transfer and other local Otya features normally'),
     );
   });
 
