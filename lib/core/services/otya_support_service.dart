@@ -44,7 +44,7 @@ class OtyaAiModel {
 
   factory OtyaAiModel.fromJson(Map<String, dynamic> json) => OtyaAiModel(
         id: '${json['id'] ?? ''}',
-        name: '${json['name'] ?? json['id'] ?? 'OTYA'}',
+        name: '${json['name'] ?? json['id'] ?? 'Next'}',
         provider: '${json['provider'] ?? ''}',
         tier: '${json['tier'] ?? ''}',
         description: '${json['description'] ?? ''}',
@@ -102,7 +102,7 @@ class OtyaSupportService {
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(_error(data, 'AI models are unavailable right now.'));
+      throw StateError(_error(data, 'Next models are unavailable right now.'));
     }
     final raw = data['models'];
     if (raw is! List) return const <OtyaAiModel>[];
@@ -155,7 +155,7 @@ class OtyaSupportService {
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(_error(data, 'Ask OTYA is unavailable right now.'));
+      throw StateError(_error(data, 'Next is unavailable right now.'));
     }
     return OtyaSupportReply(
       answer: '${data['answer'] ?? ''}'.trim().isEmpty
@@ -187,7 +187,7 @@ class OtyaSupportService {
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
-      throw StateError(_error(data, 'Could not contact OTYA support.'));
+      throw StateError(_error(data, 'Could not contact Otya Support.'));
     }
     return OtyaSupportTicket('${data['ticket'] ?? 'OTYA'}');
   }
