@@ -53,20 +53,33 @@ void main() {
     test('release source has no cleartext or development backend URLs', () {
       final root = Directory('lib');
       final findings = <String>[];
-      final forbidden = <RegExp>[
-        RegExp(r'http://', caseSensitive: false),
+      final forbiddenEverywhere = <RegExp>[
         RegExp(r'localhost', caseSensitive: false),
         RegExp(r'127\.0\.0\.1'),
         RegExp(r'\.workers\.dev', caseSensitive: false),
       ];
+      final cleartext = RegExp(r'http://', caseSensitive: false);
 
       if (root.existsSync()) {
         for (final entity in root.listSync(recursive: true, followLinks: false)) {
           if (entity is! File || !entity.path.endsWith('.dart')) continue;
+          final path = entity.path.replaceAll('\\', '/');
           final text = entity.readAsStringSync();
-          for (final pattern in forbidden) {
+
+          // OTYA Transfer is intentionally local-network only and uses
+          // authenticated cleartext HTTP between nearby devices. The transfer
+          // implementation has its own contract tests that reject non-local
+          // addresses, so the production-backend URL check must not treat this
+          // local protocol as a remote cleartext backend endpoint.
+          final isLocalTransferSource =
+              path.startsWith('lib/features/transfer/');
+          if (!isLocalTransferSource && cleartext.hasMatch(text)) {
+            findings.add('$path matched ${cleartext.pattern}');
+          }
+
+          for (final pattern in forbiddenEverywhere) {
             if (pattern.hasMatch(text)) {
-              findings.add('${entity.path} matched ${pattern.pattern}');
+              findings.add('$path matched ${pattern.pattern}');
             }
           }
         }
@@ -75,8 +88,8 @@ void main() {
       expect(
         findings,
         isEmpty,
-        reason: 'Production app source must not contain development or cleartext endpoints.\n'
-            '${findings.join('\n')}',
+        reason: 'Production app source must not contain development or remote '
+            'cleartext backend endpoints.\n${findings.join('\n')}',
       );
     });
 
