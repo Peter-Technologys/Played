@@ -29,7 +29,7 @@ abstract class AppTextStyles {
         fontFamily: _font,
         fontSize: 24,
         height: 1.15,
-        fontWeight: FontWeight.w750,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.45,
         color: AppColors.textPrimary,
       );
@@ -47,7 +47,7 @@ abstract class AppTextStyles {
         fontFamily: _font,
         fontSize: 22,
         height: 1.15,
-        fontWeight: FontWeight.w750,
+        fontWeight: FontWeight.w700,
         letterSpacing: -0.35,
         color: AppColors.textPrimary,
       );
@@ -71,7 +71,7 @@ abstract class AppTextStyles {
   static const TextStyle label = TextStyle(
     fontFamily: _font,
     fontSize: 12,
-    fontWeight: FontWeight.w650,
+    fontWeight: FontWeight.w600,
     color: AppColors.textSecondary,
     letterSpacing: 0.2,
   );
