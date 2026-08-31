@@ -1,32 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Branded splash for API 21+ (Lollipop and above).
-     Uses only shapes — no bitmap or custom drawable tag —
-     guaranteed to inflate correctly on all Android API levels. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-
-    <!-- Deep dark navy background -->
     <item>
         <shape android:shape="rectangle">
             <solid android:color="#FF04060D" />
         </shape>
     </item>
-
-    <!-- Subtle cyan glow centred -->
-    <item
-        android:gravity="center"
-        android:width="240dp"
-        android:height="240dp">
-        <shape android:shape="oval">
-            <solid android:color="#1400D4FF" />
-        </shape>
-    </item>
-
-    <!-- App icon referenced directly on <item> — the only valid way
-         to include a vector drawable inside a layer-list. -->
     <item
         android:drawable="@drawable/ic_launcher_foreground"
         android:gravity="center"
-        android:width="96dp"
-        android:height="96dp" />
-
+        android:width="72dp"
+        android:height="72dp" />
 </layer-list>
