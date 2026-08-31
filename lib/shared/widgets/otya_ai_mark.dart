@@ -2,11 +2,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Canonical Otya AI identity: only the blue, red and yellow balls.
+/// Canonical Next identity: only the blue, red and yellow balls.
 ///
-/// The larger folded O belongs to the Otya product/app identity. Otya AI uses
+/// The larger folded O belongs to the Otya product/app identity. Next uses
 /// these three balls everywhere; they stay still while idle and travel the same
-/// curved loop only while Otya is working.
+/// curved loop only while Next is working.
 class OtyaAiMark extends StatelessWidget {
   const OtyaAiMark({super.key, this.size = 52});
 
@@ -14,7 +14,7 @@ class OtyaAiMark extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) => Semantics(
-        label: 'Otya AI',
+        label: 'Next',
         image: true,
         child: SizedBox.square(
           dimension: size,
@@ -23,8 +23,8 @@ class OtyaAiMark extends StatelessWidget {
       );
 }
 
-/// Backward-compatible thinking widget used by existing Ask Otya surfaces.
-/// It now intentionally renders the AI identity rather than the large O mark.
+/// Backward-compatible thinking widget used by existing assistant surfaces.
+/// It intentionally renders the Next identity rather than the large Otya mark.
 class OtyaThinkingMark extends StatefulWidget {
   const OtyaThinkingMark({
     super.key,
@@ -85,7 +85,7 @@ class _OtyaThinkingMarkState extends State<OtyaThinkingMark>
 
   @override
   Widget build(BuildContext context) => Semantics(
-        label: widget.thinking ? 'Otya AI is thinking' : 'Otya AI',
+        label: widget.thinking ? 'Next is thinking' : 'Next',
         image: true,
         child: SizedBox.square(
           dimension: widget.size,
