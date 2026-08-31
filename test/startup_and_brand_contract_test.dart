@@ -42,7 +42,9 @@ void main() {
     expect(manifest, isNot(contains('android:icon="@drawable/otya_launcher_icon"')));
     expect(adaptive, contains('@drawable/otya_launcher_foreground'));
     expect(adaptive, contains('@color/otya_launcher_background'));
-    expect(foreground, contains('android:scaleX="0.90"'));
-    expect(foreground, contains('android:scaleY="0.90"'));
+    expect(foreground, contains('android:viewportWidth="512"'));
+    expect(foreground, contains('android:viewportHeight="512"'));
+    expect(foreground, contains('android:fillType="evenOdd"'));
+    expect(foreground, contains('#FF2979FF'));
   });
 }
