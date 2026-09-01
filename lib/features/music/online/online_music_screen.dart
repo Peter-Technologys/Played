@@ -320,6 +320,7 @@ class _OnlineTrackTile extends StatelessWidget {
                       color: AppColors.accent,
                     ),
                   ),
+                ),
         ),
       ),
       title: Text(
