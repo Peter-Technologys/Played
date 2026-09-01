@@ -94,6 +94,7 @@ class OnlineMusicService {
   static const _cacheTtl = Duration(minutes: 3);
   static const _maxCacheEntries = 32;
   final Map<String, _CachedOnlineTracks> _cache = {};
+  final Map<String, Future<List<OnlineTrack>>> _inFlight = {};
 
   Future<List<OnlineTrack>> discover({int limit = 24}) =>
       _load(limit: limit);
@@ -114,10 +115,32 @@ class OnlineMusicService {
       return cached.tracks;
     }
 
+    // Search buttons, source cards and retries can request the same query while
+    // the first network call is still pending. Share that request instead of
+    // multiplying backend/provider work and making a slow connection slower.
+    final existing = _inFlight[cacheKey];
+    if (existing != null) return existing;
+
+    final request = _fetch(query: query, limit: safeLimit, cacheKey: cacheKey);
+    _inFlight[cacheKey] = request;
+    try {
+      return await request;
+    } finally {
+      if (identical(_inFlight[cacheKey], request)) {
+        _inFlight.remove(cacheKey);
+      }
+    }
+  }
+
+  Future<List<OnlineTrack>> _fetch({
+    required String query,
+    required int limit,
+    required String cacheKey,
+  }) async {
     final uri = Uri.parse(Environment.onlineMusicUrl).replace(
       queryParameters: {
         if (query.isNotEmpty) 'q': query,
-        'limit': safeLimit.toString(),
+        'limit': limit.toString(),
       },
     );
 
@@ -166,7 +189,8 @@ class OnlineMusicService {
       );
       _cache.remove(oldest.key);
     }
-    _cache[cacheKey] = _CachedOnlineTracks(now, List.unmodifiable(tracks));
-    return _cache[cacheKey]!.tracks;
+    final stableTracks = List<OnlineTrack>.unmodifiable(tracks);
+    _cache[cacheKey] = _CachedOnlineTracks(DateTime.now(), stableTracks);
+    return stableTracks;
   }
 }

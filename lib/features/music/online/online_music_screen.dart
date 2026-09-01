@@ -33,14 +33,16 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
     super.dispose();
   }
 
-  void _search() {
+  Future<List<OnlineTrack>> _requestForCurrentQuery() {
     final query = _searchController.text.trim();
+    return query.isEmpty
+        ? OnlineMusicService.instance.discover()
+        : OnlineMusicService.instance.search(query);
+  }
+
+  void _search() {
     HapticFeedback.selectionClick();
-    setState(() {
-      _tracks = query.isEmpty
-          ? OnlineMusicService.instance.discover()
-          : OnlineMusicService.instance.search(query);
-    });
+    setState(() => _tracks = _requestForCurrentQuery());
   }
 
   Future<void> _searchSpotify() async {
@@ -184,7 +186,7 @@ class _OnlineMusicScreenState extends State<OnlineMusicScreen> {
                   return _OnlineMusicError(
                     message: snapshot.error.toString(),
                     onRetry: () => setState(
-                      () => _tracks = OnlineMusicService.instance.discover(),
+                      () => _tracks = _requestForCurrentQuery(),
                     ),
                   );
                 }
