@@ -1,15 +1,6 @@
 name: Release APK — direct install
 
 on:
-  push:
-    branches: [v1-rebuild]
-    paths:
-      - 'lib/**'
-      - 'android/**'
-      - 'assets/**'
-      - 'pubspec.yaml'
-      - 'pubspec.lock'
-      - '.github/workflows/release-apk.yml'
   workflow_dispatch:
 
 concurrency:
@@ -105,14 +96,41 @@ jobs:
             --dart-define=FIREBASE_PROJECT_ID="otya-player"
 
       - name: Verify APK and signing certificate
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         shell: bash
         run: |
           set -euo pipefail
           APK=build/app/outputs/flutter-apk/app-release.apk
+          REPORT=build/release-apk-signing-cert.txt
           test -f "$APK" || { echo "ERROR: release APK not found"; exit 1; }
           test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK suspiciously small"; exit 1; }
           sha256sum "$APK" | tee build/release-apk-sha256.txt
-          keytool -printcert -jarfile "$APK" | tee build/release-apk-signing-cert.txt
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" && test -x "$APKSIGNER" || { echo "ERROR: Android apksigner was not found"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$REPORT"
+
+          EXPECTED_SHA256="$(keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA256: //p' \
+            | head -n 1 \
+            | tr -d ':[:space:]' \
+            | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_SHA256="$(sed -n 's/^.*certificate SHA-256 digest: //p' "$REPORT" \
+            | head -n 1 \
+            | tr -d ':[:space:]' \
+            | tr '[:upper:]' '[:lower:]')"
+
+          test -n "$EXPECTED_SHA256" || { echo "ERROR: expected signing certificate is unavailable"; exit 1; }
+          test -n "$ACTUAL_SHA256" || { echo "ERROR: APK signing certificate was not reported"; exit 1; }
+          test "$EXPECTED_SHA256" = "$ACTUAL_SHA256" || {
+            echo "ERROR: release APK certificate does not match the configured Otya signing key"
+            exit 1
+          }
           cp "$APK" build/OTYA-arm64-release.apk
 
       - name: Upload signed release APK

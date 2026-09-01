@@ -76,6 +76,27 @@ jobs:
             exit 1
           }
 
+      - name: Check release version matches app
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          APP_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' pubspec.yaml)"
+          test -n "$APP_VERSION" || { echo "ERROR: pubspec.yaml version is missing"; exit 1; }
+          [[ "$APP_VERSION" == *+* ]] || { echo "ERROR: app version must include a positive build number"; exit 1; }
+          VERSION_NAME="${APP_VERSION%%+*}"
+          BUILD_NUMBER="${APP_VERSION##*+}"
+          EXPECTED_VERSION="${RELEASE_TAG#v}"
+          test "$VERSION_NAME" = "$EXPECTED_VERSION" || {
+            echo "ERROR: release tag $RELEASE_TAG does not match pubspec version $VERSION_NAME"
+            exit 1
+          }
+          [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
+            echo "ERROR: release build number must be a positive integer"
+            exit 1
+          }
+
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
@@ -185,6 +206,9 @@ jobs:
 
       - name: Name and verify Otya files
         id: artifacts
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         shell: bash
         run: |
           set -euo pipefail
@@ -206,16 +230,61 @@ jobs:
           ARM64="$OUT/Otya-arm64.apk"
           ARM32="$OUT/Otya-arm32.apk"
           AAB="$OUT/Otya.aab"
+          ARM64_REPORT="$OUT/Otya-arm64-signing.txt"
+          ARM32_REPORT="$OUT/Otya-arm32-signing.txt"
+          AAB_REPORT="$OUT/Otya-aab-signing.txt"
 
           [ "$(stat -c%s "$ARM64")" -gt 5000000 ] || { echo "ERROR: arm64 APK is too small"; exit 1; }
           [ "$(stat -c%s "$ARM32")" -gt 5000000 ] || { echo "ERROR: arm32 APK is too small"; exit 1; }
           [ "$(stat -c%s "$AAB")" -gt 5000000 ] || { echo "ERROR: app bundle is too small"; exit 1; }
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" && test -x "$APKSIGNER" || { echo "ERROR: Android apksigner was not found"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$ARM64" | tee "$ARM64_REPORT"
+          "$APKSIGNER" verify --verbose --print-certs "$ARM32" | tee "$ARM32_REPORT"
+
+          EXPECTED_SHA256="$(keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA256: //p' \
+            | head -n 1 \
+            | tr -d ':[:space:]' \
+            | tr '[:upper:]' '[:lower:]')"
+          test -n "$EXPECTED_SHA256" || { echo "ERROR: expected signing certificate is unavailable"; exit 1; }
+
+          for REPORT in "$ARM64_REPORT" "$ARM32_REPORT"; do
+            ACTUAL_SHA256="$(sed -n 's/^.*certificate SHA-256 digest: //p' "$REPORT" \
+              | head -n 1 \
+              | tr -d ':[:space:]' \
+              | tr '[:upper:]' '[:lower:]')"
+            test -n "$ACTUAL_SHA256" || { echo "ERROR: APK signing certificate was not reported"; exit 1; }
+            test "$EXPECTED_SHA256" = "$ACTUAL_SHA256" || {
+              echo "ERROR: release APK certificate does not match the configured Otya signing key"
+              exit 1
+            }
+          done
+
+          jarsigner -verify "$AAB" | tee "$AAB_REPORT"
+          keytool -printcert -jarfile "$AAB" >> "$AAB_REPORT"
+          AAB_SHA256="$(sed -n 's/^[[:space:]]*SHA256: //p' "$AAB_REPORT" \
+            | head -n 1 \
+            | tr -d ':[:space:]' \
+            | tr '[:upper:]' '[:lower:]')"
+          test -n "$AAB_SHA256" || { echo "ERROR: app bundle signing certificate was not reported"; exit 1; }
+          test "$EXPECTED_SHA256" = "$AAB_SHA256" || {
+            echo "ERROR: app bundle certificate does not match the configured Otya signing key"
+            exit 1
+          }
 
           sha256sum "$ARM64" "$ARM32" "$AAB" | tee "$OUT/checksums.txt"
           echo "arm64=$ARM64" >> "$GITHUB_OUTPUT"
           echo "arm32=$ARM32" >> "$GITHUB_OUTPUT"
           echo "aab=$AAB" >> "$GITHUB_OUTPUT"
           echo "checksums=$OUT/checksums.txt" >> "$GITHUB_OUTPUT"
+          echo "arm64_signing=$ARM64_REPORT" >> "$GITHUB_OUTPUT"
+          echo "arm32_signing=$ARM32_REPORT" >> "$GITHUB_OUTPUT"
+          echo "aab_signing=$AAB_REPORT" >> "$GITHUB_OUTPUT"
 
       - name: Save Otya release files
         uses: actions/upload-artifact@v4
@@ -228,6 +297,9 @@ jobs:
             ${{ steps.artifacts.outputs.arm32 }}
             ${{ steps.artifacts.outputs.aab }}
             ${{ steps.artifacts.outputs.checksums }}
+            ${{ steps.artifacts.outputs.arm64_signing }}
+            ${{ steps.artifacts.outputs.arm32_signing }}
+            ${{ steps.artifacts.outputs.aab_signing }}
             build/flutter-analyze-release.log
 
       - name: Publish Otya APKs
