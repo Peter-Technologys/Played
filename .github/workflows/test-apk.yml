@@ -64,7 +64,6 @@ jobs:
           test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY is missing"; exit 1; }
 
       - name: Prepare signing key
-        id: signing
         env:
           KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -73,19 +72,17 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [ -n "${KEYSTORE_BASE64:-}" ] && [ -n "${STORE_PASSWORD:-}" ] && [ -n "${KEY_ALIAS:-}" ] && [ -n "${KEY_PASSWORD:-}" ]; then
-            printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
-            test -s android/app/keystore.jks || { echo "ERROR: signing key is empty"; exit 1; }
-            echo "available=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "available=false" >> "$GITHUB_OUTPUT"
-            echo "WARNING: release signing is not available for this test build"
-          fi
+          test -n "${KEYSTORE_BASE64:-}" || { echo "ERROR: KEYSTORE_BASE64 is missing; the installable test APK must use Otya's stable signing identity"; exit 1; }
+          test -n "${STORE_PASSWORD:-}" || { echo "ERROR: STORE_PASSWORD is missing"; exit 1; }
+          test -n "${KEY_ALIAS:-}" || { echo "ERROR: KEY_ALIAS is missing"; exit 1; }
+          test -n "${KEY_PASSWORD:-}" || { echo "ERROR: KEY_PASSWORD is missing"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+          test -s android/app/keystore.jks || { echo "ERROR: signing key is empty"; exit 1; }
 
       - name: Build test APK
         env:
           FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
-          KEYSTORE_PATH: ${{ steps.signing.outputs.available == 'true' && format('{0}/android/app/keystore.jks', github.workspace) || '' }}
+          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -103,14 +100,41 @@ jobs:
           cp build/app/outputs/flutter-apk/app-debug.apk build/Otya-test.apk
 
       - name: Verify test APK
+        env:
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
         shell: bash
         run: |
           set -euo pipefail
           APK=build/Otya-test.apk
+          SIGNING_REPORT=build/Otya-test-signing.txt
           test -f "$APK" || { echo "ERROR: Otya test APK not found"; exit 1; }
           test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK is too small"; exit 1; }
           sha256sum "$APK" | tee build/Otya-test-checksum.txt
-          keytool -printcert -jarfile "$APK" | tee build/Otya-test-signing.txt
+
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -n "$APKSIGNER" && test -x "$APKSIGNER" || { echo "ERROR: Android apksigner was not found"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee "$SIGNING_REPORT"
+
+          EXPECTED_SHA256="$(keytool -list -v \
+            -keystore android/app/keystore.jks \
+            -storepass "$STORE_PASSWORD" \
+            -alias "$KEY_ALIAS" \
+            | sed -n 's/^[[:space:]]*SHA256: //p' \
+            | head -n 1 \
+            | tr -d ':[:space:]' \
+            | tr '[:upper:]' '[:lower:]')"
+          ACTUAL_SHA256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$SIGNING_REPORT" \
+            | head -n 1 \
+            | tr -d ':[:space:]' \
+            | tr '[:upper:]' '[:lower:]')"
+
+          test -n "$EXPECTED_SHA256" || { echo "ERROR: could not read the expected signing certificate"; exit 1; }
+          test -n "$ACTUAL_SHA256" || { echo "ERROR: APK signing certificate was not reported"; exit 1; }
+          test "$EXPECTED_SHA256" = "$ACTUAL_SHA256" || {
+            echo "ERROR: test APK certificate does not match the configured Otya signing key"
+            exit 1
+          }
 
       - name: Save Otya test APK
         uses: actions/upload-artifact@v4
