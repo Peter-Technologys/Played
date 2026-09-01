@@ -33,7 +33,7 @@ void main() {
     final publisher = File('scripts/publish_r2.sh').readAsStringSync();
 
     final approvalIndex = publisher.indexOf(r'[ "$RELEASE_APPROVAL" = "PUBLISH" ]');
-    final firstUploadIndex = publisher.indexOf('upload_and_verify "$ARM64_APK"');
+    final firstUploadIndex = publisher.indexOf(r'upload_and_verify "$ARM64_APK"');
 
     expect(approvalIndex, greaterThanOrEqualTo(0));
     expect(firstUploadIndex, greaterThanOrEqualTo(0));
