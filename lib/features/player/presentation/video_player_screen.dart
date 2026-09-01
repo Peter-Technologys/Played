@@ -78,7 +78,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   Future<void> _initPip() async {
     _pipSupported = await PipService.instance.isPipSupported();
     _pipAutoEnabled = ref.read(settingsProvider).autoPip;
-    await PipService.instance.setVideoPlaying(playing: true);
+    await PipService.instance.setVideoPlaying(playing: _isPlaying);
     _pipInitialized = true;
   }
 
@@ -88,7 +88,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       OtyaDatabase.instance.saveSeekPosition(widget.mediaItem.id, _position);
     }
     if (!_pipInitialized) return;
-    if (state == AppLifecycleState.paused && _pipAutoEnabled && _pipSupported) {
+    if (state == AppLifecycleState.paused &&
+        _pipAutoEnabled &&
+        _pipSupported &&
+        _isPlaying) {
       PipService.instance.enterPip();
     }
   }
@@ -944,6 +947,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     });
     _playingSub = player.stream.playing.listen((playing) {
       if (mounted) setState(() => _isPlaying = playing);
+      if (_pipInitialized) {
+        unawaited(PipService.instance.setVideoPlaying(playing: playing));
+      }
     });
   }
 
