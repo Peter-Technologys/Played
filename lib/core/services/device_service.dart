@@ -85,7 +85,7 @@ class DeviceService {
         'android_version': androidVersion,
         'app_version': packageInfo.version,
         'app_build': int.tryParse(currentBuild) ?? 0,
-        'arch': _detectArch(),
+        'arch': Environment.appArch,
         'locale': Platform.localeName,
       });
 
@@ -107,10 +107,5 @@ class DeviceService {
     } catch (e) {
       debugPrint('[DeviceService] error (non-fatal): $e');
     }
-  }
-
-  String _detectArch() {
-    const arch = String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
-    return arch;
   }
 }
