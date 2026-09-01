@@ -94,7 +94,7 @@ void main() {
     ).readAsStringSync();
 
     expect(receiver, contains("uri.path != '/media'"));
-    expect(receiver, contains("RegExp(r'^[a-f0-9]{64}$')"));
+    expect(receiver, contains(r"RegExp(r'^[a-f0-9]{64}$')"));
     expect(receiver, contains('FileMode.append'));
     expect(receiver, contains('.otya-transfer'));
     expect(receiver, contains('TransferCancelledException'));
