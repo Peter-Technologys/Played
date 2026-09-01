@@ -10,13 +10,21 @@ void main() {
     expect(source, contains('bool _listenersAttached = false;'));
     expect(source, contains('final existing = _initInFlight;'));
     expect(source, contains('if (existing != null) return existing;'));
-    expect(
-      source.indexOf(
-        'if (!await FirebasePlatformService.instance.ensureInitialized()) return;',
-      ),
-      lessThan(source.indexOf('_initialized = true;', source.indexOf('Future<void> _initOnce()'))),
-      reason: 'A transient Firebase init failure must remain retryable.',
+
+    final ensureIndex = source.indexOf(
+      'if (!await FirebasePlatformService.instance.ensureInitialized()) return;',
     );
+    final listenerGuardIndex = source.indexOf(
+      'if (!_listenersAttached) {',
+      ensureIndex,
+    );
+    final initializedIndex = source.indexOf(
+      '_initialized = true;',
+      listenerGuardIndex,
+    );
+    expect(ensureIndex, greaterThanOrEqualTo(0));
+    expect(listenerGuardIndex, greaterThan(ensureIndex));
+    expect(initializedIndex, greaterThan(listenerGuardIndex));
   });
 
   test('FCM stream listeners attach at most once across retries', () {
@@ -28,9 +36,10 @@ void main() {
   });
 
   test('token sync failure does not tear down initialized FCM transport', () {
-    final initialized = source.indexOf('_initialized = true;', source.indexOf('if (!_listenersAttached)'));
+    final listenerGuard = source.indexOf('if (!_listenersAttached) {');
+    final initialized = source.indexOf('_initialized = true;', listenerGuard);
     final getToken = source.indexOf('final token = await messaging.getToken();');
-    expect(initialized, greaterThanOrEqualTo(0));
+    expect(initialized, greaterThan(listenerGuard));
     expect(getToken, greaterThan(initialized));
     expect(source, contains('initial token sync failed (non-fatal)'));
   });
