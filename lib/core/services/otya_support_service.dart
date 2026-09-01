@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -23,6 +24,61 @@ class OtyaSupportReply {
     this.modelId,
     this.modelName,
   });
+}
+
+class OtyaSupportStreamEvent {
+  const OtyaSupportStreamEvent._({
+    required this.type,
+    this.delta,
+    this.modelId,
+    this.modelName,
+    this.error,
+    this.complete = false,
+  });
+
+  final String type;
+  final String? delta;
+  final String? modelId;
+  final String? modelName;
+  final String? error;
+  final bool complete;
+
+  bool get isDelta => type == 'delta' && delta != null && delta!.isNotEmpty;
+  bool get isError => type == 'error';
+  bool get isDone => type == 'done';
+
+  factory OtyaSupportStreamEvent.fromJson(Map<String, dynamic> json) =>
+      OtyaSupportStreamEvent._(
+        type: '${json['type'] ?? ''}',
+        delta: json['delta']?.toString(),
+        modelId: json['model']?.toString(),
+        modelName: json['model_name']?.toString(),
+        error: json['error']?.toString(),
+        complete: json['complete'] == true,
+      );
+
+  factory OtyaSupportStreamEvent.delta(
+    String text, {
+    String? modelId,
+    String? modelName,
+  }) =>
+      OtyaSupportStreamEvent._(
+        type: 'delta',
+        delta: text,
+        modelId: modelId,
+        modelName: modelName,
+      );
+
+  factory OtyaSupportStreamEvent.done({
+    String? modelId,
+    String? modelName,
+  }) =>
+      OtyaSupportStreamEvent._(
+        type: 'done',
+        modelId: modelId,
+        modelName: modelName,
+        complete: true,
+      );
 }
 
 class OtyaAiModel {
@@ -64,6 +120,7 @@ class OtyaSupportService {
 
   static const _guestKey = 'otya_support_guest_id_v1';
   static const _timeout = Duration(seconds: 35);
+  static const _connectTimeout = Duration(seconds: 12);
 
   http.Client get _client => AppHttpClient.instance.client;
   Uri get _uri => Uri.parse('${Environment.workerUrl}/api/ai/chat');
@@ -88,6 +145,30 @@ class OtyaSupportService {
         if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
       },
     );
+  }
+
+  List<Map<String, String>> _safeHistory(List<Map<String, String>> history) =>
+      history
+          .where((entry) {
+            final role = entry['role'];
+            final content = entry['content']?.trim() ?? '';
+            return (role == 'user' || role == 'assistant') && content.isNotEmpty;
+          })
+          .toList(growable: false);
+
+  Future<Map<String, dynamic>> _chatBody(
+    String question, {
+    List<Map<String, String>> history = const <Map<String, String>>[],
+    String? model,
+  }) async {
+    final safeHistory = _safeHistory(history);
+    return <String, dynamic>{
+      'message': question.trim(),
+      'guest_id': await _guestId(),
+      'surface': 'android-assistant',
+      if (safeHistory.isNotEmpty) 'history': safeHistory,
+      if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+    };
   }
 
   /// Returns only models allowed by the server policy. The server-selected
@@ -127,30 +208,109 @@ class OtyaSupportService {
     return List<OtyaAiModel>.unmodifiable(result);
   }
 
+  /// Requests Next's incremental SSE transport. During rollout, older servers
+  /// may still answer with the established JSON shape; that response is safely
+  /// converted into one delta + done pair so the Android client never depends
+  /// on an atomic server/client cutover.
+  Stream<OtyaSupportStreamEvent> askStream(
+    String question, {
+    List<Map<String, String>> history = const <Map<String, String>>[],
+    String? model,
+  }) async* {
+    final body = await _chatBody(question, history: history, model: model);
+    final headers = await _headers();
+    headers['Accept'] = 'text/event-stream';
+
+    final request = http.Request('POST', _uri)
+      ..headers.addAll(headers)
+      ..body = jsonEncode(body);
+
+    final response = await _client.send(request).timeout(_connectTimeout);
+    final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final text = await response.stream.bytesToString().timeout(_timeout);
+      Map<String, dynamic> data = const <String, dynamic>{};
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is Map) {
+          data = decoded.map((key, value) => MapEntry('$key', value));
+        }
+      } catch (_) {}
+      throw StateError(_error(data, 'Next is unavailable right now.'));
+    }
+
+    if (!contentType.contains('text/event-stream')) {
+      final text = await response.stream.bytesToString().timeout(_timeout);
+      Map<String, dynamic> data = const <String, dynamic>{};
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is Map) {
+          data = decoded.map((key, value) => MapEntry('$key', value));
+        }
+      } catch (_) {}
+      final answer = '${data['answer'] ?? ''}'.trim();
+      if (answer.isEmpty) {
+        throw StateError(_error(data, 'Next returned an empty response.'));
+      }
+      yield OtyaSupportStreamEvent.delta(
+        answer,
+        modelId: data['model']?.toString(),
+        modelName: data['model_name']?.toString(),
+      );
+      yield OtyaSupportStreamEvent.done(
+        modelId: data['model']?.toString(),
+        modelName: data['model_name']?.toString(),
+      );
+      return;
+    }
+
+    var sawDone = false;
+    await for (final line in response.stream
+        .transform(utf8.decoder)
+        .transform(const LineSplitter())
+        .timeout(_timeout)) {
+      if (!line.startsWith('data:')) continue;
+      final payload = line.substring(5).trim();
+      if (payload.isEmpty || payload == '[DONE]') continue;
+      Map<String, dynamic> data;
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is! Map) continue;
+        data = decoded.map((key, value) => MapEntry('$key', value));
+      } catch (_) {
+        continue;
+      }
+      final event = OtyaSupportStreamEvent.fromJson(data);
+      if (event.type.isEmpty) continue;
+      if (event.isDone) sawDone = true;
+      if (event.isError) {
+        throw StateError(
+          event.error?.trim().isNotEmpty == true
+              ? event.error!
+              : 'Next stopped responding. Please try again.',
+        );
+      }
+      yield event;
+    }
+
+    if (!sawDone) {
+      yield OtyaSupportStreamEvent.done();
+    }
+  }
+
   Future<OtyaSupportReply> ask(
     String question, {
     List<Map<String, String>> history = const <Map<String, String>>[],
     String? model,
   }) async {
-    final safeHistory = history
-        .where((entry) {
-          final role = entry['role'];
-          final content = entry['content']?.trim() ?? '';
-          return (role == 'user' || role == 'assistant') && content.isNotEmpty;
-        })
-        .toList(growable: false);
-
     final response = await _client
         .post(
           _uri,
           headers: await _headers(),
-          body: jsonEncode({
-            'message': question.trim(),
-            'guest_id': await _guestId(),
-            'surface': 'android-assistant',
-            if (safeHistory.isNotEmpty) 'history': safeHistory,
-            if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
-          }),
+          body: jsonEncode(
+            await _chatBody(question, history: history, model: model),
+          ),
         )
         .timeout(_timeout);
     final data = _decode(response);
