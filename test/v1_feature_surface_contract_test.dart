@@ -43,7 +43,9 @@ void main() {
       expect(source, contains("'$route'"), reason: '$route must stay wired');
     }
 
-    expect(source, contains("title: 'Next'"), reason: 'Next must stay visible from Me');
+    expect(source, contains('_NextCard(onTap:'), reason: 'Me must keep a dedicated Next card');
+    expect(source, contains("context.push('/support')"), reason: 'The Next card must open Next');
+    expect(source, contains("Text('Next'"), reason: 'Next must stay visibly named in Me');
     expect(source, contains("title: 'Trim video'"), reason: 'Trim must stay reachable');
     expect(source, contains("title: 'Equalizer'"), reason: 'Equalizer must stay reachable');
   });
