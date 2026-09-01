@@ -21,6 +21,24 @@ void main() {
     expect(source, isNot(contains(r'keytool -printcert -jarfile "$APK"')));
   });
 
+  test('production release tag must match pubspec version', () {
+    final source = File('.github/workflows/release.yml').readAsStringSync();
+
+    expect(source, contains('Check release version matches app'));
+    expect(source, contains('APP_VERSION='));
+    expect(source, contains('VERSION_NAME='));
+    expect(source, contains('BUILD_NUMBER='));
+    expect(source, contains('EXPECTED_VERSION='));
+    expect(
+      source,
+      contains('does not match pubspec version'),
+    );
+    expect(
+      source,
+      contains('release build number must be a positive integer'),
+    );
+  });
+
   test('production release verifies both APK signers before publication', () {
     final source = File('.github/workflows/release.yml').readAsStringSync();
 
