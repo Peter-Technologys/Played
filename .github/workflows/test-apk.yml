@@ -124,7 +124,7 @@ jobs:
             | head -n 1 \
             | tr -d ':[:space:]' \
             | tr '[:upper:]' '[:lower:]')"
-          ACTUAL_SHA256="$(sed -n 's/^Signer #1 certificate SHA-256 digest: //p' "$SIGNING_REPORT" \
+          ACTUAL_SHA256="$(sed -n 's/^.*certificate SHA-256 digest: //p' "$SIGNING_REPORT" \
             | head -n 1 \
             | tr -d ':[:space:]' \
             | tr '[:upper:]' '[:lower:]')"
