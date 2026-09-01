@@ -18,7 +18,7 @@ void main() {
     final source = File('lib/features/tools/whatsapp_trimmer_screen.dart')
         .readAsStringSync();
 
-    expect(source, contains("'${clipLength.round()} sec'"));
+    expect(source, contains(r"'${clipLength.round()} sec'"));
     expect(source, contains('status == TrimStatus.trimming || clipLength <= 0'));
     expect(source, contains('max: maxStart'));
   });
