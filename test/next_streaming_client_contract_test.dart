@@ -22,6 +22,34 @@ void main() {
     expect(service, contains('.timeout(_timeout)'));
   });
 
+  test('Next starts independent request preflight work in parallel', () {
+    expect(
+      service,
+      contains('final authTokenFuture = AuthService.instance.getValidToken();'),
+    );
+    expect(
+      service,
+      contains(
+        'final appCheckTokenFuture = FirebasePlatformService.instance.appCheckToken();',
+      ),
+    );
+    expect(service, contains('final bodyFuture = _chatBody('));
+    expect(service, contains('final headersFuture = _headers();'));
+    expect(
+      service.indexOf('final authTokenFuture = AuthService.instance.getValidToken();'),
+      lessThan(service.indexOf('final token = await authTokenFuture;')),
+    );
+    expect(
+      service.indexOf('final appCheckTokenFuture = FirebasePlatformService.instance.appCheckToken();'),
+      lessThan(service.indexOf('final token = await authTokenFuture;')),
+    );
+    expect(
+      service,
+      isNot(contains('return FirebasePlatformService.instance.protectedHeaders(')),
+      reason: 'Next must not serialize App Check behind auth refresh.',
+    );
+  });
+
   test('Next screen paints incremental deltas instead of waiting for completion', () {
     expect(screen, contains('await for (final event in _service.askStream('));
     expect(screen, contains('answer += event.delta!'));
