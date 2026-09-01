@@ -99,15 +99,35 @@ Future<void> _initBackground(
   AppSettings savedSettings,
   bool databaseReady,
 ) async {
-  // Playback platform comes first so a song started immediately after launch
-  // gets a real Android MediaSession/foreground-service notification.
+  // Playback platform stays first. A song started immediately after launch must
+  // always get the real Android MediaSession/foreground-service notification.
   await _safeBackground('playback platform', _initPlaybackPlatform);
-  await _safeBackground('notifications', _initNotifications);
-  await _safeBackground('storage', StorageFolderService.instance.ensureCreated);
-  await _safeBackground('connectivity', ConnectivityService.instance.init);
-  await _safeBackground('cache', CacheService.instance.init);
 
-  unawaited(_safeBackground('cache eviction', CacheService.instance.evictExpired));
+  PipService.listenForNativePause(
+    () => PlaybackCoordinator.instance.activePlayer?.pause(),
+    () => PlaybackCoordinator.instance.activePlayer?.play(),
+  );
+
+  // These services are independent once the playback platform exists. Running
+  // them together reduces post-first-frame readiness time from the sum of their
+  // startup costs to approximately the slowest individual initializer.
+  final notificationsReady =
+      _safeBackground('notifications', _initNotifications);
+  final storageReady =
+      _safeBackground('storage', StorageFolderService.instance.ensureCreated);
+  final connectivityReady =
+      _safeBackground('connectivity', ConnectivityService.instance.init);
+  final cacheReady = _safeBackground('cache', CacheService.instance.init);
+  final audioSessionReady = _safeBackground(
+    'audio session',
+    () => AudioSessionService.instance.init(
+      pauseDuringCalls: savedSettings.pauseDuringCalls,
+    ),
+  );
+  final firebaseReady = _safeBackground(
+    'Firebase platform',
+    FirebasePlatformService.instance.initOptionalServices,
+  );
 
   if (databaseReady) {
     unawaited(
@@ -115,27 +135,35 @@ Future<void> _initBackground(
     );
   }
 
+  // Follow-up work starts as soon as its own dependency is ready instead of
+  // waiting for unrelated services such as Firebase or notification setup.
   unawaited(
-    _safeBackground('update check', UpdateService.instance.checkAndNotify),
+    cacheReady.then(
+      (_) => _safeBackground('cache eviction', CacheService.instance.evictExpired),
+    ),
   );
-
-  PipService.listenForNativePause(
-    () => PlaybackCoordinator.instance.activePlayer?.pause(),
-    () => PlaybackCoordinator.instance.activePlayer?.play(),
+  unawaited(
+    connectivityReady.then(
+      (_) => _safeBackground('update check', UpdateService.instance.checkAndNotify),
+    ),
   );
-
-  await _safeBackground(
-    'audio session',
-    () => AudioSessionService.instance.init(
-      pauseDuringCalls: savedSettings.pauseDuringCalls,
+  unawaited(
+    firebaseReady.then(
+      (_) => _safeBackground('FCM', FcmService.instance.init),
     ),
   );
 
-  await _safeBackground(
-    'Firebase platform',
-    FirebasePlatformService.instance.initOptionalServices,
-  );
-  unawaited(_safeBackground('FCM', FcmService.instance.init));
+  // Keep _initBackground meaningful for diagnostics/tests: it completes only
+  // when the independent readiness group has settled, while each initializer
+  // still owns and reports its own failures through _safeBackground.
+  await Future.wait<void>([
+    notificationsReady,
+    storageReady,
+    connectivityReady,
+    cacheReady,
+    audioSessionReady,
+    firebaseReady,
+  ]);
 }
 
 Future<void> _initPlaybackPlatform() async {
