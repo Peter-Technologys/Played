@@ -21,6 +21,7 @@ class MediaNotificationService {
   bool _initialized = false;
   String? _lastArtworkKey;
   Uri? _lastArtworkUri;
+  int _metadataGeneration = 0;
 
   void Function()? onSkipPrevious;
   void Function()? onSkipNext;
@@ -103,8 +104,10 @@ class MediaNotificationService {
     required bool isPlaying,
     String? albumArtPath,
   }) async {
+    final generation = ++_metadataGeneration;
     if (!_initialized) await init();
     final artUri = await _stableArtUri(albumArtPath, id);
+    if (generation != _metadataGeneration) return;
     AudioHandlerSingleton.instance.setMediaItem(
       id: id,
       title: title,
@@ -121,6 +124,7 @@ class MediaNotificationService {
     required bool isPlaying,
     required Uint8List albumArtBytes,
   }) async {
+    final generation = ++_metadataGeneration;
     if (!_initialized) await init();
     Uri? artUri;
     try {
@@ -133,6 +137,7 @@ class MediaNotificationService {
     } catch (e) {
       debugPrint('[MediaNotification] bitmap cache failed: $e');
     }
+    if (generation != _metadataGeneration) return;
     AudioHandlerSingleton.instance.setMediaItem(
       id: id,
       title: title,
@@ -147,6 +152,7 @@ class MediaNotificationService {
   }
 
   Future<void> dismiss() async {
+    ++_metadataGeneration;
     _lastArtworkKey = null;
     _lastArtworkUri = null;
     AudioHandlerSingleton.instance.clearMediaItem();
