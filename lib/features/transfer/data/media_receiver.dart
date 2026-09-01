@@ -58,10 +58,32 @@ class MediaReceiver {
       final response = await request.close();
       if (response.statusCode == HttpStatus.requestedRangeNotSatisfiable &&
           existingBytes > 0) {
-        debugPrint('[MediaReceiver] Existing partial already satisfies transfer.');
-        onProgress?.call(existingBytes, existingBytes);
-        await _deleteSidecar(sidecar);
-        return saveFile;
+        final remoteLength = _lengthFromUnsatisfiedRange(response);
+        await response.drain<void>();
+        if (remoteLength != null && existingBytes == remoteLength) {
+          debugPrint(
+            '[MediaReceiver] Existing partial exactly matches remote transfer.',
+          );
+          onProgress?.call(existingBytes, existingBytes);
+          await _deleteSidecar(sidecar);
+          return saveFile;
+        }
+
+        // A 416 only proves the requested offset is outside the sender's
+        // current file. It does not prove our local partial is complete. If
+        // the lengths do not match (or the sender omitted the total length),
+        // discard the suspect partial and restart instead of blessing corrupt
+        // bytes as a finished transfer.
+        debugPrint(
+          '[MediaReceiver] Resume offset is invalid; restarting transfer.',
+        );
+        if (await saveFile.exists()) await saveFile.delete();
+        await sidecar.writeAsString(fingerprint, flush: true);
+        return download(
+          url: url,
+          savePath: saveFile.path,
+          onProgress: onProgress,
+        );
       }
       if (response.statusCode != HttpStatus.ok &&
           response.statusCode != HttpStatus.partialContent) {
@@ -113,6 +135,14 @@ class MediaReceiver {
     } finally {
       client.close(force: true);
     }
+  }
+
+  int? _lengthFromUnsatisfiedRange(HttpClientResponse response) {
+    final header = response.headers.value(HttpHeaders.contentRangeHeader);
+    if (header == null) return null;
+    final match = RegExp(r'^bytes \*/(\d+)$').firstMatch(header.trim());
+    if (match == null) return null;
+    return int.tryParse(match.group(1)!);
   }
 
   bool _isAllowedTransferUri(Uri uri) {
