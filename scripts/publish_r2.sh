@@ -6,6 +6,18 @@ set -euo pipefail
 RAW_TAG="${RELEASE_TAG:-${CI_COMMIT_TAG:-${GITHUB_REF_NAME:-}}}"
 [ -n "$RAW_TAG" ] || { echo "ERROR: No release tag found"; exit 1; }
 [[ "$RAW_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: Invalid release tag '$RAW_TAG'"; exit 1; }
+
+RELEASE_APPROVAL="${RELEASE_APPROVAL:-}"
+RELEASE_CONFIRM_TAG="${RELEASE_CONFIRM_TAG:-}"
+[ "$RELEASE_APPROVAL" = "PUBLISH" ] || {
+  echo "ERROR: Explicit release publication approval is required"
+  exit 1
+}
+[ "$RELEASE_CONFIRM_TAG" = "$RAW_TAG" ] || {
+  echo "ERROR: Release confirmation tag does not match $RAW_TAG"
+  exit 1
+}
+
 VERSION="${RAW_TAG#v}"
 
 PUBSPEC_VERSION=$(awk '/^version:/ {print $2; exit}' pubspec.yaml)
@@ -70,7 +82,7 @@ ARM32_VERSIONED="releases/${RAW_TAG}/Otya-arm32.apk"
 upload_and_verify "$ARM64_APK" "$ARM64_VERSIONED" "public, max-age=31536000, immutable"
 upload_and_verify "$ARM32_APK" "$ARM32_VERSIONED" "public, max-age=31536000, immutable"
 
-export RAW_TAG VERSION VERSION_CODE MIN_SDK TARGET_SDK WORKER_URL CHANGELOG_FILE ARM64_VERSIONED ARM32_VERSIONED OTYA_STORE_ADMIN_TOKEN
+export RAW_TAG VERSION VERSION_CODE MIN_SDK TARGET_SDK WORKER_URL CHANGELOG_FILE ARM64_VERSIONED ARM32_VERSIONED OTYA_STORE_ADMIN_TOKEN RELEASE_APPROVAL RELEASE_CONFIRM_TAG
 WORKFLOW_ID=$(python3 - <<'PYEOF'
 import json, os, sys, urllib.request, urllib.error
 with open(os.environ['CHANGELOG_FILE']) as f:
@@ -85,6 +97,8 @@ payload = {
     'minSdk': int(os.environ['MIN_SDK']),
     'targetSdk': int(os.environ['TARGET_SDK']),
     'workerUrl': os.environ['WORKER_URL'],
+    'approval': os.environ['RELEASE_APPROVAL'],
+    'confirmTag': os.environ['RELEASE_CONFIRM_TAG'],
 }
 req = urllib.request.Request(
     os.environ['WORKER_URL'] + '/api/admin/release-workflow',
