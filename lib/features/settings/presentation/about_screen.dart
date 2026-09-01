@@ -74,8 +74,8 @@ class _AboutScreenState extends State<AboutScreen> {
             children: [
               _NavTile(
                 icon: Icons.auto_awesome_rounded,
-                label: 'Ask OTYA',
-                subtitle: 'Help with OTYA features, playback and problems',
+                label: 'Next',
+                subtitle: 'Help with Otya features, playback and problems',
                 color: AppColors.accentViolet,
                 onTap: () => context.push('/support'),
               ),
@@ -83,18 +83,18 @@ class _AboutScreenState extends State<AboutScreen> {
               _NavTile(
                 icon: Icons.bug_report_outlined,
                 label: 'Report a problem',
-                subtitle: 'Send a problem report to OTYA Support',
+                subtitle: 'Send a problem report to Otya Support',
                 color: AppColors.accentAmber,
                 onTap: () => _launchEmail(
                   context,
-                  subject: 'OTYA Player Problem Report',
+                  subject: 'Otya problem report',
                 ),
               ),
               _Divider(),
               _NavTile(
                 icon: Icons.email_outlined,
                 label: 'Email support',
-                subtitle: 'support@petersmartlink.com',
+                subtitle: Environment.supportEmail,
                 color: AppColors.accent,
                 onTap: () => _launchEmail(context),
               ),
@@ -107,12 +107,12 @@ class _AboutScreenState extends State<AboutScreen> {
             children: [
               _NavTile(
                 icon: Icons.language_rounded,
-                label: 'OTYA website',
+                label: 'Otya website',
                 subtitle: 'Official product website',
                 color: AppColors.accent,
                 onTap: () => context.push(
                   '/webview',
-                  extra: {'url': Environment.websiteUrl, 'title': 'OTYA'},
+                  extra: {'url': Environment.websiteUrl, 'title': 'Otya'},
                 ),
               ),
               _Divider(),
@@ -123,14 +123,14 @@ class _AboutScreenState extends State<AboutScreen> {
                 color: AppColors.accentViolet,
                 onTap: () => context.push(
                   '/webview',
-                  extra: {'url': Environment.docsUrl, 'title': 'OTYA Docs'},
+                  extra: {'url': Environment.docsUrl, 'title': 'Otya Help & docs'},
                 ),
               ),
               _Divider(),
               _NavTile(
                 icon: Icons.system_update_outlined,
                 label: 'Check for updates',
-                subtitle: 'Check for a newer OTYA version',
+                subtitle: 'Check for a newer Otya version',
                 color: AppColors.accent,
                 onTap: () => _checkForUpdates(context),
               ),
@@ -145,8 +145,8 @@ class _AboutScreenState extends State<AboutScreen> {
               _Divider(),
               _NavTile(
                 icon: Icons.share_rounded,
-                label: 'Share OTYA',
-                subtitle: 'Send OTYA to a friend',
+                label: 'Share Otya',
+                subtitle: 'Send Otya to a friend',
                 color: AppColors.accentGreen,
                 onTap: () => _shareApp(context),
               ),
@@ -154,15 +154,29 @@ class _AboutScreenState extends State<AboutScreen> {
               _NavTile(
                 icon: Icons.privacy_tip_outlined,
                 label: 'Privacy',
-                subtitle: 'How OTYA handles your data',
+                subtitle: 'How Otya handles your data',
                 color: AppColors.textSecondary,
                 onTap: () => context.push('/privacy'),
               ),
               _Divider(),
               _NavTile(
+                icon: Icons.gavel_outlined,
+                label: 'Terms of Service',
+                subtitle: 'Terms that govern use of Otya services',
+                color: AppColors.textSecondary,
+                onTap: () => context.push(
+                  '/webview',
+                  extra: {
+                    'url': '${Environment.publicSiteUrl}/terms',
+                    'title': 'Terms of Service',
+                  },
+                ),
+              ),
+              _Divider(),
+              _NavTile(
                 icon: Icons.star_outline_rounded,
-                label: 'Rate OTYA',
-                subtitle: 'Send your rating directly to OTYA',
+                label: 'Rate Otya',
+                subtitle: 'Send your rating directly to Otya',
                 color: AppColors.accentAmber,
                 onTap: () => RateUsSheet.show(context),
               ),
@@ -171,7 +185,7 @@ class _AboutScreenState extends State<AboutScreen> {
           const SizedBox(height: 32),
           Center(
             child: Text(
-              _version.isEmpty ? 'OTYA' : 'OTYA v$_version',
+              _version.isEmpty ? 'Otya' : 'Otya v$_version',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textMuted,
@@ -245,11 +259,11 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _launchEmail(
     BuildContext context, {
-    String subject = 'OTYA Player Support',
+    String subject = 'Otya support',
   }) async {
     final uri = Uri(
       scheme: 'mailto',
-      path: 'support@petersmartlink.com',
+      path: Environment.supportEmail,
       queryParameters: {'subject': subject},
     );
     if (!await launchUrl(uri) && context.mounted) {
@@ -266,8 +280,8 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final info = await PackageInfo.fromPlatform();
       await Share.share(
-        'Download OTYA v${info.version} — an offline-first media player for Android:\n${Environment.downloadPageUrl}',
-        subject: 'OTYA',
+        'Download Otya v${info.version} — an offline-first media player for Android:\n${Environment.downloadPageUrl}',
+        subject: 'Otya',
       );
     } catch (_) {
       if (!context.mounted) return;
@@ -312,7 +326,7 @@ class _AppCard extends StatelessWidget {
               const OtyaMark(size: 72),
               const SizedBox(height: 16),
               const Text(
-                'OTYA',
+                'Otya',
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
@@ -354,7 +368,7 @@ class _AppCard extends StatelessWidget {
               ),
               const SizedBox(height: 8),
               const Text(
-                'support@petersmartlink.com',
+                Environment.supportEmail,
                 style: TextStyle(
                   fontSize: 12,
                   color: AppColors.textSecondary,
