@@ -1,0 +1,18 @@
+name: otya_media_tools
+description: Private local Android media muxing for OTYA.
+version: 1.0.0
+publish_to: 'none'
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.petersmartlink.otya_media_tools
+        pluginClass: OtyaMediaToolsPlugin
