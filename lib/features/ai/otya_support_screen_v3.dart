@@ -27,31 +27,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
   final _service = OtyaSupportService.instance;
   final List<_ChatEntry> _messages = <_ChatEntry>[];
 
-  List<OtyaAiModel> _models = const [];
-  OtyaAiModel? _selectedModel;
   bool _busy = false;
-  bool _loadingModels = true;
-  String? _activeModelName;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadModels();
-  }
-
-  Future<void> _loadModels() async {
-    try {
-      final models = await _service.models();
-      if (!mounted) return;
-      setState(() {
-        _models = models;
-        _selectedModel = models.isEmpty ? null : models.first;
-        _loadingModels = false;
-      });
-    } catch (_) {
-      if (mounted) setState(() => _loadingModels = false);
-    }
-  }
 
   Future<void> _ask([String? preset]) async {
     final question = (preset ?? _controller.text).trim();
@@ -75,18 +51,12 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
     _scrollToBottom();
 
     var answer = '';
-    String? modelId;
     try {
       await for (final event in _service.askStream(
         question,
         history: history,
-        model: _selectedModel?.id,
       )) {
         if (!mounted) return;
-        modelId = event.modelId ?? modelId;
-        if (event.modelName?.trim().isNotEmpty == true) {
-          _activeModelName = event.modelName;
-        }
         if (event.isDelta) {
           answer += event.delta!;
           setState(() {
@@ -104,14 +74,6 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
             fromUser: false,
           );
         });
-      }
-      if (modelId != null) {
-        for (final candidate in _models) {
-          if (candidate.id == modelId) {
-            _selectedModel = candidate;
-            break;
-          }
-        }
       }
     } catch (_) {
       if (!mounted) return;
@@ -232,7 +194,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
     final colors = Theme.of(context).colorScheme;
     final status = _busy
         ? (_messages.isNotEmpty && !_messages.last.fromUser && _messages.last.text.isNotEmpty ? 'Responding…' : 'Thinking…')
-        : (_activeModelName ?? _selectedModel?.name ?? (_loadingModels ? 'Connecting…' : 'Ready'));
+        : 'Ready';
 
     return Scaffold(
       appBar: AppBar(
@@ -245,14 +207,6 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
           ]),
         ]),
         actions: [
-          if (_models.length > 1)
-            PopupMenuButton<String>(
-              tooltip: 'Choose Next model',
-              enabled: !_busy,
-              icon: const Icon(Icons.tune_rounded),
-              onSelected: (id) => setState(() => _selectedModel = _models.firstWhere((m) => m.id == id)),
-              itemBuilder: (_) => _models.map((m) => PopupMenuItem(value: m.id, child: Text(m.name))).toList(growable: false),
-            ),
           if (_messages.isNotEmpty)
             IconButton(tooltip: 'New chat', onPressed: _busy ? null : _newChat, icon: const Icon(Icons.edit_square)),
         ],
