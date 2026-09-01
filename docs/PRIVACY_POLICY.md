@@ -1,72 +1,29 @@
-# Privacy Policy — Played
+# Otya Privacy Policy — release preparation notice
 
-**Last updated:** January 2024
+**This repository file is not the final public Privacy Policy.**
 
----
+The former `Played` privacy policy was archived at [`docs/archive/PLAYED_PRIVACY_POLICY_2024.md`](archive/PLAYED_PRIVACY_POLICY_2024.md) because it no longer describes the current Otya application.
 
-## Overview
+Otya `1.0.0+1` is still in final pre-release acceptance. The final public Privacy Policy must be published from one canonical public URL and reconciled with the verified production data flows before v1 is released.
 
-Played is an **offline-first** media player. We are committed to your privacy.
+Engineering inventory: [`PRIVACY_DATA_INVENTORY.md`](PRIVACY_DATA_INVENTORY.md)
 
----
+Public-information rules: [`PUBLIC_SURFACE_GOVERNANCE.md`](PUBLIC_SURFACE_GOVERNANCE.md)
 
-## Data We Collect
+## Release blocker
 
-**We do not collect any personal data.**
+Do not link this repository notice from the Play Store or present it to users as legal acceptance text.
 
-All data processed by Played stays on your device:
+Before release, the canonical Otya Privacy Policy must accurately cover the live app, website and backend, including as applicable:
+- Otya account and authentication data;
+- device registration and Firebase Cloud Messaging;
+- Otya crash reporting;
+- Firebase Analytics / Performance / App Check production configuration;
+- Next request processing and verified AI-provider retention/training terms;
+- Google Sign-In and user-initiated Google Drive recovery;
+- online-music providers enabled in production;
+- support/email/website data flows;
+- account deletion and any retained data/retention periods;
+- the actual Android permissions in the release build.
 
-| Data | Where it's stored | Shared? |
-|---|---|---|
-| Media file metadata (title, artist, duration) | Local Hive database | ❌ Never |
-| Playback history & seek positions | Local Hive database | ❌ Never |
-| Vault media (encrypted) | App private directory | ❌ Never |
-| Settings & preferences | Local Hive database | ❌ Never |
-| Stem split results (Studio) | Local cache directory | ❌ Never |
-
----
-
-## Permissions
-
-| Permission | Why it's needed |
-|---|---|
-| `READ_EXTERNAL_STORAGE` / `READ_MEDIA_*` | Scan device for audio & video files |
-| `WRITE_EXTERNAL_STORAGE` | Save trimmed/extracted files to Downloads |
-| `USE_BIOMETRIC` / `USE_FINGERPRINT` | Vault biometric unlock |
-| `NEARBY_WIFI_DEVICES` / `BLUETOOTH` | Air-Drop file sharing |
-| `POST_NOTIFICATIONS` | Now-playing media notification |
-| `INTERNET` | Fetch lyrics (lyrics.ovh API) · Studio stem splitting API |
-
----
-
-## Third-Party Services
-
-| Service | Purpose | Data sent |
-|---|---|---|
-| lyrics.ovh | Fetch song lyrics | Song title + artist name only |
-| Spleeter/Demucs API | Audio stem splitting | Audio file (only when you use Studio) |
-| Google Mobile Ads | Non-intrusive banner ads | Standard ad identifiers (can be opted out) |
-
----
-
-## Air-Drop
-
-Files shared via Air-Drop are transferred **directly device-to-device** using Wi-Fi Direct and Bluetooth. No data passes through any server.
-
----
-
-## Children's Privacy
-
-Played is not directed at children under 13. We do not knowingly collect data from children.
-
----
-
-## Changes to This Policy
-
-Any changes will be reflected in the app and in this document with an updated date.
-
----
-
-## Contact
-
-For privacy questions, contact the maintainer via [GitLab](https://gitlab.com/apk-v1).
+The policy must have one title, effective date, document version, scope, contact path and canonical URL. Signup consent, the in-app privacy link, the website and Google Play Data safety disclosures must agree with that same version.
