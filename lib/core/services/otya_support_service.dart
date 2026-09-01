@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:math';
 
@@ -23,6 +24,43 @@ class OtyaSupportReply {
     this.modelId,
     this.modelName,
   });
+}
+
+class OtyaSupportStreamEvent {
+  const OtyaSupportStreamEvent._({
+    required this.type,
+    this.delta,
+    this.modelId,
+    this.modelName,
+    this.error,
+    this.complete = false,
+  });
+
+  final String type;
+  final String? delta;
+  final String? modelId;
+  final String? modelName;
+  final String? error;
+  final bool complete;
+
+  bool get isDelta => type == 'delta' && delta != null && delta!.isNotEmpty;
+  bool get isError => type == 'error';
+  bool get isDone => type == 'done';
+
+  factory OtyaSupportStreamEvent.fromJson(Map<String, dynamic> json) => OtyaSupportStreamEvent._(
+        type: '${json['type'] ?? ''}',
+        delta: json['delta']?.toString(),
+        modelId: json['model']?.toString(),
+        modelName: json['model_name']?.toString(),
+        error: json['error']?.toString(),
+        complete: json['complete'] == true,
+      );
+
+  factory OtyaSupportStreamEvent.delta(String text, {String? modelId, String? modelName}) =>
+      OtyaSupportStreamEvent._(type: 'delta', delta: text, modelId: modelId, modelName: modelName);
+
+  factory OtyaSupportStreamEvent.done({String? modelId, String? modelName}) =>
+      OtyaSupportStreamEvent._(type: 'done', modelId: modelId, modelName: modelName, complete: true);
 }
 
 class OtyaAiModel {
@@ -54,7 +92,6 @@ class OtyaAiModel {
 
 class OtyaSupportTicket {
   final String id;
-
   const OtyaSupportTicket(this.id);
 }
 
@@ -64,6 +101,7 @@ class OtyaSupportService {
 
   static const _guestKey = 'otya_support_guest_id_v1';
   static const _timeout = Duration(seconds: 35);
+  static const _connectTimeout = Duration(seconds: 12);
 
   http.Client get _client => AppHttpClient.instance.client;
   Uri get _uri => Uri.parse('${Environment.workerUrl}/api/ai/chat');
@@ -73,9 +111,7 @@ class OtyaSupportService {
     final existing = prefs.getString(_guestKey);
     if (existing != null && existing.length >= 16) return existing;
     final random = Random.secure();
-    final value = base64UrlEncode(
-      List<int>.generate(24, (_) => random.nextInt(256)),
-    ).replaceAll('=', '');
+    final value = base64UrlEncode(List<int>.generate(24, (_) => random.nextInt(256))).replaceAll('=', '');
     await prefs.setString(_guestKey, value);
     return value;
   }
@@ -90,15 +126,32 @@ class OtyaSupportService {
     );
   }
 
-  /// Returns only models allowed by the server policy. The server-selected
-  /// default is moved to the first position so UI code does not accidentally
-  /// make the guest/cheapest model the default for a signed-in account.
+  List<Map<String, String>> _safeHistory(List<Map<String, String>> history) => history
+      .where((entry) {
+        final role = entry['role'];
+        final content = entry['content']?.trim() ?? '';
+        return (role == 'user' || role == 'assistant') && content.isNotEmpty;
+      })
+      .toList(growable: false);
+
+  Future<Map<String, dynamic>> _chatBody(
+    String question, {
+    List<Map<String, String>> history = const <Map<String, String>>[],
+    String? model,
+  }) async {
+    final safeHistory = _safeHistory(history);
+    return <String, dynamic>{
+      'message': question.trim(),
+      'guest_id': await _guestId(),
+      'surface': 'android-assistant',
+      if (safeHistory.isNotEmpty) 'history': safeHistory,
+      if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
+    };
+  }
+
   Future<List<OtyaAiModel>> models() async {
     final response = await _client
-        .get(
-          _uri.replace(queryParameters: const {'models': '1'}),
-          headers: await _headers(),
-        )
+        .get(_uri.replace(queryParameters: const {'models': '1'}), headers: await _headers())
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -108,23 +161,77 @@ class OtyaSupportService {
     if (raw is! List) return const <OtyaAiModel>[];
     final result = raw
         .whereType<Map>()
-        .map(
-          (value) => OtyaAiModel.fromJson(
-            value.map((key, value) => MapEntry('$key', value)),
-          ),
-        )
+        .map((value) => OtyaAiModel.fromJson(value.map((key, value) => MapEntry('$key', value))))
         .where((model) => model.id.isNotEmpty)
         .toList(growable: true);
-
     final defaultId = '${data['default_model'] ?? ''}'.trim();
     if (defaultId.isNotEmpty) {
       final index = result.indexWhere((model) => model.id == defaultId);
-      if (index > 0) {
-        final preferred = result.removeAt(index);
-        result.insert(0, preferred);
-      }
+      if (index > 0) result.insert(0, result.removeAt(index));
     }
     return List<OtyaAiModel>.unmodifiable(result);
+  }
+
+  Stream<OtyaSupportStreamEvent> askStream(
+    String question, {
+    List<Map<String, String>> history = const <Map<String, String>>[],
+    String? model,
+  }) async* {
+    final body = await _chatBody(question, history: history, model: model);
+    final headers = await _headers();
+    headers['Accept'] = 'text/event-stream';
+    final request = http.Request('POST', _uri)
+      ..headers.addAll(headers)
+      ..body = jsonEncode(body);
+    final response = await _client.send(request).timeout(_connectTimeout);
+    final contentType = response.headers['content-type']?.toLowerCase() ?? '';
+
+    if (response.statusCode < 200 || response.statusCode >= 300) {
+      final text = await response.stream.bytesToString().timeout(_timeout);
+      Map<String, dynamic> data = const <String, dynamic>{};
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is Map) data = decoded.map((key, value) => MapEntry('$key', value));
+      } catch (_) {}
+      throw StateError(_error(data, 'Next is unavailable right now.'));
+    }
+
+    if (!contentType.contains('text/event-stream')) {
+      final text = await response.stream.bytesToString().timeout(_timeout);
+      Map<String, dynamic> data = const <String, dynamic>{};
+      try {
+        final decoded = jsonDecode(text);
+        if (decoded is Map) data = decoded.map((key, value) => MapEntry('$key', value));
+      } catch (_) {}
+      final answer = '${data['answer'] ?? ''}'.trim();
+      if (answer.isEmpty) throw StateError(_error(data, 'Next returned an empty response.'));
+      yield OtyaSupportStreamEvent.delta(answer, modelId: data['model']?.toString(), modelName: data['model_name']?.toString());
+      yield OtyaSupportStreamEvent.done(modelId: data['model']?.toString(), modelName: data['model_name']?.toString());
+      return;
+    }
+
+    var sawDone = false;
+    await for (final line in response.stream.transform(utf8.decoder).transform(const LineSplitter()).timeout(_timeout)) {
+      if (!line.startsWith('data:')) continue;
+      final payload = line.substring(5).trim();
+      if (payload.isEmpty || payload == '[DONE]') continue;
+      Map<String, dynamic> data;
+      try {
+        final decoded = jsonDecode(payload);
+        if (decoded is! Map) continue;
+        data = decoded.map((key, value) => MapEntry('$key', value));
+      } catch (_) {
+        continue;
+      }
+      final event = OtyaSupportStreamEvent.fromJson(data);
+      if (event.type.isEmpty) continue;
+      if (event.isDone) sawDone = true;
+      if (event.isError) {
+        throw StateError(event.error?.trim().isNotEmpty == true ? event.error! : 'Next stopped responding. Please try again.');
+      }
+      yield event;
+    }
+    if (!sawDone) yield OtyaSupportStreamEvent.done();
   }
 
   Future<OtyaSupportReply> ask(
@@ -132,35 +239,15 @@ class OtyaSupportService {
     List<Map<String, String>> history = const <Map<String, String>>[],
     String? model,
   }) async {
-    final safeHistory = history
-        .where((entry) {
-          final role = entry['role'];
-          final content = entry['content']?.trim() ?? '';
-          return (role == 'user' || role == 'assistant') && content.isNotEmpty;
-        })
-        .toList(growable: false);
-
     final response = await _client
-        .post(
-          _uri,
-          headers: await _headers(),
-          body: jsonEncode({
-            'message': question.trim(),
-            'guest_id': await _guestId(),
-            'surface': 'android-assistant',
-            if (safeHistory.isNotEmpty) 'history': safeHistory,
-            if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
-          }),
-        )
+        .post(_uri, headers: await _headers(), body: jsonEncode(await _chatBody(question, history: history, model: model)))
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(_error(data, 'Next is unavailable right now.'));
     }
     return OtyaSupportReply(
-      answer: '${data['answer'] ?? ''}'.trim().isEmpty
-          ? 'I could not answer that right now.'
-          : '${data['answer']}'.trim(),
+      answer: '${data['answer'] ?? ''}'.trim().isEmpty ? 'I could not answer that right now.' : '${data['answer']}'.trim(),
       inScope: data['scope'] != 'outside-otya',
       handoffAvailable: data['handoff_available'] == true,
       modelId: data['model']?.toString(),
@@ -168,22 +255,15 @@ class OtyaSupportService {
     );
   }
 
-  Future<OtyaSupportTicket> handoff({
-    required String question,
-    required String email,
-  }) async {
+  Future<OtyaSupportTicket> handoff({required String question, required String email}) async {
     final response = await _client
-        .post(
-          _uri,
-          headers: await _headers(),
-          body: jsonEncode({
-            'message': question.trim(),
-            'contact_email': email.trim(),
-            'guest_id': await _guestId(),
-            'surface': 'android-assistant',
-            'request_handoff': true,
-          }),
-        )
+        .post(_uri, headers: await _headers(), body: jsonEncode({
+          'message': question.trim(),
+          'contact_email': email.trim(),
+          'guest_id': await _guestId(),
+          'surface': 'android-assistant',
+          'request_handoff': true,
+        }))
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -196,9 +276,7 @@ class OtyaSupportService {
     try {
       final decoded = jsonDecode(response.body);
       if (decoded is Map<String, dynamic>) return decoded;
-      if (decoded is Map) {
-        return decoded.map((key, value) => MapEntry('$key', value));
-      }
+      if (decoded is Map) return decoded.map((key, value) => MapEntry('$key', value));
     } catch (_) {}
     return <String, dynamic>{};
   }
