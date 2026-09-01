@@ -27,7 +27,7 @@ void main() {
     );
   });
 
-  test('Android launcher uses the adaptive mipmap instead of a legacy drawable', () {
+  test('Android launcher uses adaptive mipmap with the OTYA folded mark', () {
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
     final adaptive = File(
@@ -44,7 +44,10 @@ void main() {
     expect(adaptive, contains('@color/otya_launcher_background'));
     expect(foreground, contains('android:viewportWidth="512"'));
     expect(foreground, contains('android:viewportHeight="512"'));
-    expect(foreground, contains('android:fillType="evenOdd"'));
+    expect(foreground, contains('android:scaleX="0.90"'));
+    expect(foreground, contains('M160,98 L138,117 L116,146'));
     expect(foreground, contains('#FF2979FF'));
+    expect(foreground, contains('#FFFF3B30'));
+    expect(foreground, contains('#FFFFD60A'));
   });
 }
