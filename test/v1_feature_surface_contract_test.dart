@@ -158,7 +158,8 @@ void main() {
     ).readAsStringSync();
     expect(source, contains('Message Next'));
     expect(source, contains('ScrollController'));
-    expect(source, contains('Choose Next model'));
+    expect(source, contains('Next provider routing stays server-side'));
+    expect(source, isNot(contains('Choose Next model')));
     expect(source, contains('New chat'));
     expect(source, contains('Ask Otya Support'));
     expect(
