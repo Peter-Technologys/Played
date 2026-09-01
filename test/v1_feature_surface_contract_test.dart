@@ -21,11 +21,11 @@ void main() {
       'Transfer',
       'Files',
       'Private',
-      'Converter',
+      'Convert video to audio',
       'Playlists',
       'History',
       'Tools',
-      'Personalize',
+      'Appearance',
       'Storage',
     ]) {
       expect(source, contains("'$label'"), reason: '$label must stay reachable');
@@ -42,6 +42,10 @@ void main() {
     ]) {
       expect(source, contains("'$route'"), reason: '$route must stay wired');
     }
+
+    expect(source, contains("title: 'Next'"), reason: 'Next must stay visible from Me');
+    expect(source, contains("title: 'Trim video'"), reason: 'Trim must stay reachable');
+    expect(source, contains("title: 'Equalizer'"), reason: 'Equalizer must stay reachable');
   });
 
   test('App Lock is persisted, user-accessible and mounted at app root', () {
@@ -77,7 +81,7 @@ void main() {
     expect(screen, contains('vault_pin_blocked_until_ms'));
     expect(screen, contains('_pinMaxAttempts = 5'));
     expect(service, contains('_availableRestorePath'));
-    expect(service, contains('(restored \$index)'));
+    expect(service, contains('(restored $index)'));
     expect(service, contains('Refusing path outside Private storage'));
   });
 
@@ -90,7 +94,7 @@ void main() {
     ).readAsStringSync();
 
     expect(receiver, contains("uri.path != '/media'"));
-    expect(receiver, contains("RegExp(r'^[a-f0-9]{64}\$')"));
+    expect(receiver, contains("RegExp(r'^[a-f0-9]{64}$')"));
     expect(receiver, contains('FileMode.append'));
     expect(receiver, contains('.otya-transfer'));
     expect(receiver, contains('TransferCancelledException'));
