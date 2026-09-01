@@ -18,14 +18,20 @@ void main() {
         'release APK certificate does not match the configured Otya signing key',
       ),
     );
-    expect(source, isNot(contains('keytool -printcert -jarfile "$APK"')));
+    expect(source, isNot(contains(r'keytool -printcert -jarfile "$APK"')));
   });
 
   test('production release verifies both APK signers before publication', () {
     final source = File('.github/workflows/release.yml').readAsStringSync();
 
-    expect(source, contains('"$APKSIGNER" verify --verbose --print-certs "$ARM64"'));
-    expect(source, contains('"$APKSIGNER" verify --verbose --print-certs "$ARM32"'));
+    expect(
+      source,
+      contains(r'"$APKSIGNER" verify --verbose --print-certs "$ARM64"'),
+    );
+    expect(
+      source,
+      contains(r'"$APKSIGNER" verify --verbose --print-certs "$ARM32"'),
+    );
     expect(source, contains('EXPECTED_SHA256'));
     expect(source, contains('ACTUAL_SHA256'));
     expect(
@@ -39,8 +45,8 @@ void main() {
   test('Play bundle signature is also verified against the Otya key', () {
     final source = File('.github/workflows/release.yml').readAsStringSync();
 
-    expect(source, contains('jarsigner -verify "$AAB"'));
-    expect(source, contains('keytool -printcert -jarfile "$AAB"'));
+    expect(source, contains(r'jarsigner -verify "$AAB"'));
+    expect(source, contains(r'keytool -printcert -jarfile "$AAB"'));
     expect(source, contains('AAB_SHA256'));
     expect(
       source,
