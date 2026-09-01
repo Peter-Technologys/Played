@@ -117,13 +117,20 @@ class OtyaSupportService {
   }
 
   Future<Map<String, String>> _headers() async {
-    final token = await AuthService.instance.getValidToken();
-    return FirebasePlatformService.instance.protectedHeaders(
-      base: {
-        'Content-Type': 'application/json',
-        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-      },
-    );
+    // Auth refresh and Firebase App Check are independent network operations.
+    // Start them together so Next does not pay both waits serially before the
+    // actual AI request can even connect. This preserves the exact same auth
+    // and attestation behavior; it only removes avoidable preflight latency.
+    final authTokenFuture = AuthService.instance.getValidToken();
+    final appCheckTokenFuture = FirebasePlatformService.instance.appCheckToken();
+    final token = await authTokenFuture;
+    final appCheckToken = await appCheckTokenFuture;
+    return <String, String>{
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (appCheckToken != null && appCheckToken.isNotEmpty)
+        'X-Firebase-AppCheck': appCheckToken,
+    };
   }
 
   List<Map<String, String>> _safeHistory(List<Map<String, String>> history) => history
@@ -177,8 +184,11 @@ class OtyaSupportService {
     List<Map<String, String>> history = const <Map<String, String>>[],
     String? model,
   }) async* {
-    final body = await _chatBody(question, history: history, model: model);
-    final headers = await _headers();
+    // Guest-id/body preparation can run alongside auth/App Check preflight.
+    final bodyFuture = _chatBody(question, history: history, model: model);
+    final headersFuture = _headers();
+    final body = await bodyFuture;
+    final headers = await headersFuture;
     headers['Accept'] = 'text/event-stream';
     final request = http.Request('POST', _uri)
       ..headers.addAll(headers)
@@ -239,8 +249,12 @@ class OtyaSupportService {
     List<Map<String, String>> history = const <Map<String, String>>[],
     String? model,
   }) async {
+    final headersFuture = _headers();
+    final bodyFuture = _chatBody(question, history: history, model: model);
+    final headers = await headersFuture;
+    final body = await bodyFuture;
     final response = await _client
-        .post(_uri, headers: await _headers(), body: jsonEncode(await _chatBody(question, history: history, model: model)))
+        .post(_uri, headers: headers, body: jsonEncode(body))
         .timeout(_timeout);
     final data = _decode(response);
     if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -256,11 +270,15 @@ class OtyaSupportService {
   }
 
   Future<OtyaSupportTicket> handoff({required String question, required String email}) async {
+    final headersFuture = _headers();
+    final guestIdFuture = _guestId();
+    final headers = await headersFuture;
+    final guestId = await guestIdFuture;
     final response = await _client
-        .post(_uri, headers: await _headers(), body: jsonEncode({
+        .post(_uri, headers: headers, body: jsonEncode({
           'message': question.trim(),
           'contact_email': email.trim(),
-          'guest_id': await _guestId(),
+          'guest_id': guestId,
           'surface': 'android-assistant',
           'request_handoff': true,
         }))
