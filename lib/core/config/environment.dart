@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 /// Values that define the installed Otya application and must stay stable
 /// across environments. These are safe to compile into the APK.
 abstract final class AppContract {
@@ -74,6 +76,21 @@ abstract final class Environment {
   static const bool selfUpdateEnabled =
       bool.fromEnvironment('SELF_UPDATE', defaultValue: false);
 
-  static const String appArch =
-      String.fromEnvironment('APP_ARCH', defaultValue: 'arm64');
+  /// ABI used by update selection and backend device registration.
+  ///
+  /// A non-empty APP_ARCH remains an explicit build/test override. Normal
+  /// production APKs detect the ABI they are actually running on because both
+  /// split APKs otherwise share the same Dart compile-time default.
+  static String get appArch {
+    const override = String.fromEnvironment('APP_ARCH', defaultValue: '');
+    if (override.isNotEmpty) return override;
+
+    final abi = Abi.current();
+    if (abi == Abi.androidArm) return 'arm32';
+    if (abi == Abi.androidArm64) return 'arm64';
+
+    // Keep emulator/development values truthful instead of silently claiming
+    // arm64 on an unsupported architecture.
+    return abi.toString();
+  }
 }
