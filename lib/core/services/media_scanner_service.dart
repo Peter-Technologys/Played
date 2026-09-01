@@ -3,6 +3,7 @@ import 'dart:math' show min;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../models/media_item.dart';
 import '../permissions/permission_helper.dart';
@@ -144,12 +145,20 @@ class MediaScannerService {
   }
 
   Future<List<MediaItem>> _scanReceiveDirs(Set<String> alreadySeen) async {
+    final candidates = <String>[..._receiveDirs];
+    try {
+      final appExternal = await getExternalStorageDirectory();
+      if (appExternal != null) {
+        candidates.add('${appExternal.path}/OTYA_Received');
+      }
+    } catch (_) {}
+    final uniqueCandidates = candidates.toSet().toList(growable: false);
     final existChecks = await Future.wait(
-      _receiveDirs.map((p) => Directory(p).exists().catchError((_) => false)),
+      uniqueCandidates.map((p) => Directory(p).exists().catchError((_) => false)),
     );
     final existingDirs = [
-      for (var i = 0; i < _receiveDirs.length; i++)
-        if (existChecks[i]) _receiveDirs[i],
+      for (var i = 0; i < uniqueCandidates.length; i++)
+        if (existChecks[i]) uniqueCandidates[i],
     ];
     if (existingDirs.isEmpty) return [];
 

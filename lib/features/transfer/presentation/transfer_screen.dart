@@ -9,7 +9,6 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
-import '../../../core/services/media_scanner_service.dart';
 import '../../air_drop/data/media_receiver.dart';
 import '../../air_drop/data/media_sender.dart';
 import '../../my_space/data/media_repository.dart';
@@ -134,7 +133,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
       );
 
       MediaRepository.instance.invalidate();
-      await MediaScannerService.instance.scanDirectory(dir.path);
+      await ref.read(mediaLibraryProvider.notifier).refresh();
       if (!mounted) return;
       setState(() {
         _receivedPath = file.path;
