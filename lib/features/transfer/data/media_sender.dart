@@ -23,7 +23,7 @@ class MediaSender {
   static String _generateToken() {
     final rng = Random.secure();
     return List.generate(
-      16,
+      32,
       (_) => rng.nextInt(256).toRadixString(16).padLeft(2, '0'),
     ).join();
   }
