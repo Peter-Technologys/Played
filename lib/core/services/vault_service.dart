@@ -130,19 +130,26 @@ class VaultService {
     }
 
     final target = File(vaultPath);
+    var reservedTarget = false;
     try {
       // Reserve the target atomically. File.copy() overwrites existing files,
       // so relying on a pre-copy exists() check would still leave a race where
       // two lock operations can destroy one another's protected copy.
       await target.create(exclusive: true);
+      reservedTarget = true;
       final copied = await source.copy(vaultPath);
       if (!await copied.exists() || await copied.length() != await source.length()) {
         throw FileSystemException('Could not create complete Private copy', vaultPath);
       }
     } catch (_) {
-      try {
-        if (await target.exists()) await target.delete();
-      } catch (_) {}
+      // Only delete a file this lock attempt successfully reserved. If
+      // exclusive creation failed because a protected target already exists,
+      // that existing file belongs to another successful/older operation.
+      if (reservedTarget) {
+        try {
+          if (await target.exists()) await target.delete();
+        } catch (_) {}
+      }
       rethrow;
     }
 
