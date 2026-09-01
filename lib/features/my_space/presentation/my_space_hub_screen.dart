@@ -9,6 +9,7 @@ import '../../../core/models/media_item.dart';
 import '../../../core/services/auth_provider.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/remote_control_service.dart';
+import '../../../shared/widgets/otya_logo.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../search/smart_search_sheet.dart';
 import 'providers/my_space_provider.dart';
@@ -21,17 +22,6 @@ class MySpaceHubScreen extends ConsumerWidget {
     final displayName = ref.watch(displayNameProvider);
     final photoUrl = ref.watch(photoUrlProvider);
     final remote = RemoteControlService.instance;
-    final features = <_HubItem>[
-      _HubItem('transfer', Icons.swap_horiz_rounded, 'Transfer', () => context.push('/transfer'), enabled: remote.featureEnabled('transfer', fallback: true)),
-      _HubItem('files', Icons.folder_open_rounded, 'Files', () => context.push('/tools/folders')),
-      _HubItem('private', Icons.lock_outline_rounded, 'Private', () => context.push('/vault'), enabled: remote.featureEnabled('private', fallback: true)),
-      _HubItem('converter', Icons.transform_rounded, 'Converter', () => _showConverter(context, ref), enabled: remote.featureEnabled('converter', fallback: true)),
-      _HubItem('playlists', Icons.queue_music_rounded, 'Playlists', () => context.push('/playlists')),
-      _HubItem('history', Icons.history_rounded, 'History', () => context.push('/history')),
-      _HubItem('tools', Icons.tune_rounded, 'Tools', () => _showTools(context, ref)),
-      _HubItem('personalize', Icons.palette_outlined, 'Personalize', () => context.push('/theme')),
-      _HubItem('storage', Icons.storage_rounded, 'Storage', () => context.push('/settings/storage')),
-    ];
 
     return WallpaperScaffold(
       body: SafeArea(
@@ -39,94 +29,161 @@ class MySpaceHubScreen extends ConsumerWidget {
           physics: const BouncingScrollPhysics(),
           slivers: [
             SliverToBoxAdapter(
+              child: _MeHeader(
+                displayName: displayName,
+                photoUrl: photoUrl,
+                onSearch: () => SmartSearchSheet.show(context),
+                onProfile: () => context.push('/profile'),
+              ),
+            ),
+            SliverToBoxAdapter(
+              child: _NextCard(onTap: () => context.push('/support')),
+            ),
+            const SliverToBoxAdapter(child: _SectionLabel('Quick actions')),
+            SliverToBoxAdapter(
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 12, 10, 10),
+                padding: const EdgeInsets.fromLTRB(14, 0, 14, 20),
                 child: Row(
                   children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(12),
-                      child: Image.asset('assets/icons/play_store_512.png', width: 38, height: 38),
-                    ),
-                    const SizedBox(width: 11),
                     Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text('Me', style: TextStyle(fontSize: 23, fontWeight: FontWeight.w900, letterSpacing: -.5)),
-                          Text(
-                            displayName?.trim().isNotEmpty == true ? displayName!.trim() : 'Your OTYA space',
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontSize: 11.5, color: AppColors.textSecondary),
-                          ),
-                        ],
+                      child: _PrimaryAction(
+                        icon: Icons.swap_horiz_rounded,
+                        title: 'Transfer',
+                        subtitle: 'Send & receive',
+                        enabled: remote.featureEnabled('transfer', fallback: true),
+                        onTap: () => context.push('/transfer'),
                       ),
                     ),
-                    IconButton(
-                      tooltip: 'Search OTYA',
-                      onPressed: () => SmartSearchSheet.show(context),
-                      icon: const Icon(Icons.search_rounded),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PrimaryAction(
+                        icon: Icons.lock_outline_rounded,
+                        title: 'Private',
+                        subtitle: 'Protected media',
+                        enabled: remote.featureEnabled('private', fallback: true),
+                        onTap: () => context.push('/vault'),
+                      ),
                     ),
-                    const SizedBox(width: 2),
-                    GestureDetector(
-                      onTap: () => context.push('/profile'),
-                      child: _Avatar(photoUrl: photoUrl, name: displayName),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PrimaryAction(
+                        icon: Icons.tune_rounded,
+                        title: 'Tools',
+                        subtitle: 'Work with media',
+                        onTap: () => _showTools(context, ref),
+                      ),
                     ),
                   ],
                 ),
               ),
             ),
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(14, 8, 14, 14),
-              sliver: SliverGrid(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  crossAxisSpacing: 9,
-                  mainAxisSpacing: 9,
-                  childAspectRatio: .98,
-                ),
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) => _HubTile(item: features[index]),
-                  childCount: features.length,
-                ),
+            const SliverToBoxAdapter(child: _SectionLabel('Your library')),
+            SliverToBoxAdapter(
+              child: _RowGroup(
+                children: [
+                  _ActionRow(
+                    icon: Icons.folder_open_rounded,
+                    title: 'Files',
+                    subtitle: 'Browse media by folder',
+                    onTap: () => context.push('/tools/folders'),
+                  ),
+                  _ActionRow(
+                    icon: Icons.queue_music_rounded,
+                    title: 'Playlists',
+                    subtitle: 'Your saved listening collections',
+                    onTap: () => context.push('/playlists'),
+                  ),
+                  _ActionRow(
+                    icon: Icons.history_rounded,
+                    title: 'History',
+                    subtitle: 'Recently played media',
+                    onTap: () => context.push('/history'),
+                  ),
+                ],
               ),
             ),
-            const SliverToBoxAdapter(child: _SectionLabel('Account & settings')),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: _SectionLabel('Media tools')),
             SliverToBoxAdapter(
-              child: _RowGroup(children: [
-                _ActionRow(
-                  icon: Icons.account_circle_outlined,
-                  title: 'Account',
-                  subtitle: 'Optional sign-in, verification, Google and backup',
-                  onTap: () => context.push('/profile'),
-                ),
-                _ActionRow(
-                  icon: Icons.settings_rounded,
-                  title: 'Settings',
-                  subtitle: 'Playback, privacy, device permissions and updates',
-                  onTap: () => context.push('/settings'),
-                ),
-              ]),
+              child: _RowGroup(
+                children: [
+                  _ActionRow(
+                    icon: Icons.transform_rounded,
+                    title: 'Convert video to audio',
+                    subtitle: 'Extract the existing audio track locally',
+                    enabled: remote.featureEnabled('converter', fallback: true),
+                    onTap: () => _showConverter(context, ref),
+                  ),
+                  _ActionRow(
+                    icon: Icons.content_cut_rounded,
+                    title: 'Trim video',
+                    subtitle: 'Create a shorter local clip',
+                    onTap: () => _showTrimPicker(context, ref),
+                  ),
+                  _ActionRow(
+                    icon: Icons.graphic_eq_rounded,
+                    title: 'Equalizer',
+                    subtitle: 'Tune audio playback',
+                    onTap: () => context.push('/player/equalizer'),
+                  ),
+                ],
+              ),
             ),
-            const SliverToBoxAdapter(child: SizedBox(height: 18)),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: _SectionLabel('Personal')),
+            SliverToBoxAdapter(
+              child: _RowGroup(
+                children: [
+                  _ActionRow(
+                    icon: Icons.account_circle_outlined,
+                    title: 'OTYA Account',
+                    subtitle: 'Profile, sign-in, security and backup',
+                    onTap: () => context.push('/profile'),
+                  ),
+                  _ActionRow(
+                    icon: Icons.palette_outlined,
+                    title: 'Appearance',
+                    subtitle: 'Theme and visual preferences',
+                    onTap: () => context.push('/theme'),
+                  ),
+                  _ActionRow(
+                    icon: Icons.storage_rounded,
+                    title: 'Storage',
+                    subtitle: 'Media scanning and device storage',
+                    onTap: () => context.push('/settings/storage'),
+                  ),
+                  _ActionRow(
+                    icon: Icons.settings_rounded,
+                    title: 'Settings',
+                    subtitle: 'Playback, privacy, permissions and updates',
+                    onTap: () => context.push('/settings'),
+                  ),
+                ],
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
             const SliverToBoxAdapter(child: _SectionLabel('Help & product')),
             SliverToBoxAdapter(
-              child: _RowGroup(children: [
-                _ActionRow(
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'Ask OTYA',
-                  subtitle: 'Help with OTYA features and troubleshooting',
-                  onTap: () => context.push('/support'),
-                ),
-                _ActionRow(
-                  icon: Icons.info_outline_rounded,
-                  title: 'About OTYA',
-                  subtitle: 'Version, privacy, terms and product information',
-                  onTap: () => context.push('/about'),
-                ),
-              ]),
+              child: _RowGroup(
+                children: [
+                  _ActionRow(
+                    icon: Icons.help_outline_rounded,
+                    title: 'Help',
+                    subtitle: 'Guides, troubleshooting and support',
+                    onTap: () => context.push('/about'),
+                  ),
+                  _ActionRow(
+                    icon: Icons.info_outline_rounded,
+                    title: 'About OTYA',
+                    subtitle: 'Version, privacy, terms and product information',
+                    onTap: () => context.push('/about'),
+                  ),
+                ],
+              ),
             ),
-            SliverToBoxAdapter(child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 24)),
+            SliverToBoxAdapter(
+              child: SizedBox(height: MediaQuery.paddingOf(context).bottom + 28),
+            ),
           ],
         ),
       ),
@@ -140,8 +197,8 @@ class MySpaceHubScreen extends ConsumerWidget {
       ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
     await _showMediaActionSheet(
       context,
-      title: 'Converter',
-      subtitle: 'Extract a video’s existing audio track locally. No upload or account is required.',
+      title: 'Convert video to audio',
+      subtitle: 'Choose a video. OTYA extracts its existing audio locally without uploading the file.',
       items: videos,
       actionIcon: Icons.music_note_rounded,
       actionLabel: 'Extract audio',
@@ -157,18 +214,42 @@ class MySpaceHubScreen extends ConsumerWidget {
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
+      showDragHandle: true,
       backgroundColor: AppColors.cardOf(context),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (sheetContext) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 14, 16, 24),
+        padding: const EdgeInsets.fromLTRB(16, 4, 16, 26),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Tools', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+            const Text('Media tools', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
             const SizedBox(height: 5),
-            const Text('Media processing tools that work locally on this device.', style: TextStyle(color: AppColors.textSecondary)),
+            const Text(
+              'Work with media on this device. OTYA will show progress and where the result is saved.',
+              style: TextStyle(color: AppColors.textSecondary, height: 1.4),
+            ),
             const SizedBox(height: 14),
+            _ActionRow(
+              icon: Icons.transform_rounded,
+              title: 'Convert video to audio',
+              subtitle: 'Extract a video’s audio track',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showConverter(context, ref);
+              },
+            ),
+            _ActionRow(
+              icon: Icons.content_cut_rounded,
+              title: 'Trim video',
+              subtitle: 'Create a shorter clip',
+              onTap: () {
+                Navigator.pop(sheetContext);
+                _showTrimPicker(context, ref);
+              },
+            ),
             _ActionRow(
               icon: Icons.graphic_eq_rounded,
               title: 'Equalizer',
@@ -176,15 +257,6 @@ class MySpaceHubScreen extends ConsumerWidget {
               onTap: () {
                 Navigator.pop(sheetContext);
                 context.push('/player/equalizer');
-              },
-            ),
-            _ActionRow(
-              icon: Icons.content_cut_rounded,
-              title: 'Trim video',
-              subtitle: 'Create a local clip from a selected video',
-              onTap: () {
-                Navigator.pop(sheetContext);
-                _showTrimPicker(context, ref);
               },
             ),
           ],
@@ -201,7 +273,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     await _showMediaActionSheet(
       context,
       title: 'Trim video',
-      subtitle: 'Create a 30-second clip from the beginning of a video. Use the player Trim action for a custom range.',
+      subtitle: 'Choose a video to create a 30-second clip from its beginning. Custom-range trimming remains available in the player.',
       items: videos,
       actionIcon: Icons.content_cut_rounded,
       actionLabel: 'Trim 30 seconds',
@@ -230,125 +302,345 @@ class MySpaceHubScreen extends ConsumerWidget {
   }) async {
     String? busyId;
     String? result;
+    String? error;
     double progress = 0;
     await showModalBottomSheet<void>(
       context: context,
       useSafeArea: true,
+      showDragHandle: true,
       isScrollControlled: true,
       backgroundColor: AppColors.cardOf(context),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
       builder: (sheetContext) => StatefulBuilder(
-        builder: (context, setState) {
-          return SizedBox(
-            height: MediaQuery.sizeOf(sheetContext).height * .78,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(18, 18, 18, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(title, style: const TextStyle(fontSize: 21, fontWeight: FontWeight.w900)),
-                      const SizedBox(height: 5),
-                      Text(subtitle, style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4)),
-                      if (busyId != null) ...[
-                        const SizedBox(height: 12),
-                        LinearProgressIndicator(value: progress > 0 ? progress : null),
-                      ],
-                      if (result != null) ...[
-                        const SizedBox(height: 10),
-                        Text('Saved: ${result!.replaceAll('\\', '/').split('/').last}', style: const TextStyle(fontSize: 12, color: AppColors.accentGreen, fontWeight: FontWeight.w700)),
-                      ],
+        builder: (context, setState) => SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * .8,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(18, 4, 18, 14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
+                    const SizedBox(height: 6),
+                    Text(
+                      subtitle,
+                      style: const TextStyle(fontSize: 12.5, color: AppColors.textSecondary, height: 1.4),
+                    ),
+                    if (busyId != null) ...[
+                      const SizedBox(height: 14),
+                      LinearProgressIndicator(value: progress > 0 ? progress : null),
+                      const SizedBox(height: 7),
+                      const Text('Processing on this device…', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
                     ],
-                  ),
+                    if (result != null) ...[
+                      const SizedBox(height: 12),
+                      _ResultBanner(
+                        icon: Icons.check_circle_outline_rounded,
+                        text: 'Saved ${result!.replaceAll('\\', '/').split('/').last}',
+                        success: true,
+                      ),
+                    ],
+                    if (error != null) ...[
+                      const SizedBox(height: 12),
+                      _ResultBanner(
+                        icon: Icons.error_outline_rounded,
+                        text: error!,
+                        success: false,
+                      ),
+                    ],
+                  ],
                 ),
-                const Divider(height: 1),
-                Expanded(
-                  child: items.isEmpty
-                      ? const Center(child: Padding(padding: EdgeInsets.all(30), child: Text('No local videos are available.', textAlign: TextAlign.center)))
-                      : ListView.builder(
-                          padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
-                          itemCount: items.length,
-                          itemBuilder: (context, index) {
-                            final item = items[index];
-                            final active = busyId == item.id;
-                            return ListTile(
-                              enabled: busyId == null,
-                              leading: const Icon(Icons.movie_outlined),
-                              title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
-                              subtitle: Text('${item.formattedDuration} · ${item.formattedSize}'),
-                              trailing: active
-                                  ? const SizedBox.square(dimension: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                                  : Tooltip(message: actionLabel, child: Icon(actionIcon, color: AppColors.accent)),
-                              onTap: busyId != null
-                                  ? null
-                                  : () async {
-                                      setState(() { busyId = item.id; result = null; progress = .1; });
+              ),
+              const Divider(height: 1),
+              Expanded(
+                child: items.isEmpty
+                    ? const Center(
+                        child: Padding(
+                          padding: EdgeInsets.all(30),
+                          child: Text(
+                            'No local videos are available yet. Add or scan a video, then try again.',
+                            textAlign: TextAlign.center,
+                          ),
+                        ),
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(8, 8, 8, 20),
+                        itemCount: items.length,
+                        separatorBuilder: (_, __) => const SizedBox(height: 2),
+                        itemBuilder: (context, index) {
+                          final item = items[index];
+                          final active = busyId == item.id;
+                          return ListTile(
+                            enabled: busyId == null,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                            leading: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: AppColors.accent.withValues(alpha: .1),
+                                borderRadius: BorderRadius.circular(13),
+                              ),
+                              child: const Icon(Icons.movie_outlined, color: AppColors.accent),
+                            ),
+                            title: Text(item.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+                            subtitle: Text('${item.formattedDuration} · ${item.formattedSize}'),
+                            trailing: active
+                                ? const SizedBox.square(
+                                    dimension: 22,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : Icon(actionIcon, color: AppColors.accent),
+                            onTap: busyId != null
+                                ? null
+                                : () async {
+                                    setState(() {
+                                      busyId = item.id;
+                                      result = null;
+                                      error = null;
+                                      progress = .05;
+                                    });
+                                    try {
                                       final output = await run(item, (value) {
-                                        if (sheetContext.mounted) setState(() => progress = value);
+                                        if (sheetContext.mounted) {
+                                          setState(() => progress = value.clamp(0, 1));
+                                        }
                                       });
                                       if (!sheetContext.mounted) return;
-                                      if (output != null) await onFinished();
-                                      if (!sheetContext.mounted) return;
-                                      setState(() { busyId = null; result = output; progress = 0; });
-                                      if (output == null) {
-                                        ScaffoldMessenger.of(sheetContext).showSnackBar(SnackBar(content: Text('$actionLabel could not be completed for this file.')));
+                                      if (output != null) {
+                                        await onFinished();
+                                        if (!sheetContext.mounted) return;
+                                        setState(() => result = output);
+                                      } else {
+                                        setState(() {
+                                          error = 'OTYA could not process this file. The format or codec may not be supported by this tool yet. Try another file or open it in the player first.';
+                                        });
                                       }
-                                    },
-                            );
-                          },
-                        ),
-                ),
-              ],
-            ),
-          );
-        },
+                                    } catch (_) {
+                                      if (!sheetContext.mounted) return;
+                                      setState(() {
+                                        error = 'Processing stopped before a result could be saved. Check that the source file is still available and try again.';
+                                      });
+                                    } finally {
+                                      if (sheetContext.mounted) {
+                                        setState(() {
+                                          busyId = null;
+                                          progress = 0;
+                                        });
+                                      }
+                                    }
+                                  },
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _HubItem {
-  const _HubItem(this.key, this.icon, this.label, this.onTap, {this.enabled = true});
-  final String key;
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-  final bool enabled;
-}
+class _MeHeader extends StatelessWidget {
+  const _MeHeader({
+    required this.displayName,
+    required this.photoUrl,
+    required this.onSearch,
+    required this.onProfile,
+  });
 
-class _HubTile extends StatelessWidget {
-  const _HubTile({required this.item});
-  final _HubItem item;
+  final String? displayName;
+  final String? photoUrl;
+  final VoidCallback onSearch;
+  final VoidCallback onProfile;
 
   @override
-  Widget build(BuildContext context) => Opacity(
-        opacity: item.enabled ? 1 : .42,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(18),
-          onTap: item.enabled
-              ? () {
-                  HapticFeedback.selectionClick();
-                  item.onTap();
-                }
-              : null,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 12),
-            decoration: BoxDecoration(
-              color: AppColors.cardOf(context),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: AppColors.borderOf(context)),
-            ),
+  Widget build(BuildContext context) {
+    final name = displayName?.trim();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(18, 16, 12, 16),
+      child: Row(
+        children: [
+          Expanded(
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(item.icon, size: 27, color: AppColors.accent),
-                const SizedBox(height: 8),
-                Text(item.label, textAlign: TextAlign.center, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 11.5, fontWeight: FontWeight.w800)),
+                const Text(
+                  'Me',
+                  style: TextStyle(fontSize: 30, height: 1, fontWeight: FontWeight.w900, letterSpacing: -1),
+                ),
+                const SizedBox(height: 7),
+                Text(
+                  name?.isNotEmpty == true ? 'Good to see you, $name' : 'Your media, tools and OTYA account',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
+                ),
               ],
             ),
           ),
+          IconButton.filledTonal(
+            tooltip: 'Search OTYA',
+            onPressed: onSearch,
+            icon: const Icon(Icons.search_rounded),
+          ),
+          const SizedBox(width: 8),
+          GestureDetector(
+            onTap: onProfile,
+            child: _Avatar(photoUrl: photoUrl, name: displayName),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _NextCard extends StatelessWidget {
+  const _NextCard({required this.onTap});
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 22),
+      child: Material(
+        color: AppColors.cardOf(context).withValues(alpha: .9),
+        borderRadius: BorderRadius.circular(26),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          child: Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: AppColors.borderOf(context)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 58,
+                  height: 58,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    color: colors.surface,
+                    borderRadius: BorderRadius.circular(19),
+                  ),
+                  child: const OtyaAiMark(size: 40),
+                ),
+                const SizedBox(width: 15),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Next', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.4)),
+                      SizedBox(height: 4),
+                      Text(
+                        'Ask a question or get help with OTYA.',
+                        style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.arrow_forward_rounded),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PrimaryAction extends StatelessWidget {
+  const _PrimaryAction({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.enabled = true,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback onTap;
+  final bool enabled;
+
+  @override
+  Widget build(BuildContext context) => Opacity(
+        opacity: enabled ? 1 : .45,
+        child: Material(
+          color: AppColors.cardOf(context).withValues(alpha: .9),
+          borderRadius: BorderRadius.circular(22),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            onTap: enabled
+                ? () {
+                    HapticFeedback.selectionClick();
+                    onTap();
+                  }
+                : null,
+            child: Container(
+              constraints: const BoxConstraints(minHeight: 122),
+              padding: const EdgeInsets.fromLTRB(12, 15, 10, 13),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                border: Border.all(color: AppColors.borderOf(context)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: AppColors.accent.withValues(alpha: .1),
+                      borderRadius: BorderRadius.circular(13),
+                    ),
+                    child: Icon(icon, color: AppColors.accent),
+                  ),
+                  const Spacer(),
+                  Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900)),
+                  const SizedBox(height: 2),
+                  Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 10.5, height: 1.25, color: AppColors.textSecondary)),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+}
+
+class _ResultBanner extends StatelessWidget {
+  const _ResultBanner({required this.icon, required this.text, required this.success});
+  final IconData icon;
+  final String text;
+  final bool success;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: (success ? Colors.green : Theme.of(context).colorScheme.error).withValues(alpha: .09),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 19, color: success ? Colors.green : Theme.of(context).colorScheme.error),
+            const SizedBox(width: 9),
+            Expanded(child: Text(text, style: const TextStyle(fontSize: 12.5, height: 1.35, fontWeight: FontWeight.w600))),
+          ],
         ),
       );
 }
@@ -362,7 +654,7 @@ class _Avatar extends StatelessWidget {
   Widget build(BuildContext context) {
     final initial = (name?.trim().isNotEmpty == true ? name!.trim()[0] : 'O').toUpperCase();
     return CircleAvatar(
-      radius: 18,
+      radius: 21,
       backgroundColor: AppColors.cardOf(context),
       backgroundImage: photoUrl?.trim().isNotEmpty == true ? CachedNetworkImageProvider(photoUrl!) : null,
       child: photoUrl?.trim().isNotEmpty == true ? null : Text(initial, style: const TextStyle(fontWeight: FontWeight.w900)),
@@ -373,50 +665,82 @@ class _Avatar extends StatelessWidget {
 class _SectionLabel extends StatelessWidget {
   const _SectionLabel(this.text);
   final String text;
+
   @override
   Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.fromLTRB(18, 0, 18, 7),
-        child: Text(text.toUpperCase(), style: const TextStyle(fontSize: 10.5, fontWeight: FontWeight.w800, letterSpacing: 1.1, color: AppColors.textSecondary)),
+        padding: const EdgeInsets.fromLTRB(18, 0, 18, 8),
+        child: Text(
+          text,
+          style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w900, letterSpacing: -.1),
+        ),
       );
 }
 
 class _RowGroup extends StatelessWidget {
   const _RowGroup({required this.children});
   final List<Widget> children;
+
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.symmetric(horizontal: 14),
         decoration: BoxDecoration(
-          color: AppColors.cardOf(context),
-          borderRadius: BorderRadius.circular(18),
+          color: AppColors.cardOf(context).withValues(alpha: .9),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppColors.borderOf(context)),
         ),
-        child: Column(children: [
-          for (var i = 0; i < children.length; i++) ...[
-            children[i],
-            if (i != children.length - 1) Divider(height: 1, indent: 56, color: AppColors.borderOf(context)),
+        clipBehavior: Clip.antiAlias,
+        child: Column(
+          children: [
+            for (var i = 0; i < children.length; i++) ...[
+              children[i],
+              if (i != children.length - 1)
+                Divider(height: 1, indent: 58, color: AppColors.borderOf(context)),
+            ],
           ],
-        ]),
+        ),
       );
 }
 
 class _ActionRow extends StatelessWidget {
-  const _ActionRow({required this.icon, required this.title, required this.subtitle, required this.onTap});
+  const _ActionRow({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.onTap,
+    this.enabled = true,
+  });
+
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
+  final bool enabled;
 
   @override
-  Widget build(BuildContext context) => ListTile(
-        onTap: () {
-          HapticFeedback.selectionClick();
-          onTap();
-        },
-        leading: Icon(icon, color: AppColors.accent),
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-        subtitle: Text(subtitle),
-        trailing: const Icon(Icons.chevron_right_rounded),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+  Widget build(BuildContext context) => Opacity(
+        opacity: enabled ? 1 : .45,
+        child: ListTile(
+          enabled: enabled,
+          onTap: enabled
+              ? () {
+                  HapticFeedback.selectionClick();
+                  onTap();
+                }
+              : null,
+          leading: Container(
+            width: 38,
+            height: 38,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: .09),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 21, color: AppColors.accent),
+          ),
+          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+          subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+          trailing: const Icon(Icons.chevron_right_rounded),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+        ),
       );
 }
