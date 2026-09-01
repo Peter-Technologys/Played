@@ -32,6 +32,7 @@ class OtyaSupportStreamEvent {
     this.delta,
     this.modelId,
     this.modelName,
+    this.conversationId,
     this.error,
     this.complete = false,
   });
@@ -40,6 +41,7 @@ class OtyaSupportStreamEvent {
   final String? delta;
   final String? modelId;
   final String? modelName;
+  final String? conversationId;
   final String? error;
   final bool complete;
 
@@ -52,15 +54,37 @@ class OtyaSupportStreamEvent {
         delta: json['delta']?.toString(),
         modelId: json['model']?.toString(),
         modelName: json['model_name']?.toString(),
+        conversationId: json['conversation_id']?.toString(),
         error: json['error']?.toString(),
         complete: json['complete'] == true,
       );
 
-  factory OtyaSupportStreamEvent.delta(String text, {String? modelId, String? modelName}) =>
-      OtyaSupportStreamEvent._(type: 'delta', delta: text, modelId: modelId, modelName: modelName);
+  factory OtyaSupportStreamEvent.delta(
+    String text, {
+    String? modelId,
+    String? modelName,
+    String? conversationId,
+  }) =>
+      OtyaSupportStreamEvent._(
+        type: 'delta',
+        delta: text,
+        modelId: modelId,
+        modelName: modelName,
+        conversationId: conversationId,
+      );
 
-  factory OtyaSupportStreamEvent.done({String? modelId, String? modelName}) =>
-      OtyaSupportStreamEvent._(type: 'done', modelId: modelId, modelName: modelName, complete: true);
+  factory OtyaSupportStreamEvent.done({
+    String? modelId,
+    String? modelName,
+    String? conversationId,
+  }) =>
+      OtyaSupportStreamEvent._(
+        type: 'done',
+        modelId: modelId,
+        modelName: modelName,
+        conversationId: conversationId,
+        complete: true,
+      );
 }
 
 class OtyaAiModel {
@@ -103,6 +127,8 @@ class OtyaSupportService {
   static const _timeout = Duration(seconds: 35);
   static const _connectTimeout = Duration(seconds: 12);
 
+  String? _conversationId;
+
   http.Client get _client => AppHttpClient.instance.client;
   Uri get _uri => Uri.parse('${Environment.workerUrl}/api/ai/chat');
 
@@ -134,17 +160,26 @@ class OtyaSupportService {
       })
       .toList(growable: false);
 
+  void _rememberConversation(Object? value) {
+    final id = value?.toString().trim() ?? '';
+    if (id.isNotEmpty) _conversationId = id;
+  }
+
   Future<Map<String, dynamic>> _chatBody(
     String question, {
     List<Map<String, String>> history = const <Map<String, String>>[],
     String? model,
   }) async {
     final safeHistory = _safeHistory(history);
+    final startsVisibleConversation = safeHistory.isEmpty;
     return <String, dynamic>{
       'message': question.trim(),
       'guest_id': await _guestId(),
       'surface': 'android-assistant',
       if (safeHistory.isNotEmpty) 'history': safeHistory,
+      if (startsVisibleConversation) 'new_chat': true,
+      if (!startsVisibleConversation && _conversationId?.isNotEmpty == true)
+        'conversation_id': _conversationId,
       if (model != null && model.trim().isNotEmpty) 'model': model.trim(),
     };
   }
@@ -203,10 +238,20 @@ class OtyaSupportService {
         final decoded = jsonDecode(text);
         if (decoded is Map) data = decoded.map((key, value) => MapEntry('$key', value));
       } catch (_) {}
+      _rememberConversation(data['conversation_id']);
       final answer = '${data['answer'] ?? ''}'.trim();
       if (answer.isEmpty) throw StateError(_error(data, 'Next returned an empty response.'));
-      yield OtyaSupportStreamEvent.delta(answer, modelId: data['model']?.toString(), modelName: data['model_name']?.toString());
-      yield OtyaSupportStreamEvent.done(modelId: data['model']?.toString(), modelName: data['model_name']?.toString());
+      yield OtyaSupportStreamEvent.delta(
+        answer,
+        modelId: data['model']?.toString(),
+        modelName: data['model_name']?.toString(),
+        conversationId: data['conversation_id']?.toString(),
+      );
+      yield OtyaSupportStreamEvent.done(
+        modelId: data['model']?.toString(),
+        modelName: data['model_name']?.toString(),
+        conversationId: data['conversation_id']?.toString(),
+      );
       return;
     }
 
@@ -225,13 +270,14 @@ class OtyaSupportService {
       }
       final event = OtyaSupportStreamEvent.fromJson(data);
       if (event.type.isEmpty) continue;
+      _rememberConversation(event.conversationId);
       if (event.isDone) sawDone = true;
       if (event.isError) {
         throw StateError(event.error?.trim().isNotEmpty == true ? event.error! : 'Next stopped responding. Please try again.');
       }
       yield event;
     }
-    if (!sawDone) yield OtyaSupportStreamEvent.done();
+    if (!sawDone) yield OtyaSupportStreamEvent.done(conversationId: _conversationId);
   }
 
   Future<OtyaSupportReply> ask(
@@ -246,6 +292,7 @@ class OtyaSupportService {
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw StateError(_error(data, 'Next is unavailable right now.'));
     }
+    _rememberConversation(data['conversation_id']);
     return OtyaSupportReply(
       answer: '${data['answer'] ?? ''}'.trim().isEmpty ? 'I could not answer that right now.' : '${data['answer']}'.trim(),
       inScope: data['scope'] != 'outside-otya',
