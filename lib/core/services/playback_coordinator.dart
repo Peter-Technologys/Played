@@ -19,7 +19,7 @@ class PlaybackCoordinator {
   Player? _activePlayer;
   String? _activeType;
   double? _speedBeforeBoost;
-  bool _switching = false;
+  Future<void> _switchQueue = Future<void>.value();
 
   final Map<Player, String> _registeredTypes = <Player, String>{};
   final Map<Player, StreamSubscription<bool>> _playingSubscriptions =
@@ -30,51 +30,67 @@ class PlaybackCoordinator {
   Player? get activePlayer => _activePlayer;
   String? get activeType => _activeType;
 
-  Future<void> register(Player player, String type) async {
+  /// Serializes ownership changes so a rapid audio -> video -> audio sequence
+  /// cannot drop the newest registration while another switch is awaiting a
+  /// pause. Callers may safely await this method before starting playback.
+  Future<void> register(Player player, String type) {
     _observe(player, type);
+
+    final operation = _switchQueue.then((_) => _registerNow(player, type));
+    _switchQueue = operation.catchError((Object error, StackTrace stack) {
+      debugPrint(
+        '[PlaybackCoordinator] Ownership switch failed: $error\n$stack',
+      );
+    });
+    return operation;
+  }
+
+  Future<void> _registerNow(Player player, String type) async {
+    // A queued registration may become stale if its player was disposed while
+    // waiting behind another switch. Do not resurrect an unregistered player.
+    if (!_registeredTypes.containsKey(player)) return;
+
     if (_activePlayer == player) {
       _activeType = type;
       return;
     }
 
-    if (_switching) return;
-    _switching = true;
-    try {
-      final previous = _activePlayer;
-      final previousType = _activeType;
+    final previous = _activePlayer;
+    final previousType = _activeType;
 
-      if (previous != null && previous != player && previous.state.playing) {
-        debugPrint(
-          '[PlaybackCoordinator] Pausing $previousType player before starting $type',
+    if (previous != null && previous != player && previous.state.playing) {
+      debugPrint(
+        '[PlaybackCoordinator] Pausing $previousType player before starting $type',
+      );
+      try {
+        await previous.pause().timeout(
+          pauseTimeout,
+          onTimeout: () {
+            debugPrint(
+              '[PlaybackCoordinator] $previousType pause timed out after '
+              '${pauseTimeout.inSeconds}s; continuing with $type',
+            );
+          },
         );
-        try {
-          await previous.pause().timeout(
-            pauseTimeout,
-            onTimeout: () {
-              debugPrint(
-                '[PlaybackCoordinator] $previousType pause timed out after '
-                '${pauseTimeout.inSeconds}s; continuing with $type',
-              );
-            },
-          );
-        } catch (e, st) {
-          debugPrint(
-            '[PlaybackCoordinator] Failed to pause $previousType player: $e\n$st',
-          );
-        }
+      } catch (e, st) {
+        debugPrint(
+          '[PlaybackCoordinator] Failed to pause $previousType player: $e\n$st',
+        );
       }
-
-      _activePlayer = player;
-      _activeType = type;
-      _speedBeforeBoost = null;
-
-      // DSP is optional and local to this MediaKit player. A filter failure is
-      // never allowed to block playback or the owner switch itself.
-      unawaited(MediaDspService.instance.applySaved(player));
-      debugPrint('[PlaybackCoordinator] Registered $type player');
-    } finally {
-      _switching = false;
     }
+
+    // Re-check after awaiting the previous player: the requested player may
+    // have been unregistered/disposed while the pause was in flight.
+    if (!_registeredTypes.containsKey(player)) return;
+
+    _activePlayer = player;
+    _activeType = type;
+    _speedBeforeBoost = null;
+
+    // DSP is optional and local to this MediaKit player. A filter failure is
+    // never allowed to block playback or the owner switch itself.
+    unawaited(MediaDspService.instance.applySaved(player));
+    debugPrint('[PlaybackCoordinator] Registered $type player');
   }
 
   void _observe(Player player, String type) {
@@ -83,7 +99,7 @@ class PlaybackCoordinator {
 
     _playingSubscriptions[player] = player.stream.playing.listen(
       (playing) {
-        if (!playing || _activePlayer == player || _switching) return;
+        if (!playing || _activePlayer == player) return;
         final registeredType = _registeredTypes[player] ?? type;
         unawaited(register(player, registeredType));
       },
