@@ -3,7 +3,7 @@
 // Surface contract markers retained here for automated review while the real
 // implementation lives in otya_support_screen_v3.dart:
 // - ScrollController
-// - Choose Next model
+// - Next provider routing stays server-side
 // - New chat
 // - Message Next
 // - Ask Otya Support
