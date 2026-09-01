@@ -29,6 +29,49 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Block tracked secret and signing files
+        shell: bash
+        run: |
+          set -euo pipefail
+          tracked="$(git ls-files)"
+          if printf '%s\n' "$tracked" | grep -E '(^|/)(\.env($|\.)|\.dev\.vars$|key\.properties$|keystore\.jks$|.*\.(jks|keystore|p12|pfx|pem|key)$|.*firebase-adminsdk.*\.json$|service-account.*\.json$)' | grep -Ev '(^|/)\.env\.example$'; then
+            echo '::error::Potential credential or signing material is tracked.'
+            exit 1
+          fi
+
+      - name: Block private keys and provider tokens
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git grep -n -I -E -- '^-----BEGIN (RSA |EC |OPENSSH )?PRIVATE KEY-----$'; then
+            echo '::error::Private key material is committed.'
+            exit 1
+          fi
+          if git grep -n -I -E -- '"type"[[:space:]]*:[[:space:]]*"service_account"'; then
+            echo '::error::A Google/Firebase service-account document is committed.'
+            exit 1
+          fi
+          if git grep -n -I -E -- '"private_key"[[:space:]]*:[[:space:]]*"-----BEGIN'; then
+            echo '::error::Embedded JSON private-key material is committed.'
+            exit 1
+          fi
+          if git grep -n -I -E -- '[0-9]{8,12}:[A-Za-z0-9_-]{25,}'; then
+            echo '::error::Possible Telegram bot token committed to source.'
+            exit 1
+          fi
+          if git grep -n -I -E -- '\bre_[A-Za-z0-9_-]{20,}\b'; then
+            echo '::error::Possible Resend API key committed to source.'
+            exit 1
+          fi
+          if git grep -n -I -E -- '\b(ghp|github_pat)_[A-Za-z0-9_]{20,}\b'; then
+            echo '::error::Possible GitHub access token committed to source.'
+            exit 1
+          fi
+          if git grep -n -I -E -- '\bsk-[A-Za-z0-9_-]{20,}\b'; then
+            echo '::error::Possible AI/provider secret key committed to source.'
+            exit 1
+          fi
+
       - name: Set up Java 17
         uses: actions/setup-java@v5
         with:
