@@ -251,9 +251,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
               enabled: !_busy,
               icon: const Icon(Icons.tune_rounded),
               onSelected: (id) => setState(() => _selectedModel = _models.firstWhere((m) => m.id == id)),
-              itemBuilder: (_) => _models
-                  .map((m) => PopupMenuItem(value: m.id, child: Text(m.name)))
-                  .toList(growable: false),
+              itemBuilder: (_) => _models.map((m) => PopupMenuItem(value: m.id, child: Text(m.name))).toList(growable: false),
             ),
           if (_messages.isNotEmpty)
             IconButton(tooltip: 'New chat', onPressed: _busy ? null : _newChat, icon: const Icon(Icons.edit_square)),
@@ -356,7 +354,12 @@ class _MessageBubble extends StatelessWidget {
                 const SizedBox(width: 8),
                 const Text('Responding', style: TextStyle(fontSize: 11, color: AppColors.textSecondary)),
               ] else if (onCopy != null)
-                IconButton.visualDensity(visualDensity: VisualDensity.compact, tooltip: 'Copy', onPressed: onCopy, icon: const Icon(Icons.copy_rounded, size: 17)),
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  tooltip: 'Copy',
+                  onPressed: onCopy,
+                  icon: const Icon(Icons.copy_rounded, size: 17),
+                ),
               if (onHandoff != null)
                 TextButton.icon(onPressed: onHandoff, icon: const Icon(Icons.support_agent_rounded, size: 17), label: const Text('Support')),
             ]),
