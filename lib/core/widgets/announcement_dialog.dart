@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../providers/theme_provider.dart';
 import '../services/remote_control_service.dart';
 import '../../app/theme/app_colors.dart';
 
@@ -8,7 +7,6 @@ class AnnouncementDialog extends StatelessWidget {
   final String title;
   final String message;
   final String buttonText;
-  final bool remoteControl;
 
   const AnnouncementDialog({
     super.key,
@@ -16,37 +14,20 @@ class AnnouncementDialog extends StatelessWidget {
     required this.title,
     required this.message,
     required this.buttonText,
-    required this.remoteControl,
   });
 
   static Future<void> showIfPending(BuildContext context) async {
     final remote = await RemoteControlService.instance.pendingAnnouncement();
-    if (remote != null && context.mounted) {
-      await showDialog<void>(
-        context: context,
-        barrierDismissible: false,
-        builder: (_) => AnnouncementDialog(
-          id: remote['id']?.toString() ?? 'remote',
-          title: remote['title']?.toString() ?? 'OTYA',
-          message: remote['message']?.toString() ?? '',
-          buttonText: remote['buttonText']?.toString() ?? 'Got it',
-          remoteControl: true,
-        ),
-      );
-      return;
-    }
+    if (remote == null || !context.mounted) return;
 
-    final legacy = await ThemeProvider.instance.pendingAnnouncement();
-    if (legacy == null || !context.mounted) return;
     await showDialog<void>(
       context: context,
       barrierDismissible: false,
       builder: (_) => AnnouncementDialog(
-        id: legacy.id,
-        title: legacy.title,
-        message: legacy.message,
-        buttonText: legacy.buttonText,
-        remoteControl: false,
+        id: remote['id']?.toString() ?? 'remote',
+        title: remote['title']?.toString() ?? 'OTYA',
+        message: remote['message']?.toString() ?? '',
+        buttonText: remote['buttonText']?.toString() ?? 'Got it',
       ),
     );
   }
@@ -81,11 +62,7 @@ class AnnouncementDialog extends StatelessWidget {
         actions: [
           ElevatedButton(
             onPressed: () async {
-              if (remoteControl) {
-                await RemoteControlService.instance.markAnnouncementSeen(id);
-              } else {
-                await ThemeProvider.instance.markAnnouncementSeen(id);
-              }
+              await RemoteControlService.instance.markAnnouncementSeen(id);
               if (context.mounted) Navigator.of(context).pop();
             },
             child: Text(buttonText),
