@@ -19,7 +19,7 @@ void main() {
 
     expect(account, contains('AccountLinkService.instance.addPrimaryEmail(email)'));
     expect(account, contains("title: 'Add email'"));
-    expect(account, contains('https://space.petersmartlink.com/u/$publicId/'));
+    expect(account, contains(r'https://space.petersmartlink.com/u/$publicId/'));
     expect(account, isNot(contains('https://petersmartlink.com/account#')));
   });
 
@@ -28,7 +28,7 @@ void main() {
     final linker = File('lib/core/services/account_link_service.dart').readAsStringSync();
 
     expect(google, contains('AccountLinkService.instance.linkGoogle(idToken)'));
-    expect(linker, contains("Uri.parse('$_kAuthBase/google/link')"));
-    expect(linker, contains("'Authorization': 'Bearer $token'"));
+    expect(linker, contains(r"Uri.parse('$_kAuthBase/google/link')"));
+    expect(linker, contains(r"'Authorization': 'Bearer $token'"));
   });
 }
