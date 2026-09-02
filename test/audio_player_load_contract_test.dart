@@ -13,7 +13,7 @@ void main() {
     expect(source, contains('required int generation'));
     expect(
       source,
-      contains("_loadGeneration == generation && _currentItemId == item.id"),
+      contains('_loadGeneration == generation && _currentItemId == item.id'),
     );
     expect(source, contains('final loaded = await _loadCurrent('));
     expect(source, contains('if (!loaded ||'));
