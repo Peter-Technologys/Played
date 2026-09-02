@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import 'account_link_service.dart';
 import 'auth_service.dart';
 import 'backup_service.dart';
 
@@ -64,13 +65,22 @@ class GoogleAccountService {
         );
       }
 
-      final result = await AuthService.instance.loginWithGoogle(
-        idToken,
-        '',
-        termsAccepted: termsAccepted,
-        privacyAccepted: privacyAccepted,
-        marketingConsent: marketingConsent,
-      );
+      // There is one OTYA identity model. If the device already has a valid
+      // OTYA session, Google is being added as another sign-in method for that
+      // current OTYA ID. Only a signed-out device may use the create-or-login
+      // Google endpoint. This prevents the Account screen from silently
+      // replacing a Telegram/email identity with a second account.
+      final hasOtyaSession = await AuthService.instance.checkIsLoggedIn();
+      final result = hasOtyaSession
+          ? await AccountLinkService.instance.linkGoogle(idToken)
+          : await AuthService.instance.loginWithGoogle(
+              idToken,
+              '',
+              termsAccepted: termsAccepted,
+              privacyAccepted: privacyAccepted,
+              marketingConsent: marketingConsent,
+            );
+
       if (result.ok) {
         _account = account;
         _driveAccessToken = null;
