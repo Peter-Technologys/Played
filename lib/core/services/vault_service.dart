@@ -1,5 +1,7 @@
+import 'dart:convert';
 import 'dart:io';
 
+import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
@@ -29,6 +31,9 @@ class VaultService {
         ? 'private_file_${DateTime.now().millisecondsSinceEpoch}'
         : clean;
   }
+
+  static String _privateStorageId(String mediaId) =>
+      sha256.convert(utf8.encode(mediaId)).toString();
 
   static Future<void> _assertWithinVault(String path) async {
     final base = await getApplicationDocumentsDirectory();
@@ -106,12 +111,16 @@ class VaultService {
   }
 
   Future<VaultItem> lockItem(MediaItem item) async {
+    if (OtyaDatabase.instance.getVaultItem(item.id) != null) {
+      throw StateError('This media item is already in Private.');
+    }
+
     final dir = await _vaultDir;
     final rawExt = item.fileName.contains('.')
         ? item.fileName.split('.').last
         : 'bin';
     final privateExt = _sanitizeFileName('file.$rawExt').split('.').last;
-    final privateId = _sanitizeFileName(item.id);
+    final privateId = _privateStorageId(item.id);
     final vaultPath = '${dir.path}/$privateId.$privateExt';
     await _assertWithinVault(vaultPath);
 
@@ -120,11 +129,31 @@ class VaultService {
       throw FileSystemException('Source file not found', item.filePath);
     }
 
-    final copied = await source.copy(vaultPath);
-    if (!await copied.exists()) {
-      throw FileSystemException('Could not create Private copy', vaultPath);
+    final target = File(vaultPath);
+    var reservedTarget = false;
+    try {
+      // File.copy() overwrites its destination. Reserve the protected path
+      // atomically first so concurrent/duplicate lock attempts can never
+      // overwrite an existing Private copy.
+      await target.create(exclusive: true);
+      reservedTarget = true;
+      final sourceLength = await source.length();
+      final copied = await source.copy(vaultPath);
+      if (!await copied.exists() || await copied.length() != sourceLength) {
+        throw FileSystemException('Could not create complete Private copy', vaultPath);
+      }
+    } catch (_) {
+      // Delete only a target reserved by this attempt. If exclusive creation
+      // failed, an existing protected file belongs to another operation.
+      if (reservedTarget) {
+        try {
+          if (await target.exists()) await target.delete();
+        } catch (_) {}
+      }
+      rethrow;
     }
 
+    final copied = target;
     final vaultItem = VaultItem(
       mediaId: item.id,
       originalPath: item.filePath,
