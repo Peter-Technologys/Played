@@ -5,7 +5,8 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   test('public app version remains 1.0.0 with a positive internal build', () {
     final pubspec = File('pubspec.yaml').readAsStringSync();
-    final match = RegExp(r'^version:\s*(\S+)\s*$', multiLine: true).firstMatch(pubspec);
+    final match =
+        RegExp(r'^version:\s*(\S+)\s*$', multiLine: true).firstMatch(pubspec);
 
     expect(match, isNotNull);
     final version = match!.group(1)!;
@@ -26,12 +27,18 @@ void main() {
     expect(directRelease, contains('actions/checkout@v6'));
   });
 
-  test('direct release build enforces the v1.0.0 version identity', () {
+  test('all release publishing is locked to the first official v1.0.0 tag', () {
     final directRelease =
         File('.github/workflows/release-apk.yml').readAsStringSync();
+    final release = File('.github/workflows/release.yml').readAsStringSync();
 
     expect(directRelease, contains('Verify v1.0.0 release identity'));
     expect(directRelease, contains(r'^1\.0\.0\+[1-9][0-9]*$'));
+    expect(release, contains("- 'v1.0.0'"));
+    expect(release, contains("test \"\$TAG\" = 'v1.0.0'"));
+    expect(release, contains(r'^1\.0\.0\+[1-9][0-9]*$'));
+    expect(release, isNot(contains("'v[0-9]*.[0-9]*.[0-9]*'")));
+    expect(release, contains('actions/checkout@v6'));
   });
 
   test('retired Online Music cannot return as a release dependency', () {
