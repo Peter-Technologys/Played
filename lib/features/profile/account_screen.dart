@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../core/services/account_link_service.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/consent_service.dart';
@@ -58,7 +59,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (widget.focusVerification &&
         !_verificationPromptShown &&
         profile != null &&
-        profile.email?.trim().isNotEmpty == true &&
+        profile.hasEmail &&
         !profile.isVerified) {
       _verificationPromptShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -75,14 +76,70 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     });
   }
 
+  Future<void> _addEmail() async {
+    if (_busy) return;
+    final controller = TextEditingController();
+    final email = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const OtyaLogo(iconOnly: true, fontSize: 48),
+        title: const Text('Add email to OTYA'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Email address',
+              hintText: 'you@example.com',
+            ),
+            onSubmitted: (value) {
+              final clean = value.trim().toLowerCase();
+              if (clean.contains('@')) Navigator.pop(dialogContext, clean);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final clean = controller.text.trim().toLowerCase();
+              if (clean.contains('@')) Navigator.pop(dialogContext, clean);
+            },
+            child: const Text('Add email'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (email == null || !mounted) return;
+
+    _setBusy(true);
+    setState(() => _message = null);
+    final result = await AccountLinkService.instance.addPrimaryEmail(email);
+    if (!mounted) return;
+    _setBusy(false);
+    if (!result.ok) {
+      setState(() => _message = result.error ?? 'That email could not be added.');
+      return;
+    }
+
+    await _refresh();
+    if (!mounted) return;
+    setState(() => _message = 'Email added. Verify it to finish connecting this sign-in method.');
+  }
+
   Future<void> _verifyEmail() async {
     if (_busy) return;
-    final email = _profile?.email?.trim();
-    if (email == null || email.isEmpty) {
-      if (mounted) {
-        setState(() => _message =
-            'This account does not have a primary email yet. Add one from Otya Space before requesting email verification.');
-      }
+    final profile = _profile;
+    if (profile == null || !profile.hasEmail) {
+      setState(() => _message = 'Add an email address to this OTYA account before verifying it.');
       return;
     }
 
@@ -123,7 +180,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 decoration: const InputDecoration(
                   counterText: '',
                   hintText: 'A0000',
-                  labelText: 'Otya verification code',
+                  labelText: 'OTYA verification code',
                 ),
                 onChanged: (value) {
                   final clean = value
@@ -192,12 +249,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
       await ref.read(authNotifierProvider.notifier).signIn(
             userId: user.id,
-            displayName: user.name ?? user.email ?? 'Otya user',
+            displayName: user.name ?? user.email ?? user.otyaId ?? 'OTYA user',
             email: user.email,
             photoUrl: user.avatarUrl,
           );
       await _refresh();
-      if (mounted) setState(() => _message = 'Google account connected.');
+      if (mounted) setState(() => _message = 'Google account connected to this OTYA ID.');
     } catch (_) {
       if (mounted) {
         setState(() => _message = 'Google sign-in could not be completed.');
@@ -228,7 +285,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Accept current policies?'),
         content: const Text(
-          'Review the current Terms and Privacy Policy first. Your acceptance is stored with your Otya account.',
+          'Review the current Terms and Privacy Policy first. Your acceptance is stored with your OTYA account.',
         ),
         actions: [
           TextButton(
@@ -293,7 +350,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       builder: (dialogContext) => AlertDialog(
         title: const Text('Delete playlist backup?'),
         content: const Text(
-          'This removes the Otya recovery snapshot from your private Google Drive app folder. It does not delete playlists already stored on this phone.',
+          'This removes the OTYA recovery snapshot from your private Google Drive app folder. It does not delete playlists already stored on this phone.',
         ),
         actions: [
           TextButton(
@@ -336,13 +393,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _openAccountCenter(String section, String title) {
+    final publicId = _profile?.otyaId?.trim().toUpperCase();
+    final validPublicId = publicId != null && RegExp(r'^2IS\d{8}$').hasMatch(publicId);
+    final canonicalSection = switch (section) {
+      'sessions' => 'devices',
+      'connected' => 'providers',
+      _ => section,
+    };
+    final url = validPublicId
+        ? 'https://space.petersmartlink.com/u/$publicId/$canonicalSection'
+        : 'https://space.petersmartlink.com/account#$section';
+
     context.push(
       '/webview',
       extra: {
-        'url': 'https://space.petersmartlink.com/account#$section',
+        'url': url,
         'title': title,
       },
     );
+  }
+
+  void _openSignInMethods() {
+    final publicId = _profile?.otyaId?.trim().toUpperCase();
+    final validPublicId = publicId != null && RegExp(r'^2IS\d{8}$').hasMatch(publicId);
+    final url = validPublicId
+        ? 'https://space.petersmartlink.com/u/$publicId/account/sign-in-methods'
+        : 'https://space.petersmartlink.com/account/sign-in-methods/';
+    context.push('/webview', extra: {'url': url, 'title': 'Sign-in methods'});
   }
 
   Future<void> _signOut() async {
@@ -358,9 +435,9 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Delete Otya account?'),
+        title: const Text('Delete OTYA account?'),
         content: const Text(
-          'This permanently deletes your Otya cloud account and account data. Media and Private files stored locally on this phone are not deleted.',
+          'This permanently deletes your OTYA cloud account and account data. Media and Private files stored locally on this phone are not deleted.',
         ),
         actions: [
           TextButton(
@@ -465,28 +542,26 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   Widget _securityAndPrivacy(UserProfile profile) {
-    final hasEmail = profile.email?.trim().isNotEmpty == true;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         const _SectionLabel('Security'),
         _CardGroup(
           children: [
-            if (hasEmail && !profile.isVerified) ...[
+            if (!profile.hasEmail) ...[
+              _AccountTile(
+                icon: Icons.alternate_email_rounded,
+                title: 'Add email',
+                subtitle: 'Add an email to this same OTYA ID for recovery and another sign-in method',
+                onTap: _addEmail,
+              ),
+              const _InsetDivider(),
+            ] else if (!profile.isVerified) ...[
               _AccountTile(
                 icon: Icons.verified_outlined,
                 title: 'Verify email',
-                subtitle: 'Confirm your account email with an Otya code',
+                subtitle: 'Confirm your account email with an OTYA code',
                 onTap: _verifyEmail,
-              ),
-              const _InsetDivider(),
-            ],
-            if (!hasEmail) ...[
-              _AccountTile(
-                icon: Icons.alternate_email_rounded,
-                title: 'Primary email',
-                subtitle: 'Add an email from Otya Space for email recovery and verification',
-                onTap: () => _openAccountCenter('sign-in-methods', 'Sign-in methods'),
               ),
               const _InsetDivider(),
             ],
@@ -496,9 +571,16 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ? 'Google connected'
                   : 'Connect Google',
               subtitle: GoogleAccountService.instance.hasGoogleSession
-                  ? 'Google is linked to this Otya account'
-                  : 'Use Google as another secure way to access this same Otya account',
+                  ? 'Google is linked to this OTYA account'
+                  : 'Use Google as another secure way to access this same OTYA account',
               onTap: _connectGoogle,
+            ),
+            const _InsetDivider(),
+            _AccountTile(
+              icon: Icons.link_rounded,
+              title: 'Sign-in methods',
+              subtitle: 'Manage email, Google and Telegram for this one OTYA ID',
+              onTap: _openSignInMethods,
             ),
             const _InsetDivider(),
             _AccountTile(
@@ -523,7 +605,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _AccountTile(
               icon: Icons.description_outlined,
               title: 'Terms of Service',
-              subtitle: 'Read the current Otya Terms',
+              subtitle: 'Read the current OTYA Terms',
               onTap: () => context.push(
                 '/webview',
                 extra: const {
@@ -536,7 +618,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _AccountTile(
               icon: Icons.privacy_tip_outlined,
               title: 'Privacy Policy',
-              subtitle: 'Review how Otya handles service and account data',
+              subtitle: 'Review how OTYA handles service and account data',
               onTap: () => context.push('/privacy'),
             ),
             if (_consent != null && !_consent!.legalCurrent) ...[
@@ -558,7 +640,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   color: AppColors.accent,
                 ),
                 title: const Text(
-                  'Otya news & promotions',
+                  'OTYA news & promotions',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
                 subtitle: const Text(
@@ -582,7 +664,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 14, 16, 4),
               child: Text(
-                'Otya currently backs up playlist names and saved media references. Media files, Private files and app settings stay on this device.',
+                'OTYA currently backs up playlist names and saved media references. Media files, Private files and app settings stay on this device.',
                 style: TextStyle(
                   fontSize: 12.5,
                   height: 1.45,
@@ -600,14 +682,14 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _AccountTile(
               icon: Icons.cloud_download_rounded,
               title: 'Restore playlists',
-              subtitle: 'Restore playlists from a compatible Otya recovery snapshot',
+              subtitle: 'Restore playlists from a compatible OTYA recovery snapshot',
               onTap: _restorePlaylists,
             ),
             const _InsetDivider(),
             _AccountTile(
               icon: Icons.delete_outline_rounded,
               title: 'Delete Drive backup',
-              subtitle: 'Remove only the Otya recovery snapshot from Google Drive',
+              subtitle: 'Remove only the OTYA recovery snapshot from Google Drive',
               onTap: _deletePlaylistBackup,
             ),
           ],
@@ -626,7 +708,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
             _AccountTile(
               icon: Icons.delete_forever_rounded,
               title: 'Delete account',
-              subtitle: 'Permanently delete Otya cloud account data',
+              subtitle: 'Permanently delete OTYA cloud account data',
               danger: true,
               onTap: _deleteAccount,
             ),
@@ -660,7 +742,7 @@ class _SignedOutAccount extends StatelessWidget {
               const OtyaLogo(iconOnly: true, fontSize: 78),
               const SizedBox(height: 20),
               Text(
-                'Your Otya account',
+                'Your OTYA account',
                 textAlign: TextAlign.center,
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                       fontWeight: FontWeight.w900,
@@ -699,12 +781,21 @@ class _IdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initialSource = (profile.name ?? profile.email ?? 'Otya').trim();
-    final initial = initialSource.isEmpty
-        ? 'O'
-        : initialSource.characters.first.toUpperCase();
+    final initialSource = (profile.name ?? profile.email ?? profile.otyaId ?? 'OTYA').trim();
+    final initial = initialSource.isEmpty ? 'O' : initialSource.characters.first.toUpperCase();
     final scheme = Theme.of(context).colorScheme;
-    final hasEmail = profile.email?.trim().isNotEmpty == true;
+    final hasEmail = profile.hasEmail;
+    final emailLabel = hasEmail ? profile.email! : 'No primary email added';
+    final statusLabel = !hasEmail
+        ? 'Email not added'
+        : profile.isVerified
+            ? 'Email verified'
+            : 'Email verification needed';
+    final statusText = !hasEmail
+        ? 'Add email for recovery and another sign-in method'
+        : profile.isVerified
+            ? 'Verified'
+            : 'Verification needed';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -738,7 +829,7 @@ class _IdentityCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.name ?? profile.email ?? 'Otya user',
+                  profile.name ?? profile.otyaId ?? 'OTYA User',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -746,20 +837,29 @@ class _IdentityCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (profile.otyaId?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    profile.otyaId!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: scheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 3),
                 Text(
-                  profile.email ?? 'No primary email added',
+                  emailLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 8),
                 Semantics(
-                  label: !hasEmail
-                      ? 'No primary email'
-                      : profile.isVerified
-                          ? 'Email verified'
-                          : 'Email verification needed',
+                  label: statusLabel,
                   child: Row(
                     children: [
                       Icon(
@@ -769,28 +869,20 @@ class _IdentityCard extends StatelessWidget {
                                 ? Icons.verified_rounded
                                 : Icons.info_outline_rounded,
                         size: 16,
-                        color: !hasEmail
-                            ? scheme.onSurfaceVariant
-                            : profile.isVerified
-                                ? AppColors.accentGreen
-                                : AppColors.warning,
+                        color: profile.isVerified && hasEmail
+                            ? AppColors.accentGreen
+                            : AppColors.warning,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          !hasEmail
-                              ? 'Provider-only account'
-                              : profile.isVerified
-                                  ? 'Verified'
-                                  : 'Verification needed',
+                          statusText,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: !hasEmail
-                                ? scheme.onSurfaceVariant
-                                : profile.isVerified
-                                    ? AppColors.accentGreen
-                                    : AppColors.warning,
+                            color: profile.isVerified && hasEmail
+                                ? AppColors.accentGreen
+                                : AppColors.warning,
                           ),
                         ),
                       ),
