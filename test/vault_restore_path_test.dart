@@ -64,5 +64,32 @@ void main() {
             'before surfacing the error.',
       );
     });
+
+    test('source contract never overwrites an existing Private lock target', () {
+      final source = File(
+        'lib/core/services/vault_service.dart',
+      ).readAsStringSync();
+
+      expect(source, contains('sha256.convert(utf8.encode(mediaId)).toString()'));
+      expect(source, contains('await target.create(exclusive: true);'));
+      expect(source, contains('var reservedTarget = false;'));
+      expect(source, contains('reservedTarget = true;'));
+      expect(
+        source,
+        contains('if (reservedTarget) {'),
+        reason: 'A failed exclusive reservation must never delete a target '
+            'that existed before this lock attempt.',
+      );
+      expect(
+        source,
+        contains("throw StateError('This media item is already in Private.');"),
+      );
+      expect(
+        source,
+        contains('await copied.length() != sourceLength'),
+        reason: 'The original media must not be removed unless the protected '
+            'copy has the expected byte length.',
+      );
+    });
   });
 }
