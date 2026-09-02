@@ -1,7 +1,5 @@
 import 'dart:async';
 
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -10,7 +8,6 @@ import '../../app/theme/app_colors.dart';
 import '../../core/models/media_item.dart';
 import '../../core/models/playlist.dart';
 import '../../core/services/otya_support_service.dart';
-import '../music/online/online_music_service.dart';
 import '../my_space/presentation/providers/my_space_provider.dart';
 import '../player/presentation/mini_player.dart';
 import '../player/presentation/queue_screen.dart';
@@ -55,25 +52,19 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final _ai = OtyaSupportService.instance;
-  final _onlineMusic = OnlineMusicService.instance;
 
-  Timer? _onlineDebounce;
-  int _onlineGeneration = 0;
   String _query = '';
   String? _aiAnswer;
   String? _aiError;
   bool _asking = false;
-  bool _onlineLoading = false;
-  List<OnlineTrack> _onlineTracks = const [];
 
   static const _help = <_HelpHit>[
-    _HelpHit('Add subtitles', 'Open a video and use the CC control. OTYA can select embedded subtitle tracks when they are available.', ['subtitle', 'subtitles', 'caption', 'captions', 'cc']),
-    _HelpHit('Media is missing', 'Open OTYA Settings and review Android media permissions, then refresh Video or Music. Local scanning never requires an account.', ['missing', 'scan', 'media', 'library', 'permission']),
+    _HelpHit('Add subtitles', 'Open a video and use the CC control. Otya can select embedded subtitle tracks when they are available.', ['subtitle', 'subtitles', 'caption', 'captions', 'cc']),
+    _HelpHit('Media is missing', 'Open Otya Settings and review Android media permissions, then refresh Video or Music. Local scanning never requires an account.', ['missing', 'scan', 'media', 'library', 'permission']),
     _HelpHit('Transfer files', 'Open Me → Transfer. Keep both devices on the same Wi-Fi or hotspot, then scan the sender QR code or open its local link.', ['transfer', 'send', 'receive', 'nearby', 'qr', 'computer']),
-    _HelpHit('Convert video to audio', 'Open Me → Converter and choose a local video. OTYA extracts its existing audio track on the device without uploading it.', ['convert', 'converter', 'extract audio', 'm4a']),
-    _HelpHit('Private media', 'Open Me → Private. Protected media stays in OTYA app-private storage until you restore it.', ['private', 'vault', 'lock', 'hide media']),
+    _HelpHit('Convert video to audio', 'Open Me → Converter and choose a local video. Otya extracts its existing audio track on the device without uploading it.', ['convert', 'converter', 'extract audio', 'm4a']),
+    _HelpHit('Private media', 'Open Me → Private. Protected media stays in Otya app-private storage until you restore it.', ['private', 'vault', 'lock', 'hide media']),
     _HelpHit('Downloads', 'Playable files in Android Download/Downloads folders automatically belong to Video or Music after scanning. Me → Files → Downloads shows that subset.', ['download', 'downloads', 'downloaded']),
-    _HelpHit('Online music', 'When internet is available, Search can also show legal online music. Local songs and downloaded music remain available without internet.', ['online music', 'jamendo', 'stream', 'streaming', 'online song']),
   ];
 
   @override
@@ -84,7 +75,6 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
 
   @override
   void dispose() {
-    _onlineDebounce?.cancel();
     _controller.dispose();
     _focusNode.dispose();
     super.dispose();
@@ -159,50 +149,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
       _query = value;
       _aiAnswer = null;
       _aiError = null;
-      if (value.trim().length < 2) {
-        _onlineTracks = const [];
-        _onlineLoading = false;
-      }
     });
-    _scheduleOnlineSearch(value);
-  }
-
-  void _scheduleOnlineSearch(String value) {
-    _onlineDebounce?.cancel();
-    final query = value.trim();
-    final generation = ++_onlineGeneration;
-    if (query.length < 2) return;
-    _onlineDebounce = Timer(const Duration(milliseconds: 380), () {
-      _searchOnline(query, generation);
-    });
-  }
-
-  Future<void> _searchOnline(String query, int generation) async {
-    try {
-      final connectivity = await Connectivity().checkConnectivity();
-      if (!mounted || generation != _onlineGeneration) return;
-      if (connectivity.every((result) => result == ConnectivityResult.none)) {
-        setState(() {
-          _onlineLoading = false;
-          _onlineTracks = const [];
-        });
-        return;
-      }
-
-      setState(() => _onlineLoading = true);
-      final tracks = await _onlineMusic.search(query, limit: 10);
-      if (!mounted || generation != _onlineGeneration || _query.trim() != query) return;
-      setState(() {
-        _onlineTracks = tracks.take(10).toList(growable: false);
-        _onlineLoading = false;
-      });
-    } catch (_) {
-      if (!mounted || generation != _onlineGeneration) return;
-      setState(() {
-        _onlineTracks = const [];
-        _onlineLoading = false;
-      });
-    }
   }
 
   Future<void> _askAi() async {
@@ -218,7 +165,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
       if (mounted) setState(() => _aiAnswer = reply.answer);
     } catch (_) {
       if (mounted) {
-        setState(() => _aiError = 'Ask OTYA is unavailable right now. Local Search and offline help still work.');
+        setState(() => _aiError = 'Next is unavailable right now. Local Search and offline help still work.');
       }
     } finally {
       if (mounted) setState(() => _asking = false);
@@ -238,15 +185,6 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
     ref.read(queueProvider.notifier).setQueue(queue, startIndex: index < 0 ? 0 : index);
     if (!item.isVideo) ref.read(miniPlayerItemProvider.notifier).state = item;
     _closeThen(() => context.push(item.isVideo ? '/player/video' : '/player/audio', extra: item));
-  }
-
-  void _openOnlineTrack(OnlineTrack track) {
-    final queue = _onlineTracks.map((entry) => entry.toMediaItem()).toList(growable: false);
-    final item = track.toMediaItem();
-    final index = queue.indexWhere((entry) => entry.id == item.id);
-    ref.read(queueProvider.notifier).setQueue(queue, startIndex: index < 0 ? 0 : index);
-    ref.read(miniPlayerItemProvider.notifier).state = item;
-    _closeThen(() => context.push('/player/audio', extra: item));
   }
 
   void _openGroup(_GroupHit hit) {
@@ -287,9 +225,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
         media.isEmpty &&
         groups.isEmpty &&
         playlistHits.isEmpty &&
-        help.isEmpty &&
-        _onlineTracks.isEmpty &&
-        !_onlineLoading;
+        help.isEmpty;
 
     return Column(
       children: [
@@ -313,22 +249,18 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
             },
             onChanged: _queryChanged,
             decoration: InputDecoration(
-              hintText: 'Search OTYA',
+              hintText: 'Search Otya',
               prefixIcon: const Icon(Icons.search_rounded),
               suffixIcon: _query.isEmpty
                   ? null
                   : IconButton(
                       tooltip: 'Clear',
                       onPressed: () {
-                        _onlineDebounce?.cancel();
-                        _onlineGeneration++;
                         _controller.clear();
                         setState(() {
                           _query = '';
                           _aiAnswer = null;
                           _aiError = null;
-                          _onlineTracks = const [];
-                          _onlineLoading = false;
                         });
                       },
                       icon: const Icon(Icons.close_rounded),
@@ -401,43 +333,8 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
                             onTap: () => _openMedia(item, library),
                           )),
                     ],
-                    if (_onlineLoading || _onlineTracks.isNotEmpty) ...[
-                      _SectionLabel(
-                        'Online music',
-                        _onlineLoading ? 'Checking…' : '${_onlineTracks.length}',
-                      ),
-                      if (_onlineLoading && _onlineTracks.isEmpty)
-                        const LinearProgressIndicator(minHeight: 2)
-                      else
-                        ..._onlineTracks.map((track) => ListTile(
-                              contentPadding: const EdgeInsets.symmetric(horizontal: 4),
-                              leading: ClipRRect(
-                                borderRadius: BorderRadius.circular(10),
-                                child: SizedBox.square(
-                                  dimension: 44,
-                                  child: track.artworkUrl.isEmpty
-                                      ? const ColoredBox(
-                                          color: AppColors.surfaceElevated,
-                                          child: Icon(Icons.music_note_rounded, color: AppColors.accent),
-                                        )
-                                      : CachedNetworkImage(
-                                          imageUrl: track.artworkUrl,
-                                          fit: BoxFit.cover,
-                                          errorWidget: (_, __, ___) => const ColoredBox(
-                                            color: AppColors.surfaceElevated,
-                                            child: Icon(Icons.music_note_rounded, color: AppColors.accent),
-                                          ),
-                                        ),
-                                ),
-                              ),
-                              title: Text(track.title, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
-                              subtitle: Text('${track.artist} · Online', maxLines: 1, overflow: TextOverflow.ellipsis),
-                              trailing: const Icon(Icons.play_arrow_rounded),
-                              onTap: () => _openOnlineTrack(track),
-                            )),
-                    ],
                     if (help.isNotEmpty) ...[
-                      _SectionLabel('OTYA help', '${help.length}'),
+                      _SectionLabel('Otya help', '${help.length}'),
                       ...help.map((entry) => Container(
                             margin: const EdgeInsets.only(bottom: 9),
                             padding: const EdgeInsets.all(14),
@@ -456,7 +353,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
                           )),
                     ],
                     if (noLocalAnswer || _aiAnswer != null || _aiError != null) ...[
-                      _SectionLabel('Ask OTYA', noLocalAnswer ? 'Online help' : ''),
+                      _SectionLabel('Next', noLocalAnswer ? 'Optional online help' : ''),
                       if (_aiAnswer != null)
                         Container(
                           padding: const EdgeInsets.all(15),
@@ -501,10 +398,10 @@ class _SearchStart extends StatelessWidget {
             children: [
               Icon(Icons.manage_search_rounded, size: 48, color: AppColors.accent),
               SizedBox(height: 14),
-              Text('Search OTYA', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
+              Text('Search Otya', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
               SizedBox(height: 7),
               Text(
-                'Local songs, videos, albums, artists, folders and playlists appear instantly. When internet is available, OTYA can add online music without slowing or blocking offline search.',
+                'Search local songs, videos, albums, artists, folders and playlists on this device. Search does not contact a music provider while you type.',
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
               ),
