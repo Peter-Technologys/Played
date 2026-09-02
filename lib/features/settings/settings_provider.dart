@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -164,10 +166,19 @@ class AppSettings {
 class SettingsNotifier extends StateNotifier<AppSettings> {
   SettingsNotifier(super.initial);
 
-  /// Applies settings loaded from local storage after OTYA has rendered its
+  final Completer<AppSettings> _startupHydration = Completer<AppSettings>();
+
+  /// Completes exactly once when the startup privacy/settings load has either
+  /// produced saved settings or deliberately fallen back to safe defaults.
+  Future<AppSettings> get startupHydration => _startupHydration.future;
+
+  /// Applies settings loaded from local storage after Otya has rendered its
   /// first frame. Hydration must not write them back or touch native services.
   void hydrate(AppSettings settings) {
     state = settings;
+    if (!_startupHydration.isCompleted) {
+      _startupHydration.complete(settings);
+    }
   }
 
   Future<void> _update(AppSettings s) async {

@@ -74,10 +74,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
   Future<void> _hydrateStartupPrivacyAndOnboarding() async {
     try {
+      // Start the onboarding preference read at the same time, but keep the
+      // privacy settings load explicit: App Lock must be hydrated before the
+      // router can be revealed.
       final prefsFuture = SharedPreferences.getInstance();
-      final settingsFuture = AppSettings.load();
+      final savedSettings = await AppSettings.load();
       final prefs = await prefsFuture;
-      final savedSettings = await settingsFuture;
       if (!mounted) return;
       ref.read(settingsProvider.notifier).hydrate(savedSettings);
       setState(() {
@@ -85,6 +87,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         _checking = false;
       });
     } catch (_) {
+      ref.read(settingsProvider.notifier).hydrate(const AppSettings());
       if (mounted) {
         setState(() {
           _onboardingDone = true;
@@ -137,7 +140,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
     if (_checking) {
       return MaterialApp(
-        title: 'OTYA',
+        title: 'Otya',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.light,
         darkTheme: _darkTheme(settings.themeMode),
@@ -157,12 +160,12 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
                 const OtyaLogo(iconOnly: true, fontSize: 68),
                 const SizedBox(height: 16),
                 Text(
-                  'OTYA',
+                  'Otya',
                   style: TextStyle(
                     color: AppColors.textPrimaryOf(context),
                     fontSize: 18,
                     fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
+                    letterSpacing: 1.2,
                     fontFamily: 'Inter',
                   ),
                 ),

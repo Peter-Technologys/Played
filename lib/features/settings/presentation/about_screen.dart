@@ -12,7 +12,7 @@ import '../../../core/widgets/rate_us_sheet.dart';
 import '../../../core/widgets/update_dialog.dart';
 import '../../../shared/widgets/otya_logo.dart';
 
-/// Help & About stays useful even when online support is unavailable.
+/// Product information and support entry points that stay useful offline.
 class AboutScreen extends StatefulWidget {
   const AboutScreen({super.key});
 
@@ -39,139 +39,116 @@ class _AboutScreenState extends State<AboutScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-        elevation: 0,
-        scrolledUnderElevation: 0,
+        title: const Text('About Otya'),
         leading: IconButton(
-          icon: Icon(
-            Icons.arrow_back_ios_new_rounded,
-            color: Theme.of(context).colorScheme.onSurface,
-            size: 20,
-          ),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: Text(
-          'Help & About',
-          style: TextStyle(
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontFamily: 'Inter',
-          ),
+          tooltip: 'Back',
+          icon: const Icon(Icons.arrow_back_rounded),
+          onPressed: () => context.canPop() ? context.pop() : context.go('/myspace'),
         ),
       ),
       body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 40),
+        padding: EdgeInsets.fromLTRB(
+          16,
+          8,
+          16,
+          MediaQuery.paddingOf(context).bottom + 32,
+        ),
         children: [
-          const SizedBox(height: 8),
-          _AppCard(version: _version, buildNumber: _build),
+          _ProductCard(version: _version, buildNumber: _build),
           const SizedBox(height: 24),
-          const _SectionHeader(label: 'Support'),
-          const SizedBox(height: 10),
+          const _SectionHeader('Support'),
           _GroupCard(
             children: [
               _NavTile(
                 icon: Icons.auto_awesome_rounded,
-                label: 'Ask OTYA',
-                subtitle: 'Help with OTYA features, playback and problems',
-                color: AppColors.accentViolet,
+                label: 'Next',
+                subtitle: 'Ask a question or get help with Otya',
                 onTap: () => context.push('/support'),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.bug_report_outlined,
                 label: 'Report a problem',
-                subtitle: 'Send a problem report to OTYA Support',
-                color: AppColors.accentAmber,
+                subtitle: 'Email Otya Support with a problem report',
                 onTap: () => _launchEmail(
                   context,
-                  subject: 'OTYA Player Problem Report',
+                  subject: 'Otya Problem Report',
                 ),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.email_outlined,
                 label: 'Email support',
                 subtitle: 'support@petersmartlink.com',
-                color: AppColors.accent,
                 onTap: () => _launchEmail(context),
               ),
             ],
           ),
           const SizedBox(height: 24),
-          const _SectionHeader(label: 'About'),
-          const SizedBox(height: 10),
+          const _SectionHeader('Product'),
           _GroupCard(
             children: [
               _NavTile(
                 icon: Icons.language_rounded,
-                label: 'OTYA website',
+                label: 'Otya website',
                 subtitle: 'Official product website',
-                color: AppColors.accent,
                 onTap: () => context.push(
                   '/webview',
-                  extra: {'url': Environment.websiteUrl, 'title': 'OTYA'},
+                  extra: {'url': Environment.websiteUrl, 'title': 'Otya'},
                 ),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.description_outlined,
                 label: 'Help & docs',
                 subtitle: 'Guides, account, privacy and support',
-                color: AppColors.accentViolet,
                 onTap: () => context.push(
                   '/webview',
-                  extra: {'url': Environment.docsUrl, 'title': 'OTYA Docs'},
+                  extra: {'url': Environment.docsUrl, 'title': 'Otya Docs'},
                 ),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.system_update_outlined,
                 label: 'Check for updates',
-                subtitle: 'Check for a newer OTYA version',
-                color: AppColors.accent,
+                subtitle: 'Check the official Otya release service',
                 onTap: () => _checkForUpdates(context),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.new_releases_outlined,
                 label: 'What’s new',
-                subtitle: 'See what changed in this version',
-                color: AppColors.accentViolet,
+                subtitle: 'See what changed in this build',
                 onTap: () => context.push('/whats-new'),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.share_rounded,
-                label: 'Share OTYA',
-                subtitle: 'Send OTYA to a friend',
-                color: AppColors.accentGreen,
+                label: 'Share Otya',
+                subtitle: 'Send the official download page to a friend',
                 onTap: () => _shareApp(context),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.privacy_tip_outlined,
                 label: 'Privacy',
-                subtitle: 'How OTYA handles your data',
-                color: AppColors.textSecondary,
+                subtitle: 'How Otya handles account and service data',
                 onTap: () => context.push('/privacy'),
               ),
-              _Divider(),
+              const _Divider(),
               _NavTile(
                 icon: Icons.star_outline_rounded,
-                label: 'Rate OTYA',
-                subtitle: 'Send your rating directly to OTYA',
-                color: AppColors.accentAmber,
+                label: 'Rate Otya',
+                subtitle: 'Send product feedback and a rating',
                 onTap: () => RateUsSheet.show(context),
               ),
             ],
           ),
-          const SizedBox(height: 32),
+          const SizedBox(height: 28),
           Center(
             child: Text(
-              _version.isEmpty ? 'OTYA' : 'OTYA v$_version',
+              _version.isEmpty ? 'Otya' : 'Otya v$_version · build $_build',
               style: const TextStyle(
                 fontSize: 12,
                 color: AppColors.textMuted,
@@ -204,17 +181,13 @@ class _AboutScreenState extends State<AboutScreen> {
             SizedBox(
               width: 16,
               height: 16,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: AppColors.accent,
-              ),
+              child: CircularProgressIndicator(strokeWidth: 2),
             ),
             SizedBox(width: 12),
             Text('Checking for updates…'),
           ],
         ),
         duration: Duration(seconds: 30),
-        backgroundColor: AppColors.surface,
       ),
     );
     try {
@@ -223,10 +196,7 @@ class _AboutScreenState extends State<AboutScreen> {
       if (!context.mounted) return;
       if (info == null) {
         messenger.showSnackBar(
-          const SnackBar(
-            content: Text('You have the latest version.'),
-            backgroundColor: AppColors.surface,
-          ),
+          const SnackBar(content: Text('Otya is up to date.')),
         );
       } else {
         await UpdateDialog.checkAndShow(context);
@@ -236,8 +206,7 @@ class _AboutScreenState extends State<AboutScreen> {
       if (!context.mounted) return;
       messenger.showSnackBar(
         const SnackBar(
-          content: Text('Could not check. Make sure you have internet.'),
-          backgroundColor: AppColors.error,
+          content: Text('Could not check for updates. Check your connection and try again.'),
         ),
       );
     }
@@ -245,7 +214,7 @@ class _AboutScreenState extends State<AboutScreen> {
 
   Future<void> _launchEmail(
     BuildContext context, {
-    String subject = 'OTYA Player Support',
+    String subject = 'Otya Support',
   }) async {
     final uri = Uri(
       scheme: 'mailto',
@@ -254,10 +223,7 @@ class _AboutScreenState extends State<AboutScreen> {
     );
     if (!await launchUrl(uri) && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open email app.'),
-          backgroundColor: AppColors.error,
-        ),
+        const SnackBar(content: Text('Could not open an email app.')),
       );
     }
   }
@@ -266,194 +232,160 @@ class _AboutScreenState extends State<AboutScreen> {
     try {
       final info = await PackageInfo.fromPlatform();
       await Share.share(
-        'Download OTYA v${info.version} — an offline-first media player for Android:\n${Environment.downloadPageUrl}',
-        subject: 'OTYA',
+        'Otya v${info.version} is an offline-first media player for Android. Download it from the official page:\n${Environment.downloadPageUrl}',
+        subject: 'Otya',
       );
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Could not open sharing right now.'),
-          backgroundColor: AppColors.error,
-        ),
+        const SnackBar(content: Text('Could not open sharing right now.')),
       );
     }
   }
 }
 
-class _AppCard extends StatelessWidget {
+class _ProductCard extends StatelessWidget {
+  const _ProductCard({required this.version, required this.buildNumber});
+
   final String version;
   final String buildNumber;
-  const _AppCard({required this.version, required this.buildNumber});
 
   @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.all(2),
-        decoration: BoxDecoration(
-          gradient: const LinearGradient(
-            colors: [AppColors.accent, AppColors.accentViolet],
-          ),
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.accent.withValues(alpha: 0.18),
-              blurRadius: 24,
-            ),
-          ],
-        ),
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            color: Theme.of(context).colorScheme.surface,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: Column(
-            children: [
-              const OtyaMark(size: 72),
-              const SizedBox(height: 16),
-              const Text(
-                'OTYA',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.w800,
-                  color: AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                  letterSpacing: -0.3,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Video, music and sharing in one place.',
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              const SizedBox(height: 8),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 5),
-                decoration: BoxDecoration(
-                  color: AppColors.accent.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(
-                    color: AppColors.accent.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Text(
-                  version.isEmpty
-                      ? 'Loading…'
-                      : 'Version $version (build $buildNumber)',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.accent,
-                    fontFamily: 'Inter',
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'support@petersmartlink.com',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              const SizedBox(height: 20),
-              const Divider(color: AppColors.border, height: 1),
-              const SizedBox(height: 20),
-              const Text(
-                'Play, organise and share local audio and video with an offline-first experience. Online help and account features are optional.',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
-                  height: 1.6,
-                  fontFamily: 'Inter',
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-}
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final versionLabel = version.isEmpty
+        ? 'Reading version…'
+        : 'Version $version · build $buildNumber';
 
-class _SectionHeader extends StatelessWidget {
-  final String label;
-  const _SectionHeader({required this.label});
-
-  @override
-  Widget build(BuildContext context) => Row(
+    return Container(
+      padding: const EdgeInsets.all(22),
+      decoration: BoxDecoration(
+        color: AppColors.cardOf(context),
+        borderRadius: BorderRadius.circular(26),
+        border: Border.all(color: AppColors.borderOf(context)),
+      ),
+      child: Column(
         children: [
           Container(
-            width: 3,
-            height: 14,
+            width: 88,
+            height: 88,
+            alignment: Alignment.center,
             decoration: BoxDecoration(
-              gradient: const LinearGradient(
-                colors: [AppColors.accent, AppColors.accentViolet],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-              borderRadius: BorderRadius.circular(2),
+              color: scheme.surfaceContainerHighest,
+              borderRadius: BorderRadius.circular(28),
+            ),
+            child: const OtyaMark(size: 68),
+          ),
+          const SizedBox(height: 16),
+          const Text(
+            'Otya',
+            style: TextStyle(
+              fontSize: 26,
+              fontWeight: FontWeight.w900,
+              fontFamily: 'Inter',
+              letterSpacing: -.6,
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            label.toUpperCase(),
-            style: const TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
+          const SizedBox(height: 6),
+          const Text(
+            'Your media. Your way.',
+            style: TextStyle(
+              fontSize: 13,
               color: AppColors.textSecondary,
-              letterSpacing: 1.4,
+              fontFamily: 'Inter',
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 7),
+            decoration: BoxDecoration(
+              color: scheme.primaryContainer,
+              borderRadius: BorderRadius.circular(99),
+            ),
+            child: Text(
+              versionLabel,
+              style: TextStyle(
+                fontSize: 12,
+                color: scheme.onPrimaryContainer,
+                fontWeight: FontWeight.w700,
+                fontFamily: 'Inter',
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
+          const Text(
+            'Play and organize local music and video, move supported media nearby, protect private media and use Next when you want connected help. Core playback stays offline-first.',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 13,
+              color: AppColors.textSecondary,
+              height: 1.55,
               fontFamily: 'Inter',
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader(this.label);
+  final String label;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 0, 4, 9),
+        child: Text(
+          label,
+          style: const TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.w900,
+            fontFamily: 'Inter',
+          ),
+        ),
       );
 }
 
 class _GroupCard extends StatelessWidget {
-  final List<Widget> children;
   const _GroupCard({required this.children});
+  final List<Widget> children;
 
   @override
   Widget build(BuildContext context) => Container(
         decoration: BoxDecoration(
-          color: Theme.of(context).colorScheme.surface,
-          borderRadius: BorderRadius.circular(16),
+          color: AppColors.cardOf(context),
+          borderRadius: BorderRadius.circular(22),
           border: Border.all(color: AppColors.borderOf(context)),
         ),
+        clipBehavior: Clip.antiAlias,
         child: Column(children: children),
       );
 }
 
 class _Divider extends StatelessWidget {
+  const _Divider();
+
   @override
   Widget build(BuildContext context) => Divider(
         height: 1,
-        thickness: 1,
+        indent: 58,
         color: AppColors.borderOf(context),
-        indent: 16,
-        endIndent: 16,
       );
 }
 
 class _NavTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String? subtitle;
-  final Color color;
-  final VoidCallback onTap;
-
   const _NavTile({
     required this.icon,
     required this.label,
-    this.subtitle,
-    required this.color,
+    required this.subtitle,
     required this.onTap,
   });
+
+  final IconData icon;
+  final String label;
+  final String subtitle;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) => ListTile(
@@ -462,38 +394,18 @@ class _NavTile extends StatelessWidget {
           onTap();
         },
         leading: Container(
-          width: 36,
-          height: 36,
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.12),
-            borderRadius: BorderRadius.circular(10),
+            color: AppColors.accent.withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(12),
           ),
-          child: Icon(icon, color: color, size: 18),
+          child: Icon(icon, color: AppColors.accent, size: 21),
         ),
-        title: Text(
-          label,
-          style: TextStyle(
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
-            color: Theme.of(context).colorScheme.onSurface,
-            fontFamily: 'Inter',
-          ),
-        ),
-        subtitle: subtitle == null
-            ? null
-            : Text(
-                subtitle!,
-                style: const TextStyle(
-                  fontSize: 11,
-                  color: AppColors.textSecondary,
-                  fontFamily: 'Inter',
-                ),
-              ),
-        trailing: const Icon(
-          Icons.chevron_right_rounded,
-          color: AppColors.textSecondary,
-          size: 18,
-        ),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        title: Text(label, style: const TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       );
 }

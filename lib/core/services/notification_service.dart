@@ -4,23 +4,25 @@ import 'package:url_launcher/url_launcher.dart';
 
 import 'shared_notification_plugin.dart';
 
-/// Manages OTYA local notifications.
+/// Manages Otya local notifications.
 ///
 /// Notification permission is deliberately NOT requested from [init]. On
-/// Android 13+ the user first sees OTYA's onboarding explanation, then the
-/// platform prompt is requested contextually.
+/// Android 13+ Otya asks only when an ordinary notification feature needs it;
+/// local MediaSession playback controls do not depend on this service's prompt.
 class NotificationService {
   NotificationService._();
   static final NotificationService instance = NotificationService._();
+
+  static const _officialHost = 'petersmartlink.com';
 
   Future<void> init() async {
     await initSharedNotificationsPlugin();
     debugPrint('[Notifications] Initialized.');
   }
 
-  /// Requests Android 13+ notification permission after OTYA has explained
-  /// that it is used for Now Playing controls, lock-screen playback and tool
-  /// progress. Older Android versions return true without a runtime prompt.
+  /// Requests Android 13+ permission for ordinary Otya notifications such as
+  /// completed tools, security notices and updates. Older Android versions
+  /// return true without a runtime prompt.
   Future<bool> requestPermission() async {
     final android = sharedNotificationsPlugin
         .resolvePlatformSpecificImplementation<
@@ -46,9 +48,11 @@ class NotificationService {
 
   bool _isSafePayload(Uri uri) {
     if (uri.scheme == 'file') return uri.path.isNotEmpty;
-    if (uri.scheme != 'https' && uri.scheme != 'http') return false;
-    if (uri.host.isEmpty || uri.userInfo.isNotEmpty) return false;
-    return true;
+    if (uri.scheme != 'https' || uri.host.isEmpty || uri.userInfo.isNotEmpty) {
+      return false;
+    }
+    final host = uri.host.toLowerCase();
+    return host == _officialHost || host.endsWith('.$_officialHost');
   }
 
   Future<void> _openPayload(String payload) async {
@@ -75,7 +79,7 @@ class NotificationService {
     final safeProgress = progress.clamp(0, 100).toInt();
     final androidDetails = AndroidNotificationDetails(
       'com.otyaplayer.app.tools.progress',
-      'OTYA Player Tools — Progress',
+      'Otya Tools — Progress',
       channelDescription: 'Audio extraction and video trim progress (silent)',
       importance: Importance.low,
       priority: Priority.low,
@@ -101,7 +105,7 @@ class NotificationService {
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'com.otyaplayer.app.tools.complete',
-      'OTYA Player Tools — Complete',
+      'Otya Tools — Complete',
       channelDescription: 'Audio extraction and video trim completion alerts',
       importance: Importance.high,
       priority: Priority.high,
@@ -124,7 +128,7 @@ class NotificationService {
   }) async {
     const androidDetails = AndroidNotificationDetails(
       'com.otyaplayer.app.tools.error',
-      'OTYA Player Tools — Error',
+      'Otya Tools — Error',
       channelDescription: 'Audio extraction and video trim error alerts',
       importance: Importance.high,
       priority: Priority.high,
