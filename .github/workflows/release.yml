@@ -94,9 +94,14 @@ jobs:
             exit 1
           }
           VERSION_NAME="${APP_VERSION%%+*}"
+          BUILD_NUMBER="${APP_VERSION##*+}"
           EXPECTED_VERSION="${RELEASE_TAG#v}"
           test "$VERSION_NAME" = "$EXPECTED_VERSION" || {
             echo "ERROR: release tag $RELEASE_TAG does not match pubspec version $VERSION_NAME"
+            exit 1
+          }
+          [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
+            echo "ERROR: release build number must be a positive integer"
             exit 1
           }
 
