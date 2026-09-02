@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../core/services/account_link_service.dart';
 import '../../core/services/auth_provider.dart';
 import '../../core/services/auth_service.dart';
 import '../../core/services/consent_service.dart';
@@ -58,6 +59,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     if (widget.focusVerification &&
         !_verificationPromptShown &&
         profile != null &&
+        profile.hasEmail &&
         !profile.isVerified) {
       _verificationPromptShown = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -74,8 +76,73 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     });
   }
 
+  Future<void> _addEmail() async {
+    if (_busy) return;
+    final controller = TextEditingController();
+    final email = await showDialog<String>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        icon: const OtyaLogo(iconOnly: true, fontSize: 48),
+        title: const Text('Add email to OTYA'),
+        content: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 420),
+          child: TextField(
+            controller: controller,
+            autofocus: true,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.done,
+            autocorrect: false,
+            decoration: const InputDecoration(
+              labelText: 'Email address',
+              hintText: 'you@example.com',
+            ),
+            onSubmitted: (value) {
+              final clean = value.trim().toLowerCase();
+              if (clean.contains('@')) Navigator.pop(dialogContext, clean);
+            },
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final clean = controller.text.trim().toLowerCase();
+              if (clean.contains('@')) Navigator.pop(dialogContext, clean);
+            },
+            child: const Text('Add email'),
+          ),
+        ],
+      ),
+    );
+    controller.dispose();
+    if (email == null || !mounted) return;
+
+    _setBusy(true);
+    setState(() => _message = null);
+    final result = await AccountLinkService.instance.addPrimaryEmail(email);
+    if (!mounted) return;
+    _setBusy(false);
+    if (!result.ok) {
+      setState(() => _message = result.error ?? 'That email could not be added.');
+      return;
+    }
+
+    await _refresh();
+    if (!mounted) return;
+    setState(() => _message = 'Email added. Verify it to finish connecting this sign-in method.');
+  }
+
   Future<void> _verifyEmail() async {
     if (_busy) return;
+    final profile = _profile;
+    if (profile == null || !profile.hasEmail) {
+      setState(() => _message = 'Add an email address to this OTYA account before verifying it.');
+      return;
+    }
+
     _setBusy(true);
     setState(() => _message = null);
 
@@ -182,12 +249,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       }
       await ref.read(authNotifierProvider.notifier).signIn(
             userId: user.id,
-            displayName: user.name ?? user.email,
+            displayName: user.name ?? user.email ?? user.otyaId ?? 'OTYA user',
             email: user.email,
             photoUrl: user.avatarUrl,
           );
       await _refresh();
-      if (mounted) setState(() => _message = 'Google account connected.');
+      if (mounted) setState(() => _message = 'Google account connected to this OTYA ID.');
     } catch (_) {
       if (mounted) {
         setState(() => _message = 'Google sign-in could not be completed.');
@@ -326,13 +393,33 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   }
 
   void _openAccountCenter(String section, String title) {
+    final publicId = _profile?.otyaId?.trim().toUpperCase();
+    final validPublicId = publicId != null && RegExp(r'^2IS\d{8}$').hasMatch(publicId);
+    final canonicalSection = switch (section) {
+      'sessions' => 'devices',
+      'connected' => 'providers',
+      _ => section,
+    };
+    final url = validPublicId
+        ? 'https://space.petersmartlink.com/u/$publicId/$canonicalSection'
+        : 'https://space.petersmartlink.com/account#$section';
+
     context.push(
       '/webview',
       extra: {
-        'url': 'https://petersmartlink.com/account#$section',
+        'url': url,
         'title': title,
       },
     );
+  }
+
+  void _openSignInMethods() {
+    final publicId = _profile?.otyaId?.trim().toUpperCase();
+    final validPublicId = publicId != null && RegExp(r'^2IS\d{8}$').hasMatch(publicId);
+    final url = validPublicId
+        ? 'https://space.petersmartlink.com/u/$publicId/account/sign-in-methods'
+        : 'https://space.petersmartlink.com/account/sign-in-methods/';
+    context.push('/webview', extra: {'url': url, 'title': 'Sign-in methods'});
   }
 
   Future<void> _signOut() async {
@@ -461,7 +548,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         const _SectionLabel('Security'),
         _CardGroup(
           children: [
-            if (!profile.isVerified) ...[
+            if (!profile.hasEmail) ...[
+              _AccountTile(
+                icon: Icons.alternate_email_rounded,
+                title: 'Add email',
+                subtitle: 'Add an email to this same OTYA ID for recovery and another sign-in method',
+                onTap: _addEmail,
+              ),
+              const _InsetDivider(),
+            ] else if (!profile.isVerified) ...[
               _AccountTile(
                 icon: Icons.verified_outlined,
                 title: 'Verify email',
@@ -479,6 +574,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   ? 'Google is linked to this OTYA account'
                   : 'Use Google as another secure way to access this same OTYA account',
               onTap: _connectGoogle,
+            ),
+            const _InsetDivider(),
+            _AccountTile(
+              icon: Icons.link_rounded,
+              title: 'Sign-in methods',
+              subtitle: 'Manage email, Google and Telegram for this one OTYA ID',
+              onTap: _openSignInMethods,
             ),
             const _InsetDivider(),
             _AccountTile(
@@ -679,9 +781,21 @@ class _IdentityCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final initialSource = (profile.name ?? profile.email).trim();
+    final initialSource = (profile.name ?? profile.email ?? profile.otyaId ?? 'OTYA').trim();
     final initial = initialSource.isEmpty ? 'O' : initialSource.characters.first.toUpperCase();
     final scheme = Theme.of(context).colorScheme;
+    final hasEmail = profile.hasEmail;
+    final emailLabel = hasEmail ? profile.email! : 'No primary email added';
+    final statusLabel = !hasEmail
+        ? 'Email not added'
+        : profile.isVerified
+            ? 'Email verified'
+            : 'Email verification needed';
+    final statusText = !hasEmail
+        ? 'Add email for recovery and another sign-in method'
+        : profile.isVerified
+            ? 'Verified'
+            : 'Verification needed';
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -715,7 +829,7 @@ class _IdentityCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  profile.name ?? 'OTYA User',
+                  profile.name ?? profile.otyaId ?? 'OTYA User',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -723,39 +837,50 @@ class _IdentityCard extends StatelessWidget {
                     fontWeight: FontWeight.w900,
                   ),
                 ),
+                if (profile.otyaId?.trim().isNotEmpty == true) ...[
+                  const SizedBox(height: 3),
+                  Text(
+                    profile.otyaId!,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: scheme.primary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 3),
                 Text(
-                  profile.email,
+                  emailLabel,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: scheme.onSurfaceVariant),
                 ),
                 const SizedBox(height: 8),
                 Semantics(
-                  label: profile.isVerified
-                      ? 'Email verified'
-                      : 'Email verification needed',
+                  label: statusLabel,
                   child: Row(
                     children: [
                       Icon(
-                        profile.isVerified
-                            ? Icons.verified_rounded
-                            : Icons.info_outline_rounded,
+                        !hasEmail
+                            ? Icons.alternate_email_rounded
+                            : profile.isVerified
+                                ? Icons.verified_rounded
+                                : Icons.info_outline_rounded,
                         size: 16,
-                        color: profile.isVerified
+                        color: profile.isVerified && hasEmail
                             ? AppColors.accentGreen
                             : AppColors.warning,
                       ),
                       const SizedBox(width: 6),
                       Flexible(
                         child: Text(
-                          profile.isVerified
-                              ? 'Verified'
-                              : 'Verification needed',
+                          statusText,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w700,
-                            color: profile.isVerified
+                            color: profile.isVerified && hasEmail
                                 ? AppColors.accentGreen
                                 : AppColors.warning,
                           ),
