@@ -69,7 +69,7 @@ class AuthNotifier extends Notifier<AuthState> {
 
   Future<void> signIn({
     required String userId,
-    required String displayName,
+    String? displayName,
     String? email,
     String? photoUrl,
   }) async {
@@ -86,18 +86,27 @@ class AuthNotifier extends Notifier<AuthState> {
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('otya_user_id', authenticatedUserId);
-    await prefs.setString('otya_user_name', displayName);
+    final resolvedName = displayName?.trim();
+    if (resolvedName != null && resolvedName.isNotEmpty) {
+      await prefs.setString('otya_user_name', resolvedName);
+    } else {
+      await prefs.remove('otya_user_name');
+    }
     final resolvedEmail = email ?? AuthService.instance.userEmail;
     if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
       await prefs.setString('otya_user_email', resolvedEmail);
+    } else {
+      await prefs.remove('otya_user_email');
     }
-    if (photoUrl != null) {
+    if (photoUrl != null && photoUrl.isNotEmpty) {
       await prefs.setString('otya_user_avatar', photoUrl);
+    } else {
+      await prefs.remove('otya_user_avatar');
     }
 
     state = AuthState(
       userId: authenticatedUserId,
-      displayName: displayName,
+      displayName: resolvedName,
       email: resolvedEmail,
       photoUrl: photoUrl,
     );
