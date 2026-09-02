@@ -49,19 +49,7 @@ abstract final class Environment {
   static const String apiVersionUrl = '$workerUrl/api/version';
   static const String apiDeviceUrl = '$workerUrl/api/device';
   static const String apiFeedbackUrl = '$workerUrl/api/feedback';
-  static const String onlineMusicUrl = '$workerUrl/api/music/jamendo';
   static const String latestUrl = '$workerUrl/latest';
-
-  // Spotify client ID and redirect URI are public OAuth application metadata,
-  // not credentials. The Spotify client secret must never be shipped here.
-  static const String spotifyClientId = String.fromEnvironment(
-    'SPOTIFY_CLIENT_ID',
-    defaultValue: '',
-  );
-  static const String spotifyRedirectUri = String.fromEnvironment(
-    'SPOTIFY_REDIRECT_URI',
-    defaultValue: 'https://petersmartlink.com/auth/spotify/callback',
-  );
 
   static const String arm64DownloadUrl = '$workerUrl/apk/arm64';
   static const String arm32DownloadUrl = '$workerUrl/apk/arm32';
