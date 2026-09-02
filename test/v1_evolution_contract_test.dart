@@ -27,6 +27,15 @@ void main() {
     expect(directRelease, contains('actions/checkout@v6'));
   });
 
+  test('test APK verification uses the Android signing verifier', () {
+    final workflow =
+        File('.github/workflows/test-apk.yml').readAsStringSync();
+
+    expect(workflow, contains('apksigner'));
+    expect(workflow, contains('verify --verbose --print-certs'));
+    expect(workflow, isNot(contains(r'keytool -printcert -jarfile "$APK"')));
+  });
+
   test('all release publishing is locked to the first official v1.0.0 tag', () {
     final directRelease =
         File('.github/workflows/release-apk.yml').readAsStringSync();

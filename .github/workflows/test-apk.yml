@@ -153,7 +153,9 @@ jobs:
           test -f "$APK" || { echo "ERROR: Otya test APK not found"; exit 1; }
           test "$(stat -c%s "$APK")" -gt 5000000 || { echo "ERROR: APK is too small"; exit 1; }
           sha256sum "$APK" | tee build/Otya-test-checksum.txt
-          keytool -printcert -jarfile "$APK" | tee build/Otya-test-signing.txt
+          APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
+          test -x "$APKSIGNER" || { echo "ERROR: Android apksigner was not found"; exit 1; }
+          "$APKSIGNER" verify --verbose --print-certs "$APK" | tee build/Otya-test-signing.txt
 
       - name: Save Otya test APK
         uses: actions/upload-artifact@v4
