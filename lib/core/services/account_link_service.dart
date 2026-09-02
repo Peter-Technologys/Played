@@ -21,7 +21,7 @@ class AccountLinkService {
     if (token == null) {
       return const AuthResult(
         ok: false,
-        error: 'Sign in to the OTYA account you want to keep first.',
+        error: 'Sign in to the Otya account you want to keep first.',
       );
     }
 
@@ -34,7 +34,10 @@ class AccountLinkService {
         },
         body: jsonEncode({'id_token': idToken}),
       ).timeout(_timeout);
-      return _profileResult(response, fallback: 'Google could not be connected to this OTYA account.');
+      return _profileResult(
+        response,
+        fallback: 'Google could not be connected to this Otya account.',
+      );
     } catch (error) {
       debugPrint('[AccountLink] Google link failed: ${error.runtimeType}');
       return const AuthResult(
@@ -47,7 +50,7 @@ class AccountLinkService {
   Future<AuthResult> addPrimaryEmail(String email) async {
     final token = await AuthService.instance.getValidToken();
     if (token == null) {
-      return const AuthResult(ok: false, error: 'Sign in to OTYA first.');
+      return const AuthResult(ok: false, error: 'Sign in to Otya first.');
     }
 
     final normalized = email.trim().toLowerCase();
@@ -64,12 +67,15 @@ class AccountLinkService {
         },
         body: jsonEncode({'email': normalized}),
       ).timeout(_timeout);
-      return _profileResult(response, fallback: 'That email could not be added to this OTYA account.');
+      return _profileResult(
+        response,
+        fallback: 'That email could not be added to this Otya account.',
+      );
     } catch (error) {
       debugPrint('[AccountLink] Add email failed: ${error.runtimeType}');
       return const AuthResult(
         ok: false,
-        error: 'OTYA could not add that email right now. Check your connection and try again.',
+        error: 'Otya could not add that email right now. Check your connection and try again.',
       );
     }
   }
@@ -80,7 +86,9 @@ class AccountLinkService {
       if (decoded is! Map<String, dynamic>) {
         return AuthResult(ok: false, error: fallback);
       }
-      if (response.statusCode >= 200 && response.statusCode < 300 && decoded['ok'] == true) {
+      if (response.statusCode >= 200 &&
+          response.statusCode < 300 &&
+          decoded['ok'] == true) {
         final userJson = decoded['user'];
         final user = userJson is Map<String, dynamic>
             ? UserProfile.fromJson(userJson)
