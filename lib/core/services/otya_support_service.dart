@@ -166,13 +166,19 @@ class OtyaSupportService {
   }
 
   Future<Map<String, String>> _headers() async {
-    final token = await AuthService.instance.getValidToken();
-    return FirebasePlatformService.instance.protectedHeaders(
-      base: {
-        'Content-Type': 'application/json',
-        if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
-      },
-    );
+    // Token refresh and App Check are independent. Starting both immediately
+    // avoids adding their latency together before Next can open its request.
+    final authTokenFuture = AuthService.instance.getValidToken();
+    final appCheckTokenFuture =
+        FirebasePlatformService.instance.appCheckToken();
+    final token = await authTokenFuture;
+    final appCheckToken = await appCheckTokenFuture;
+    return <String, String>{
+      'Content-Type': 'application/json',
+      if (token != null && token.isNotEmpty) 'Authorization': 'Bearer $token',
+      if (appCheckToken != null && appCheckToken.isNotEmpty)
+        'X-Firebase-AppCheck': appCheckToken,
+    };
   }
 
   List<Map<String, String>> _safeHistory(List<Map<String, String>> history) {

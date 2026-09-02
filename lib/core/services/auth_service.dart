@@ -601,19 +601,43 @@ class AuthService {
       if (res.statusCode >= 200 &&
           res.statusCode < 300 &&
           data['ok'] == true) {
-        final accessToken = data['access_token'] as String?;
-        final refreshToken = data['refresh_token'] as String?;
-        final userJson = data['user'] as Map<String, dynamic>?;
-        final user = userJson != null ? UserProfile.fromJson(userJson) : null;
+        final accessTokenValue = data['access_token'];
+        final refreshTokenValue = data['refresh_token'];
+        final userValue = data['user'];
+
+        // Treat login/create as one atomic session. Never save a refresh token,
+        // access token, or profile independently when the backend returned a
+        // partial success payload.
+        if (accessTokenValue is! String ||
+            accessTokenValue.trim().isEmpty ||
+            refreshTokenValue is! String ||
+            refreshTokenValue.trim().isEmpty ||
+            userValue is! Map<String, dynamic>) {
+          return const AuthResult(
+            ok: false,
+            error:
+                'Authentication service returned incomplete session data. Please try again.',
+          );
+        }
+
+        final user = UserProfile.fromJson(userValue);
+        if (user.id.trim().isEmpty) {
+          return const AuthResult(
+            ok: false,
+            error:
+                'Authentication service returned incomplete session data. Please try again.',
+          );
+        }
+
         await _persist(
-          accessToken: accessToken,
-          refreshToken: refreshToken,
+          accessToken: accessTokenValue,
+          refreshToken: refreshTokenValue,
           user: user,
         );
         return AuthResult(
           ok: true,
-          accessToken: accessToken,
-          refreshToken: refreshToken,
+          accessToken: accessTokenValue,
+          refreshToken: refreshTokenValue,
           user: user,
         );
       }

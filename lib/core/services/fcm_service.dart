@@ -33,6 +33,8 @@ class FcmService {
 
   static const _keyFcmToken = 'fcm_token';
   bool _initialized = false;
+  bool _listenersAttached = false;
+  Future<void>? _initInFlight;
 
   /// Public destinations that a backend notification is allowed to open.
   /// This is intentionally an allow-list: a remote push must not be able to
@@ -56,44 +58,73 @@ class FcmService {
 
   Future<void> init() async {
     if (_initialized) return;
-    _initialized = true;
+    final existing = _initInFlight;
+    if (existing != null) return existing;
 
+    final attempt = _initOnce();
+    _initInFlight = attempt;
+    try {
+      await attempt;
+    } finally {
+      if (identical(_initInFlight, attempt)) _initInFlight = null;
+    }
+  }
+
+  Future<void> _initOnce() async {
     if (!Platform.isAndroid) {
       debugPrint('[FCM] Android transport not required on this platform.');
+      _initialized = true;
       return;
     }
     if (!OtyaFirebaseConfig.configured) {
       debugPrint('[FCM] Disabled: Firebase build configuration is incomplete.');
+      _initialized = true;
       return;
     }
 
     try {
       if (!await FirebasePlatformService.instance.ensureInitialized()) return;
-      FirebaseMessaging.onBackgroundMessage(otyaFirebaseBackgroundHandler);
 
       final messaging = FirebaseMessaging.instance;
       await messaging.setAutoInitEnabled(true);
 
-      FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
-      FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
-      messaging.onTokenRefresh.listen((token) {
-        _storeAndRegister(token).ignore();
-      });
-
-      final initialMessage = await messaging.getInitialMessage();
-      if (initialMessage != null) {
-        await _handleOpenedMessage(initialMessage);
+      if (!_listenersAttached) {
+        FirebaseMessaging.onBackgroundMessage(otyaFirebaseBackgroundHandler);
+        FirebaseMessaging.onMessage.listen(_handleForegroundMessage);
+        FirebaseMessaging.onMessageOpenedApp.listen(_handleOpenedMessage);
+        messaging.onTokenRefresh.listen((token) {
+          _storeAndRegister(token).ignore();
+        });
+        _listenersAttached = true;
       }
 
-      final token = await messaging.getToken();
-      if (token != null && token.isNotEmpty) {
-        await _storeAndRegister(token);
-      } else {
-        final prefs = await SharedPreferences.getInstance();
-        final cached = prefs.getString(_keyFcmToken);
-        if (cached != null && cached.isNotEmpty) {
-          await _registerWithBackend(cached);
+      // The transport is ready now. Initial-message lookup and token sync are
+      // recoverable follow-up work and must not attach duplicate listeners on a
+      // later init attempt.
+      _initialized = true;
+
+      try {
+        final initialMessage = await messaging.getInitialMessage();
+        if (initialMessage != null) {
+          await _handleOpenedMessage(initialMessage);
         }
+      } catch (e) {
+        debugPrint('[FCM] initial message lookup failed (non-fatal): $e');
+      }
+
+      try {
+        final token = await messaging.getToken();
+        if (token != null && token.isNotEmpty) {
+          await _storeAndRegister(token);
+        } else {
+          final prefs = await SharedPreferences.getInstance();
+          final cached = prefs.getString(_keyFcmToken);
+          if (cached != null && cached.isNotEmpty) {
+            await _registerWithBackend(cached);
+          }
+        }
+      } catch (e) {
+        debugPrint('[FCM] initial token sync failed (non-fatal): $e');
       }
 
       debugPrint('[FCM] Initialized and token sync requested.');
