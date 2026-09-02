@@ -21,7 +21,7 @@ jobs:
     timeout-minutes: 55
     steps:
       - name: Checkout exact current head
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -45,11 +45,21 @@ jobs:
       - name: Run code generation
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Flutter analysis
-        run: flutter analyze --no-fatal-infos
+      - name: Flutter analysis — zero issues required
+        run: flutter analyze
 
       - name: Flutter tests
         run: flutter test
+
+      - name: Verify v1.0.0 release identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' pubspec.yaml)"
+          [[ "$APP_VERSION" =~ ^1\.0\.0\+[1-9][0-9]*$ ]] || {
+            echo "ERROR: first-release evolution must remain 1.0.0+<positive build>; found $APP_VERSION"
+            exit 1
+          }
 
       - name: Verify required release configuration
         env:
@@ -131,7 +141,7 @@ jobs:
             echo "ERROR: release APK certificate does not match the configured Otya signing key"
             exit 1
           }
-          cp "$APK" build/OTYA-arm64-release.apk
+          cp "$APK" build/Otya-arm64-release.apk
 
       - name: Upload signed release APK
         uses: actions/upload-artifact@v4
@@ -140,7 +150,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
           path: |
-            build/OTYA-arm64-release.apk
+            build/Otya-arm64-release.apk
             build/release-apk-sha256.txt
             build/release-apk-signing-cert.txt
 
