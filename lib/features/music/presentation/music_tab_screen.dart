@@ -9,7 +9,6 @@ import '../../../shared/widgets/album_art_thumb.dart';
 import '../../../shared/widgets/otya_logo.dart';
 import '../../../shared/widgets/permission_denied_screen.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
-import '../online/online_music_screen.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
@@ -72,7 +71,7 @@ class _MusicTabScreenState extends ConsumerState<MusicTabScreen>
               );
             }
             return _LibraryError(
-              message: 'OTYA could not refresh your music library.',
+              message: 'Otya could not refresh your music library.',
               onRetry: () => ref.read(mediaLibraryProvider.notifier).refresh(),
             );
           },
@@ -239,17 +238,7 @@ class _Header extends StatelessWidget {
               ),
             ),
             IconButton(
-              tooltip: 'Online Music',
-              onPressed: () {
-                HapticFeedback.selectionClick();
-                Navigator.of(context).push(
-                  MaterialPageRoute<void>(builder: (_) => const OnlineMusicScreen()),
-                );
-              },
-              icon: const Icon(Icons.public_rounded),
-            ),
-            IconButton(
-              tooltip: 'Search OTYA',
+              tooltip: 'Search Otya',
               onPressed: () {
                 HapticFeedback.selectionClick();
                 SmartSearchSheet.show(context);
@@ -350,7 +339,7 @@ class _EmptyMusic extends StatelessWidget {
               const SizedBox(height: 14),
               const Text('No music found', style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800)),
               const SizedBox(height: 7),
-              const Text('OTYA shows playable audio discovered by Android MediaStore. Check media permissions if songs are missing.', textAlign: TextAlign.center),
+              const Text('Otya shows playable audio discovered by Android MediaStore. Check media permissions if songs are missing.', textAlign: TextAlign.center),
             ],
           ),
         ),

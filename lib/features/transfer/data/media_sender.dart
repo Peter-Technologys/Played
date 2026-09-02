@@ -4,7 +4,7 @@ import 'dart:math';
 
 import 'package:flutter/foundation.dart';
 
-/// Pure Dart local HTTP sender for OTYA Transfer.
+/// Pure Dart local HTTP sender for Otya Transfer.
 ///
 /// No cloud relay is used. A cryptographically random one-time token protects
 /// the serving URL, and Range requests allow a matching receiver to resume an
@@ -12,6 +12,21 @@ import 'package:flutter/foundation.dart';
 class MediaSender {
   static const int _preferredPort = 8080;
   static const int _chunkBytes = 256 * 1024;
+  static const Set<String> _supportedExtensions = {
+    'mp4',
+    'mkv',
+    'avi',
+    'mov',
+    'webm',
+    'ts',
+    'mp3',
+    'aac',
+    'flac',
+    'wav',
+    'ogg',
+    'm4a',
+    'opus',
+  };
 
   HttpServer? _server;
   String? _filePath;
@@ -36,6 +51,10 @@ class MediaSender {
     if (!await file.exists()) {
       throw FileSystemException('File not found', filePath);
     }
+    final extension = _extension(filePath);
+    if (!_supportedExtensions.contains(extension)) {
+      throw const FormatException('Otya Transfer only shares supported media files.');
+    }
 
     final ip = await _getLocalIp();
     _filePath = filePath;
@@ -49,7 +68,7 @@ class MediaSender {
           : 'otya-transfer',
     );
     final url = 'http://$ip:${_server!.port}/media?t=$_token&name=$name';
-    debugPrint('[MediaSender] OTYA Transfer server ready on local network.');
+    debugPrint('[MediaSender] Otya Transfer server ready on local network.');
     _server!.listen(
       _handleRequest,
       onError: (Object e) => debugPrint('[MediaSender] Error: $e'),
@@ -81,6 +100,7 @@ class MediaSender {
 
   Future<void> _handleRequest(HttpRequest req) async {
     if (req.method != 'GET' && req.method != 'HEAD') {
+      _secureHeaders(req.response);
       req.response
         ..statusCode = HttpStatus.methodNotAllowed
         ..headers.set(HttpHeaders.allowHeader, 'GET, HEAD')
@@ -90,6 +110,7 @@ class MediaSender {
     }
 
     if (req.uri.path != '/media') {
+      _secureHeaders(req.response);
       req.response
         ..statusCode = HttpStatus.notFound
         ..write('Not found');
@@ -98,7 +119,8 @@ class MediaSender {
     }
 
     final requestToken = req.uri.queryParameters['t'];
-    if (_token == null || requestToken != _token) {
+    if (!_tokenMatches(requestToken, _token)) {
+      _secureHeaders(req.response);
       req.response
         ..statusCode = HttpStatus.forbidden
         ..write('Forbidden');
@@ -109,6 +131,7 @@ class MediaSender {
 
     final filePath = _filePath;
     if (filePath == null) {
+      _secureHeaders(req.response);
       req.response
         ..statusCode = HttpStatus.serviceUnavailable
         ..write('No file');
@@ -118,6 +141,7 @@ class MediaSender {
 
     final file = File(filePath);
     if (!await file.exists()) {
+      _secureHeaders(req.response);
       req.response
         ..statusCode = HttpStatus.notFound
         ..write('File not found');
@@ -127,6 +151,7 @@ class MediaSender {
 
     final fileLength = await file.length();
     if (fileLength <= 0) {
+      _secureHeaders(req.response);
       req.response
         ..statusCode = HttpStatus.noContent
         ..headers.set(HttpHeaders.cacheControlHeader, 'no-store');
@@ -151,6 +176,7 @@ class MediaSender {
           requestedStart < 0 ||
           requestedStart >= fileLength ||
           (requestedEnd != null && requestedEnd < requestedStart)) {
+        _secureHeaders(req.response);
         req.response
           ..statusCode = HttpStatus.requestedRangeNotSatisfiable
           ..headers.set(HttpHeaders.contentRangeHeader, 'bytes */$fileLength');
@@ -164,13 +190,15 @@ class MediaSender {
     }
 
     final contentLength = end - start + 1;
-    final response = req.response
+    final response = req.response;
+    _secureHeaders(response);
+    response
       ..statusCode = isPartial ? HttpStatus.partialContent : HttpStatus.ok
       ..headers.contentType = ContentType.parse(mimeType)
       ..headers.set(HttpHeaders.contentLengthHeader, contentLength)
       ..headers.set(HttpHeaders.acceptRangesHeader, 'bytes')
       ..headers.set(HttpHeaders.cacheControlHeader, 'no-store')
-      ..headers.set('X-OTYA-Transfer', '1');
+      ..headers.set('X-Otya-Transfer', '1');
 
     final fileName = file.uri.pathSegments.isNotEmpty
         ? file.uri.pathSegments.last
@@ -213,6 +241,25 @@ class MediaSender {
     }
   }
 
+  void _secureHeaders(HttpResponse response) {
+    response.headers
+      ..set(HttpHeaders.cacheControlHeader, 'no-store')
+      ..set('X-Content-Type-Options', 'nosniff')
+      ..set('Referrer-Policy', 'no-referrer')
+      ..set('Content-Security-Policy', "default-src 'none'; frame-ancestors 'none'");
+  }
+
+  bool _tokenMatches(String? provided, String? expected) {
+    if (provided == null || expected == null || provided.length != expected.length) {
+      return false;
+    }
+    var difference = 0;
+    for (var i = 0; i < provided.length; i++) {
+      difference |= provided.codeUnitAt(i) ^ expected.codeUnitAt(i);
+    }
+    return difference == 0;
+  }
+
   Future<String> _getLocalIp() async {
     try {
       final ifaces = await NetworkInterface.list(
@@ -239,6 +286,12 @@ class MediaSender {
     );
   }
 
+  String _extension(String path) {
+    final name = path.replaceAll('\\', '/').split('/').last;
+    final dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
+  }
+
   String _mimeType(String path) {
     const map = {
       'mp4': 'video/mp4',
@@ -255,7 +308,6 @@ class MediaSender {
       'm4a': 'audio/mp4',
       'opus': 'audio/opus',
     };
-    return map[path.split('.').last.toLowerCase()] ??
-        'application/octet-stream';
+    return map[_extension(path)] ?? 'application/octet-stream';
   }
 }

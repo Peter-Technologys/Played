@@ -2,18 +2,21 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
-/// Progress callback: (bytesDownloaded, totalBytes).
-/// totalBytes is -1 if the server did not send Content-Length.
 typedef ProgressCallback = void Function(int bytesDownloaded, int totalBytes);
 
-/// MediaReceiver — pure Dart HTTP file downloader for OTYA Transfer.
+/// MediaReceiver — restricted local HTTP downloader for Otya Transfer.
 ///
-/// Incoming bytes are streamed directly to disk so large videos never need to
-/// be buffered in memory. Resume is allowed only when a small sidecar proves
-/// that the partial file belongs to the same OTYA transfer endpoint/token.
-/// A different transfer using the same advertised filename is saved under a
-/// numbered name instead of being appended to unrelated bytes.
+/// Incoming bytes are streamed directly to disk. The receiver accepts only
+/// authenticated Otya media links on private/local IPv4 ranges, refuses
+/// redirects, checks the sender marker/MIME/declared size, and resumes only
+/// when a sidecar proves the partial belongs to the same transfer token.
 class MediaReceiver {
+  static const int _maxTransferBytes = 16 * 1024 * 1024 * 1024;
+  static const Set<String> _supportedExtensions = {
+    'mp4', 'mkv', 'avi', 'mov', 'webm', 'ts',
+    'mp3', 'aac', 'flac', 'wav', 'ogg', 'm4a', 'opus',
+  };
+
   bool _cancelled = false;
 
   Future<File> download({
@@ -25,7 +28,12 @@ class MediaReceiver {
     final uri = Uri.parse(url);
     if (!_isAllowedTransferUri(uri)) {
       throw const FormatException(
-        'OTYA Transfer only accepts authenticated private local-network links.',
+        'Otya Transfer only accepts authenticated private local-network links.',
+      );
+    }
+    if (!_supportedExtensions.contains(_extension(savePath))) {
+      throw const FormatException(
+        'Otya Transfer only receives supported media files.',
       );
     }
 
@@ -43,24 +51,44 @@ class MediaReceiver {
         await sidecar.exists() &&
         await sidecar.readAsString() == fingerprint) {
       existingBytes = await saveFile.length();
+      if (existingBytes > _maxTransferBytes) {
+        throw FileSystemException(
+          'Partial transfer exceeds Otya safety limit.',
+          saveFile.path,
+        );
+      }
     } else {
-      existingBytes = 0;
       await sidecar.writeAsString(fingerprint, flush: true);
     }
 
     IOSink? sink;
     try {
       final request = await client.getUrl(uri);
+      request.followRedirects = false;
       if (existingBytes > 0) {
         request.headers.set(HttpHeaders.rangeHeader, 'bytes=$existingBytes-');
       }
 
       final response = await request.close();
+      if (_isRedirect(response.statusCode)) {
+        await response.drain<void>();
+        throw HttpException('Otya Transfer does not follow redirects.', uri: uri);
+      }
+      if (response.headers.value('X-Otya-Transfer') != '1') {
+        await response.drain<void>();
+        throw HttpException(
+          'The nearby endpoint is not an Otya Transfer sender.',
+          uri: uri,
+        );
+      }
+
       if (response.statusCode == HttpStatus.requestedRangeNotSatisfiable &&
           existingBytes > 0) {
         final remoteLength = _lengthFromUnsatisfiedRange(response);
         await response.drain<void>();
-        if (remoteLength != null && existingBytes == remoteLength) {
+        if (remoteLength != null &&
+            remoteLength <= _maxTransferBytes &&
+            existingBytes == remoteLength) {
           debugPrint(
             '[MediaReceiver] Existing partial exactly matches remote transfer.',
           );
@@ -69,14 +97,7 @@ class MediaReceiver {
           return saveFile;
         }
 
-        // A 416 only proves the requested offset is outside the sender's
-        // current file. It does not prove our local partial is complete. If
-        // the lengths do not match (or the sender omitted the total length),
-        // discard the suspect partial and restart instead of blessing corrupt
-        // bytes as a finished transfer.
-        debugPrint(
-          '[MediaReceiver] Resume offset is invalid; restarting transfer.',
-        );
+        debugPrint('[MediaReceiver] Resume offset invalid; restarting transfer.');
         if (await saveFile.exists()) await saveFile.delete();
         await sidecar.writeAsString(fingerprint, flush: true);
         return download(
@@ -85,9 +106,21 @@ class MediaReceiver {
           onProgress: onProgress,
         );
       }
+
       if (response.statusCode != HttpStatus.ok &&
           response.statusCode != HttpStatus.partialContent) {
         throw HttpException('Server returned ${response.statusCode}', uri: uri);
+      }
+
+      final contentType =
+          response.headers.contentType?.mimeType.toLowerCase() ?? '';
+      if (!contentType.startsWith('audio/') &&
+          !contentType.startsWith('video/')) {
+        await response.drain<void>();
+        throw HttpException(
+          'Otya Transfer rejected a non-media response.',
+          uri: uri,
+        );
       }
 
       final isResume = response.statusCode == HttpStatus.partialContent &&
@@ -95,9 +128,23 @@ class MediaReceiver {
       if (!isResume) existingBytes = 0;
 
       final responseBytes = response.contentLength;
-      final totalBytes = responseBytes >= 0 ? existingBytes + responseBytes : -1;
-      var downloaded = existingBytes;
+      if (responseBytes < 0) {
+        await response.drain<void>();
+        throw HttpException(
+          'Otya Transfer requires a known file size.',
+          uri: uri,
+        );
+      }
+      final totalBytes = existingBytes + responseBytes;
+      if (totalBytes <= 0 || totalBytes > _maxTransferBytes) {
+        await response.drain<void>();
+        throw HttpException(
+          'Transfer size is outside Otya safety limits.',
+          uri: uri,
+        );
+      }
 
+      var downloaded = existingBytes;
       sink = saveFile.openWrite(
         mode: isResume ? FileMode.append : FileMode.writeOnly,
       );
@@ -105,11 +152,17 @@ class MediaReceiver {
 
       await for (final chunk in response) {
         if (_cancelled) {
-          debugPrint('[MediaReceiver] Cancelled; partial file kept for resume.');
+          debugPrint('[MediaReceiver] Cancelled; partial kept for safe resume.');
           break;
         }
-        sink.add(chunk);
         downloaded += chunk.length;
+        if (downloaded > _maxTransferBytes || downloaded > totalBytes) {
+          throw HttpException(
+            'Otya Transfer exceeded the declared safe size.',
+            uri: uri,
+          );
+        }
+        sink.add(chunk);
         onProgress?.call(downloaded, totalBytes);
       }
 
@@ -118,8 +171,7 @@ class MediaReceiver {
       sink = null;
 
       if (_cancelled) throw const TransferCancelledException();
-
-      if (totalBytes >= 0 && downloaded != totalBytes) {
+      if (downloaded != totalBytes) {
         throw HttpException(
           'Transfer ended early ($downloaded of $totalBytes bytes)',
           uri: uri,
@@ -137,6 +189,13 @@ class MediaReceiver {
     }
   }
 
+  bool _isRedirect(int statusCode) =>
+      statusCode == HttpStatus.movedPermanently ||
+      statusCode == HttpStatus.found ||
+      statusCode == HttpStatus.seeOther ||
+      statusCode == HttpStatus.temporaryRedirect ||
+      statusCode == 308;
+
   int? _lengthFromUnsatisfiedRange(HttpClientResponse response) {
     final header = response.headers.value(HttpHeaders.contentRangeHeader);
     if (header == null) return null;
@@ -146,7 +205,12 @@ class MediaReceiver {
   }
 
   bool _isAllowedTransferUri(Uri uri) {
-    if (uri.scheme != 'http' || uri.path != '/media' || uri.userInfo.isNotEmpty) {
+    if (uri.scheme != 'http' ||
+        uri.path != '/media' ||
+        uri.userInfo.isNotEmpty ||
+        uri.fragment.isNotEmpty ||
+        uri.port <= 0 ||
+        uri.port > 65535) {
       return false;
     }
     final token = uri.queryParameters['t'] ?? '';
@@ -171,6 +235,12 @@ class MediaReceiver {
     return '${uri.host}:${uri.port}${uri.path}|$token';
   }
 
+  String _extension(String path) {
+    final name = path.replaceAll('\\', '/').split('/').last;
+    final dot = name.lastIndexOf('.');
+    return dot >= 0 ? name.substring(dot + 1).toLowerCase() : '';
+  }
+
   File _sidecarFor(File file) => File('${file.path}.otya-transfer');
 
   Future<File> _destinationFor(String requestedPath, String fingerprint) async {
@@ -180,9 +250,7 @@ class MediaReceiver {
     final existingSidecar = _sidecarFor(requested);
     if (await existingSidecar.exists()) {
       try {
-        if (await existingSidecar.readAsString() == fingerprint) {
-          return requested;
-        }
+        if (await existingSidecar.readAsString() == fingerprint) return requested;
       } catch (_) {}
     }
 

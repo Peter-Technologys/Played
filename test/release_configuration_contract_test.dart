@@ -66,11 +66,11 @@ void main() {
           final path = entity.path.replaceAll('\\', '/');
           final text = entity.readAsStringSync();
 
-          // OTYA Transfer is intentionally local-network only and uses
-          // authenticated cleartext HTTP between nearby devices. The transfer
-          // implementation has its own contract tests that reject non-local
-          // addresses, so the production-backend URL check must not treat this
-          // local protocol as a remote cleartext backend endpoint.
+          // Otya Transfer is intentionally local-network only and uses
+          // authenticated cleartext HTTP between nearby devices. Transfer has
+          // its own contract tests that reject non-local addresses, so this
+          // production-backend check must not treat that LAN protocol as a
+          // remote cleartext backend endpoint.
           final isLocalTransferSource =
               path.startsWith('lib/features/transfer/');
           if (!isLocalTransferSource && cleartext.hasMatch(text)) {
@@ -96,24 +96,26 @@ void main() {
     test('changeable public values are centralized in Environment', () {
       final env = File('lib/core/config/environment.dart').readAsStringSync();
 
-      expect(env, contains("String.fromEnvironment(\n    'WORKER_URL'"));
-      expect(env, contains("String.fromEnvironment(\n    'PUBLIC_SITE_URL'"));
-      expect(env, contains("String.fromEnvironment(\n    'SUPPORT_EMAIL'"));
-      expect(env, contains("String.fromEnvironment(\n    'SPOTIFY_CLIENT_ID'"));
-      expect(env, contains("String.fromEnvironment(\n    'SPOTIFY_REDIRECT_URI'"));
+      expect(env, contains('String.fromEnvironment(\n    \'WORKER_URL\''));
+      expect(env, contains('String.fromEnvironment(\n    \'PUBLIC_SITE_URL\''));
+      expect(env, contains('String.fromEnvironment(\n    \'SUPPORT_EMAIL\''));
+      expect(env, isNot(contains('SPOTIFY_CLIENT_ID')));
+      expect(env, isNot(contains('SPOTIFY_REDIRECT_URI')));
+      expect(env, isNot(contains('onlineMusicUrl')));
+      expect(env, isNot(contains('JAMENDO')));
     });
 
     test('update notifications use the ABI-specific APK target', () {
       final updateService =
           File('lib/core/services/update_service.dart').readAsStringSync();
 
-      expect(updateService, contains("final abi = _detectAbi();"));
-      expect(updateService, contains("downloads['arm64']"));
-      expect(updateService, contains("downloads['arm32']"));
+      expect(updateService, contains('final abi = _detectAbi();'));
+      expect(updateService, contains('downloads[\'arm64\']'));
+      expect(updateService, contains('downloads[\'arm32\']'));
       expect(updateService, contains('downloadUrl: directUrl'));
       expect(
         updateService,
-        isNot(contains("downloadUrl:\n            downloads['auto']")),
+        isNot(contains('downloadUrl:\n            downloads[\'auto\']')),
         reason: 'The server legacy auto URL may resolve to arm64. Device update '
             'notifications must use the APK matching the installed app ABI.',
       );

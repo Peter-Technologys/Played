@@ -1,17 +1,24 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
-import 'package:otya_player/features/air_drop/data/media_receiver.dart';
+import 'package:otya_player/features/transfer/data/media_receiver.dart';
 
 void main() {
   const tokenA = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
   const tokenB = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
   const tokenC = 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc';
 
+  void markOtyaAudio(HttpResponse response, int length) {
+    response.headers
+      ..contentType = ContentType('audio', 'mpeg')
+      ..set(HttpHeaders.contentLengthHeader, length)
+      ..set('X-Otya-Transfer', '1');
+  }
+
   test('MediaReceiver resumes only a matching transfer partial', () async {
     final source = List<int>.generate(4096, (index) => index % 251);
     final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
-    final target = File('${temp.path}/received.bin');
+    final target = File('${temp.path}/received.mp3');
     const existing = 1379;
 
     String? receivedRange;
@@ -25,12 +32,14 @@ void main() {
       receivedRange = request.headers.value(HttpHeaders.rangeHeader);
       final start = receivedRange == null
           ? 0
-          : int.parse(receivedRange!.substring('bytes='.length).split('-').first);
+          : int.parse(
+              receivedRange!.substring('bytes='.length).split('-').first,
+            );
       final bytes = source.sublist(start);
-      request.response
-        ..statusCode = start > 0 ? HttpStatus.partialContent : HttpStatus.ok
-        ..headers.set(HttpHeaders.acceptRangesHeader, 'bytes')
-        ..headers.set(HttpHeaders.contentLengthHeader, bytes.length);
+      request.response.statusCode =
+          start > 0 ? HttpStatus.partialContent : HttpStatus.ok;
+      markOtyaAudio(request.response, bytes.length);
+      request.response.headers.set(HttpHeaders.acceptRangesHeader, 'bytes');
       if (start > 0) {
         request.response.headers.set(
           HttpHeaders.contentRangeHeader,
@@ -59,17 +68,16 @@ void main() {
     final oldBytes = List<int>.filled(700, 7);
     final newBytes = List<int>.generate(2048, (index) => (index * 7) % 253);
     final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
-    final target = File('${temp.path}/received.bin');
+    final target = File('${temp.path}/received.mp3');
     await target.writeAsBytes(oldBytes, flush: true);
 
     String? receivedRange;
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     server.listen((request) async {
       receivedRange = request.headers.value(HttpHeaders.rangeHeader);
-      request.response
-        ..statusCode = HttpStatus.ok
-        ..headers.set(HttpHeaders.contentLengthHeader, newBytes.length)
-        ..add(newBytes);
+      request.response.statusCode = HttpStatus.ok;
+      markOtyaAudio(request.response, newBytes.length);
+      request.response.add(newBytes);
       await request.response.close();
     });
 
@@ -93,7 +101,7 @@ void main() {
   test('MediaReceiver restarts cleanly when server ignores Range', () async {
     final source = List<int>.generate(2048, (index) => (index * 7) % 253);
     final temp = await Directory.systemTemp.createTemp('otya_transfer_test_');
-    final target = File('${temp.path}/received.bin');
+    final target = File('${temp.path}/received.mp3');
 
     final server = await HttpServer.bind(InternetAddress.loopbackIPv4, 0);
     final url = 'http://127.0.0.1:${server.port}/media?t=$tokenC';
@@ -102,10 +110,9 @@ void main() {
         .writeAsString('127.0.0.1:${server.port}/media|$tokenC', flush: true);
 
     server.listen((request) async {
-      request.response
-        ..statusCode = HttpStatus.ok
-        ..headers.set(HttpHeaders.contentLengthHeader, source.length)
-        ..add(source);
+      request.response.statusCode = HttpStatus.ok;
+      markOtyaAudio(request.response, source.length);
+      request.response.add(source);
       await request.response.close();
     });
 
@@ -128,21 +135,28 @@ void main() {
       await expectLater(
         receiver.download(
           url: 'http://example.com/media?t=$tokenA',
-          savePath: '${temp.path}/remote.bin',
+          savePath: '${temp.path}/remote.mp3',
         ),
         throwsA(isA<FormatException>()),
       );
       await expectLater(
         receiver.download(
           url: 'https://127.0.0.1/media?t=$tokenA',
-          savePath: '${temp.path}/https.bin',
+          savePath: '${temp.path}/https.mp3',
         ),
         throwsA(isA<FormatException>()),
       );
       await expectLater(
         receiver.download(
           url: 'http://127.0.0.1/media?t=short',
-          savePath: '${temp.path}/short.bin',
+          savePath: '${temp.path}/short.mp3',
+        ),
+        throwsA(isA<FormatException>()),
+      );
+      await expectLater(
+        receiver.download(
+          url: 'http://127.0.0.1/media?t=$tokenA',
+          savePath: '${temp.path}/payload.bin',
         ),
         throwsA(isA<FormatException>()),
       );

@@ -30,7 +30,7 @@ void main() {
     );
     expect(
       source.indexOf('generation != _sessionGeneration'),
-      lessThan(source.indexOf("if (res.statusCode == 200)")),
+      lessThan(source.indexOf('if (res.statusCode == 200)')),
       reason: 'A stale refresh response must be rejected before it can persist a new access token.',
     );
   });
