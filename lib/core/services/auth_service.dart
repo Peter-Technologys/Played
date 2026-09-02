@@ -4,8 +4,9 @@
 //
 // SECURITY: access_token and refresh_token are stored ONLY in
 // flutter_secure_storage (Android Keystore / iOS Secure Enclave).
-// Non-sensitive profile fields (userId, email, name, avatar) remain in
-// SharedPreferences for fast synchronous access.
+// Non-sensitive profile fields (internal user ID, public OTYA ID, optional
+// email, name and avatar) remain in SharedPreferences for fast synchronous
+// access.
 //
 // Auto-refreshes token when expired (checks exp from JWT payload).
 
@@ -24,6 +25,7 @@ String get _kAuthBase => '${Environment.workerUrl}/auth';
 const _kSecureAccessToken = 'otya_access_token';
 const _kSecureRefreshToken = 'otya_refresh_token';
 const _kUserId = 'otya_user_id';
+const _kOtyaPublicId = 'otya_public_id';
 const _kUserEmail = 'otya_user_email';
 const _kUserName = 'otya_user_name';
 const _kUserAvatar = 'otya_user_avatar';
@@ -56,24 +58,29 @@ class AuthResult {
 
 class UserProfile {
   final String id;
-  final String email;
+  final String? otyaId;
+  final String? email;
   final String? name;
   final String? avatarUrl;
   final bool isVerified;
 
   const UserProfile({
     required this.id,
-    required this.email,
+    this.otyaId,
+    this.email,
     this.name,
     this.avatarUrl,
     required this.isVerified,
   });
 
+  bool get hasEmail => email?.trim().isNotEmpty == true;
+
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final verified = json['is_verified'];
     return UserProfile(
       id: json['id'] as String,
-      email: json['email'] as String,
+      otyaId: json['otya_id'] as String?,
+      email: json['email'] as String?,
       name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       isVerified: verified == true || verified == 1,
@@ -119,6 +126,7 @@ class AuthService {
   String? _accessToken;
   String? _refreshToken;
   String? _userId;
+  String? _otyaPublicId;
   String? _userEmail;
   String? _userName;
   String? _userAvatar;
@@ -136,6 +144,7 @@ class AuthService {
     _refreshToken = await _secureStorage.read(key: _kSecureRefreshToken);
     final prefs = await SharedPreferences.getInstance();
     _userId = prefs.getString(_kUserId);
+    _otyaPublicId = prefs.getString(_kOtyaPublicId);
     _userEmail = prefs.getString(_kUserEmail);
     _userName = prefs.getString(_kUserName);
     _userAvatar = prefs.getString(_kUserAvatar);
@@ -165,13 +174,23 @@ class AuthService {
     }
     if (user != null) {
       _userId = user.id;
+      _otyaPublicId = user.otyaId;
       _userEmail = user.email;
       _userName = user.name;
       _userAvatar = user.avatarUrl;
       _isVerified = user.isVerified;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kUserId, user.id);
-      await prefs.setString(_kUserEmail, user.email);
+      if (user.otyaId != null && user.otyaId!.trim().isNotEmpty) {
+        await prefs.setString(_kOtyaPublicId, user.otyaId!);
+      } else {
+        await prefs.remove(_kOtyaPublicId);
+      }
+      if (user.email != null && user.email!.trim().isNotEmpty) {
+        await prefs.setString(_kUserEmail, user.email!);
+      } else {
+        await prefs.remove(_kUserEmail);
+      }
       if (user.name != null && user.name!.trim().isNotEmpty) {
         await prefs.setString(_kUserName, user.name!);
       } else {
@@ -194,11 +213,18 @@ class AuthService {
     _refreshToken = null;
     final prefs = await SharedPreferences.getInstance();
     _userId = null;
+    _otyaPublicId = null;
     _userEmail = null;
     _userName = null;
     _userAvatar = null;
     _isVerified = false;
-    for (final key in [_kUserId, _kUserEmail, _kUserName, _kUserAvatar]) {
+    for (final key in [
+      _kUserId,
+      _kOtyaPublicId,
+      _kUserEmail,
+      _kUserName,
+      _kUserAvatar,
+    ]) {
       await prefs.remove(key);
     }
     await prefs.remove(_kIsVerified);
@@ -212,6 +238,7 @@ class AuthService {
   }
 
   String? get userId => _userId;
+  String? get otyaPublicId => _otyaPublicId;
   String? get userEmail => _userEmail;
   String? get userName => _userName;
   String? get userAvatar => _userAvatar;
@@ -272,6 +299,10 @@ class AuthService {
               key: _kSecureAccessToken,
               value: newToken,
             );
+            final userJson = decoded['user'];
+            if (userJson is Map<String, dynamic>) {
+              await _persist(user: UserProfile.fromJson(userJson));
+            }
             return newToken;
           }
         }
