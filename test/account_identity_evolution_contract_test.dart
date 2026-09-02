@@ -9,7 +9,7 @@ void main() {
     expect(auth, contains('final String? email;'));
     expect(auth, contains('this.email,'));
     expect(auth, contains("final rawEmail = json['email'];"));
-    expect(auth, contains("rawEmail is String && rawEmail.trim().isNotEmpty"));
+    expect(auth, contains('rawEmail is String && rawEmail.trim().isNotEmpty'));
     expect(auth, isNot(contains("email: json['email'] as String")));
     expect(auth, contains('await prefs.remove(_kUserEmail);'));
   });
