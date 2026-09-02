@@ -13,7 +13,7 @@ final trimStartProvider = StateProvider<double>((_) => 0.0);
 final trimEndProvider = StateProvider<double>((_) => 30.0);
 
 /// Historical class name kept for route compatibility. User-facing naming is
-/// simply OTYA Trim / Trim video.
+/// simply Otya Trim / Trim video.
 class WhatsAppTrimmerScreen extends ConsumerWidget {
   final MediaItem mediaItem;
   const WhatsAppTrimmerScreen({super.key, required this.mediaItem});
@@ -22,9 +22,12 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final status = ref.watch(trimStatusProvider);
     final progress = ref.watch(trimProgressProvider);
-    final start = ref.watch(trimStartProvider);
-    final end = ref.watch(trimEndProvider);
+    final storedStart = ref.watch(trimStartProvider);
     final duration = mediaItem.duration?.inSeconds.toDouble() ?? 60.0;
+    final clipLength = duration.clamp(0.0, 30.0).toDouble();
+    final maxStart = (duration - clipLength).clamp(0.0, duration).toDouble();
+    final start = storedStart.clamp(0.0, maxStart).toDouble();
+    final end = (start + clipLength).clamp(start, duration).toDouble();
     final primary = AppColors.textPrimaryOf(context);
     final secondary = Theme.of(context).colorScheme.onSurface.withValues(alpha: .58);
     final card = AppColors.cardOf(context);
@@ -56,7 +59,9 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                     const SizedBox(width: 12),
                     Expanded(
                       child: Text(
-                        'Create a 30-second clip locally. OTYA trims the original video without uploading it.',
+                        clipLength >= 30
+                            ? 'Create a 30-second clip locally. Otya trims the original video without uploading it.'
+                            : 'Create a local clip from this video. Otya keeps the trim inside the file duration and never uploads it.',
                         style: TextStyle(
                           fontSize: 12,
                           color: secondary,
@@ -92,13 +97,15 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
               Slider(
                 value: start,
                 min: 0,
-                max: (duration - 30).clamp(0, duration),
-                onChanged: (v) {
-                  HapticFeedback.selectionClick();
-                  ref.read(trimStartProvider.notifier).state = v;
-                  ref.read(trimEndProvider.notifier).state =
-                      (v + 30).clamp(0, duration);
-                },
+                max: maxStart,
+                onChanged: maxStart <= 0
+                    ? null
+                    : (v) {
+                        HapticFeedback.selectionClick();
+                        ref.read(trimStartProvider.notifier).state = v;
+                        ref.read(trimEndProvider.notifier).state =
+                            (v + clipLength).clamp(v, duration).toDouble();
+                      },
               ),
               const SizedBox(height: 10),
               Container(
@@ -131,9 +138,9 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                         color: AppColors.accent.withValues(alpha: .12),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: const Text(
-                        '30 sec',
-                        style: TextStyle(
+                      child: Text(
+                        '${clipLength.round()} sec',
+                        style: const TextStyle(
                           fontSize: 11,
                           color: AppColors.accent,
                           fontWeight: FontWeight.w800,
@@ -180,7 +187,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                 width: double.infinity,
                 height: 56,
                 child: FilledButton.icon(
-                  onPressed: status == TrimStatus.trimming
+                  onPressed: status == TrimStatus.trimming || clipLength <= 0
                       ? null
                       : () async {
                           HapticFeedback.mediumImpact();
@@ -208,7 +215,9 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                   label: Text(
                     status == TrimStatus.trimming
                         ? 'Processing…'
-                        : 'Create 30-second clip',
+                        : clipLength >= 30
+                            ? 'Create 30-second clip'
+                            : 'Create clip',
                   ),
                 ),
               ),
