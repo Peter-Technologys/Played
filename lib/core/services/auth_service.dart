@@ -56,14 +56,14 @@ class AuthResult {
 
 class UserProfile {
   final String id;
-  final String email;
+  final String? email;
   final String? name;
   final String? avatarUrl;
   final bool isVerified;
 
   const UserProfile({
     required this.id,
-    required this.email,
+    this.email,
     this.name,
     this.avatarUrl,
     required this.isVerified,
@@ -71,9 +71,13 @@ class UserProfile {
 
   factory UserProfile.fromJson(Map<String, dynamic> json) {
     final verified = json['is_verified'];
+    final rawEmail = json['email'];
+    final email = rawEmail is String && rawEmail.trim().isNotEmpty
+        ? rawEmail.trim()
+        : null;
     return UserProfile(
       id: json['id'] as String,
-      email: json['email'] as String,
+      email: email,
       name: json['name'] as String?,
       avatarUrl: json['avatar_url'] as String?,
       isVerified: verified == true || verified == 1,
@@ -128,7 +132,7 @@ class AuthService {
   int _sessionGeneration = 0;
 
   static const _networkError =
-      'Could not reach OTYA right now. Check your connection and try again.';
+      'Could not reach Otya right now. Check your connection and try again.';
 
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
@@ -150,18 +154,12 @@ class AuthService {
   }) async {
     if (accessToken != null) {
       _accessToken = accessToken;
-      await _secureStorage.write(
-        key: _kSecureAccessToken,
-        value: accessToken,
-      );
+      await _secureStorage.write(key: _kSecureAccessToken, value: accessToken);
     }
     if (refreshToken != null) {
       if (_refreshToken != refreshToken) _sessionGeneration++;
       _refreshToken = refreshToken;
-      await _secureStorage.write(
-        key: _kSecureRefreshToken,
-        value: refreshToken,
-      );
+      await _secureStorage.write(key: _kSecureRefreshToken, value: refreshToken);
     }
     if (user != null) {
       _userId = user.id;
@@ -171,7 +169,11 @@ class AuthService {
       _isVerified = user.isVerified;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString(_kUserId, user.id);
-      await prefs.setString(_kUserEmail, user.email);
+      if (user.email != null && user.email!.trim().isNotEmpty) {
+        await prefs.setString(_kUserEmail, user.email!);
+      } else {
+        await prefs.remove(_kUserEmail);
+      }
       if (user.name != null && user.name!.trim().isNotEmpty) {
         await prefs.setString(_kUserName, user.name!);
       } else {
@@ -238,9 +240,6 @@ class AuthService {
   Future<String?> _refreshAccessToken() async {
     final refreshToken = _refreshToken;
     if (refreshToken == null || refreshToken.isEmpty) {
-      // An expired access token with no refresh token cannot become a valid
-      // session again. Remove the stale account state instead of leaving the UI
-      // looking signed in while every authenticated request fails.
       await _clearPersisted();
       return null;
     }
@@ -255,9 +254,6 @@ class AuthService {
           )
           .timeout(_timeout);
 
-      // Logout, account replacement, or any refresh-token change while the
-      // request was in flight invalidates this response. Never resurrect a
-      // session after the user has signed out.
       if (generation != _sessionGeneration || _refreshToken != refreshToken) {
         return null;
       }
@@ -268,19 +264,13 @@ class AuthService {
           final newToken = decoded['access_token'] as String?;
           if (newToken != null && newToken.isNotEmpty) {
             _accessToken = newToken;
-            await _secureStorage.write(
-              key: _kSecureAccessToken,
-              value: newToken,
-            );
+            await _secureStorage.write(key: _kSecureAccessToken, value: newToken);
             return newToken;
           }
         }
       }
 
       if (res.statusCode == 401 || res.statusCode == 403) {
-        // The server has definitively rejected this refresh session. Clear only
-        // in this case; transient network/server failures must not destroy a
-        // locally remembered account while the user is offline.
         await _clearPersisted();
       }
     } catch (e) {
@@ -350,8 +340,7 @@ class AuthService {
   }
 
   Future<AuthResult> loginWithGoogle(
-    String idToken,
-    String driveAccessToken, {
+    String idToken, {
     bool termsAccepted = false,
     bool privacyAccepted = false,
     bool marketingConsent = false,
@@ -363,7 +352,6 @@ class AuthService {
             headers: {'Content-Type': 'application/json'},
             body: jsonEncode({
               'id_token': idToken,
-              'drive_access_token': driveAccessToken,
               'terms_accepted': termsAccepted,
               'terms_version': termsVersion,
               'privacy_accepted': privacyAccepted,
@@ -392,9 +380,6 @@ class AuthService {
             )
             .timeout(_timeout);
       } catch (e) {
-        // Local sign-out must still work if the network is unavailable. The
-        // server-side refresh token expires independently and can also be
-        // revoked from Devices & sessions.
         debugPrint('[AuthService] Logout request failed: ${e.runtimeType}');
       }
     }
@@ -413,13 +398,10 @@ class AuthService {
           .timeout(_timeout);
       if (res.statusCode != 200) return null;
       final decoded = jsonDecode(res.body);
-      if (decoded is! Map<String, dynamic> ||
-          decoded['user'] is! Map<String, dynamic>) {
+      if (decoded is! Map<String, dynamic> || decoded['user'] is! Map<String, dynamic>) {
         return null;
       }
-      final user = UserProfile.fromJson(
-        decoded['user'] as Map<String, dynamic>,
-      );
+      final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
       await _persist(user: user);
       return user;
     } catch (e) {
@@ -447,11 +429,8 @@ class AuthService {
           .timeout(_timeout);
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
-        if (decoded is Map<String, dynamic> &&
-            decoded['user'] is Map<String, dynamic>) {
-          final user = UserProfile.fromJson(
-            decoded['user'] as Map<String, dynamic>,
-          );
+        if (decoded is Map<String, dynamic> && decoded['user'] is Map<String, dynamic>) {
+          final user = UserProfile.fromJson(decoded['user'] as Map<String, dynamic>);
           await _persist(user: user);
         }
       }
@@ -472,9 +451,7 @@ class AuthService {
           .timeout(_timeout);
       return res.statusCode >= 200 && res.statusCode < 300;
     } catch (e) {
-      debugPrint(
-        '[AuthService] sendVerificationOtp failed: ${e.runtimeType}',
-      );
+      debugPrint('[AuthService] sendVerificationOtp failed: ${e.runtimeType}');
       return false;
     }
   }
@@ -546,15 +523,11 @@ class AuthService {
     }
   }
 
-  /// Permanently deletes the authenticated OTYA cloud account.
-  ///
-  /// This intentionally throws when deletion is not confirmed by the server.
-  /// Callers must not sign the device out or claim success after a timeout,
-  /// offline failure or rejected request. Local media is never touched here.
+  /// Permanently deletes the authenticated Otya cloud account.
   Future<void> deleteAccount() async {
     final token = await getValidToken();
     if (token == null) {
-      throw StateError('No valid OTYA session is available.');
+      throw StateError('No valid Otya session is available.');
     }
 
     final res = await _client
@@ -566,7 +539,7 @@ class AuthService {
 
     if (res.statusCode < 200 || res.statusCode >= 300) {
       throw StateError(
-        'OTYA account deletion was not confirmed (HTTP ${res.statusCode}).',
+        'Otya account deletion was not confirmed (HTTP ${res.statusCode}).',
       );
     }
 
@@ -593,18 +566,12 @@ class AuthService {
         );
       }
       final data = decoded;
-      if (res.statusCode >= 200 &&
-          res.statusCode < 300 &&
-          data['ok'] == true) {
+      if (res.statusCode >= 200 && res.statusCode < 300 && data['ok'] == true) {
         final accessToken = data['access_token'] as String?;
         final refreshToken = data['refresh_token'] as String?;
         final userJson = data['user'] as Map<String, dynamic>?;
         final user = userJson != null ? UserProfile.fromJson(userJson) : null;
-        await _persist(
-          accessToken: accessToken,
-          refreshToken: refreshToken,
-          user: user,
-        );
+        await _persist(accessToken: accessToken, refreshToken: refreshToken, user: user);
         return AuthResult(
           ok: true,
           accessToken: accessToken,
@@ -622,11 +589,7 @@ class AuthService {
         errorCode: code is String ? code : null,
       );
     } catch (e) {
-      // Do not log the body here: an upstream/misconfigured endpoint could
-      // include tokens, HTML internals or other sensitive diagnostics.
-      debugPrint(
-        '[AuthService] Invalid auth response: HTTP ${res.statusCode}, ${e.runtimeType}',
-      );
+      debugPrint('[AuthService] Invalid auth response: HTTP ${res.statusCode}, ${e.runtimeType}');
       return AuthResult(
         ok: false,
         error:

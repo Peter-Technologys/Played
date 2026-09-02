@@ -10,17 +10,12 @@ import 'backup_service.dart';
 ///
 /// Basic Google Sign-In requests identity only. The narrower Drive App Data
 /// permission is requested lazily when the user explicitly backs up, restores,
-/// or deletes a backup. OTYA never stores the Google OAuth access token on disk.
-/// OTYA account tokens remain in Android Keystore via [AuthService].
+/// or deletes a backup. Otya never stores the Google OAuth access token on disk.
+/// Otya account tokens remain in Android Keystore via [AuthService].
 class GoogleAccountService {
   GoogleAccountService._();
   static final GoogleAccountService instance = GoogleAccountService._();
 
-  /// Android Google Sign-In uses the Web OAuth client as serverClientId so the
-  /// returned ID token is intended for OTYA's backend. This client ID is public
-  /// application configuration, not a secret, so a safe production default is
-  /// embedded to prevent otherwise-valid builds from disabling Google sign-in.
-  /// CI can still override it with --dart-define when required.
   static const String _webClientId = String.fromEnvironment(
     'GOOGLE_WEB_CLIENT_ID',
     defaultValue:
@@ -61,21 +56,19 @@ class GoogleAccountService {
       if (idToken == null || idToken.isEmpty) {
         return const AuthResult(
           ok: false,
-          error: 'Google could not verify this app installation. Please update OTYA and try again.',
+          error: 'Google could not verify this app installation. Please update Otya and try again.',
         );
       }
 
-      // There is one OTYA identity model. If the device already has a valid
-      // OTYA session, Google is being added as another sign-in method for that
-      // current OTYA ID. Only a signed-out device may use the create-or-login
-      // Google endpoint. This prevents the Account screen from silently
-      // replacing a Telegram/email identity with a second account.
+      // There is one Otya identity model. If the device already has a valid
+      // Otya session, Google is linked to that current Otya ID. A signed-out
+      // device may use the create-or-login Google endpoint. Drive permission is
+      // deliberately not part of either identity path.
       final hasOtyaSession = await AuthService.instance.checkIsLoggedIn();
       final result = hasOtyaSession
           ? await AccountLinkService.instance.linkGoogle(idToken)
           : await AuthService.instance.loginWithGoogle(
               idToken,
-              '',
               termsAccepted: termsAccepted,
               privacyAccepted: privacyAccepted,
               marketingConsent: marketingConsent,
@@ -114,10 +107,10 @@ class GoogleAccountService {
     if (details.contains('10') ||
         details.contains('developer_error') ||
         details.contains('developer error')) {
-      return 'Google could not verify this signed OTYA build. Check the Android OAuth package name and SHA fingerprint for this signing key.';
+      return 'Google could not verify this signed Otya build. Check the Android OAuth package name and SHA fingerprint for this signing key.';
     }
     if (code.contains('sign_in_failed')) {
-      return 'Google could not verify this OTYA installation. Please update the app and try again.';
+      return 'Google could not verify this Otya installation. Please update the app and try again.';
     }
     return 'Google Sign-In could not be completed. Please try again.';
   }

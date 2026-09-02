@@ -50,7 +50,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
           _error = message;
           if (message.contains('Terms of Service') ||
               message.contains('Privacy Policy') ||
-              message.contains('create your OTYA account')) {
+              message.contains('create your OTYA account') ||
+              message.contains('create your Otya account')) {
             _register = true;
           }
         });
@@ -59,7 +60,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     }
     await ref.read(authNotifierProvider.notifier).signIn(
       userId: user.id,
-      displayName: user.name ?? user.email,
+      displayName: user.name ?? user.email ?? 'Otya user',
       email: user.email,
       photoUrl: user.avatarUrl,
     );
@@ -74,7 +75,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
   bool _validateRegistrationConsent() {
     if (!_termsAccepted || !_privacyAccepted) {
       setState(() => _error =
-          'Accept the Terms of Service and Privacy Policy to create your OTYA account.');
+          'Accept the Terms of Service and Privacy Policy to create your Otya account.');
       return false;
     }
     return true;
@@ -93,7 +94,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
     if (_register && !_validateRegistrationConsent()) return;
     if (_twoFactorRequired && _twoFactor.text.trim().isEmpty) {
       setState(() => _error = _useRecoveryCode
-          ? 'Enter one of your OTYA recovery codes.'
+          ? 'Enter one of your Otya recovery codes.'
           : 'Enter the 6-digit code from your authenticator app.');
       return;
     }
@@ -174,7 +175,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               ShaderMask(
                 shaderCallback: AppColors.accentGradient.createShader,
                 child: const Text(
-                  'OTYA Account',
+                  'Otya Account',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white,
@@ -187,8 +188,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const SizedBox(height: 8),
               Text(
                 _twoFactorRequired
-                    ? 'Confirm this sign-in with your OTYA two-step verification.'
-                    : 'One secure account for verification, recovery, supported backup services and saved Ask OTYA conversations.',
+                    ? 'Confirm this sign-in with your Otya two-step verification.'
+                    : 'One secure account for verification, recovery, supported backup services and saved Next conversations.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
               ),
@@ -268,7 +269,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         ? 'Recovery code'
                         : 'Authenticator code',
                     helperText: _useRecoveryCode
-                        ? 'Use one unused recovery code from your OTYA account.'
+                        ? 'Use one unused recovery code from your Otya account.'
                         : 'Enter the 6-digit code from your authenticator app.',
                     prefixIcon: Icon(_useRecoveryCode
                         ? Icons.vpn_key_outlined
@@ -325,7 +326,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                   onChanged: (v) => setState(() => _marketingConsent = v ?? false),
                   controlAffinity: ListTileControlAffinity.leading,
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Send me OTYA news, product announcements and promotions'),
+                  title: const Text('Send me Otya news, product announcements and promotions'),
                   subtitle: const Text(
                     'Optional. You can turn this off later. Security, account and legal notices are still sent when needed.',
                     style: TextStyle(color: AppColors.textSecondary, fontSize: 11),
@@ -353,7 +354,7 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
                         )
                       : Text(_twoFactorRequired
                           ? 'Verify and sign in'
-                          : (_register ? 'Create OTYA Account' : 'Login')),
+                          : (_register ? 'Create Otya Account' : 'Login')),
                 ),
               ),
               if (_twoFactorRequired) ...[
@@ -372,8 +373,8 @@ class _AuthScreenState extends ConsumerState<AuthScreen> {
               const SizedBox(height: 16),
               Text(
                 _twoFactorRequired
-                    ? 'OTYA never asks you to share authenticator or recovery codes outside the official sign-in flow.'
-                    : 'Google and email/password both connect to the same OTYA account. Local playback does not require sign-in.',
+                    ? 'Otya never asks you to share authenticator or recovery codes outside the official sign-in flow.'
+                    : 'Google and email/password both connect to the same Otya account. Local playback does not require sign-in.',
                 textAlign: TextAlign.center,
                 style: const TextStyle(color: AppColors.textMuted, fontSize: 11),
               ),
