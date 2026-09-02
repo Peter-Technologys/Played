@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 45
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -92,8 +92,8 @@ jobs:
       - name: Generate code
         run: dart run build_runner build --delete-conflicting-outputs
 
-      - name: Check code
-        run: flutter analyze --no-fatal-infos
+      - name: Check code strictly
+        run: flutter analyze
 
       - name: Run tests
         run: flutter test
