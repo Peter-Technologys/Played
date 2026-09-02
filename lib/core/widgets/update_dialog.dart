@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../shared/widgets/otya_logo.dart';
 import '../config/environment.dart';
 import '../services/update_service.dart';
 
-/// Single-purpose OTYA update dialog.
+/// Single-purpose Otya update dialog.
 ///
-/// OTYA intentionally does not install APKs itself. Google Play restricts the
+/// Otya intentionally does not install APKs itself. Google Play restricts the
 /// REQUEST_INSTALL_PACKAGES permission for self-update use, and local playback
 /// must not depend on a privileged installer path. The app checks canonical
 /// release metadata, explains the update, and hands the user to the official
@@ -29,7 +30,7 @@ class UpdateDialog extends StatefulWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-              'OTYA is up to date, or the update service is unavailable.',
+              'Otya is up to date, or the update service is unavailable.',
             ),
           ),
         );
@@ -50,7 +51,7 @@ class UpdateDialog extends StatefulWidget {
     }
   }
 
-  // Minimum-version policy is enforced at online-service boundaries. OTYA
+  // Minimum-version policy is enforced at online-service boundaries. Otya
   // never blocks a user's local media library behind an internet update.
   static bool updateIsMandatory(UpdateInfo info) => false;
 
@@ -74,9 +75,6 @@ class _UpdateDialogState extends State<UpdateDialog> {
       _error = null;
     });
 
-    // Prefer the public download page when release metadata provides one. A
-    // direct APK URL remains a valid fallback for PeterSmart Link distribution,
-    // but Android/browser owns the actual download/install permission flow.
     final raw = widget.info.downloadUrl.isNotEmpty
         ? widget.info.downloadUrl
         : widget.info.directUrl.isNotEmpty
@@ -91,7 +89,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       if (mounted) {
         setState(() {
           _opening = false;
-          _error = 'OTYA could not verify the official update address.';
+          _error = 'Otya could not verify the official update address.';
         });
       }
       return;
@@ -103,12 +101,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
         mode: LaunchMode.externalApplication,
       );
       if (!opened && mounted) {
-        setState(() => _error = 'Could not open the official OTYA update page.');
+        setState(() => _error = 'Could not open the official Otya update page.');
       }
       if (opened && mounted) Navigator.of(context).pop();
     } catch (_) {
       if (mounted) {
-        setState(() => _error = 'Could not open the official OTYA update page.');
+        setState(() => _error = 'Could not open the official Otya update page.');
       }
     } finally {
       if (mounted) setState(() => _opening = false);
@@ -127,21 +125,16 @@ class _UpdateDialogState extends State<UpdateDialog> {
 
     return AlertDialog(
       icon: Container(
-        width: 58,
-        height: 58,
+        width: 64,
+        height: 64,
+        alignment: Alignment.center,
         decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(18),
-          gradient: const LinearGradient(
-            colors: [Color(0xFF8173F2), Color(0xFF668FE8)],
-          ),
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(20),
         ),
-        child: const Icon(
-          Icons.system_update_rounded,
-          color: Colors.white,
-          size: 30,
-        ),
+        child: const OtyaMark(size: 46),
       ),
-      title: Text('OTYA ${widget.info.version} is available'),
+      title: Text('Otya ${widget.info.version} is available'),
       content: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 420),
         child: Column(
@@ -149,7 +142,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Installed build ${widget.info.installedCode} · new build ${widget.info.versionCode}',
+              'Installed build ${widget.info.installedCode} · available build ${widget.info.versionCode}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             if (notes.isNotEmpty) ...[
@@ -168,7 +161,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
             ],
             const SizedBox(height: 14),
             Text(
-              'OTYA will open the official PeterSmart Link update destination. '
+              'Otya will open the official PeterSmart Link update destination. '
               'The app does not silently install packages or require installer permission.',
               style: Theme.of(context).textTheme.bodySmall,
             ),

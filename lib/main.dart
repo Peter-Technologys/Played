@@ -24,22 +24,13 @@ import 'core/services/update_service.dart';
 import 'features/settings/settings_provider.dart';
 
 Future<void> main() async {
-  // Flutter records the zone in which the binding is initialized and requires
-  // runApp to execute in that same zone. Keeping both inside one guarded zone
-  // prevents the startup "Zone mismatch" loop seen in device bugreports.
   await runZonedGuarded(() async {
     WidgetsFlutterBinding.ensureInitialized();
 
-    // Install one crash pipeline before the first frame. The old startup code
-    // installed a second pair of Flutter/platform handlers and CrashReporter
-    // later chained back into them, which could upload the same failure twice.
     await CrashReporter.instance.init();
 
     final settingsNotifier = SettingsNotifier(const AppSettings());
 
-    // First paint must not wait on SharedPreferences, SQLite, MediaKit,
-    // AudioService, Firebase or any other plugin-backed service. Render Otya
-    // immediately with safe local defaults, then hydrate after the first frame.
     runApp(
       ProviderScope(
         overrides: [
@@ -53,24 +44,16 @@ Future<void> main() async {
       unawaited(_bootstrapAfterFirstFrame(settingsNotifier));
     });
   }, (error, stack) {
-    // Never call runApp from a zone error callback. Replacing the root widget
-    // from here can recursively trigger the same startup error and leave the
-    // Android splash visible indefinitely. Log/report instead; the app's normal
-    // UI remains the only root widget tree.
     debugPrint('[ZoneError] $error\n$stack');
     CrashReporter.instance.report(error, stack);
   });
 }
 
 Future<void> _bootstrapAfterFirstFrame(SettingsNotifier settingsNotifier) async {
-  var savedSettings = const AppSettings();
-  try {
-    savedSettings = await AppSettings.load();
-    settingsNotifier.hydrate(savedSettings);
-  } catch (e, st) {
-    debugPrint('[Settings] load failed: $e\n$st');
-    CrashReporter.instance.report(e, st);
-  }
+  // The app gate owns the one startup settings read because privacy/App Lock
+  // must be known before protected content is revealed. Background services
+  // reuse that same result instead of opening SharedPreferences a second time.
+  final savedSettings = await settingsNotifier.startupHydration;
 
   var databaseReady = false;
   try {
@@ -98,8 +81,6 @@ Future<void> _initBackground(
   AppSettings savedSettings,
   bool databaseReady,
 ) async {
-  // Playback platform comes first so a song started immediately after launch
-  // gets a real Android MediaSession/foreground-service notification.
   await _safeBackground('playback platform', _initPlaybackPlatform);
   await _safeBackground('notifications', _initNotifications);
   await _safeBackground('storage', StorageFolderService.instance.ensureCreated);

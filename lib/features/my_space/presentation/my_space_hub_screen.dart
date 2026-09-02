@@ -57,6 +57,15 @@ class MySpaceHubScreen extends ConsumerWidget {
                     const SizedBox(width: 10),
                     Expanded(
                       child: _PrimaryAction(
+                        icon: Icons.folder_open_rounded,
+                        title: 'Files',
+                        subtitle: 'Browse folders',
+                        onTap: () => context.push('/tools/folders'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _PrimaryAction(
                         icon: Icons.lock_outline_rounded,
                         title: 'Private',
                         subtitle: 'Protected media',
@@ -64,81 +73,39 @@ class MySpaceHubScreen extends ConsumerWidget {
                         onTap: () => context.push('/vault'),
                       ),
                     ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: _PrimaryAction(
-                        icon: Icons.tune_rounded,
-                        title: 'Tools',
-                        subtitle: 'Work with media',
-                        onTap: () => _showTools(context, ref),
-                      ),
-                    ),
                   ],
                 ),
               ),
             ),
-            const SliverToBoxAdapter(child: _SectionLabel('Your library')),
+            const SliverToBoxAdapter(child: _SectionLabel('Library & activity')),
             SliverToBoxAdapter(
               child: _RowGroup(
                 children: [
                   _ActionRow(
-                    icon: Icons.folder_open_rounded,
-                    title: 'Files',
-                    subtitle: 'Browse media by folder',
-                    onTap: () => context.push('/tools/folders'),
-                  ),
-                  _ActionRow(
                     icon: Icons.queue_music_rounded,
                     title: 'Playlists',
-                    subtitle: 'Your saved listening collections',
+                    subtitle: 'Open your saved local playlists',
                     onTap: () => context.push('/playlists'),
                   ),
                   _ActionRow(
                     icon: Icons.history_rounded,
                     title: 'History',
-                    subtitle: 'Recently played media',
+                    subtitle: 'Recently played media on this device',
                     onTap: () => context.push('/history'),
                   ),
                 ],
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
-            const SliverToBoxAdapter(child: _SectionLabel('Media tools')),
+            const SliverToBoxAdapter(child: _SectionLabel('Tools & settings')),
             SliverToBoxAdapter(
               child: _RowGroup(
                 children: [
                   _ActionRow(
-                    icon: Icons.transform_rounded,
-                    title: 'Convert video to audio',
-                    subtitle: 'Extract the existing audio track locally',
-                    enabled: remote.featureEnabled('converter', fallback: true),
-                    onTap: () => _showConverter(context, ref),
-                  ),
-                  _ActionRow(
-                    icon: Icons.content_cut_rounded,
-                    title: 'Trim video',
-                    subtitle: 'Create a shorter local clip',
-                    onTap: () => _showTrimPicker(context, ref),
-                  ),
-                  _ActionRow(
-                    icon: Icons.graphic_eq_rounded,
-                    title: 'Equalizer',
-                    subtitle: 'Tune audio playback',
-                    onTap: () => context.push('/player/equalizer'),
-                  ),
-                ],
-              ),
-            ),
-            const SliverToBoxAdapter(child: SizedBox(height: 20)),
-            const SliverToBoxAdapter(child: _SectionLabel('Personal')),
-            SliverToBoxAdapter(
-              child: _RowGroup(
-                children: [
-                  _ActionRow(
-                    icon: Icons.account_circle_outlined,
-                    title: 'OTYA Account',
-                    subtitle: 'Profile, sign-in, security and backup',
-                    onTap: () => context.push('/profile'),
+                    icon: Icons.tune_rounded,
+                    title: 'Tools',
+                    subtitle: 'Convert, trim and adjust media',
+                    onTap: () => _showTools(context, ref),
                   ),
                   _ActionRow(
                     icon: Icons.palette_outlined,
@@ -162,19 +129,27 @@ class MySpaceHubScreen extends ConsumerWidget {
               ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 20)),
-            const SliverToBoxAdapter(child: _SectionLabel('Help & product')),
+            const SliverToBoxAdapter(child: _SectionLabel('Account')),
             SliverToBoxAdapter(
               child: _RowGroup(
                 children: [
                   _ActionRow(
-                    icon: Icons.help_outline_rounded,
-                    title: 'Help',
-                    subtitle: 'Guides, troubleshooting and support',
-                    onTap: () => context.push('/about'),
+                    icon: Icons.account_circle_outlined,
+                    title: 'Otya Account',
+                    subtitle: 'Profile, sign-in, security and backup',
+                    onTap: () => context.push('/profile'),
                   ),
+                ],
+              ),
+            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 20)),
+            const SliverToBoxAdapter(child: _SectionLabel('Product')),
+            SliverToBoxAdapter(
+              child: _RowGroup(
+                children: [
                   _ActionRow(
                     icon: Icons.info_outline_rounded,
-                    title: 'About OTYA',
+                    title: 'About Otya',
                     subtitle: 'Version, privacy, terms and product information',
                     onTap: () => context.push('/about'),
                   ),
@@ -198,7 +173,7 @@ class MySpaceHubScreen extends ConsumerWidget {
     await _showMediaActionSheet(
       context,
       title: 'Convert video to audio',
-      subtitle: 'Choose a video. OTYA extracts its existing audio locally without uploading the file.',
+      subtitle: 'Choose a video. Otya extracts its existing audio locally without uploading the file.',
       items: videos,
       actionIcon: Icons.music_note_rounded,
       actionLabel: 'Extract audio',
@@ -228,7 +203,7 @@ class MySpaceHubScreen extends ConsumerWidget {
             const Text('Media tools', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w900)),
             const SizedBox(height: 5),
             const Text(
-              'Work with media on this device. OTYA will show progress and where the result is saved.',
+              'Work with media on this device. Otya will show progress and where the result is saved.',
               style: TextStyle(color: AppColors.textSecondary, height: 1.4),
             ),
             const SizedBox(height: 14),
@@ -416,7 +391,7 @@ class MySpaceHubScreen extends ConsumerWidget {
                                         setState(() => result = output);
                                       } else {
                                         setState(() {
-                                          error = 'OTYA could not process this file. The format or codec may not be supported by this tool yet. Try another file or open it in the player first.';
+                                          error = 'Otya could not process this file. The format or codec may not be supported by this tool yet. Try another file or open it in the player first.';
                                         });
                                       }
                                     } catch (_) {
@@ -475,7 +450,7 @@ class _MeHeader extends StatelessWidget {
                 ),
                 const SizedBox(height: 7),
                 Text(
-                  name?.isNotEmpty == true ? 'Good to see you, $name' : 'Your media, tools and OTYA account',
+                  name?.isNotEmpty == true ? 'Good to see you, $name' : 'Your media, tools and Otya account',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(fontSize: 13, color: AppColors.textSecondary),
@@ -484,14 +459,18 @@ class _MeHeader extends StatelessWidget {
             ),
           ),
           IconButton.filledTonal(
-            tooltip: 'Search OTYA',
+            tooltip: 'Search Otya',
             onPressed: onSearch,
             icon: const Icon(Icons.search_rounded),
           ),
           const SizedBox(width: 8),
-          GestureDetector(
-            onTap: onProfile,
-            child: _Avatar(photoUrl: photoUrl, name: displayName),
+          Semantics(
+            button: true,
+            label: 'Open Otya Account',
+            child: GestureDetector(
+              onTap: onProfile,
+              child: _Avatar(photoUrl: photoUrl, name: displayName),
+            ),
           ),
         ],
       ),
@@ -543,7 +522,7 @@ class _NextCard extends StatelessWidget {
                       Text('Next', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: -.4)),
                       SizedBox(height: 4),
                       Text(
-                        'Ask a question or get help with OTYA.',
+                        'Ask a question or get help with Otya.',
                         style: TextStyle(fontSize: 12.5, height: 1.35, color: AppColors.textSecondary),
                       ),
                     ],
@@ -707,40 +686,32 @@ class _ActionRow extends StatelessWidget {
     required this.title,
     required this.subtitle,
     required this.onTap,
-    this.enabled = true,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
-  final bool enabled;
 
   @override
-  Widget build(BuildContext context) => Opacity(
-        opacity: enabled ? 1 : .45,
-        child: ListTile(
-          enabled: enabled,
-          onTap: enabled
-              ? () {
-                  HapticFeedback.selectionClick();
-                  onTap();
-                }
-              : null,
-          leading: Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: .09),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, size: 21, color: AppColors.accent),
+  Widget build(BuildContext context) => ListTile(
+        onTap: () {
+          HapticFeedback.selectionClick();
+          onTap();
+        },
+        leading: Container(
+          width: 38,
+          height: 38,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            color: AppColors.accent.withValues(alpha: .09),
+            borderRadius: BorderRadius.circular(12),
           ),
-          title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
-          subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
-          trailing: const Icon(Icons.chevron_right_rounded),
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
+          child: Icon(icon, size: 21, color: AppColors.accent),
         ),
+        title: Text(title, style: const TextStyle(fontWeight: FontWeight.w800)),
+        subtitle: Text(subtitle, maxLines: 2, overflow: TextOverflow.ellipsis),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 3),
       );
 }
