@@ -52,6 +52,47 @@ jobs:
           }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
 
+      - name: Validate production release configuration
+        shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+          WORKER_URL: ${{ vars.WORKER_URL }}
+          OTYA_STORE_ADMIN_TOKEN: ${{ secrets.OTYA_STORE_ADMIN_TOKEN }}
+        run: |
+          set -euo pipefail
+          required=(
+            KEYSTORE_BASE64
+            STORE_PASSWORD
+            KEY_ALIAS
+            KEY_PASSWORD
+            FIREBASE_API_KEY
+            R2_ACCESS_KEY_ID
+            R2_SECRET_ACCESS_KEY
+            R2_ENDPOINT
+            R2_BUCKET
+            WORKER_URL
+            OTYA_STORE_ADMIN_TOKEN
+          )
+          missing=()
+          for name in "${required[@]}"; do
+            if [ -z "${!name:-}" ]; then
+              missing+=("$name")
+            fi
+          done
+          if [ "${#missing[@]}" -ne 0 ]; then
+            printf 'ERROR: Missing production release configuration: %s\n' "${missing[*]}"
+            exit 1
+          fi
+          echo "Production release configuration is present."
+
       - name: Free disk space
         uses: jlumbroso/free-disk-space@main
         with:
@@ -319,9 +360,6 @@ jobs:
           R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
           R2_BUCKET: ${{ vars.R2_BUCKET }}
           WORKER_URL: ${{ vars.WORKER_URL }}
-          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-          KV_NAMESPACE_ID: ${{ vars.KV_NAMESPACE_ID }}
           OTYA_STORE_ADMIN_TOKEN: ${{ secrets.OTYA_STORE_ADMIN_TOKEN }}
           ARM64_APK: ${{ steps.artifacts.outputs.arm64 }}
           ARM32_APK: ${{ steps.artifacts.outputs.arm32 }}
