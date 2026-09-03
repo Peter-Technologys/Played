@@ -23,7 +23,8 @@ class UpdateService {
 
   static const String _prefLastCheck = 'update_last_check';
 
-  bool _checkInProgress = false;
+  Future<UpdateInfo?>? _checkInFlight;
+  bool _checkInFlightForced = false;
   UpdateCheckState _lastState = UpdateCheckState.idle;
   String? _lastError;
 
@@ -32,17 +33,33 @@ class UpdateService {
   String get downloadUrl => Environment.downloadUrl;
 
   Future<UpdateInfo?> checkForUpdate({bool force = false}) async {
-    if (_checkInProgress) {
+    final existing = _checkInFlight;
+    if (existing != null) {
+      final existingWasForced = _checkInFlightForced;
       _lastState = UpdateCheckState.checking;
-      return null;
+      final result = await existing;
+
+      // If a manual check arrived while a scheduled check was only skipped by
+      // the 24-hour throttle, honour the manual request after the shared check
+      // completes. Never launch two network checks at the same time.
+      if (force && !existingWasForced && _lastState == UpdateCheckState.skipped) {
+        return checkForUpdate(force: true);
+      }
+      return result;
     }
-    _checkInProgress = true;
+
     _lastState = UpdateCheckState.checking;
     _lastError = null;
+    final check = _doCheckForUpdate(force: force);
+    _checkInFlight = check;
+    _checkInFlightForced = force;
     try {
-      return await _doCheckForUpdate(force: force);
+      return await check;
     } finally {
-      _checkInProgress = false;
+      if (identical(_checkInFlight, check)) {
+        _checkInFlight = null;
+        _checkInFlightForced = false;
+      }
     }
   }
 
