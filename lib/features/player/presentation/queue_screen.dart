@@ -49,10 +49,24 @@ class QueueNotifier extends StateNotifier<QueueState> {
   }
 
   void removeAt(int index) {
+    if (index < 0 || index >= state.items.length) return;
+
+    final currentId = state.current?.id;
     final updated = List<MediaItem>.from(state.items)..removeAt(index);
-    final nextIndex = updated.isEmpty
-        ? 0
-        : state.currentIndex.clamp(0, updated.length - 1);
+    if (updated.isEmpty) {
+      state = const QueueState();
+      return;
+    }
+
+    // Removing an item before the active item shifts its numeric index. Resolve
+    // the active item by identity so playback does not silently jump tracks.
+    final preservedIndex = currentId == null
+        ? -1
+        : updated.indexWhere((item) => item.id == currentId);
+    final nextIndex = preservedIndex >= 0
+        ? preservedIndex
+        : index.clamp(0, updated.length - 1);
+
     state = state.copyWith(items: updated, currentIndex: nextIndex);
   }
 
