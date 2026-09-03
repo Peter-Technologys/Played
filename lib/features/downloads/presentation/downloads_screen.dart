@@ -201,7 +201,7 @@ class _VideoThumb extends StatelessWidget {
       child: SizedBox(
         width: 68,
         height: 48,
-        child: path != null && path.isNotEmpty && File(path).existsSync()
+        child: path != null && path.isNotEmpty
             ? Image.file(File(path), fit: BoxFit.cover, cacheWidth: 220, errorBuilder: (_, __, ___) => _placeholder(context))
             : _placeholder(context),
       ),
