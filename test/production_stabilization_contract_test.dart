@@ -25,7 +25,7 @@ void main() {
     expect(main, contains('await CrashReporter.instance.init();'));
     expect(main, isNot(contains("_safeBackground('crash reporter'")));
     expect(main, isNot(contains('FlutterError.onError = (details)'));
-    expect(main, isNot(contains('PlatformDispatcher.instance.onError =')));
+    expect(main, isNot(contains('PlatformDispatcher.instance.onError ='));
   });
 
   test('update checks do not pretend disabled or failed checks mean current', () {
@@ -47,5 +47,20 @@ void main() {
     expect(repository, contains('if (identical(_scanInFlight, scan))'));
     expect(repository, isNot(contains('Completer<List<MediaItem>>')));
     expect(repository, isNot(contains('completeError(e)')));
+  });
+
+  test('video retry releases failed native player before replacement', () {
+    final engine =
+        File('lib/core/services/media_kit_engine.dart').readAsStringSync();
+
+    expect(engine, contains('final generation = ++_playerGeneration'));
+    expect(engine, contains('Future<void> _releaseCurrentPlayer()'));
+    expect(engine, contains('await _releaseCurrentPlayer();'));
+    expect(engine, contains('await player.dispose();'));
+    expect(engine, contains('onPressed: _retrying ? null : _retryPlayer'));
+    expect(
+      engine,
+      isNot(contains("onPressed: () {\n                      setState(() { _hasError = false;")),
+    );
   });
 }
