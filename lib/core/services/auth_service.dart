@@ -9,6 +9,7 @@
 //
 // Auto-refreshes token when expired (checks exp from JWT payload).
 
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -396,20 +397,29 @@ class AuthService {
   Future<void> logout() async {
     await _ensureLoaded();
     final refreshToken = _refreshToken;
-    if (refreshToken != null) {
-      try {
-        await _client
-            .post(
-              Uri.parse('$_kAuthBase/logout'),
-              headers: {'Content-Type': 'application/json'},
-              body: jsonEncode({'refresh_token': refreshToken}),
-            )
-            .timeout(_timeout);
-      } catch (e) {
-        debugPrint('[AuthService] Logout request failed: ${e.runtimeType}');
-      }
-    }
+
+    // Local sign-out is the security boundary. Clear tokens and identity first
+    // so an offline/slow network cannot keep the device signed in or let an
+    // in-flight refresh restore the session after the user chose Sign out.
     await _clearPersisted();
+
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      unawaited(_revokeRefreshToken(refreshToken));
+    }
+  }
+
+  Future<void> _revokeRefreshToken(String refreshToken) async {
+    try {
+      await _client
+          .post(
+            Uri.parse('$_kAuthBase/logout'),
+            headers: {'Content-Type': 'application/json'},
+            body: jsonEncode({'refresh_token': refreshToken}),
+          )
+          .timeout(_timeout);
+    } catch (e) {
+      debugPrint('[AuthService] Logout revocation failed: ${e.runtimeType}');
+    }
   }
 
   Future<UserProfile?> getProfile() async {
