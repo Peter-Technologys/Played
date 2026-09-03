@@ -65,7 +65,8 @@ jobs:
           R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
           R2_BUCKET: ${{ vars.R2_BUCKET }}
           WORKER_URL: ${{ vars.WORKER_URL }}
-          OTYA_STORE_ADMIN_TOKEN: ${{ secrets.OTYA_STORE_ADMIN_TOKEN }}
+          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
         run: |
           set -euo pipefail
           required=(
@@ -79,7 +80,8 @@ jobs:
             R2_ENDPOINT
             R2_BUCKET
             WORKER_URL
-            OTYA_STORE_ADMIN_TOKEN
+            CF_ACCOUNT_ID
+            CF_API_TOKEN
           )
           missing=()
           for name in "${required[@]}"; do
@@ -381,7 +383,8 @@ jobs:
           R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
           R2_BUCKET: ${{ vars.R2_BUCKET }}
           WORKER_URL: ${{ vars.WORKER_URL }}
-          OTYA_STORE_ADMIN_TOKEN: ${{ secrets.OTYA_STORE_ADMIN_TOKEN }}
+          CF_ACCOUNT_ID: ${{ vars.CF_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           ARM64_APK: ${{ steps.artifacts.outputs.arm64 }}
           ARM32_APK: ${{ steps.artifacts.outputs.arm32 }}
         run: bash scripts/publish_r2.sh
