@@ -67,4 +67,32 @@ void main() {
       'onPressed: () {\n                      setState(() { _hasError = false;',
     );
   });
+
+  test('audio load failures expose retry state immediately', () {
+    final audio = File(
+      'lib/features/player/presentation/audio_player_screen.dart',
+    ).readAsStringSync();
+
+    expect(audio, contains('final bool hasLoadError;'));
+    expect(audio, contains('hasLoadError: true'));
+    expect(audio, contains('hasLoadError: false'));
+    expect(
+      audio,
+      contains('final showRetry = _showRetry || playerState.hasLoadError;'),
+    );
+  });
+
+  test('hot media UI avoids synchronous filesystem existence checks', () {
+    const paths = [
+      'lib/features/my_space/presentation/widgets/media_card.dart',
+      'lib/features/downloads/presentation/downloads_screen.dart',
+      'lib/features/video/presentation/video_tab_screen.dart',
+      'lib/features/settings/presentation/theme_selection_screen.dart',
+    ];
+
+    for (final path in paths) {
+      final source = File(path).readAsStringSync();
+      expectNotContains(source, 'existsSync()');
+    }
+  });
 }
