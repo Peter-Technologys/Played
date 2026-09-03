@@ -67,6 +67,14 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
     _playingSub = _bufferingSub = _positionSub = _durationSub = null;
   }
 
+  List<MediaControl> _controls(bool isPlaying) => [
+        MediaControl.skipToPrevious,
+        isPlaying ? MediaControl.pause : MediaControl.play,
+        MediaControl.skipToNext,
+        MediaControl.rewind,
+        MediaControl.fastForward,
+      ];
+
   void _updatePlaybackState({
     bool? playing,
     bool? buffering,
@@ -84,19 +92,16 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
             : AudioProcessingState.ready;
 
     playbackState.add(playbackState.value.copyWith(
-      controls: [
-        MediaControl.skipToPrevious,
-        MediaControl.rewind,
-        isPlaying ? MediaControl.pause : MediaControl.play,
-        MediaControl.fastForward,
-        MediaControl.skipToNext,
-      ],
+      // Keep the three universal transport actions first. Pre-Android 13
+      // MediaStyle notifications use this order directly; Android 13+ maps the
+      // same PlaybackState actions into its system-owned modern media slots.
+      controls: _controls(isPlaying),
       systemActions: const {
         MediaAction.seek,
         MediaAction.seekForward,
         MediaAction.seekBackward,
       },
-      androidCompactActionIndices: const [0, 2, 4],
+      androidCompactActionIndices: const [0, 1, 2],
       processingState: processingState,
       playing: isPlaying,
       updatePosition: pos,
@@ -194,6 +199,14 @@ class AudioHandlerSingleton {
 
   OtyaAudioHandler? get handler => _handler;
 
+  List<MediaControl> _controls(bool isPlaying) => [
+        MediaControl.skipToPrevious,
+        isPlaying ? MediaControl.pause : MediaControl.play,
+        MediaControl.skipToNext,
+        MediaControl.rewind,
+        MediaControl.fastForward,
+      ];
+
   set handler(OtyaAudioHandler? h) {
     _handler = h;
     if (h == null) return;
@@ -220,14 +233,8 @@ class AudioHandlerSingleton {
       final current = h.playbackState.value;
       h.playbackState.add(current.copyWith(
         playing: pendingPlaying,
-        controls: [
-          MediaControl.skipToPrevious,
-          MediaControl.rewind,
-          pendingPlaying ? MediaControl.pause : MediaControl.play,
-          MediaControl.fastForward,
-          MediaControl.skipToNext,
-        ],
-        androidCompactActionIndices: const [0, 2, 4],
+        controls: _controls(pendingPlaying),
+        androidCompactActionIndices: const [0, 1, 2],
       ));
     }
     debugPrint('[AudioHandlerSingleton] Handler ready; queued Now Playing state flushed.');
@@ -281,14 +288,8 @@ class AudioHandlerSingleton {
     final current = h.playbackState.value;
     h.playbackState.add(current.copyWith(
       playing: isPlaying,
-      controls: [
-        MediaControl.skipToPrevious,
-        MediaControl.rewind,
-        isPlaying ? MediaControl.pause : MediaControl.play,
-        MediaControl.fastForward,
-        MediaControl.skipToNext,
-      ],
-      androidCompactActionIndices: const [0, 2, 4],
+      controls: _controls(isPlaying),
+      androidCompactActionIndices: const [0, 1, 2],
     ));
   }
 
