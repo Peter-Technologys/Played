@@ -167,6 +167,7 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
   SettingsNotifier(super.initial);
 
   final Completer<AppSettings> _startupHydration = Completer<AppSettings>();
+  Future<void> _saveChain = Future<void>.value();
 
   /// Completes exactly once when the startup privacy/settings load has either
   /// produced saved settings or deliberately fallen back to safe defaults.
@@ -181,9 +182,18 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
     }
   }
 
-  Future<void> _update(AppSettings s) async {
+  void _update(AppSettings s) {
     state = s;
-    s.save().ignore();
+
+    // SharedPreferences writes for a full settings snapshot must stay ordered.
+    // Otherwise rapid toggles can interleave two save() calls and leave an
+    // older/mixed snapshot on disk even though the UI shows the newest state.
+    _saveChain = _saveChain
+        .then((_) => s.save())
+        .catchError((Object _) {
+          // Keep the chain usable after a storage failure so later user
+          // changes can still be persisted.
+        });
   }
 
   void setThemeMode(AppThemeMode v) => _update(state.copyWith(themeMode: v));
