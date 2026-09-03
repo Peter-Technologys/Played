@@ -32,6 +32,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
   bool _pipSupported = false;
   bool _pipAutoEnabled = false;
   bool _pipInitialized = false;
+  bool _handoffToAnotherVideo = false;
   late final Duration _savedPosition;
 
   bool _controlsVisible = true;
@@ -144,6 +145,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
+  void _openQueuedVideo(MediaItem item) {
+    if (_position > Duration.zero) {
+      OtyaDatabase.instance.saveSeekPosition(widget.mediaItem.id, _position);
+    }
+    _handoffToAnotherVideo = true;
+    context.pushReplacement('/player/video', extra: item);
+  }
+
   String get size {
     final bytes = widget.mediaItem.fileSizeBytes;
     if (bytes == 0) return 'Unknown';
@@ -202,9 +211,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     showModalBottomSheet(
       context: context,
       useSafeArea: true,
-      backgroundColor: AppColors.surface,
+      backgroundColor: AppColors.surface.withValues(alpha: 0.96),
+      barrierColor: Colors.black.withValues(alpha: 0.42),
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       builder: (_) => Padding(
         padding: const EdgeInsets.fromLTRB(0, 12, 0, 32),
@@ -225,7 +235,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(
                 Icons.share_rounded,
-                color: AppColors.accentGreen,
+                color: AppColors.accent,
                 size: 22,
               ),
               title: const Text(
@@ -244,7 +254,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(
                 Icons.info_outline_rounded,
-                color: AppColors.accent,
+                color: AppColors.textSecondary,
                 size: 22,
               ),
               title: const Text(
@@ -298,7 +308,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(
                 Icons.audiotrack_rounded,
-                color: AppColors.accentViolet,
+                color: AppColors.textSecondary,
                 size: 22,
               ),
               title: const Text(
@@ -340,7 +350,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             ListTile(
               leading: const Icon(
                 Icons.content_cut_rounded,
-                color: AppColors.accentAmber,
+                color: AppColors.textSecondary,
                 size: 22,
               ),
               title: const Text(
@@ -384,7 +394,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           child: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.black87, Colors.transparent],
+                colors: [Color(0xCC000000), Colors.transparent],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -420,29 +430,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
-                    if (widget.mediaItem.filePath.toLowerCase().contains('hdr'))
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 5,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          border: Border.all(
-                            color: Colors.cyanAccent,
-                            width: 0.8,
-                          ),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: const Text(
-                          'HDR',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.cyanAccent,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ),
                     IconButton(
                       icon: Icon(
                         Icons.closed_caption_rounded,
@@ -450,7 +437,8 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             _ccEnabled ? AppColors.accent : Colors.white70,
                         size: 20,
                       ),
-                      tooltip: _ccEnabled ? 'Turn subtitles off' : 'Turn subtitles on',
+                      tooltip:
+                          _ccEnabled ? 'Turn subtitles off' : 'Turn subtitles on',
                       onPressed: _toggleSubtitles,
                     ),
                     IconButton(
@@ -522,95 +510,78 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           ),
         ),
         Positioned(
-          left: 4,
+          left: 10,
           top: 0,
           bottom: 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
-                tooltip: _isMuted ? 'Unmute' : 'Mute',
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _isMuted = !_isMuted);
-                  _player?.setVolume(_isMuted ? 0 : 100);
-                },
-                icon: Icon(
-                  _isMuted
-                      ? Icons.volume_off_rounded
-                      : Icons.volume_up_rounded,
-                  color: Colors.white70,
-                  size: 24,
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.38),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
                 ),
               ),
-              const SizedBox(height: 4),
-              IconButton(
-                tooltip: 'Lock controls',
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  setState(() => _isLocked = true);
-                  _hideTimer?.cancel();
-                },
-                icon: const Icon(
-                  Icons.lock_open_rounded,
-                  color: Colors.white70,
-                  size: 24,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: _isMuted ? 'Unmute' : 'Mute',
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _isMuted = !_isMuted);
+                      _player?.setVolume(_isMuted ? 0 : 100);
+                    },
+                    icon: Icon(
+                      _isMuted
+                          ? Icons.volume_off_rounded
+                          : Icons.volume_up_rounded,
+                      color: Colors.white70,
+                      size: 23,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Lock controls',
+                    onPressed: () {
+                      HapticFeedback.selectionClick();
+                      setState(() => _isLocked = true);
+                      _hideTimer?.cancel();
+                    },
+                    icon: const Icon(
+                      Icons.lock_open_rounded,
+                      color: Colors.white70,
+                      size: 23,
+                    ),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
         Positioned(
-          right: 4,
+          right: 10,
           top: 0,
           bottom: 0,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              IconButton(
+          child: Center(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.38),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.08),
+                ),
+              ),
+              child: IconButton(
                 tooltip: 'Rotate screen',
                 onPressed: _toggleOrientation,
                 icon: const Icon(
                   Icons.screen_rotation_rounded,
                   color: Colors.white70,
-                  size: 24,
+                  size: 23,
                 ),
               ),
-              const SizedBox(height: 4),
-              IconButton(
-                tooltip: 'Screenshot help',
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text(
-                        'Use your device\'s power + volume-down buttons to screenshot',
-                      ),
-                      backgroundColor: AppColors.surface,
-                      duration: Duration(seconds: 3),
-                    ),
-                  );
-                },
-                icon: const Icon(
-                  Icons.camera_alt_rounded,
-                  color: Colors.white70,
-                  size: 24,
-                ),
-              ),
-              const SizedBox(height: 4),
-              IconButton(
-                tooltip: 'Trim video',
-                onPressed: () {
-                  HapticFeedback.selectionClick();
-                  context.push('/tools/whatsapp', extra: widget.mediaItem);
-                },
-                icon: const Icon(
-                  Icons.content_cut_rounded,
-                  color: Colors.white70,
-                  size: 24,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
         Positioned(
@@ -620,7 +591,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           child: Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                colors: [Colors.transparent, Colors.black54],
+                colors: [Colors.transparent, Color(0xB8000000)],
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
               ),
@@ -707,10 +678,10 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           icon: const Icon(
                             Icons.replay_10_rounded,
                             color: Colors.white,
-                            size: 32,
+                            size: 30,
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         IconButton(
                           tooltip: 'Previous',
                           onPressed: () {
@@ -718,8 +689,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             ref.read(queueProvider.notifier).previous();
                             final previous = ref.read(queueProvider).current;
                             if (previous != null && context.mounted) {
-                              Navigator.of(context).pop();
-                              context.push('/player/video', extra: previous);
+                              _openQueuedVideo(previous);
                             }
                           },
                           icon: const Icon(
@@ -728,30 +698,41 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             size: 28,
                           ),
                         ),
-                        const SizedBox(width: 4),
-                        IconButton(
-                          tooltip: _isPlaying ? 'Pause' : 'Play',
-                          constraints: const BoxConstraints(
-                            minWidth: 56,
-                            minHeight: 56,
-                          ),
-                          onPressed: () {
-                            HapticFeedback.mediumImpact();
-                            if (_isPlaying) {
-                              _player?.pause();
-                            } else {
-                              _player?.play();
-                            }
-                          },
-                          icon: Icon(
-                            _isPlaying
-                                ? Icons.pause_circle_filled_rounded
-                                : Icons.play_circle_filled_rounded,
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 56,
+                          height: 56,
+                          decoration: BoxDecoration(
                             color: AppColors.accent,
-                            size: 52,
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color:
+                                    AppColors.accent.withValues(alpha: 0.24),
+                                blurRadius: 18,
+                              ),
+                            ],
+                          ),
+                          child: IconButton(
+                            tooltip: _isPlaying ? 'Pause' : 'Play',
+                            onPressed: () {
+                              HapticFeedback.mediumImpact();
+                              if (_isPlaying) {
+                                _player?.pause();
+                              } else {
+                                _player?.play();
+                              }
+                            },
+                            icon: Icon(
+                              _isPlaying
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 34,
+                            ),
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         IconButton(
                           tooltip: 'Next',
                           onPressed: () {
@@ -759,8 +740,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             ref.read(queueProvider.notifier).next();
                             final next = ref.read(queueProvider).current;
                             if (next != null && context.mounted) {
-                              Navigator.of(context).pop();
-                              context.push('/player/video', extra: next);
+                              _openQueuedVideo(next);
                             }
                           },
                           icon: const Icon(
@@ -769,7 +749,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                             size: 28,
                           ),
                         ),
-                        const SizedBox(width: 4),
+                        const SizedBox(width: 6),
                         IconButton(
                           tooltip: 'Forward 10 seconds',
                           onPressed: () {
@@ -784,31 +764,33 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                           icon: const Icon(
                             Icons.forward_10_rounded,
                             color: Colors.white,
-                            size: 32,
+                            size: 30,
                           ),
                         ),
                         const Spacer(),
                       ],
                     ),
-                    const SizedBox(height: 4),
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         TextButton(
                           onPressed: _showSpeedPicker,
                           style: TextButton.styleFrom(
-                            minimumSize: const Size(48, 48),
+                            minimumSize: const Size(48, 44),
                             padding: const EdgeInsets.symmetric(horizontal: 10),
                             side: BorderSide(
-                              color: AppColors.accent.withValues(alpha: 0.4),
+                              color: Colors.white.withValues(alpha: 0.12),
                             ),
+                            backgroundColor:
+                                Colors.black.withValues(alpha: 0.24),
                             shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(12),
                             ),
                           ),
                           child: Text(
                             '${_playbackSpeed}x',
                             style: const TextStyle(
-                              color: AppColors.accent,
+                              color: AppColors.textPrimary,
                               fontSize: 12,
                               fontWeight: FontWeight.w700,
                               fontFamily: 'Inter',
@@ -903,9 +885,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                     shape: BoxShape.circle,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.5),
+                        color: AppColors.accent.withValues(alpha: 0.32),
                         blurRadius: 20,
-                        spreadRadius: 4,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
@@ -962,7 +944,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     if (_player != null) {
       PlaybackCoordinator.instance.unregister(_player!);
     }
-    Future.microtask(_restoreOrientation);
+    if (!_handoffToAnotherVideo) {
+      Future.microtask(_restoreOrientation);
+    }
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -1003,7 +987,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
           if (!_isLocked)
             AnimatedOpacity(
               opacity: _controlsVisible ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
+              duration: const Duration(milliseconds: 260),
               child: IgnorePointer(
                 ignoring: !_controlsVisible,
                 child: GestureDetector(
