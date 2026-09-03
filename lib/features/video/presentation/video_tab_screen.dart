@@ -433,7 +433,7 @@ class _VideoThumbState extends State<_VideoThumb> {
         child: SizedBox(
           width: 74,
           height: 48,
-          child: _path != null && File(_path!).existsSync()
+          child: _path != null && _path!.isNotEmpty
               ? Image.file(
                   File(_path!),
                   fit: BoxFit.cover,
