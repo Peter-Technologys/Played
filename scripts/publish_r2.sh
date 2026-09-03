@@ -25,9 +25,19 @@ VERSION_CODE="$PUBSPEC_CODE"
 WORKER_URL="${WORKER_URL:-https://petersmartlink.com}"
 WORKER_URL="${WORKER_URL%/}"
 
+: "${AWS_ACCESS_KEY_ID:?R2 access key is required}"
+: "${AWS_SECRET_ACCESS_KEY:?R2 secret access key is required}"
 : "${R2_ENDPOINT:?R2_ENDPOINT is required}"
 : "${R2_BUCKET:?R2_BUCKET is required}"
 : "${OTYA_STORE_ADMIN_TOKEN:?OTYA_STORE_ADMIN_TOKEN is required}"
+[[ "$R2_ENDPOINT" == https://* ]] || {
+  echo "ERROR: R2_ENDPOINT must use HTTPS"
+  exit 1
+}
+[[ "$WORKER_URL" == https://* ]] || {
+  echo "ERROR: WORKER_URL must use HTTPS"
+  exit 1
+}
 
 ARM64_APK="${ARM64_APK:-build/app/outputs/flutter-apk/app-arm64-v8a-release.apk}"
 ARM32_APK="${ARM32_APK:-build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk}"
