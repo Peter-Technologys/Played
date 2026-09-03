@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:local_auth/local_auth.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../../../app/theme/app_colors.dart';
@@ -134,7 +135,7 @@ class SettingsDetailScreen extends ConsumerWidget {
               title: 'App Lock',
               subtitle: 'Require your Android screen lock, fingerprint or face after Otya leaves the foreground',
               value: settings.appLockEnabled,
-              onChanged: notifier.setAppLock,
+              onChanged: (enabled) => _setAppLock(context, notifier, enabled),
             ),
             const _Line(),
             _SwitchTile(
@@ -216,6 +217,64 @@ class SettingsDetailScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static Future<void> _setAppLock(
+    BuildContext context,
+    SettingsNotifier notifier,
+    bool enabled,
+  ) async {
+    if (!enabled) {
+      notifier.setAppLock(false);
+      return;
+    }
+
+    try {
+      final auth = LocalAuthentication();
+      final supported = await auth.isDeviceSupported();
+      if (!context.mounted) return;
+      if (!supported) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'Set an Android screen lock, fingerprint or face authentication before enabling App Lock.',
+            ),
+          ),
+        );
+        return;
+      }
+
+      final verified = await auth.authenticate(
+        localizedReason: 'Verify your device authentication to enable OTYA App Lock',
+        options: const AuthenticationOptions(
+          biometricOnly: false,
+          stickyAuth: true,
+          useErrorDialogs: true,
+        ),
+      );
+      if (!context.mounted) return;
+      if (verified) {
+        notifier.setAppLock(true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('App Lock enabled.')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('App Lock was not enabled because authentication was cancelled.'),
+          ),
+        );
+      }
+    } catch (_) {
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Device authentication is unavailable. Check Android security settings and try again.',
+          ),
+        ),
+      );
+    }
   }
 
   static Future<void> _chooseWallpaper(BuildContext context) async {
