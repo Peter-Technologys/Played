@@ -50,9 +50,12 @@ Otya Music is local-first. The built-in Online Music/Jamendo provider integratio
 - Transfer accepts supported media only, refuses redirects, verifies the Otya sender marker, checks MIME and declared size, and rejects oversized/unknown-length streams.
 - Security reports use the private process documented in [SECURITY.md](SECURITY.md).
 
-## Release gate
+## Release validation
 
-The current v1 rebuild remains in controlled integration/acceptance. It must not be tagged or published until the current head passes strict Flutter analysis, all tests, Android/Kotlin release compilation, verified signed artifact checks and real-device acceptance on the target Android range.
+A public Otya release is valid only when its exact tagged commit passes strict
+Flutter analysis, all tests, Android/Kotlin release compilation, signed artifact
+verification and the public download checks. Release metadata must never point
+to an APK before its versioned R2 object has been uploaded and verified.
 
 Official public surfaces:
 

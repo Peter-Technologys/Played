@@ -125,7 +125,7 @@ class FeedbackService {
     }, info['deviceId']!).ignore();
 
     final starEmoji = List.filled(stars.clamp(1, 5), '⭐').join();
-    final subject = 'OTYA Player Rating — ${stars.clamp(1, 5)} stars';
+    final subject = 'Otya Rating — ${stars.clamp(1, 5)} stars';
     final body =
         'Stars: $starEmoji (${stars.clamp(1, 5)}/5)\n'
         '${comment.trim().isNotEmpty ? 'Comment: ${comment.trim()}\n' : ''}\n'
@@ -155,7 +155,7 @@ class FeedbackService {
     }, info['deviceId']!).ignore();
 
     final categoryLabel = cleanCategory[0].toUpperCase() + cleanCategory.substring(1);
-    final subject = 'OTYA Player Problem Report — $categoryLabel';
+    final subject = 'Otya Problem Report — $categoryLabel';
     final body =
         'Category: $categoryLabel\n'
         'Description: $cleanDescription\n\n'

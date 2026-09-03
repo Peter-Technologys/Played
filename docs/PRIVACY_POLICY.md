@@ -1,72 +1,140 @@
-# Privacy Policy — Played
+# Otya Privacy Policy
 
-**Last updated:** January 2024
+**Effective date:** September 3, 2026
 
----
+**Policy version:** 1.0
 
-## Overview
+**Provider:** PeterSmart Link
 
-Played is an **offline-first** media player. We are committed to your privacy.
+This policy explains how Otya's Android app, account services, Next assistant,
+website, support channels and related cloud services handle information.
 
----
+## What stays on your device
 
-## Data We Collect
+Otya is offline-first. Core music and video playback does not require an Otya
+account or an internet connection. The following information is normally stored
+on your device:
 
-**We do not collect any personal data.**
+- media file paths and metadata needed to build your library;
+- playback history, seek positions, playlists, favourites and settings;
+- Private media stored in Otya's app-private area;
+- local Transfer pairing and progress state; and
+- pending diagnostic reports while your device is offline.
 
-All data processed by Played stays on your device:
+Otya does not upload your raw music or video library as part of normal playback,
+device registration, analytics or Google Drive recovery.
 
-| Data | Where it's stored | Shared? |
-|---|---|---|
-| Media file metadata (title, artist, duration) | Local Hive database | ❌ Never |
-| Playback history & seek positions | Local Hive database | ❌ Never |
-| Vault media (encrypted) | App private directory | ❌ Never |
-| Settings & preferences | Local Hive database | ❌ Never |
-| Stem split results (Studio) | Local cache directory | ❌ Never |
+## Information Otya services process
 
----
+Depending on the features you use, Otya may process:
 
-## Permissions
+- account details such as your Otya ID, name, email address, linked sign-in
+  provider and consent status;
+- security records needed for verification, password recovery, 2FA, sessions
+  and abuse prevention;
+- a randomly generated Otya device ID, device model, Android version, app
+  version/build, architecture and locale;
+- a Firebase Cloud Messaging token for notifications;
+- ratings, problem reports and any contact details or descriptions you choose
+  to submit;
+- diagnostic records containing the Otya device ID, app version/build, error
+  type, truncated error description, truncated stack trace and timestamp; and
+- prompts, messages and necessary service metadata when you choose to use Next.
 
-| Permission | Why it's needed |
-|---|---|
-| `READ_EXTERNAL_STORAGE` / `READ_MEDIA_*` | Scan device for audio & video files |
-| `WRITE_EXTERNAL_STORAGE` | Save trimmed/extracted files to Downloads |
-| `USE_BIOMETRIC` / `USE_FINGERPRINT` | Vault biometric unlock |
-| `NEARBY_WIFI_DEVICES` / `BLUETOOTH` | Air-Drop file sharing |
-| `POST_NOTIFICATIONS` | Now-playing media notification |
-| `INTERNET` | Fetch lyrics (lyrics.ovh API) · Studio stem splitting API |
+Otya does not sell personal information. Otya does not use your local media
+library for advertising.
 
----
+## Optional connected features
 
-## Third-Party Services
+### Otya account
 
-| Service | Purpose | Data sent |
-|---|---|---|
-| lyrics.ovh | Fetch song lyrics | Song title + artist name only |
-| Spleeter/Demucs API | Audio stem splitting | Audio file (only when you use Studio) |
-| Google Mobile Ads | Non-intrusive banner ads | Standard ad identifiers (can be opted out) |
+Creating an account is optional for local playback. Account information is used
+to authenticate you, protect your account, provide recovery and operate the
+connected features you request.
 
----
+### Next
 
-## Air-Drop
+Next is optional. Messages you send to Next are transmitted to Otya's
+Cloudflare-hosted service and the configured AI processing service to generate
+a response. Do not include passwords, payment details or other information you
+do not want processed as part of a support or AI request.
 
-Files shared via Air-Drop are transferred **directly device-to-device** using Wi-Fi Direct and Bluetooth. No data passes through any server.
+### Google Sign-In and Google Drive
 
----
+Google Sign-In is optional. If you explicitly start backup, restore or backup
+deletion, Otya requests the Google Drive permission needed to use the hidden
+Drive app data folder. Recovery snapshots can contain playlist names, playlist
+media references and related supported recovery data; they do not contain the
+raw media files or Private media. Google access tokens are used for the requested
+operation and are not persisted by the Android app.
 
-## Children's Privacy
+### Transfer
 
-Played is not directed at children under 13. We do not knowingly collect data from children.
+Otya Transfer sends supported media directly between devices on the same Wi-Fi
+or hotspot connection. Otya's cloud is not used as a general file relay.
 
----
+## Service providers
 
-## Changes to This Policy
+Otya uses service providers only for the connected function involved:
 
-Any changes will be reflected in the app and in this document with an updated date.
+- **Cloudflare** for the website, authentication and application services,
+  storage, security, rate limiting, diagnostics, release delivery and Next;
+- **Google Firebase** for push notifications, App Check/Play Integrity,
+  analytics and performance measurement when enabled by Otya's current policy;
+- **Google Identity and Drive** when you choose Google Sign-In or Drive recovery;
+- **Resend** for transactional and support email; and
+- **Telegram** when you choose a Telegram sign-in or community interaction.
 
----
+These providers process information under their own terms and privacy policies.
+Otya does not include an advertising SDK in the current v1 Android build.
+
+## Android permissions
+
+Otya may request media-read access, network and Wi-Fi state, camera access for
+QR pairing, biometric/device authentication, foreground media playback, wake
+lock, notifications and vibration. Permissions are used for the feature shown
+to you. Otya v1 does not request all-files access or package-installer access.
+Android performs biometric matching; Otya does not receive or store your
+biometric template.
+
+## Retention and deletion
+
+Local information remains until you remove it, clear Otya's storage or uninstall
+the app. Pending crash records are capped on-device and removed after successful
+upload.
+
+You can delete an authenticated Otya cloud account from the account screen.
+Account deletion is reported as complete only after the server confirms it.
+Google Drive recovery data is controlled separately and can be deleted from the
+Otya account screen or your Google account. Information that must be retained
+for security, fraud prevention or legal compliance may be kept only for the
+applicable purpose and period.
+
+For help with access or deletion, contact **support@petersmartlink.com** or use
+the privacy controls at **https://space.petersmartlink.com**.
+
+## Security
+
+Otya uses HTTPS for internet-facing services, protected application storage,
+short-lived authentication sessions and request-integrity controls. No service
+can guarantee absolute security. Please report suspected security issues through
+the private process described in the repository security policy or the official
+support channel.
+
+## Children
+
+Otya is not directed to children under 13, and PeterSmart Link does not knowingly
+collect personal information from children under 13.
+
+## Changes
+
+Material changes will update the effective date and policy version. When a new
+acceptance is required, Otya will request it through the relevant account flow.
 
 ## Contact
 
-For privacy questions, contact the maintainer via [GitLab](https://gitlab.com/apk-v1).
+PeterSmart Link
+
+Email: **support@petersmartlink.com**
+
+Website: **https://petersmartlink.com**

@@ -1,12 +1,3 @@
-# Flutter Web Auth 2 — force newer version compatible with Kotlin 2.x
--keep class com.linusu.flutter_web_auth_2.** { *; }
-
-# Appwrite SDK
--keep class io.appwrite.** { *; }
--dontwarn io.appwrite.**
-
-# nearby_connections — REMOVED (not in pubspec; replaced by pure-Dart Flash Share)
-
 # Hive
 -keep class hive.** { *; }
 -keep class com.hivedb.** { *; }
@@ -42,26 +33,16 @@
 -keep class dev.steenbakker.mobile_scanner.** { *; }
 -dontwarn dev.steenbakker.mobile_scanner.**
 
-# workmanager
--keep class be.tramckrijte.workmanager.** { *; }
--dontwarn be.tramckrijte.workmanager.**
 # ── App classes (workers, receivers, services, activities) ───────────────
 # Explicit keeps for all app-defined classes.
-# R8 fullMode was stripping MainActivity and BootReceiver by name,
-# causing ClassNotFoundException on launch (14 crashes confirmed).
+# Preserve the app activity, native media bridge and notification receiver.
 -keep class com.otyaplayer.app.** { *; }
 -keep class com.otyaplayer.app.MainActivity { *; }
--keep class com.otyaplayer.app.BootReceiver { *; }
 -keep class com.otyaplayer.app.NotificationDismissReceiver { *; }
--keep class com.otyaplayer.app.UpdateCheckWorker { *; }
 
 # connectivity_plus
 -keep class dev.fluttercommunity.plus.connectivity.** { *; }
 -dontwarn dev.fluttercommunity.plus.connectivity.**
-
-# network_info_plus
--keep class dev.fluttercommunity.plus.network_info.** { *; }
--dontwarn dev.fluttercommunity.plus.network_info.**
 
 # permission_handler
 -keep class com.baseflow.permissionhandler.** { *; }
@@ -91,14 +72,6 @@
 # Firebase MessagingService subclass (referenced by name in AndroidManifest)
 -keep class * extends com.google.firebase.messaging.FirebaseMessagingService { *; }
 
-# androidx.work — WorkManager internals
--keep class androidx.work.** { *; }
--dontwarn androidx.work.**
-
-# open_filex
--keep class com.crazecoder.openfile.** { *; }
--dontwarn com.crazecoder.openfile.**
-
 # flutter_secure_storage
 -keep class com.it_nomads.fluttersecurestorage.** { *; }
 -dontwarn com.it_nomads.fluttersecurestorage.**
@@ -113,13 +86,9 @@
 -keep class com.dexterous.flutterlocalnotifications.** { *; }
 -dontwarn com.dexterous.flutterlocalnotifications.**
 
-# Google Mobile Ads + local_auth (Google Play Services)
+# Google Sign-In, Firebase and local_auth (Google Play Services)
 -keep class com.google.android.gms.** { *; }
 -dontwarn com.google.android.gms.**
-
-# androidx.startup — required by WorkManagerInitializer declared in AndroidManifest
--keep class androidx.startup.** { *; }
--dontwarn androidx.startup.**
 
 # local_auth — biometric classes
 -keep class androidx.biometric.** { *; }

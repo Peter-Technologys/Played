@@ -3,7 +3,7 @@ import 'package:flutter/services.dart';
 import '../services/feedback_service.dart';
 import '../../app/theme/app_colors.dart';
 
-/// Bottom sheet for rating OTYA Player (1–5 stars + optional comment).
+/// Bottom sheet for rating Otya (1–5 stars + optional comment).
 ///
 /// Auto-show with connection check:
 ///   await RateUsSheet.showIfAppropriate(context);

@@ -41,87 +41,84 @@ class _PolicyBody extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: const [
-        _PolicyHeading('OTYA Player — Privacy Policy'),
-        _PolicyText('Effective date: June 2026'),
+        _PolicyHeading('Otya Privacy Policy'),
+        _PolicyText('Effective date: September 3, 2026 · Version 1.0'),
         SizedBox(height: 24),
 
         _PolicySection(
-          title: '1. Who We Are',
+          title: '1. Who we are',
           body:
-              'OTYA Player is developed and maintained by PeterSmart Link '
+              'Otya is developed and maintained by PeterSmart Link '
               '(petersmartlink.com). '
               'If you have any questions about this policy, contact us at '
               'support@petersmartlink.com.',
         ),
 
         _PolicySection(
-          title: '2. Data We Collect',
+          title: '2. What stays on your device',
           body:
-              'OTYA Player is a local media player. We do NOT collect, store, or '
-              'sell any personal data.\n\n'
-              'The app accesses the following on your device:\n'
-              '• Audio and video files — only to display and play your media.\n'
-              '• Storage — to read, organise, and (optionally) write media files.\n'
-              '• Biometric data — only to unlock the in-app Vault; never leaves your device.\n'
-              '• Network — only for optional cloud backup (Appwrite) and ad delivery.\n\n'
-              'No usage analytics, crash reports, or behavioural data are sent to us.',
+              'Core playback is offline-first. Media paths and metadata, playback '
+              'history, playlists, favourites, settings and Private media normally '
+              'stay on this device. Otya does not upload your raw music or video '
+              'library as part of normal playback, analytics or Drive recovery.',
         ),
 
         _PolicySection(
-          title: '3. Permissions We Request',
+          title: '3. Information connected services process',
           body:
-              '• READ_MEDIA_AUDIO / READ_MEDIA_VIDEO — to scan and play your local files.\n'
-              '• MANAGE_EXTERNAL_STORAGE — to access files on SD cards and all folders.\n'
-              '• INTERNET / ACCESS_NETWORK_STATE — for optional cloud sync and ads.\n'
-              '• BLUETOOTH / NEARBY_WIFI_DEVICES — for the Air-Drop file-sharing feature.\n'
-              '• USE_BIOMETRIC / USE_FINGERPRINT — for Vault unlock; data never leaves the device.\n'
-              '• FOREGROUND_SERVICE / FOREGROUND_SERVICE_MEDIA_PLAYBACK — to keep audio playing when the screen is off.\n'
-              '• POST_NOTIFICATIONS — to show the media playback notification.\n'
-              '• REQUEST_INSTALL_PACKAGES — to install app updates downloaded in-app.\n'
-              '• CAMERA — used by the QR scanner in the Air-Drop feature.\n\n'
-              'Each permission is requested only when you use the feature that needs it.',
+              'Depending on what you use, Otya may process account and security '
+              'details, a randomly generated Otya device ID, device/app information, '
+              'a push-notification token, ratings or problem reports, and diagnostic '
+              'records containing truncated error details. Messages you send to Next '
+              'are processed online to generate a response. Otya does not sell '
+              'personal information or use your local media library for advertising.',
         ),
 
         _PolicySection(
-          title: '4. Third-Party Services',
+          title: '4. Optional features',
           body:
-              '• Cloudflare Workers / D1 — optional cloud sync for playlists, '
-              'history, and EQ presets. Data is stored on our Cloudflare account '
-              'and is associated only with your account ID.\n'
-              '• Firebase Cloud Messaging (FCM) — used to deliver update alerts '
-              'and announcements. No personal data is shared with Google beyond '
-              'what is required for push delivery.\n'
-              '• Google AdMob — used to serve ads in the free tier. AdMob may '
-              'collect device identifiers in accordance with Google\'s privacy policy.',
+              'An Otya account is optional for local playback. Google Sign-In and '
+              'Google Drive recovery are used only when you choose them. Drive '
+              'recovery stores supported playlist data in the hidden app data folder, '
+              'not raw media or Private files. Transfer sends supported files directly '
+              'between devices on the same Wi-Fi or hotspot connection.',
         ),
 
         _PolicySection(
-          title: '5. Data Retention & Deletion',
+          title: '5. Service providers',
           body:
-              'We do not store personal data on our servers. All media and playlists '
-              'remain on your device. To delete all app data, uninstall OTYA Player '
-              'or clear app data in your device Settings → Apps → OTYA Player → Storage.',
+              'Otya uses Cloudflare for connected services and release delivery; '
+              'Google Firebase for notifications, app attestation, analytics and '
+              'performance measurement when enabled; Google Identity and Drive for '
+              'features you choose; Resend for email; and Telegram when you choose a '
+              'Telegram interaction. The current v1 Android build has no advertising SDK.',
         ),
 
         _PolicySection(
-          title: '6. Children',
+          title: '6. Permissions',
           body:
-              'OTYA Player is not directed at children under 13. We do not knowingly '
-              'collect data from children.',
+              'Otya may request media-read access, network and Wi-Fi state, camera '
+              'access for QR pairing, biometric/device authentication, foreground '
+              'media playback and notifications. Android performs biometric matching; '
+              'Otya does not receive or store your biometric template. Otya v1 does '
+              'not request all-files or package-installer access.',
         ),
 
         _PolicySection(
-          title: '7. Changes to This Policy',
+          title: '7. Retention and deletion',
           body:
-              'We may update this policy. The effective date at the top will reflect '
-              'the latest revision. Continued use of the app after changes constitutes '
-              'acceptance of the updated policy.',
+              'Local information remains until you remove it, clear Otya storage or '
+              'uninstall the app. You can delete an authenticated Otya cloud account '
+              'from the account screen. Google Drive recovery data is controlled '
+              'separately and can also be deleted. Visit space.petersmartlink.com or '
+              'contact support for data-access or deletion help.',
         ),
 
         _PolicySection(
-          title: '8. Contact',
+          title: '8. Children, changes and contact',
           body:
-              'Questions or concerns?\n'
+              'Otya is not directed to children under 13. Material policy changes '
+              'will update the effective date and version shown above.\n\n'
               'Email: support@petersmartlink.com\n'
               'Website: https://petersmartlink.com',
         ),

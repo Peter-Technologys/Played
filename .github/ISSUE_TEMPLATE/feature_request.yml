@@ -1,5 +1,5 @@
 name: Feature request
-description: Propose an improvement for OTYA Player
+description: Propose an improvement for Otya
 title: "[Feature]: "
 labels:
   - enhancement
@@ -33,7 +33,7 @@ body:
         - Downloads
         - Authentication
         - Sharing
-        - Vault and privacy
+        - Private and privacy
         - Notifications
         - Updates
         - UI/UX

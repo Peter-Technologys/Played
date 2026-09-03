@@ -74,7 +74,7 @@ class AudioPlayerState {
 class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
   final Player _player = Player(
     configuration: const PlayerConfiguration(
-      title: 'OTYA Player',
+      title: 'Otya',
       logLevel: MPVLogLevel.error,
     ),
   );
