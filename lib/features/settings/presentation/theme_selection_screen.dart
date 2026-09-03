@@ -103,7 +103,7 @@ class _ThemeSelectionScreenState extends State<ThemeSelectionScreen> {
   @override
   Widget build(BuildContext context) {
     final path = _wallpaperPath;
-    final hasImage = path != null && File(path).existsSync();
+    final hasImage = path != null && path.isNotEmpty;
     final activeId = CustomThemeManager.instance.themeId;
 
     return WallpaperScaffold(
@@ -238,6 +238,16 @@ class _PhotoThemeCard extends StatelessWidget {
   final bool active;
   final VoidCallback onTap;
 
+  Widget _fallback() => const DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF1E1430), Color(0xFF08080B)],
+          ),
+        ),
+      );
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -257,17 +267,13 @@ class _PhotoThemeCard extends StatelessWidget {
             fit: StackFit.expand,
             children: [
               if (path != null)
-                Image.file(File(path!), fit: BoxFit.cover)
+                Image.file(
+                  File(path!),
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => _fallback(),
+                )
               else
-                const DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [Color(0xFF1E1430), Color(0xFF08080B)],
-                    ),
-                  ),
-                ),
+                _fallback(),
               ColoredBox(color: Colors.black.withValues(alpha: 0.28)),
               Center(
                 child: Column(
