@@ -32,6 +32,8 @@ class OtyaPlayerApp extends ConsumerStatefulWidget {
 class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
   bool _onboardingDone = false;
   bool _checking = true;
+  bool _startupDialogsScheduled = false;
+  Timer? _startupDialogTimer;
 
   @override
   void initState() {
@@ -42,19 +44,14 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
     SchedulerBinding.instance.addPostFrameCallback((_) {
       unawaited(_startRemoteServicesAfterFirstFrame());
-      Future.delayed(const Duration(seconds: 2), () {
-        if (!mounted) return;
-        try {
-          AnnouncementDialog.showIfPending(context);
-        } catch (_) {}
-      });
-      Future.delayed(const Duration(seconds: 4), () {
-        if (!mounted) return;
-        try {
-          UpdateDialog.checkAndShow(context);
-        } catch (_) {}
-      });
+      _scheduleStartupDialogs();
     });
+  }
+
+  @override
+  void dispose() {
+    _startupDialogTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadLocalVisualTheme() async {
@@ -72,6 +69,42 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     );
   }
 
+  void _scheduleStartupDialogs() {
+    if (!mounted ||
+        _checking ||
+        !_onboardingDone ||
+        _startupDialogsScheduled) {
+      return;
+    }
+
+    _startupDialogsScheduled = true;
+    _startupDialogTimer?.cancel();
+    _startupDialogTimer = Timer(const Duration(seconds: 2), () {
+      unawaited(_showStartupDialogsSequentially());
+    });
+  }
+
+  Future<void> _showStartupDialogsSequentially() async {
+    try {
+      var navigatorContext = AppRouter.navigatorKey.currentContext;
+      if (!mounted || navigatorContext == null) return;
+
+      // Announcements have priority and must finish before an update prompt is
+      // considered. This prevents two modal routes from being stacked during
+      // startup and uses a context that actually belongs to the root Navigator.
+      await AnnouncementDialog.showIfPending(navigatorContext);
+      if (!mounted) return;
+
+      await Future<void>.delayed(const Duration(seconds: 2));
+      navigatorContext = AppRouter.navigatorKey.currentContext;
+      if (!mounted || navigatorContext == null) return;
+      await UpdateDialog.checkAndShow(navigatorContext);
+    } catch (_) {
+      // Startup notices are non-critical. Local playback and navigation must
+      // remain available even when a remote announcement/update check fails.
+    }
+  }
+
   Future<void> _hydrateStartupPrivacyAndOnboarding() async {
     try {
       // Start the onboarding preference read at the same time, but keep the
@@ -86,6 +119,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
         _onboardingDone = prefs.getBool('onboarding_done') ?? false;
         _checking = false;
       });
+      _scheduleStartupDialogs();
     } catch (_) {
       ref.read(settingsProvider.notifier).hydrate(const AppSettings());
       if (mounted) {
@@ -93,6 +127,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
           _onboardingDone = true;
           _checking = false;
         });
+        _scheduleStartupDialogs();
       }
     }
   }
@@ -104,6 +139,7 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
     } catch (_) {}
     if (!mounted) return;
     setState(() => _onboardingDone = true);
+    _scheduleStartupDialogs();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       unawaited(_requestNotificationPermissionSafely());
