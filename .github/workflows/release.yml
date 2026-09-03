@@ -110,26 +110,26 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && 'refs/heads/main' || github.ref }}
 
-      - name: Check release tag
+      - name: Check first-release identity
         shell: bash
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          test "$RELEASE_TAG" = 'v1.0.0' || { echo "ERROR: unexpected release tag $RELEASE_TAG"; exit 1; }
+          test "$RELEASE_TAG" = 'v1.0.0' || {
+            echo "ERROR: unexpected release tag $RELEASE_TAG"
+            exit 1
+          }
           git rev-parse -q --verify "refs/tags/$RELEASE_TAG" >/dev/null || {
             echo "ERROR: release tag $RELEASE_TAG does not exist"
             exit 1
           }
 
-      - name: Check release version matches app
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-        run: |
-          set -euo pipefail
           APP_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' pubspec.yaml)"
-          test -n "$APP_VERSION" || { echo "ERROR: pubspec.yaml version is missing"; exit 1; }
+          test -n "$APP_VERSION" || {
+            echo "ERROR: pubspec.yaml version is missing"
+            exit 1
+          }
           [[ "$APP_VERSION" =~ ^1\.0\.0\+[1-9][0-9]*$ ]] || {
             echo "ERROR: Otya first-release builds must stay 1.0.0+<positive build>; found $APP_VERSION"
             exit 1
@@ -145,33 +145,6 @@ jobs:
             echo "ERROR: release build number must be a positive integer"
             exit 1
           }
-
-      - name: Align first-release tag to validated main
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          HEAD_SHA="$(git rev-parse HEAD)"
-          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
-          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
-            echo "$RELEASE_TAG already points to the validated release commit."
-            exit 0
-          fi
-
-          ASSET_COUNT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets | length' 2>/dev/null || printf '0')"
-          test "$ASSET_COUNT" = '0' || {
-            echo "ERROR: refusing to move $RELEASE_TAG because its GitHub Release already has assets"
-            exit 1
-          }
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -f "$RELEASE_TAG" "$HEAD_SHA"
-          git push --force origin "refs/tags/$RELEASE_TAG"
-          echo "$RELEASE_TAG now points to validated main commit $HEAD_SHA."
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
@@ -217,13 +190,17 @@ jobs:
 
       - name: Load signing key
         shell: bash
+        env:
+          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
-          test -n '${{ secrets.KEYSTORE_BASE64 }}' || { echo "ERROR: Release signing key is missing"; exit 1; }
-          printf '%s' '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/app/keystore.jks
-          test -s android/app/keystore.jks || { echo "ERROR: Release signing key is empty"; exit 1; }
+          printf '%s' "$KEYSTORE_BASE64" | base64 -d > android/app/keystore.jks
+          test -s android/app/keystore.jks || {
+            echo "ERROR: Release signing key is empty"
+            exit 1
+          }
 
-      - name: Build APKs
+      - name: Build release artifacts
         env:
           KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
@@ -233,15 +210,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$STORE_PASSWORD" || { echo "ERROR: STORE_PASSWORD is missing"; exit 1; }
-          test -n "$KEY_ALIAS" || { echo "ERROR: KEY_ALIAS is missing"; exit 1; }
-          test -n "$KEY_PASSWORD" || { echo "ERROR: KEY_PASSWORD is missing"; exit 1; }
-          test -n "$FIREBASE_API_KEY" || { echo "ERROR: FIREBASE_API_KEY is missing"; exit 1; }
-
           GOOGLE_WEB_CLIENT_ID='82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'
           FIREBASE_APP_ID='1:82776565585:android:085cf9b4eecb76e9535570'
           FIREBASE_MESSAGING_SENDER_ID='82776565585'
           FIREBASE_PROJECT_ID='otya-player'
+
           COMMON_DEFINES=(
             --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID"
             --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY"
@@ -257,28 +230,10 @@ jobs:
             --dart-define=SELF_UPDATE=true \
             "${COMMON_DEFINES[@]}"
 
-      - name: Build Play Store bundle
-        env:
-          KEYSTORE_PATH: ${{ github.workspace }}/android/app/keystore.jks
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
-          FIREBASE_API_KEY: ${{ vars.FIREBASE_API_KEY }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          GOOGLE_WEB_CLIENT_ID='82776565585-obr8k53b8n6djsggissv8qne81cm3u5u.apps.googleusercontent.com'
-          FIREBASE_APP_ID='1:82776565585:android:085cf9b4eecb76e9535570'
-          FIREBASE_MESSAGING_SENDER_ID='82776565585'
-          FIREBASE_PROJECT_ID='otya-player'
           flutter build appbundle --release \
             --split-debug-info=build/debug-info \
             --dart-define=SELF_UPDATE=false \
-            --dart-define=GOOGLE_WEB_CLIENT_ID="$GOOGLE_WEB_CLIENT_ID" \
-            --dart-define=FIREBASE_API_KEY="$FIREBASE_API_KEY" \
-            --dart-define=FIREBASE_APP_ID="$FIREBASE_APP_ID" \
-            --dart-define=FIREBASE_MESSAGING_SENDER_ID="$FIREBASE_MESSAGING_SENDER_ID" \
-            --dart-define=FIREBASE_PROJECT_ID="$FIREBASE_PROJECT_ID"
+            "${COMMON_DEFINES[@]}"
 
       - name: Name and verify Otya files
         id: artifacts
@@ -315,7 +270,10 @@ jobs:
           [ "$(stat -c%s "$AAB")" -gt 5000000 ] || { echo "ERROR: app bundle is too small"; exit 1; }
 
           APKSIGNER="$(find "$ANDROID_HOME/build-tools" -type f -name apksigner -print | sort -V | tail -n 1)"
-          test -n "$APKSIGNER" && test -x "$APKSIGNER" || { echo "ERROR: Android apksigner was not found"; exit 1; }
+          test -n "$APKSIGNER" && test -x "$APKSIGNER" || {
+            echo "ERROR: Android apksigner was not found"
+            exit 1
+          }
           "$APKSIGNER" verify --verbose --print-certs "$ARM64" | tee "$ARM64_REPORT"
           "$APKSIGNER" verify --verbose --print-certs "$ARM32" | tee "$ARM32_REPORT"
 
@@ -327,14 +285,20 @@ jobs:
             | head -n 1 \
             | tr -d ':[:space:]' \
             | tr '[:upper:]' '[:lower:]')"
-          test -n "$EXPECTED_SHA256" || { echo "ERROR: expected signing certificate is unavailable"; exit 1; }
+          test -n "$EXPECTED_SHA256" || {
+            echo "ERROR: expected signing certificate is unavailable"
+            exit 1
+          }
 
           for REPORT in "$ARM64_REPORT" "$ARM32_REPORT"; do
             ACTUAL_SHA256="$(sed -n 's/^.*certificate SHA-256 digest: //p' "$REPORT" \
               | head -n 1 \
               | tr -d ':[:space:]' \
               | tr '[:upper:]' '[:lower:]')"
-            test -n "$ACTUAL_SHA256" || { echo "ERROR: APK signing certificate was not reported"; exit 1; }
+            test -n "$ACTUAL_SHA256" || {
+              echo "ERROR: APK signing certificate was not reported"
+              exit 1
+            }
             test "$EXPECTED_SHA256" = "$ACTUAL_SHA256" || {
               echo "ERROR: release APK certificate does not match the configured Otya signing key"
               exit 1
@@ -347,7 +311,10 @@ jobs:
             | head -n 1 \
             | tr -d ':[:space:]' \
             | tr '[:upper:]' '[:lower:]')"
-          test -n "$AAB_SHA256" || { echo "ERROR: app bundle signing certificate was not reported"; exit 1; }
+          test -n "$AAB_SHA256" || {
+            echo "ERROR: app bundle signing certificate was not reported"
+            exit 1
+          }
           test "$EXPECTED_SHA256" = "$AAB_SHA256" || {
             echo "ERROR: app bundle certificate does not match the configured Otya signing key"
             exit 1
@@ -377,6 +344,33 @@ jobs:
             ${{ steps.artifacts.outputs.arm32_signing }}
             ${{ steps.artifacts.outputs.aab_signing }}
             build/flutter-analyze-release.log
+
+      - name: Align v1.0.0 tag to verified main
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
+            echo "$RELEASE_TAG already points to the verified release commit."
+            exit 0
+          fi
+
+          ASSET_COUNT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets | length')"
+          test "$ASSET_COUNT" = '0' || {
+            echo "ERROR: refusing to move $RELEASE_TAG because its GitHub Release already has assets"
+            exit 1
+          }
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f "$RELEASE_TAG" "$HEAD_SHA"
+          git push --force origin "refs/tags/$RELEASE_TAG"
+          echo "$RELEASE_TAG now points to verified main commit $HEAD_SHA."
 
       - name: Publish Otya APKs
         env:
