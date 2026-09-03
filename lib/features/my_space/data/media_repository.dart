@@ -12,75 +12,76 @@ class MediaRepository {
 
   List<MediaItem>? _cachedItems;
   List<MediaItem>? get cachedItems => _cachedItems;
-  bool _scanning = false;
 
-  /// Completer that all concurrent callers await while a scan is in progress.
-  /// Replaced with a fresh Completer on each new scan so callers never hold
-  /// a stale reference to a completed Completer.
-  Completer<List<MediaItem>>? _scanCompleter;
+  /// The single authoritative scan shared by every concurrent caller.
+  ///
+  /// Keeping the scan itself as the shared Future avoids a separate Completer
+  /// whose error could go unobserved when only the original caller exists.
+  Future<List<MediaItem>>? _scanInFlight;
 
   Future<List<MediaItem>> getAllMedia({bool forceRefresh = false}) async {
     if (_cachedItems != null && !forceRefresh) return _cachedItems!;
-    // Prevent concurrent scans — if a scan is already in progress, all
-    // callers await the same Completer instead of busy-polling.
-    if (_scanning) {
-      _scanCompleter ??= Completer<List<MediaItem>>();
-      return _scanCompleter!.future;
-    }
-    _scanning = true;
-    _scanCompleter = Completer<List<MediaItem>>();
+
+    // MediaStore observers, lifecycle refreshes and manual refreshes can arrive
+    // close together. Reuse the same scan instead of duplicating expensive I/O.
+    final existingScan = _scanInFlight;
+    if (existingScan != null) return existingScan;
+
+    final scan = _scanAndCache();
+    _scanInFlight = scan;
     try {
-      final scanned = await MediaScannerService.instance.scanAll();
+      return await scan;
+    } finally {
+      if (identical(_scanInFlight, scan)) {
+        _scanInFlight = null;
+      }
+    }
+  }
 
-      // MediaStore identity is carried explicitly in mediaStoreId. Artwork is
-      // optional (and videos normally have no albumArtPath), so artwork must
-      // never be used to infer where an item came from.
-      final mediaStoreItems =
-          scanned.where((e) => e.mediaStoreId != null).toList();
-      final supplemental =
-          scanned.where((e) => e.mediaStoreId == null).toList();
+  Future<List<MediaItem>> _scanAndCache() async {
+    final scanned = await MediaScannerService.instance.scanAll();
 
-      final alive = <MediaItem>[...mediaStoreItems];
+    // MediaStore identity is carried explicitly in mediaStoreId. Artwork is
+    // optional (and videos normally have no albumArtPath), so artwork must
+    // never be used to infer where an item came from.
+    final mediaStoreItems =
+        scanned.where((e) => e.mediaStoreId != null).toList();
+    final supplemental =
+        scanned.where((e) => e.mediaStoreId == null).toList();
 
-      // Verify supplemental (receive-dir) items in batches of 50
-      // to avoid OOM on large libraries from one giant Future.wait().
-      if (supplemental.isNotEmpty) {
-        const batchSize = 50;
-        for (var i = 0; i < supplemental.length; i += batchSize) {
-          final batch = supplemental.skip(i).take(batchSize).toList();
-          final checks = await Future.wait(
-            batch.map(
-              (item) => File(item.filePath).exists().catchError((_) => false),
-            ),
-          );
-          for (var j = 0; j < batch.length; j++) {
-            if (checks[j]) alive.add(batch[j]);
-          }
+    final alive = <MediaItem>[...mediaStoreItems];
+
+    // Verify supplemental (receive-dir) items in batches of 50
+    // to avoid OOM on large libraries from one giant Future.wait().
+    if (supplemental.isNotEmpty) {
+      const batchSize = 50;
+      for (var i = 0; i < supplemental.length; i += batchSize) {
+        final batch = supplemental.skip(i).take(batchSize).toList();
+        final checks = await Future.wait(
+          batch.map(
+            (item) => File(item.filePath).exists().catchError((_) => false),
+          ),
+        );
+        for (var j = 0; j < batch.length; j++) {
+          if (checks[j]) alive.add(batch[j]);
         }
       }
-
-      _cachedItems = alive;
-
-      // Fire-and-forget shelf cache update.
-      try {
-        final bundle = ShelfSorter.buildAllShelves(alive);
-        OtyaDatabase.instance
-            .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
-            .ignore();
-        OtyaDatabase.instance
-            .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
-            .ignore();
-      } catch (_) {}
-
-      _scanCompleter?.complete(alive);
-      return alive;
-    } catch (e) {
-      _scanCompleter?.completeError(e);
-      rethrow;
-    } finally {
-      _scanning = false;
-      _scanCompleter = null;
     }
+
+    _cachedItems = alive;
+
+    // Fire-and-forget shelf cache update.
+    try {
+      final bundle = ShelfSorter.buildAllShelves(alive);
+      OtyaDatabase.instance
+          .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
+          .ignore();
+      OtyaDatabase.instance
+          .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
+          .ignore();
+    } catch (_) {}
+
+    return alive;
   }
 
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
