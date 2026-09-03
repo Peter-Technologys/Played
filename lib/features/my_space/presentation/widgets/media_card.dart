@@ -63,7 +63,7 @@ class _MediaCardState extends State<MediaCard>
     final item = widget.item;
     if (item.isVideo) {
       final cached = _thumbCache[item.filePath];
-      if (cached != null && File(cached).existsSync()) {
+      if (cached != null && cached.isNotEmpty) {
         _thumbPath = cached;
         _loaded = true;
         return;
@@ -75,12 +75,12 @@ class _MediaCardState extends State<MediaCard>
         return;
       }
       if (!raw.startsWith('albumid:')) {
-        if (File(raw).existsSync()) _artPath = raw;
+        _artPath = raw;
         _loaded = true;
         return;
       }
       final cached = _artCache[raw];
-      if (cached != null && File(cached).existsSync()) {
+      if (cached != null && cached.isNotEmpty) {
         _artPath = cached;
         _loaded = true;
         return;
@@ -116,7 +116,7 @@ class _MediaCardState extends State<MediaCard>
           'path': item.filePath,
           'id': item.mediaStoreId ?? '',
         });
-        if (path != null && path.isNotEmpty && File(path).existsSync()) {
+        if (path != null && path.isNotEmpty) {
           _cacheInsert(_thumbCache, key, path);
         }
         if (mounted) {
@@ -137,7 +137,7 @@ class _MediaCardState extends State<MediaCard>
       if (!raw.startsWith('albumid:')) {
         if (mounted) {
           setState(() {
-            _artPath = File(raw).existsSync() ? raw : null;
+            _artPath = raw;
             _loaded = true;
           });
         }
@@ -149,7 +149,7 @@ class _MediaCardState extends State<MediaCard>
           'getAlbumArt',
           {'albumId': albumId},
         );
-        if (path != null && path.isNotEmpty && File(path).existsSync()) {
+        if (path != null && path.isNotEmpty) {
           _cacheInsert(_artCache, raw, path);
         }
         if (mounted) {
@@ -365,7 +365,7 @@ class _MediaCardState extends State<MediaCard>
           );
     }
     final path = isVideo ? _thumbPath : _artPath;
-    if (path != null && File(path).existsSync()) {
+    if (path != null && path.isNotEmpty) {
       return RepaintBoundary(
         child: Image.file(
           File(path),
