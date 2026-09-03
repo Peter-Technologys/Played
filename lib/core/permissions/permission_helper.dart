@@ -25,10 +25,15 @@ class PermissionHelper {
     return _sdkInt!;
   }
 
+  static bool _usable(PermissionStatus status) =>
+      status.isGranted || status.isLimited;
+
   /// Request Android permissions needed to discover the local media library.
   ///
-  /// Android 13+ uses the split audio/video permissions. Android 12 and below
-  /// use READ_EXTERNAL_STORAGE. OTYA never requests broad all-files access.
+  /// Android 13+ splits audio and video permissions. OTYA accepts either one:
+  /// a user who allows only music or only video still gets the permitted part
+  /// of their local library. Android 12 and below use one storage permission.
+  /// OTYA never requests broad all-files access.
   static Future<bool> requestMediaPermissions({BuildContext? context}) async {
     final sdk = await _getSdkInt();
     if (sdk == 0) return true;
@@ -37,39 +42,40 @@ class PermissionHelper {
         ? [Permission.audio, Permission.videos]
         : [Permission.storage];
     final statuses = await permissions.request();
+    final hasUsableAccess = statuses.values.any(_usable);
 
-    if (context != null && context.mounted) {
+    // Only send the user to Settings when OTYA has no usable media access at
+    // all. A music-only/video-only choice is valid and should not be nagged.
+    if (!hasUsableAccess && context != null && context.mounted) {
       for (final status in statuses.values) {
         if (status.isPermanentlyDenied) {
           await showPermanentlyDeniedDialog(
             context,
             permissionName: 'Media access',
             rationale:
-                'OTYA needs Android media access to discover the songs and videos on this phone. Open Settings to grant the permission.',
+                'OTYA needs Android media access to discover songs or videos on this phone. Open Settings to grant the permission.',
           );
           break;
         }
       }
     }
 
-    return statuses.values.every(
-      (status) => status.isGranted || status.isLimited,
-    );
+    return hasUsableAccess;
   }
 
-  /// Check without prompting whether OTYA can currently read both audio and
-  /// video. Limited status is accepted where Android exposes it.
+  /// Check without prompting whether OTYA can read at least one local media
+  /// category. Android 13+ audio/video permissions are intentionally
+  /// independent; limited status is accepted where Android exposes it.
   static Future<bool> hasMediaPermissions() async {
     final sdk = await _getSdkInt();
     if (sdk == 0) return true;
     if (sdk >= 33) {
       final audio = await Permission.audio.status;
       final videos = await Permission.videos.status;
-      return (audio.isGranted || audio.isLimited) &&
-          (videos.isGranted || videos.isLimited);
+      return _usable(audio) || _usable(videos);
     }
     final storage = await Permission.storage.status;
-    return storage.isGranted || storage.isLimited;
+    return _usable(storage);
   }
 
   /// Show recovery UI for a permission Android will no longer prompt for.
@@ -152,7 +158,7 @@ class PermissionHelper {
             ),
             const SizedBox(height: 10),
             const Text(
-              'OTYA needs Android media access to find music and videos already on this phone. Building your local library does not upload those files.',
+              'OTYA needs Android media access to find music and videos already on this phone. You can allow only the media categories you want; building your local library does not upload those files.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 13,
