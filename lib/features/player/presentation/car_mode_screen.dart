@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
+import '../../../shared/widgets/album_art_thumb.dart';
 import 'audio_player_screen.dart';
 import 'mini_player.dart';
 import 'queue_screen.dart';
@@ -66,7 +67,7 @@ class _CarModeScreenState extends ConsumerState<CarModeScreen> {
         }
       },
       child: Scaffold(
-        backgroundColor: const Color(0xFF08090C),
+        backgroundColor: AppColors.background,
         body: SafeArea(
           child: LayoutBuilder(
             builder: (context, constraints) {
@@ -76,6 +77,7 @@ class _CarModeScreenState extends ConsumerState<CarModeScreen> {
                 artist: item?.artist != null && item!.artist != '<unknown>'
                     ? item.artist!
                     : 'Unknown artist',
+                albumArtPath: item?.albumArtPath,
                 progress: progress,
                 isPlaying: playerState.isPlaying,
                 isShuffle: isShuffle,
@@ -102,6 +104,7 @@ class _CarModeScreenState extends ConsumerState<CarModeScreen> {
                   context: context,
                   useSafeArea: true,
                   isScrollControlled: true,
+                  backgroundColor: Colors.transparent,
                   builder: (_) => const QueueScreen(),
                 ),
               );
@@ -115,6 +118,11 @@ class _CarModeScreenState extends ConsumerState<CarModeScreen> {
                         IconButton.filledTonal(
                           tooltip: 'Exit large controls',
                           onPressed: _close,
+                          style: IconButton.styleFrom(
+                            backgroundColor: AppColors.surfaceElevated,
+                            foregroundColor: AppColors.textPrimary,
+                            side: const BorderSide(color: AppColors.border),
+                          ),
                           icon: const Icon(Icons.close_rounded),
                         ),
                         const Spacer(),
@@ -160,6 +168,7 @@ class _PlaybackContent extends StatelessWidget {
   const _PlaybackContent({
     required this.title,
     required this.artist,
+    required this.albumArtPath,
     required this.progress,
     required this.isPlaying,
     required this.isShuffle,
@@ -175,6 +184,7 @@ class _PlaybackContent extends StatelessWidget {
 
   final String title;
   final String artist;
+  final String? albumArtPath;
   final double progress;
   final bool isPlaying;
   final bool isShuffle;
@@ -195,17 +205,36 @@ class _PlaybackContent extends StatelessWidget {
         children: [
           const Spacer(),
           Container(
-            width: 132,
-            height: 132,
+            width: 138,
+            height: 138,
+            padding: const EdgeInsets.all(3),
             decoration: BoxDecoration(
-              color: const Color(0xFF14161D),
+              color: AppColors.surfaceElevated,
               borderRadius: BorderRadius.circular(AppDimensions.radiusXLarge),
-              border: Border.all(color: Colors.white10),
+              border: Border.all(color: AppColors.border),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: .28),
+                  blurRadius: 24,
+                  offset: const Offset(0, 10),
+                ),
+                if (isPlaying)
+                  BoxShadow(
+                    color: AppColors.accent.withValues(alpha: .10),
+                    blurRadius: 30,
+                    spreadRadius: -6,
+                  ),
+              ],
             ),
-            child: const Icon(
-              Icons.music_note_rounded,
-              color: AppColors.accent,
-              size: 54,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(
+                AppDimensions.radiusXLarge - 3,
+              ),
+              child: AlbumArtThumb(
+                albumArtPath: albumArtPath,
+                size: 132,
+                borderRadius: 0,
+              ),
             ),
           ),
           const SizedBox(height: 24),
@@ -215,7 +244,7 @@ class _PlaybackContent extends StatelessWidget {
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.textPrimary,
               fontSize: 24,
               fontWeight: FontWeight.w900,
               letterSpacing: -.45,
@@ -228,16 +257,25 @@ class _PlaybackContent extends StatelessWidget {
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             style: const TextStyle(
-              color: Colors.white60,
+              color: AppColors.textSecondary,
               fontSize: 15,
             ),
           ),
           const SizedBox(height: 28),
           Semantics(
             label: 'Playback position',
-            child: Slider(
-              value: progress,
-              onChanged: onSeek,
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                activeTrackColor: AppColors.accent,
+                inactiveTrackColor: AppColors.border,
+                thumbColor: AppColors.accent,
+                overlayColor: AppColors.accent.withValues(alpha: .14),
+                trackHeight: 5,
+              ),
+              child: Slider(
+                value: progress,
+                onChanged: onSeek,
+              ),
             ),
           ),
           const SizedBox(height: 18),
@@ -323,8 +361,11 @@ class _LargeControl extends StatelessWidget {
           onPressed: onPressed,
           style: IconButton.styleFrom(
             backgroundColor:
-                primary ? AppColors.accent : const Color(0xFF1B1D25),
-            foregroundColor: primary ? Colors.white : Colors.white,
+                primary ? AppColors.accent : AppColors.surfaceElevated,
+            foregroundColor: Colors.white,
+            side: primary
+                ? null
+                : const BorderSide(color: AppColors.border),
           ),
           iconSize: primary ? 46 : 38,
           icon: Icon(icon),
@@ -357,11 +398,13 @@ class _SecondaryControl extends StatelessWidget {
           onPressed: onPressed,
           style: IconButton.styleFrom(
             backgroundColor: active
-                ? AppColors.accent.withValues(alpha: .18)
-                : const Color(0xFF171920),
-            foregroundColor: active ? AppColors.accent : Colors.white70,
+                ? AppColors.accent.withValues(alpha: .16)
+                : AppColors.surface,
+            foregroundColor: active ? AppColors.accent : AppColors.textSecondary,
             side: BorderSide(
-              color: active ? AppColors.accent : Colors.white10,
+              color: active
+                  ? AppColors.accent.withValues(alpha: .34)
+                  : AppColors.border,
             ),
           ),
           icon: Icon(icon),
