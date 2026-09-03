@@ -95,19 +95,22 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
         forceRefresh: true,
       );
 
-      final currentItems = state.valueOrNull ?? const <MediaItem>[];
-      if (fresh.isNotEmpty || currentItems.isEmpty) {
-        try {
-          state = AsyncData(fresh);
-        } catch (_) {
-          return;
-        }
+      // A completed scan is authoritative even when it returns zero items.
+      // Failures throw into the catch block below, where an existing library is
+      // preserved. Treating a successful empty scan as "ignore" leaves files
+      // visible after the user deletes or moves them.
+      try {
+        state = AsyncData(fresh);
+      } catch (_) {
+        return;
       }
 
       if (fresh.isNotEmpty) {
         _writeBackToHive(fresh).ignore();
-        unawaited(_detectDuplicates(fresh));
       }
+
+      // Always recompute duplicates so an empty/new library clears old groups.
+      unawaited(_detectDuplicates(fresh));
     } catch (error, stack) {
       debugPrint('[MediaLibrary] Background refresh failed: $error');
       final currentItems = state.valueOrNull ?? const <MediaItem>[];
