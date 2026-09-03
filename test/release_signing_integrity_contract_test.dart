@@ -24,7 +24,7 @@ void main() {
   test('production release tag must match pubspec version', () {
     final source = File('.github/workflows/release.yml').readAsStringSync();
 
-    expect(source, contains('Check release version matches app'));
+    expect(source, contains('Check first-release identity'));
     expect(source, contains('APP_VERSION='));
     expect(source, contains('VERSION_NAME='));
     expect(source, contains('BUILD_NUMBER='));
