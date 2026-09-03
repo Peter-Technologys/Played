@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 
 import '../core/models/media_item.dart';
 import '../core/services/remote_control_service.dart';
-import '../core/widgets/update_dialog.dart';
 import '../features/ai/otya_support_screen.dart';
 import '../features/air_drop/presentation/air_drop_screen.dart';
 import '../features/auth/auth_screen.dart';
@@ -498,14 +497,6 @@ class _MainShell extends ConsumerStatefulWidget {
 class _MainShellState extends ConsumerState<_MainShell> {
   static const _routes = ['/', '/music', '/myspace'];
   static const _wideBreakpoint = 600.0;
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) UpdateDialog.checkAndShow(context);
-    });
-  }
 
   void _onTap(int index) {
     HapticFeedback.selectionClick();
