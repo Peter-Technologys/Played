@@ -87,19 +87,28 @@ class AuthNotifier extends Notifier<AuthState> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('otya_user_id', authenticatedUserId);
     await prefs.setString('otya_user_name', displayName);
+
     final resolvedEmail = email ?? AuthService.instance.userEmail;
-    if (resolvedEmail != null && resolvedEmail.isNotEmpty) {
-      await prefs.setString('otya_user_email', resolvedEmail);
+    if (resolvedEmail != null && resolvedEmail.trim().isNotEmpty) {
+      await prefs.setString('otya_user_email', resolvedEmail.trim());
+    } else {
+      // Never inherit identity metadata from a previously signed-in account.
+      await prefs.remove('otya_user_email');
     }
-    if (photoUrl != null) {
-      await prefs.setString('otya_user_avatar', photoUrl);
+
+    final resolvedPhotoUrl = photoUrl?.trim();
+    if (resolvedPhotoUrl != null && resolvedPhotoUrl.isNotEmpty) {
+      await prefs.setString('otya_user_avatar', resolvedPhotoUrl);
+    } else {
+      // A new account without an avatar must not display the previous user's.
+      await prefs.remove('otya_user_avatar');
     }
 
     state = AuthState(
       userId: authenticatedUserId,
       displayName: displayName,
-      email: resolvedEmail,
-      photoUrl: photoUrl,
+      email: resolvedEmail?.trim().isNotEmpty == true ? resolvedEmail!.trim() : null,
+      photoUrl: resolvedPhotoUrl?.isNotEmpty == true ? resolvedPhotoUrl : null,
     );
   }
 
