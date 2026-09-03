@@ -65,7 +65,9 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
 
   bool   _initialized = false;
   bool   _hasError    = false;
+  bool   _retrying    = false;
   String _errorMsg    = '';
+  int    _playerGeneration = 0;
 
   // Track lists populated after the media opens
   List<_TrackOption> _subtitleTracks = [];
@@ -85,15 +87,16 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
   }
 
   Future<void> _initPlayer() async {
+    final generation = ++_playerGeneration;
     try {
-      _player = Player(
+      final player = Player(
         configuration: const PlayerConfiguration(
           title: 'Otya',
           logLevel: MPVLogLevel.error,
         ),
       );
-      _controller = VideoController(
-        _player!,
+      final controller = VideoController(
+        player,
         configuration: const VideoControllerConfiguration(
           // Use hardware decoding on all Android devices.
           // Falls back to software automatically if unsupported.
@@ -101,19 +104,31 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
         ),
       );
 
+      if (!mounted || generation != _playerGeneration) {
+        await player.dispose();
+        return;
+      }
+      _player = player;
+      _controller = controller;
+
       // A media item is considered seen only after real playback starts.
       // This keeps NEW intact when a user merely browses or opens a failed file.
-      _playingSub = _player!.stream.playing.listen((playing) {
+      _playingSub = player.stream.playing.listen((playing) {
+        if (generation != _playerGeneration) return;
         if (playing) {
           unawaited(NewMediaTracker.instance.markSeenPath(widget.filePath));
         }
       });
 
-      // Listen for track changes (fires after media opens)
-      _trackSub = _player!.stream.tracks.listen(_onTracksChanged);
+      // Listen for track changes (fires after media opens).
+      _trackSub = player.stream.tracks.listen((tracks) {
+        if (generation == _playerGeneration) _onTracksChanged(tracks);
+      });
 
-      // Listen for player errors
-      _errorSub = _player!.stream.error.listen((err) {
+      // Listen for player errors. Generation pinning prevents a late event from
+      // a disposed failed player from corrupting the state of its replacement.
+      _errorSub = player.stream.error.listen((err) {
+        if (generation != _playerGeneration) return;
         if (mounted && err.isNotEmpty) {
           setState(() { _hasError = true; _errorMsg = err; _initialized = true; });
         }
@@ -121,49 +136,118 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
 
       // Open the file before marking initialized so the Video widget only
       // renders once the player has a valid source ready.
-      await _openFile();
-      if (!mounted) return;
+      final opened = await _openFile(player, generation);
+      if (!mounted || generation != _playerGeneration || !opened) return;
 
       // Notify the parent widget that the player is ready for external control.
-      widget.onPlayerReady?.call(_player!);
+      widget.onPlayerReady?.call(player);
 
       if (mounted) setState(() => _initialized = true);
     } catch (e) {
-      if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
+      if (mounted && generation == _playerGeneration) {
+        setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
+      }
     }
   }
 
-  Future<void> _openFile() async {
+  Future<bool> _openFile(Player player, int generation) async {
     try {
       final file = File(widget.filePath);
       if (!await file.exists()) {
-        if (mounted) {
+        if (mounted && generation == _playerGeneration) {
           setState(() {
             _hasError    = true;
             _errorMsg    = 'File not found:\n${widget.filePath}';
             _initialized = true;
           });
         }
-        return;
+        return false;
       }
 
-      await _player!.open(
+      await player.open(
         Media(widget.filePath),
         play: false, // seek first, then play
       );
-      if (!mounted) return;
+      if (!mounted || generation != _playerGeneration) return false;
 
       if (widget.startPosition > Duration.zero) {
-        await _player!.seek(widget.startPosition);
+        await player.seek(widget.startPosition);
       }
-      if (!mounted) return;
+      if (!mounted || generation != _playerGeneration) return false;
 
       if (widget.autoPlay) {
-        await PlaybackCoordinator.instance.register(_player!, 'video');
-        await _player!.play();
+        await PlaybackCoordinator.instance.register(player, 'video');
+        if (!mounted || generation != _playerGeneration) {
+          PlaybackCoordinator.instance.unregister(player);
+          return false;
+        }
+        await player.play();
       }
+      return mounted && generation == _playerGeneration;
     } catch (e) {
-      if (mounted) setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
+      if (mounted && generation == _playerGeneration) {
+        setState(() { _hasError = true; _errorMsg = e.toString(); _initialized = true; });
+      }
+      return false;
+    }
+  }
+
+  Future<void> _releaseCurrentPlayer() async {
+    final player = _player;
+    final playingSub = _playingSub;
+    final trackSub = _trackSub;
+    final errorSub = _errorSub;
+
+    _player = null;
+    _controller = null;
+    _playingSub = null;
+    _trackSub = null;
+    _errorSub = null;
+
+    try {
+      await playingSub?.cancel();
+    } catch (_) {}
+    try {
+      await trackSub?.cancel();
+    } catch (_) {}
+    try {
+      await errorSub?.cancel();
+    } catch (_) {}
+
+    if (player != null) {
+      PlaybackCoordinator.instance.unregister(player);
+      try {
+        await player.dispose();
+      } catch (e) {
+        debugPrint('[MediaKit] Player dispose error: $e');
+      }
+    }
+  }
+
+  Future<void> _retryPlayer() async {
+    if (_retrying) return;
+    _retrying = true;
+
+    // Invalidate every callback from the failed generation before cleanup.
+    _playerGeneration++;
+    if (mounted) {
+      setState(() {
+        _hasError = false;
+        _errorMsg = '';
+        _initialized = false;
+        _subtitleTracks = [];
+        _audioTracks = [];
+        _activeSubId = null;
+        _activeAudioId = null;
+      });
+    }
+
+    try {
+      await _releaseCurrentPlayer();
+      if (!mounted) return;
+      await _initPlayer();
+    } finally {
+      _retrying = false;
     }
   }
 
@@ -229,6 +313,10 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
 
   @override
   void dispose() {
+    // Invalidate async initialization/open callbacks before tearing down the
+    // current generation so they cannot touch a replacement or disposed State.
+    _playerGeneration++;
+
     // Cancel subscriptions BEFORE disposing the player so their callbacks
     // cannot fire after the player is torn down (avoids setState-after-dispose).
     _playingSub?.cancel();
@@ -243,6 +331,8 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     // Dispose releases all native MPV/MediaCodec resources.
     // Must be called to prevent memory leaks on track navigation.
     _player?.dispose();
+    _player = null;
+    _controller = null;
     super.dispose();
   }
 
@@ -318,10 +408,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton.icon(
-                    onPressed: () {
-                      setState(() { _hasError = false; _errorMsg = ''; _initialized = false; });
-                      _initPlayer();
-                    },
+                    onPressed: _retrying ? null : _retryPlayer,
                     icon: const Icon(Icons.refresh_rounded, size: 18),
                     label: const Text('Retry'),
                     style: ElevatedButton.styleFrom(
@@ -728,4 +815,3 @@ class _NeonHud extends StatelessWidget {
     );
   }
 }
-
