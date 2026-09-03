@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/models/media_item.dart';
@@ -12,6 +13,7 @@ import '../my_space/presentation/providers/my_space_provider.dart';
 import '../player/presentation/mini_player.dart';
 import '../player/presentation/queue_screen.dart';
 import '../playlists/playlist_screen.dart';
+import '../settings/settings_provider.dart';
 
 class SmartSearchSheet extends ConsumerStatefulWidget {
   const SmartSearchSheet({super.key});
@@ -49,6 +51,9 @@ class _GroupHit {
 }
 
 class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
+  static const _historyKey = 'otya_search_history';
+  static const _historyLimit = 8;
+
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   final _ai = OtyaSupportService.instance;
@@ -57,6 +62,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   String? _aiAnswer;
   String? _aiError;
   bool _asking = false;
+  List<String> _recentSearches = const [];
 
   static const _help = <_HelpHit>[
     _HelpHit('Add subtitles', 'Open a video and use the CC control. Otya can select embedded subtitle tracks when they are available.', ['subtitle', 'subtitles', 'caption', 'captions', 'cc']),
@@ -71,6 +77,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   void initState() {
     super.initState();
     scheduleMicrotask(_focusNode.requestFocus);
+    unawaited(_loadSearchHistory());
   }
 
   @override
@@ -81,6 +88,53 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   }
 
   String get _q => _query.trim().toLowerCase();
+
+  Future<void> _loadSearchHistory() async {
+    if (!ref.read(settingsProvider).searchHistory) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final history = prefs.getStringList(_historyKey) ?? const <String>[];
+      final cleaned = history
+          .map((entry) => entry.trim())
+          .where((entry) => entry.isNotEmpty)
+          .take(_historyLimit)
+          .toList(growable: false);
+      if (mounted) setState(() => _recentSearches = cleaned);
+    } catch (_) {}
+  }
+
+  Future<void> _rememberQuery(String rawQuery) async {
+    final query = rawQuery.trim();
+    if (query.isEmpty || !ref.read(settingsProvider).searchHistory) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final previous = prefs.getStringList(_historyKey) ?? const <String>[];
+      final queryKey = query.toLowerCase();
+      final updated = <String>[
+        query,
+        ...previous.where((entry) => entry.trim().toLowerCase() != queryKey),
+      ].take(_historyLimit).toList(growable: false);
+      await prefs.setStringList(_historyKey, updated);
+      if (mounted) setState(() => _recentSearches = updated);
+    } catch (_) {}
+  }
+
+  Future<void> _clearSearchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_historyKey);
+    } catch (_) {}
+    if (mounted) setState(() => _recentSearches = const []);
+  }
+
+  void _selectRecentSearch(String query) {
+    _controller.value = TextEditingValue(
+      text: query,
+      selection: TextSelection.collapsed(offset: query.length),
+    );
+    _queryChanged(query);
+    _focusNode.requestFocus();
+  }
 
   List<MediaItem> _mediaMatches(List<MediaItem> items) {
     final q = _q;
@@ -155,6 +209,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   Future<void> _askAi() async {
     final query = _query.trim();
     if (query.isEmpty || _asking) return;
+    unawaited(_rememberQuery(query));
     setState(() {
       _asking = true;
       _aiAnswer = null;
@@ -179,31 +234,36 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
     });
   }
 
+  void _rememberAndClose(VoidCallback action) {
+    unawaited(_rememberQuery(_query));
+    _closeThen(action);
+  }
+
   void _openMedia(MediaItem item, List<MediaItem> library) {
     final queue = library.where((candidate) => candidate.isVideo == item.isVideo).toList();
     final index = queue.indexWhere((candidate) => candidate.id == item.id);
     ref.read(queueProvider.notifier).setQueue(queue, startIndex: index < 0 ? 0 : index);
     if (!item.isVideo) ref.read(miniPlayerItemProvider.notifier).state = item;
-    _closeThen(() => context.push(item.isVideo ? '/player/video' : '/player/audio', extra: item));
+    _rememberAndClose(() => context.push(item.isVideo ? '/player/video' : '/player/audio', extra: item));
   }
 
   void _openGroup(_GroupHit hit) {
     final type = hit.type;
     if (type == 'Album') {
-      _closeThen(() => context.push('/music/album', extra: {'name': hit.name, 'items': hit.items}));
+      _rememberAndClose(() => context.push('/music/album', extra: {'name': hit.name, 'items': hit.items}));
     } else if (type == 'Artist') {
-      _closeThen(() => context.push('/music/artist', extra: {'name': hit.name, 'items': hit.items}));
+      _rememberAndClose(() => context.push('/music/artist', extra: {'name': hit.name, 'items': hit.items}));
     } else {
       final hasVideo = hit.items.any((item) => item.isVideo);
       final hasAudio = hit.items.any((item) => !item.isVideo);
       if (hasVideo && !hasAudio) {
-        _closeThen(() => context.push('/video/folder', extra: {'name': hit.name, 'items': hit.items}));
+        _rememberAndClose(() => context.push('/video/folder', extra: {'name': hit.name, 'items': hit.items}));
       } else if (hasAudio && !hasVideo) {
-        _closeThen(() => context.push('/music/folder', extra: {'name': hit.name, 'items': hit.items}));
+        _rememberAndClose(() => context.push('/music/folder', extra: {'name': hit.name, 'items': hit.items}));
       } else {
         final path = hit.items.first.filePath.replaceAll('\\', '/');
         final slash = path.lastIndexOf('/');
-        _closeThen(() => context.push('/tools/folder-detail', extra: {
+        _rememberAndClose(() => context.push('/tools/folder-detail', extra: {
           'folderName': hit.name,
           'fullPath': slash > 0 ? path.substring(0, slash) : '/',
           'items': hit.items,
@@ -216,6 +276,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
   Widget build(BuildContext context) {
     final library = ref.watch(mediaLibraryProvider).valueOrNull ?? const <MediaItem>[];
     final playlists = ref.watch(playlistsProvider);
+    final historyEnabled = ref.watch(settingsProvider.select((s) => s.searchHistory));
     final media = _mediaMatches(library);
     final groups = _groupMatches(library);
     final playlistHits = _playlistMatches(playlists);
@@ -245,7 +306,11 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
             focusNode: _focusNode,
             textInputAction: TextInputAction.search,
             onSubmitted: (_) {
-              if (noLocalAnswer) _askAi();
+              if (noLocalAnswer) {
+                unawaited(_askAi());
+              } else {
+                unawaited(_rememberQuery(_query));
+              }
             },
             onChanged: _queryChanged,
             decoration: InputDecoration(
@@ -276,7 +341,12 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
         ),
         Expanded(
           child: !hasQuery
-              ? const _SearchStart()
+              ? _SearchStart(
+                  recentSearches:
+                      historyEnabled ? _recentSearches : const <String>[],
+                  onSelectRecent: _selectRecentSearch,
+                  onClearRecent: _clearSearchHistory,
+                )
               : ListView(
                   keyboardDismissBehavior: ScrollViewKeyboardDismissBehavior.onDrag,
                   padding: const EdgeInsets.fromLTRB(16, 2, 16, 30),
@@ -310,7 +380,7 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
                             title: Text(playlist.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(fontWeight: FontWeight.w700)),
                             subtitle: Text('${playlist.mediaIds.length} saved item${playlist.mediaIds.length == 1 ? '' : 's'}'),
                             trailing: const Icon(Icons.chevron_right_rounded),
-                            onTap: () => _closeThen(() => context.push('/playlist/${playlist.id}')),
+                            onTap: () => _rememberAndClose(() => context.push('/playlist/${playlist.id}')),
                           )),
                     ],
                     if (media.isNotEmpty) ...[
@@ -387,27 +457,69 @@ class _SmartSearchSheetState extends ConsumerState<SmartSearchSheet> {
 }
 
 class _SearchStart extends StatelessWidget {
-  const _SearchStart();
+  const _SearchStart({
+    required this.recentSearches,
+    required this.onSelectRecent,
+    required this.onClearRecent,
+  });
+
+  final List<String> recentSearches;
+  final ValueChanged<String> onSelectRecent;
+  final VoidCallback onClearRecent;
 
   @override
-  Widget build(BuildContext context) => const Center(
-        child: Padding(
-          padding: EdgeInsets.all(28),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(Icons.manage_search_rounded, size: 48, color: AppColors.accent),
-              SizedBox(height: 14),
-              Text('Search Otya', style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900)),
-              SizedBox(height: 7),
-              Text(
-                'Search local songs, videos, albums, artists, folders and playlists on this device. Search does not contact a music provider while you type.',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
-              ),
-            ],
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.fromLTRB(28, 44, 28, 28),
+        children: [
+          const Icon(Icons.manage_search_rounded, size: 48, color: AppColors.accent),
+          const SizedBox(height: 14),
+          const Text(
+            'Search Otya',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900),
           ),
-        ),
+          const SizedBox(height: 7),
+          const Text(
+            'Search local songs, videos, albums, artists, folders and playlists on this device. Search does not contact a music provider while you type.',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontSize: 12.5, height: 1.5, color: AppColors.textSecondary),
+          ),
+          if (recentSearches.isNotEmpty) ...[
+            const SizedBox(height: 30),
+            Row(
+              children: [
+                const Expanded(
+                  child: Text(
+                    'RECENT SEARCHES',
+                    style: TextStyle(
+                      fontSize: 10.5,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: .6,
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: onClearRecent,
+                  child: const Text('Clear'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: recentSearches
+                  .map(
+                    (query) => ActionChip(
+                      avatar: const Icon(Icons.history_rounded, size: 17),
+                      label: Text(query, overflow: TextOverflow.ellipsis),
+                      onPressed: () => onSelectRecent(query),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+          ],
+        ],
       );
 }
 
