@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../core/models/media_item.dart';
 
@@ -31,72 +34,138 @@ class FileInfoSheet extends StatelessWidget {
 
     return FractionallySizedBox(
       heightFactor: .78,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 8, 10),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline_rounded, color: scheme.primary, size: 21),
-                const SizedBox(width: 9),
-                const Expanded(
-                  child: Text(
-                    'File details',
-                    style: TextStyle(fontSize: 17, fontWeight: FontWeight.w800),
-                  ),
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surface.withValues(alpha: .92),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(30)),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: .08),
                 ),
-                IconButton(
-                  tooltip: 'Close details',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
-                ),
-              ],
+              ),
             ),
-          ),
-          const Divider(),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final wide = constraints.maxWidth >= AppDimensions.mediumMin;
-                return ListView.separated(
-                  padding: EdgeInsets.fromLTRB(
-                    wide ? 32 : 18,
-                    12,
-                    wide ? 32 : 18,
-                    36,
-                  ),
-                  itemCount: rows.length,
-                  separatorBuilder: (_, __) => const Divider(),
-                  itemBuilder: (context, index) => _DetailRow(
-                    row: rows[index],
-                    stacked: !wide,
-                  ),
-                );
-              },
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 6, 20, 18),
-            child: Row(
+            child: Column(
               children: [
-                Icon(
-                  Icons.content_copy_rounded,
-                  size: 16,
-                  color: scheme.onSurfaceVariant,
+                const SizedBox(height: 10),
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: scheme.onSurface.withValues(alpha: .16),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
                 ),
-                const SizedBox(width: 8),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 10, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: .10),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: .18),
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.info_outline_rounded,
+                          color: AppColors.accent,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Text(
+                          'File details',
+                          style: TextStyle(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: scheme.onSurface,
+                            letterSpacing: -.2,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close details',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppColors.borderOf(context)),
                 Expanded(
-                  child: Text(
-                    'Tap the copy button on any value to copy it.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: scheme.onSurfaceVariant,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final wide =
+                          constraints.maxWidth >= AppDimensions.mediumMin;
+                      return ListView.separated(
+                        padding: EdgeInsets.fromLTRB(
+                          wide ? 32 : 18,
+                          12,
+                          wide ? 32 : 18,
+                          36,
+                        ),
+                        itemCount: rows.length,
+                        separatorBuilder: (_, __) => Divider(
+                          height: 1,
+                          color: AppColors.borderOf(context)
+                              .withValues(alpha: .72),
+                        ),
+                        itemBuilder: (context, index) => _DetailRow(
+                          row: rows[index],
+                          stacked: !wide,
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                Container(
+                  margin: const EdgeInsets.fromLTRB(18, 6, 18, 18),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 13,
+                    vertical: 11,
+                  ),
+                  decoration: BoxDecoration(
+                    color: scheme.onSurface.withValues(alpha: .035),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: scheme.outlineVariant.withValues(alpha: .52),
                     ),
                   ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        Icons.content_copy_rounded,
+                        size: 16,
+                        color: AppColors.accent,
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          'Use the copy button beside any value to copy it.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: scheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -129,7 +198,10 @@ class _DetailRow extends StatelessWidget {
     ScaffoldMessenger.of(context)
       ..hideCurrentSnackBar()
       ..showSnackBar(
-        SnackBar(content: Text('${row.label} copied')),
+        SnackBar(
+          content: Text('${row.label} copied'),
+          backgroundColor: AppColors.surfaceElevated,
+        ),
       );
   }
 
@@ -147,6 +219,17 @@ class _DetailRow extends StatelessWidget {
         color: scheme.onSurface,
       ),
     );
+
+    Widget copyButton() => IconButton(
+          tooltip: 'Copy ${row.label.toLowerCase()}',
+          visualDensity: VisualDensity.compact,
+          onPressed: () => _copy(context),
+          icon: const Icon(
+            Icons.copy_rounded,
+            size: 17,
+            color: AppColors.accent,
+          ),
+        );
 
     if (stacked) {
       return Padding(
@@ -167,11 +250,7 @@ class _DetailRow extends StatelessWidget {
               children: [
                 Expanded(child: value),
                 const SizedBox(width: 6),
-                IconButton(
-                  tooltip: 'Copy ${row.label.toLowerCase()}',
-                  onPressed: () => _copy(context),
-                  icon: const Icon(Icons.copy_rounded, size: 18),
-                ),
+                copyButton(),
               ],
             ),
           ],
@@ -196,11 +275,7 @@ class _DetailRow extends StatelessWidget {
           ),
           const SizedBox(width: 16),
           Expanded(child: value),
-          IconButton(
-            tooltip: 'Copy ${row.label.toLowerCase()}',
-            onPressed: () => _copy(context),
-            icon: const Icon(Icons.copy_rounded, size: 18),
-          ),
+          copyButton(),
         ],
       ),
     );
