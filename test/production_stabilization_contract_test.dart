@@ -82,8 +82,9 @@ void main() {
     );
   });
 
-  test('hot media UI avoids synchronous filesystem existence checks', () {
+  test('hot UI paths avoid synchronous filesystem existence checks', () {
     const paths = [
+      'lib/core/services/custom_theme_manager.dart',
       'lib/features/my_space/presentation/widgets/media_card.dart',
       'lib/features/downloads/presentation/downloads_screen.dart',
       'lib/features/video/presentation/video_tab_screen.dart',
