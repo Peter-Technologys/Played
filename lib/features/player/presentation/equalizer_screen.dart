@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../core/services/media_dsp_service.dart';
 import '../../../core/services/playback_coordinator.dart';
@@ -100,8 +101,14 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     final scheme = theme.colorScheme;
 
     return Scaffold(
+      backgroundColor: AppColors.backgroundOf(context),
       appBar: AppBar(
-        title: const Text('Sound Tuner'),
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: const Text(
+          'Sound Tuner',
+          style: TextStyle(fontWeight: FontWeight.w800),
+        ),
         actions: [
           TextButton(
             onPressed: _loading || _applying
@@ -114,7 +121,12 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
       body: SafeArea(
         top: false,
         child: _loading
-            ? const Center(child: CircularProgressIndicator())
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.accent,
+                  strokeWidth: 2.5,
+                ),
+              )
             : ListView(
                 padding: const EdgeInsets.fromLTRB(
                   AppDimensions.space16,
@@ -123,65 +135,141 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                   AppDimensions.space32,
                 ),
                 children: [
-                  Text(
-                    'Tune OTYA, not your whole phone',
-                    style: theme.textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w900,
-                      letterSpacing: -.5,
+                  Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardOf(context),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: AppColors.borderOf(context)),
+                    ),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: AppColors.accent.withValues(alpha: .10),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: AppColors.accent.withValues(alpha: .18),
+                            ),
+                          ),
+                          child: const Icon(
+                            Icons.graphic_eq_rounded,
+                            color: AppColors.accent,
+                            size: 23,
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Tune OTYA, not your whole phone',
+                                style: theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  letterSpacing: -.4,
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                'Five-band EQ runs inside the active OTYA player. Your preset is remembered and reapplied when playback changes.',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  height: 1.45,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 18),
                   Text(
-                    'Five-band EQ runs inside the active OTYA player. Your preset is remembered and reapplied when playback changes.',
-                    style: theme.textTheme.bodyMedium?.copyWith(
+                    'Presets',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      fontWeight: FontWeight.w800,
                       color: scheme.onSurfaceVariant,
-                      height: 1.45,
                     ),
                   ),
-                  const SizedBox(height: 20),
+                  const SizedBox(height: 10),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
                     children: MediaDspService.presets.keys.map((name) {
+                      final selected = _preset == name;
                       return ChoiceChip(
                         label: Text(name),
-                        selected: _preset == name,
+                        selected: selected,
                         onSelected: _applying
                             ? null
-                            : (selected) {
-                                if (selected) _choosePreset(name);
+                            : (value) {
+                                if (value) _choosePreset(name);
                               },
+                        showCheckmark: false,
+                        selectedColor: AppColors.accent,
+                        backgroundColor: AppColors.cardOf(context),
+                        side: BorderSide(
+                          color: selected
+                              ? AppColors.accent
+                              : AppColors.borderOf(context),
+                        ),
+                        labelStyle: TextStyle(
+                          color: selected ? Colors.white : scheme.onSurface,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
                       );
                     }).toList(growable: false),
                   ),
-                  const SizedBox(height: 20),
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
-                      child: Column(
-                        children: List.generate(_gains.length, (index) {
-                          final value = _gains[index];
-                          return Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 6),
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                  width: 62,
-                                  child: Text(
-                                    MediaDspService.labels[index],
-                                    style: const TextStyle(
-                                      fontSize: 12,
-                                      fontWeight: FontWeight.w700,
-                                    ),
+                  const SizedBox(height: 18),
+                  Container(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 10),
+                    decoration: BoxDecoration(
+                      color: AppColors.cardOf(context),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: AppColors.borderOf(context)),
+                    ),
+                    child: Column(
+                      children: List.generate(_gains.length, (index) {
+                        final value = _gains[index];
+                        return Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 6),
+                          child: Row(
+                            children: [
+                              SizedBox(
+                                width: 62,
+                                child: Text(
+                                  MediaDspService.labels[index],
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
                                   ),
                                 ),
-                                Expanded(
+                              ),
+                              Expanded(
+                                child: SliderTheme(
+                                  data: SliderTheme.of(context).copyWith(
+                                    activeTrackColor: AppColors.accent,
+                                    inactiveTrackColor:
+                                        AppColors.borderOf(context),
+                                    thumbColor: AppColors.accent,
+                                    overlayColor: AppColors.accent
+                                        .withValues(alpha: .14),
+                                    trackHeight: 4,
+                                  ),
                                   child: Slider(
                                     value: value,
                                     min: -10,
                                     max: 10,
                                     divisions: 40,
-                                    label: '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)} dB',
+                                    label:
+                                        '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)} dB',
                                     onChanged: _applying
                                         ? null
                                         : (next) => _setBand(index, next),
@@ -190,25 +278,25 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                                         : (_) => _apply(),
                                   ),
                                 ),
-                                SizedBox(
-                                  width: 58,
-                                  child: Text(
-                                    '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}',
-                                    textAlign: TextAlign.end,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      fontFeatures: const [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                      color: scheme.onSurfaceVariant,
-                                    ),
+                              ),
+                              SizedBox(
+                                width: 58,
+                                child: Text(
+                                  '${value >= 0 ? '+' : ''}${value.toStringAsFixed(1)}',
+                                  textAlign: TextAlign.end,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                    color: scheme.onSurfaceVariant,
                                   ),
                                 ),
-                              ],
-                            ),
-                          );
-                        }),
-                      ),
+                              ),
+                            ],
+                          ),
+                        );
+                      }),
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -216,18 +304,21 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                     Container(
                       padding: const EdgeInsets.all(14),
                       decoration: BoxDecoration(
-                        color: scheme.surfaceContainer,
+                        color: AppColors.accent.withValues(alpha: .07),
                         borderRadius: BorderRadius.circular(
                           AppDimensions.radiusMedium,
+                        ),
+                        border: Border.all(
+                          color: AppColors.accent.withValues(alpha: .16),
                         ),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
+                          const Icon(
                             Icons.tune_rounded,
                             size: 19,
-                            color: scheme.primary,
+                            color: AppColors.accent,
                           ),
                           const SizedBox(width: 10),
                           Expanded(
@@ -242,23 +333,26 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
                       ),
                     ),
                   const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _applying ? null : _apply,
-                          icon: _applying
-                              ? const SizedBox.square(
-                                  dimension: 18,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.graphic_eq_rounded),
-                          label: Text(_applying ? 'Applying…' : 'Apply tuning'),
-                        ),
+                  FilledButton.icon(
+                    onPressed: _applying ? null : _apply,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(52),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ],
+                    ),
+                    icon: _applying
+                        ? const SizedBox.square(
+                            dimension: 18,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : const Icon(Icons.graphic_eq_rounded),
+                    label: Text(_applying ? 'Applying…' : 'Apply tuning'),
                   ),
                   const SizedBox(height: 12),
                   Text(
