@@ -140,6 +140,7 @@ class AuthService {
   String? _userAvatar;
   bool _isVerified = false;
   bool _loaded = false;
+  Future<void>? _loadInFlight;
   Future<String?>? _refreshInFlight;
   int _sessionGeneration = 0;
 
@@ -148,15 +149,50 @@ class AuthService {
 
   Future<void> _ensureLoaded() async {
     if (_loaded) return;
-    _accessToken = await _secureStorage.read(key: _kSecureAccessToken);
-    _refreshToken = await _secureStorage.read(key: _kSecureRefreshToken);
+
+    final existingLoad = _loadInFlight;
+    if (existingLoad != null) {
+      await existingLoad;
+      return;
+    }
+
+    final load = _loadPersistedSession();
+    _loadInFlight = load;
+    try {
+      await load;
+    } finally {
+      if (identical(_loadInFlight, load)) _loadInFlight = null;
+    }
+  }
+
+  Future<void> _loadPersistedSession() async {
+    final generation = _sessionGeneration;
+
+    // Read into locals first. Assigning each field as its storage read finishes
+    // can expose a half-old/half-new session when another startup service calls
+    // AuthService at the same time.
+    final accessToken = await _secureStorage.read(key: _kSecureAccessToken);
+    final refreshToken = await _secureStorage.read(key: _kSecureRefreshToken);
     final prefs = await SharedPreferences.getInstance();
-    _userId = prefs.getString(_kUserId);
-    _otyaPublicId = prefs.getString(_kPublicId);
-    _userEmail = prefs.getString(_kUserEmail);
-    _userName = prefs.getString(_kUserName);
-    _userAvatar = prefs.getString(_kUserAvatar);
-    _isVerified = prefs.getBool(_kIsVerified) ?? false;
+    final userId = prefs.getString(_kUserId);
+    final publicId = prefs.getString(_kPublicId);
+    final email = prefs.getString(_kUserEmail);
+    final name = prefs.getString(_kUserName);
+    final avatar = prefs.getString(_kUserAvatar);
+    final verified = prefs.getBool(_kIsVerified) ?? false;
+
+    // A logout/session replacement invalidates this snapshot. Never let an
+    // older secure-storage read overwrite the newer in-memory session.
+    if (generation != _sessionGeneration) return;
+
+    _accessToken = accessToken;
+    _refreshToken = refreshToken;
+    _userId = userId;
+    _otyaPublicId = publicId;
+    _userEmail = email;
+    _userName = name;
+    _userAvatar = avatar;
+    _isVerified = verified;
     _loaded = true;
   }
 
@@ -209,17 +245,22 @@ class AuthService {
 
   Future<void> _clearPersisted() async {
     _sessionGeneration++;
-    await _secureStorage.delete(key: _kSecureAccessToken);
-    await _secureStorage.delete(key: _kSecureRefreshToken);
+
+    // In-memory invalidation is immediate. Storage cleanup can take time, but
+    // no concurrent caller may continue using the session after logout begins.
     _accessToken = null;
     _refreshToken = null;
-    final prefs = await SharedPreferences.getInstance();
     _userId = null;
     _otyaPublicId = null;
     _userEmail = null;
     _userName = null;
     _userAvatar = null;
     _isVerified = false;
+    _loaded = true;
+
+    await _secureStorage.delete(key: _kSecureAccessToken);
+    await _secureStorage.delete(key: _kSecureRefreshToken);
+    final prefs = await SharedPreferences.getInstance();
     for (final key in [
       _kUserId,
       _kPublicId,
@@ -315,6 +356,7 @@ class AuthService {
     bool marketingConsent = false,
   }) async {
     try {
+      await _ensureLoaded();
       final res = await _client
           .post(
             Uri.parse('$_kAuthBase/register'),
@@ -345,6 +387,7 @@ class AuthService {
     String? recoveryCode,
   }) async {
     try {
+      await _ensureLoaded();
       final res = await _client
           .post(
             Uri.parse('$_kAuthBase/login'),
@@ -373,6 +416,7 @@ class AuthService {
     bool marketingConsent = false,
   }) async {
     try {
+      await _ensureLoaded();
       final res = await _client
           .post(
             Uri.parse('$_kAuthBase/google'),
