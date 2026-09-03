@@ -425,6 +425,7 @@ class AuthService {
   Future<UserProfile?> getProfile() async {
     final token = await getValidToken();
     if (token == null) return null;
+    final generation = _sessionGeneration;
     try {
       final res = await _client
           .get(
@@ -432,6 +433,7 @@ class AuthService {
             headers: {'Authorization': 'Bearer $token'},
           )
           .timeout(_timeout);
+      if (generation != _sessionGeneration) return null;
       if (res.statusCode != 200) return null;
       final decoded = jsonDecode(res.body);
       if (decoded is! Map<String, dynamic> ||
@@ -441,6 +443,7 @@ class AuthService {
       final user = UserProfile.fromJson(
         decoded['user'] as Map<String, dynamic>,
       );
+      if (generation != _sessionGeneration) return null;
       await _persist(user: user);
       return user;
     } catch (e) {
@@ -452,6 +455,7 @@ class AuthService {
   Future<void> updateProfile({String? name, String? avatarUrl}) async {
     final token = await getValidToken();
     if (token == null) return;
+    final generation = _sessionGeneration;
     try {
       final body = <String, dynamic>{};
       if (name != null) body['name'] = name;
@@ -466,6 +470,7 @@ class AuthService {
             body: jsonEncode(body),
           )
           .timeout(_timeout);
+      if (generation != _sessionGeneration) return;
       if (res.statusCode == 200) {
         final decoded = jsonDecode(res.body);
         if (decoded is Map<String, dynamic> &&
@@ -473,6 +478,7 @@ class AuthService {
           final user = UserProfile.fromJson(
             decoded['user'] as Map<String, dynamic>,
           );
+          if (generation != _sessionGeneration) return;
           await _persist(user: user);
         }
       }
@@ -501,6 +507,7 @@ class AuthService {
   Future<bool> verifyOtp(String otp) async {
     final token = await getValidToken();
     if (token == null) return false;
+    final generation = _sessionGeneration;
     try {
       final res = await _client
           .post(
@@ -512,9 +519,11 @@ class AuthService {
             body: jsonEncode({'otp': otp}),
           )
           .timeout(_timeout);
+      if (generation != _sessionGeneration) return false;
       if (res.statusCode == 200) {
         _isVerified = true;
         final prefs = await SharedPreferences.getInstance();
+        if (generation != _sessionGeneration) return false;
         await prefs.setBool(_kIsVerified, true);
         return true;
       }
