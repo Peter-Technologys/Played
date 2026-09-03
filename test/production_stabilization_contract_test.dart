@@ -24,16 +24,28 @@ void main() {
 
     expect(main, contains('await CrashReporter.instance.init();'));
     expect(main, isNot(contains("_safeBackground('crash reporter'")));
-    expect(main, isNot(contains('FlutterError.onError = (details)')));
+    expect(main, isNot(contains('FlutterError.onError = (details)'));
     expect(main, isNot(contains('PlatformDispatcher.instance.onError =')));
   });
 
   test('update checks do not pretend disabled or failed checks mean current', () {
     final updates = File('lib/core/services/update_service.dart').readAsStringSync();
 
-    expect(updates, isNot(contains('if (!Environment.selfUpdateEnabled) return null;')));
+    expect(updates, isNot(contains('if (!Environment.selfUpdateEnabled) return null;'));
     expect(updates, contains('UpdateCheckState.unavailable'));
     expect(updates, contains('UpdateCheckState.current'));
     expect(updates, contains('UpdateCheckState.updateAvailable'));
+  });
+
+  test('media refreshes share one in-flight scan without orphaned errors', () {
+    final repository =
+        File('lib/features/my_space/data/media_repository.dart').readAsStringSync();
+
+    expect(repository, contains('Future<List<MediaItem>>? _scanInFlight'));
+    expect(repository, contains('final existingScan = _scanInFlight'));
+    expect(repository, contains('if (existingScan != null) return existingScan;'));
+    expect(repository, contains('if (identical(_scanInFlight, scan))'));
+    expect(repository, isNot(contains('Completer<List<MediaItem>>')));
+    expect(repository, isNot(contains('completeError(e)')));
   });
 }
