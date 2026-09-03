@@ -28,7 +28,7 @@ class CustomThemeManager extends ChangeNotifier {
   double get artBlur => _artBlur;
   bool get hasImageWallpaper {
     final path = _wallpaperPath;
-    return path != null && File(path).existsSync();
+    return path != null && path.isNotEmpty;
   }
 
   Map<String, dynamic>? get storyTheme => _storyTheme == null
@@ -220,7 +220,7 @@ class CustomThemeManager extends ChangeNotifier {
 
   DecorationImage? get wallpaperDecoration {
     final path = _wallpaperPath;
-    if (path == null || !File(path).existsSync()) return null;
+    if (path == null || path.isEmpty) return null;
     return DecorationImage(
       image: FileImage(File(path)),
       fit: BoxFit.cover,
@@ -228,6 +228,7 @@ class CustomThemeManager extends ChangeNotifier {
         Colors.black.withValues(alpha: _artOpacity.clamp(0.0, 1.0)),
         BlendMode.darken,
       ),
+      onError: (_, __) {},
     );
   }
 
