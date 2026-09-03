@@ -417,7 +417,11 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   bool _showRetry = false;
   Timer? _loadTimeoutTimer;
 
-  void _startLoad() {
+  MediaItem get _activeItem =>
+      ref.read(miniPlayerItemProvider) ?? widget.mediaItem;
+
+  void _startLoad([MediaItem? requestedItem]) {
+    final item = requestedItem ?? _activeItem;
     _showRetry = false;
     _loadTimeoutTimer?.cancel();
     _loadTimeoutTimer = Timer(const Duration(seconds: 10), () {
@@ -426,7 +430,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
       }
     });
     ref.read(audioPlayerProvider.notifier).load(
-          widget.mediaItem,
+          item,
           settings: ref.read(settingsProvider),
         );
   }
@@ -436,21 +440,21 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!widget.resumeOnly) _startLoad();
+      if (!widget.resumeOnly) _startLoad(widget.mediaItem);
     });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused) {
-      ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
+      ref.read(audioPlayerProvider.notifier).savePosition(_activeItem.id);
     }
   }
 
   @override
   void dispose() {
     _loadTimeoutTimer?.cancel();
-    ref.read(audioPlayerProvider.notifier).savePosition(widget.mediaItem.id);
+    ref.read(audioPlayerProvider.notifier).savePosition(_activeItem.id);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -462,28 +466,28 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
         builder: (_) => const QueueScreen(),
       );
 
-  void _showLyrics(Duration position) => showModalBottomSheet(
+  void _showLyrics(MediaItem item, Duration position) => showModalBottomSheet(
         context: context,
         useSafeArea: true,
         isScrollControlled: true,
-        builder: (_) => LyricsSheet(item: widget.mediaItem, position: position),
+        builder: (_) => LyricsSheet(item: item, position: position),
       );
 
-  void _showFileInfo() => showModalBottomSheet(
+  void _showFileInfo(MediaItem item) => showModalBottomSheet(
         context: context,
         useSafeArea: true,
         isScrollControlled: true,
-        builder: (_) => FileInfoSheet(item: widget.mediaItem),
+        builder: (_) => FileInfoSheet(item: item),
       );
 
-  void _showOptions() => showModalBottomSheet(
+  void _showOptions(MediaItem item) => showModalBottomSheet(
         context: context,
         useSafeArea: true,
         builder: (_) => _OptionsSheet(
-          mediaItem: widget.mediaItem,
+          mediaItem: item,
           onFileInfo: () {
             Navigator.pop(context);
-            _showFileInfo();
+            _showFileInfo(item);
           },
         ),
       );
@@ -491,6 +495,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
   @override
   Widget build(BuildContext context) {
     final playerState = ref.watch(audioPlayerProvider);
+    final activeItem = ref.watch(miniPlayerItemProvider) ?? widget.mediaItem;
     final isShuffle = ref.watch(queueProvider.select((queue) => queue.shuffle));
     final screenHeight = MediaQuery.of(context).size.height;
     final screenWidth = MediaQuery.of(context).size.width;
@@ -540,7 +545,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       color: AppColors.textSecondary,
                       size: 22,
                     ),
-                    onPressed: _showOptions,
+                    onPressed: () => _showOptions(activeItem),
                   ),
                 ],
               ),
@@ -549,9 +554,9 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
               child: Padding(
                 padding: EdgeInsets.symmetric(horizontal: artPadding, vertical: 8),
                 child: _AlbumArt(
-                  albumArtPath: widget.mediaItem.albumArtPath,
+                  albumArtPath: activeItem.albumArtPath,
                   isPlaying: playerState.isPlaying,
-                  title: widget.mediaItem.title,
+                  title: activeItem.title,
                   onSwipeLeft: () =>
                       ref.read(audioPlayerProvider.notifier).skipNext(),
                   onSwipeRight: () =>
@@ -569,7 +574,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.mediaItem.title,
+                          activeItem.title,
                           style: TextStyle(
                             fontSize: 20,
                             fontWeight: FontWeight.w700,
@@ -581,7 +586,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          widget.mediaItem.artist ?? 'Unknown Artist',
+                          activeItem.artist ?? 'Unknown Artist',
                           style: const TextStyle(
                             fontSize: 13,
                             color: AppColors.textSecondary,
@@ -604,7 +609,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                             : Icons.favorite_border_rounded,
                         key: ValueKey(playerState.isFavorite),
                         color: playerState.isFavorite
-                            ? Colors.redAccent
+                            ? AppColors.brandRed
                             : AppColors.textSecondary,
                         size: 26,
                       ),
@@ -705,7 +710,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     onTap: () {
                       if (_showRetry) {
                         setState(() => _showRetry = false);
-                        _startLoad();
+                        _startLoad(activeItem);
                       } else {
                         HapticFeedback.mediumImpact();
                         ref.read(audioPlayerProvider.notifier).togglePlay();
@@ -789,7 +794,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                     _SecondaryBtn(
                       icon: Icons.lyrics_rounded,
                       label: 'Lyrics',
-                      onTap: () => _showLyrics(playerState.position),
+                      onTap: () => _showLyrics(activeItem, playerState.position),
                     ),
                     _SecondaryBtn(
                       icon: Icons.graphic_eq_rounded,
@@ -805,8 +810,8 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                       icon: Icons.share_rounded,
                       label: 'Share',
                       onTap: () => Share.shareXFiles(
-                        [XFile(widget.mediaItem.filePath)],
-                        text: widget.mediaItem.title,
+                        [XFile(activeItem.filePath)],
+                        text: activeItem.title,
                       ),
                     ),
                   ],
@@ -848,6 +853,7 @@ class _AlbumArtState extends State<_AlbumArt> {
   String? _resolvedPath;
   bool _loading = true;
   double _dragX = 0;
+  int _resolveGeneration = 0;
 
   @override
   void initState() {
@@ -862,9 +868,10 @@ class _AlbumArtState extends State<_AlbumArt> {
   }
 
   Future<void> _resolve() async {
+    final generation = ++_resolveGeneration;
     final path = widget.albumArtPath;
     if (path == null) {
-      if (mounted) {
+      if (mounted && generation == _resolveGeneration) {
         setState(() {
           _resolvedPath = null;
           _loading = false;
@@ -873,7 +880,7 @@ class _AlbumArtState extends State<_AlbumArt> {
       return;
     }
     if (!path.startsWith('albumid:')) {
-      if (mounted) {
+      if (mounted && generation == _resolveGeneration) {
         setState(() {
           _resolvedPath = path;
           _loading = false;
@@ -882,16 +889,15 @@ class _AlbumArtState extends State<_AlbumArt> {
       return;
     }
 
-    if (mounted) {
+    if (mounted && generation == _resolveGeneration) {
       setState(() => _loading = true);
     }
     final resolved = await AlbumArtService.instance.resolve(path);
-    if (mounted) {
-      setState(() {
-        _resolvedPath = resolved;
-        _loading = false;
-      });
-    }
+    if (!mounted || generation != _resolveGeneration) return;
+    setState(() {
+      _resolvedPath = resolved;
+      _loading = false;
+    });
   }
 
   @override
@@ -946,11 +952,11 @@ class _AlbumArtState extends State<_AlbumArt> {
           Transform.translate(
             offset: Offset(_dragX.clamp(-40.0, 40.0), 0),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeInOut,
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOutCubic,
               transform: Matrix4.diagonal3Values(
-                widget.isPlaying ? 1.0 : 0.88,
-                widget.isPlaying ? 1.0 : 0.88,
+                widget.isPlaying ? 1.0 : 0.97,
+                widget.isPlaying ? 1.0 : 0.97,
                 1.0,
               ),
               transformAlignment: Alignment.center,
@@ -958,18 +964,16 @@ class _AlbumArtState extends State<_AlbumArt> {
                 borderRadius: BorderRadius.circular(28),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.accent.withValues(
-                      alpha: widget.isPlaying ? 0.35 : 0.1,
-                    ),
-                    blurRadius: widget.isPlaying ? 48 : 16,
-                    spreadRadius: widget.isPlaying ? 6 : 0,
+                    color: Colors.black.withValues(alpha: 0.32),
+                    blurRadius: 30,
+                    offset: const Offset(0, 14),
                   ),
                   BoxShadow(
-                    color: AppColors.accentViolet.withValues(
-                      alpha: widget.isPlaying ? 0.20 : 0.05,
+                    color: AppColors.accent.withValues(
+                      alpha: widget.isPlaying ? 0.14 : 0.06,
                     ),
-                    blurRadius: widget.isPlaying ? 64 : 20,
-                    spreadRadius: widget.isPlaying ? 8 : 0,
+                    blurRadius: widget.isPlaying ? 34 : 20,
+                    spreadRadius: -6,
                   ),
                 ],
               ),
@@ -1016,8 +1020,8 @@ class _DynamicArtPlaceholder extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                AppColors.accent.withValues(alpha: 0.20),
-                AppColors.accentViolet.withValues(alpha: 0.35),
+                AppColors.surfaceElevated,
+                AppColors.accent.withValues(alpha: 0.16),
               ],
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -1104,9 +1108,13 @@ class _SeekBar extends StatelessWidget {
           ),
           child: Slider(
             value: progress,
-            onChanged: (value) => onSeek(
-              Duration(milliseconds: (value * duration.inMilliseconds).toInt()),
-            ),
+            onChanged: duration.inMilliseconds <= 0
+                ? null
+                : (value) => onSeek(
+                      Duration(
+                        milliseconds: (value * duration.inMilliseconds).toInt(),
+                      ),
+                    ),
           ),
         ),
         Padding(
@@ -1212,20 +1220,20 @@ class _SecondaryBtn extends StatelessWidget {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: 0.10),
+              color: AppColors.surfaceElevated.withValues(alpha: 0.88),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: AppColors.accent.withValues(alpha: 0.35),
+                color: Colors.white.withValues(alpha: 0.07),
               ),
             ),
-            child: Icon(icon, color: AppColors.accent, size: 20),
+            child: Icon(icon, color: AppColors.textSecondary, size: 20),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
               fontSize: 10,
-              color: AppColors.accent,
+              color: AppColors.textSecondary,
               fontFamily: 'Inter',
               fontWeight: FontWeight.w600,
             ),
@@ -1261,7 +1269,7 @@ class _OptionsSheet extends ConsumerWidget {
           const SnackBar(content: Text('Queued!')),
         );
       }),
-      _Opt(Icons.lock_rounded, 'Move to Private', AppColors.accentViolet, () async {
+      _Opt(Icons.lock_rounded, 'Move to Private', AppColors.textSecondary, () async {
         Navigator.pop(context);
         await VaultService.instance.lockItem(mediaItem);
         if (context.mounted) {
@@ -1299,8 +1307,11 @@ class _OptionsSheet extends ConsumerWidget {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.border,
+                  color: AppColors.surfaceElevated,
                   borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.07),
+                  ),
                 ),
                 child: const Icon(
                   Icons.music_note_rounded,
@@ -1345,7 +1356,7 @@ class _OptionsSheet extends ConsumerWidget {
                 width: 36,
                 height: 36,
                 decoration: BoxDecoration(
-                  color: option.color.withValues(alpha: 0.12),
+                  color: option.color.withValues(alpha: 0.10),
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: Icon(option.icon, color: option.color, size: 18),
