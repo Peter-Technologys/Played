@@ -38,6 +38,7 @@ class AudioPlayerState {
   final Duration duration;
   final double speed;
   final bool isLoading;
+  final bool hasLoadError;
   final bool isFavorite;
   final RepeatState repeat;
 
@@ -47,6 +48,7 @@ class AudioPlayerState {
     this.duration = Duration.zero,
     this.speed = 1.0,
     this.isLoading = true,
+    this.hasLoadError = false,
     this.isFavorite = false,
     this.repeat = RepeatState.off,
   });
@@ -57,6 +59,7 @@ class AudioPlayerState {
     Duration? duration,
     double? speed,
     bool? isLoading,
+    bool? hasLoadError,
     bool? isFavorite,
     RepeatState? repeat,
   }) =>
@@ -66,6 +69,7 @@ class AudioPlayerState {
         duration: duration ?? this.duration,
         speed: speed ?? this.speed,
         isLoading: isLoading ?? this.isLoading,
+        hasLoadError: hasLoadError ?? this.hasLoadError,
         isFavorite: isFavorite ?? this.isFavorite,
         repeat: repeat ?? this.repeat,
       );
@@ -191,7 +195,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
       } catch (error) {
         debugPrint('[AudioPlayer] player.open failed: $error\nPath: ${item.filePath}');
         if (isCurrent() && mounted) {
-          state = state.copyWith(isLoading: false);
+          state = state.copyWith(isLoading: false, hasLoadError: true);
         }
         return false;
       }
@@ -212,7 +216,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     } catch (error) {
       debugPrint('[AudioPlayer] load failed: $error');
       if (isCurrent() && mounted) {
-        state = state.copyWith(isLoading: false);
+        state = state.copyWith(isLoading: false, hasLoadError: true);
       }
       return false;
     }
@@ -224,6 +228,7 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     if (mounted) {
       state = state.copyWith(
         isLoading: true,
+        hasLoadError: false,
         isFavorite: _loadFavorite(item.id),
       );
     }
@@ -254,14 +259,20 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
         return;
       }
 
-      if (mounted) state = state.copyWith(speed: speed, isLoading: false);
+      if (mounted) {
+        state = state.copyWith(
+          speed: speed,
+          isLoading: false,
+          hasLoadError: false,
+        );
+      }
       OtyaDatabase.instance.recordPlay(item).ignore();
     } catch (error) {
       debugPrint('[AudioPlayer] load error: $error');
       if (_loadGeneration == generation &&
           _currentItemId == item.id &&
           mounted) {
-        state = state.copyWith(isLoading: false);
+        state = state.copyWith(isLoading: false, hasLoadError: true);
       }
     }
   }
@@ -494,6 +505,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final playButtonSize = isTablet ? 80.0 : isSmall ? 56.0 : 68.0;
     final skipIconSize = isTablet ? 34.0 : isSmall ? 24.0 : 30.0;
     final spacing = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
+    final showRetry = _showRetry || playerState.hasLoadError;
 
     return WallpaperScaffold(
       body: SafeArea(
@@ -696,7 +708,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                   ),
                   GestureDetector(
                     onTap: () {
-                      if (_showRetry) {
+                      if (showRetry) {
                         setState(() => _showRetry = false);
                         _startLoad(activeItem);
                       } else {
@@ -720,7 +732,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                           ),
                         ],
                       ),
-                      child: playerState.isLoading && !_showRetry
+                      child: playerState.isLoading && !showRetry
                           ? const Padding(
                               padding: EdgeInsets.all(20),
                               child: CircularProgressIndicator(
@@ -728,7 +740,7 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
                                 strokeWidth: 2,
                               ),
                             )
-                          : _showRetry
+                          : showRetry
                               ? const Padding(
                                   padding: EdgeInsets.all(14),
                                   child: Icon(
