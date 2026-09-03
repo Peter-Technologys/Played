@@ -1,8 +1,10 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
@@ -187,97 +189,200 @@ class _LyricsSheetState extends ConsumerState<LyricsSheet> {
     final state = ref.watch(lyricsProvider(widget.item));
     final player = PlaybackCoordinator.instance.activePlayer;
     final positionStream = player?.stream.position;
+    final scheme = Theme.of(context).colorScheme;
 
     return FractionallySizedBox(
       heightFactor: .82,
-      child: Column(
-        children: [
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 4, 12, 10),
-            child: Row(
+      child: ClipRRect(
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: DecoratedBox(
+            decoration: BoxDecoration(
+              color: scheme.surface.withValues(alpha: .92),
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(30)),
+              border: Border(
+                top: BorderSide(
+                  color: Colors.white.withValues(alpha: .08),
+                ),
+              ),
+            ),
+            child: Column(
               children: [
-                const Icon(Icons.lyrics_rounded, size: 21),
-                const SizedBox(width: 9),
-                const Expanded(
-                  child: Text(
-                    'Lyrics',
-                    style: TextStyle(
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                    ),
+                const SizedBox(height: 10),
+                Container(
+                  width: 38,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: scheme.onSurface.withValues(alpha: .16),
+                    borderRadius: BorderRadius.circular(999),
                   ),
                 ),
-                if (state.source != null)
-                  Text(
-                    state.source!,
-                    style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 14, 12, 12),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 38,
+                        height: 38,
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: .10),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: AppColors.accent.withValues(alpha: .18),
+                          ),
                         ),
+                        child: const Icon(
+                          Icons.lyrics_rounded,
+                          size: 19,
+                          color: AppColors.accent,
+                        ),
+                      ),
+                      const SizedBox(width: 11),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Lyrics',
+                              style: TextStyle(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w800,
+                                color: scheme.onSurface,
+                                letterSpacing: -.2,
+                              ),
+                            ),
+                            if (state.source != null) ...[
+                              const SizedBox(height: 2),
+                              Text(
+                                state.source!,
+                                style: TextStyle(
+                                  color: scheme.onSurfaceVariant,
+                                  fontSize: 10.5,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: 'Close lyrics',
+                        onPressed: () => Navigator.of(context).pop(),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
-                IconButton(
-                  tooltip: 'Close lyrics',
-                  onPressed: () => Navigator.of(context).pop(),
-                  icon: const Icon(Icons.close_rounded),
+                ),
+                Divider(height: 1, color: AppColors.borderOf(context)),
+                Expanded(
+                  child: state.isLoading
+                      ? const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.accent,
+                            strokeWidth: 2.5,
+                          ),
+                        )
+                      : state.isEmpty
+                          ? _EmptyLyrics(item: widget.item)
+                          : state.isLrc
+                              ? StreamBuilder<Duration>(
+                                  stream: positionStream,
+                                  initialData:
+                                      player?.state.position ?? widget.position,
+                                  builder: (context, snapshot) {
+                                    final position =
+                                        snapshot.data ?? widget.position;
+                                    final active =
+                                        _activeIndex(state.lrcLines, position);
+                                    _keepActiveVisible(active);
+                                    return ListView.builder(
+                                      controller: _scrollController,
+                                      padding: const EdgeInsets.fromLTRB(
+                                        24,
+                                        30,
+                                        24,
+                                        80,
+                                      ),
+                                      itemCount: state.lrcLines.length,
+                                      itemBuilder: (context, index) {
+                                        final line = state.lrcLines[index];
+                                        final selected = index == active;
+                                        return AnimatedDefaultTextStyle(
+                                          duration: AppDimensions.motionFast,
+                                          curve: Curves.easeOutCubic,
+                                          style: TextStyle(
+                                            color: selected
+                                                ? scheme.onSurface
+                                                : scheme.onSurface
+                                                    .withValues(alpha: .46),
+                                            fontSize: selected ? 20 : 16,
+                                            fontWeight: selected
+                                                ? FontWeight.w800
+                                                : FontWeight.w500,
+                                            height: 1.35,
+                                          ),
+                                          child: AnimatedContainer(
+                                            duration: AppDimensions.motionFast,
+                                            margin: const EdgeInsets.symmetric(
+                                              vertical: 2,
+                                            ),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 12,
+                                              vertical: 10,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: selected
+                                                  ? AppColors.accent.withValues(
+                                                      alpha: .08,
+                                                    )
+                                                  : Colors.transparent,
+                                              borderRadius:
+                                                  BorderRadius.circular(14),
+                                              border: Border.all(
+                                                color: selected
+                                                    ? AppColors.accent.withValues(
+                                                        alpha: .18,
+                                                      )
+                                                    : Colors.transparent,
+                                              ),
+                                            ),
+                                            child: Text(line.text),
+                                          ),
+                                        );
+                                      },
+                                    );
+                                  },
+                                )
+                              : ListView.separated(
+                                  padding: const EdgeInsets.fromLTRB(
+                                    24,
+                                    28,
+                                    24,
+                                    60,
+                                  ),
+                                  itemCount: state.lines.length,
+                                  separatorBuilder: (_, __) =>
+                                      const SizedBox(height: 12),
+                                  itemBuilder: (_, index) => Text(
+                                    state.lines[index],
+                                    style: TextStyle(
+                                      fontSize: 17,
+                                      height: 1.5,
+                                      color: scheme.onSurface
+                                          .withValues(alpha: .82),
+                                    ),
+                                  ),
+                                ),
                 ),
               ],
             ),
           ),
-          const Divider(),
-          Expanded(
-            child: state.isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : state.isEmpty
-                    ? _EmptyLyrics(item: widget.item)
-                    : state.isLrc
-                        ? StreamBuilder<Duration>(
-                            stream: positionStream,
-                            initialData: player?.state.position ?? widget.position,
-                            builder: (context, snapshot) {
-                              final position = snapshot.data ?? widget.position;
-                              final active = _activeIndex(state.lrcLines, position);
-                              _keepActiveVisible(active);
-                              return ListView.builder(
-                                controller: _scrollController,
-                                padding: const EdgeInsets.fromLTRB(24, 28, 24, 80),
-                                itemCount: state.lrcLines.length,
-                                itemBuilder: (context, index) {
-                                  final line = state.lrcLines[index];
-                                  final selected = index == active;
-                                  return AnimatedDefaultTextStyle(
-                                    duration: AppDimensions.motionFast,
-                                    style: TextStyle(
-                                      color: selected
-                                          ? Theme.of(context).colorScheme.primary
-                                          : Theme.of(context)
-                                              .colorScheme
-                                              .onSurface
-                                              .withValues(alpha: .56),
-                                      fontSize: selected ? 20 : 16,
-                                      fontWeight: selected
-                                          ? FontWeight.w800
-                                          : FontWeight.w500,
-                                      height: 1.35,
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.symmetric(vertical: 10),
-                                      child: Text(line.text),
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                          )
-                        : ListView.separated(
-                            padding: const EdgeInsets.fromLTRB(24, 26, 24, 60),
-                            itemCount: state.lines.length,
-                            separatorBuilder: (_, __) => const SizedBox(height: 12),
-                            itemBuilder: (_, index) => Text(
-                              state.lines[index],
-                              style: const TextStyle(fontSize: 17, height: 1.5),
-                            ),
-                          ),
-          ),
-        ],
+        ),
       ),
     );
   }
@@ -302,20 +407,35 @@ class _EmptyLyrics extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.lyrics_outlined,
-                size: 52,
-                color: scheme.onSurfaceVariant,
+              Container(
+                width: 76,
+                height: 76,
+                decoration: BoxDecoration(
+                  color: AppColors.accent.withValues(alpha: .08),
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(
+                    color: AppColors.accent.withValues(alpha: .16),
+                  ),
+                ),
+                child: const Icon(
+                  Icons.lyrics_outlined,
+                  size: 34,
+                  color: AppColors.accent,
+                ),
               ),
-              const SizedBox(height: 16),
-              const Text(
+              const SizedBox(height: 18),
+              Text(
                 'No local lyrics found',
                 textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+                style: TextStyle(
+                  fontSize: 19,
+                  fontWeight: FontWeight.w800,
+                  color: scheme.onSurface,
+                ),
               ),
               const SizedBox(height: 9),
               Text(
-                'For private offline lyrics, place a matching $lrcName file beside this track. Timestamped LRC files will follow playback automatically.',
+                'Place a matching $lrcName file beside this track. Timestamped LRC lyrics will follow playback automatically.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: scheme.onSurfaceVariant,
