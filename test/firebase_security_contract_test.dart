@@ -26,6 +26,18 @@ void main() {
     expect(httpClient, contains("request.headers['X-Firebase-AppCheck']"));
   });
 
+  test('App Check tokens are pinned to the configured Otya worker origin', () {
+    final httpClient = read('lib/core/services/http_client.dart');
+
+    expect(httpClient, contains("import '../config/environment.dart';"));
+    expect(httpClient, contains('Uri.tryParse(Environment.workerUrl)'));
+    expect(
+      httpClient,
+      contains('uri.host.toLowerCase() != workerUri.host.toLowerCase()'),
+    );
+    expect(httpClient, contains('uri.port != workerUri.port'));
+  });
+
   test('Google backend ID tokens prefer Web OAuth client id', () {
     final google = read('lib/core/services/google_account_service.dart');
     final workflow = read('.github/workflows/test-apk.yml');
