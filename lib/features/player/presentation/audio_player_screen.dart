@@ -81,8 +81,6 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   String? _currentItemId;
   int _loadGeneration = 0;
-  String? _lastNotificationItemId;
-  String? _lastResolvedArtPath;
 
   StreamSubscription? _playingSub;
   StreamSubscription? _bufferingSub;
@@ -272,28 +270,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
     final item = _container?.read(miniPlayerItemProvider);
     if (item == null) return;
 
-    if (item.id == _lastNotificationItemId) {
+    // MediaNotificationService owns artwork resolution, caching and generation
+    // ordering. Passing the source value directly avoids a second async layer
+    // here that could complete out of order during rapid Next/Previous taps.
+    unawaited(
       MediaNotificationService.instance.show(
         id: item.id,
         title: item.title,
         artist: item.artist ?? 'Unknown Artist',
         isPlaying: state.isPlaying,
-        albumArtPath: _lastResolvedArtPath,
-      );
-      return;
-    }
-
-    _lastNotificationItemId = item.id;
-    AlbumArtService.instance.resolve(item.albumArtPath).then((resolvedPath) {
-      _lastResolvedArtPath = resolvedPath;
-      MediaNotificationService.instance.show(
-        id: item.id,
-        title: item.title,
-        artist: item.artist ?? 'Unknown Artist',
-        isPlaying: state.isPlaying,
-        albumArtPath: resolvedPath,
-      );
-    });
+        albumArtPath: item.albumArtPath,
+      ),
+    );
   }
 
   bool _loadFavorite(String id) => OtyaDatabase.instance.getFavoriteFlag(id);
