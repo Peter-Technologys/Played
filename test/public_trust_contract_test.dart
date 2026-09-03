@@ -32,7 +32,10 @@ void main() {
       'android/app/src/main/res/values/strings.xml',
     ).readAsStringSync();
 
-    expect(security, contains('first public release line is `1.0.0`'));
+    expect(
+      security,
+      matches(RegExp(r'first\s+public release line is `1\.0\.0`')),
+    );
     expect(security, isNot(contains('1.6.0+10')));
     expect(contributing, contains('github.com/PeterSmartLink/OtyaPlayer'));
     expect(contributing, isNot(contains('gitlab.com/apk-v1')));
