@@ -64,7 +64,7 @@ void main() {
     expect(engine, contains('onPressed: _retrying ? null : _retryPlayer'));
     expectNotContains(
       engine,
-      "onPressed: () {\n                      setState(() { _hasError = false;",
+      'onPressed: () {\n                      setState(() { _hasError = false;',
     );
   });
 }
