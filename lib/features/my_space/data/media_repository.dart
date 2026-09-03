@@ -30,48 +30,50 @@ class MediaRepository {
     _scanning = true;
     _scanCompleter = Completer<List<MediaItem>>();
     try {
+      final scanned = await MediaScannerService.instance.scanAll();
 
-    final scanned = await MediaScannerService.instance.scanAll();
+      // MediaStore identity is carried explicitly in mediaStoreId. Artwork is
+      // optional (and videos normally have no albumArtPath), so artwork must
+      // never be used to infer where an item came from.
+      final mediaStoreItems =
+          scanned.where((e) => e.mediaStoreId != null).toList();
+      final supplemental =
+          scanned.where((e) => e.mediaStoreId == null).toList();
 
-    // MediaStore items have albumArtPath set — they are already confirmed
-    // to exist by the OS. Skip File.exists() for them (saves thousands of
-    // async I/O calls on large libraries).
-    final mediaStoreItems = scanned.where((e) => e.albumArtPath != null).toList();
-    final supplemental    = scanned.where((e) => e.albumArtPath == null).toList();
+      final alive = <MediaItem>[...mediaStoreItems];
 
-    final alive = <MediaItem>[...mediaStoreItems];
-
-    // Verify supplemental (receive-dir) items in batches of 50
-    // to avoid OOM on large libraries from one giant Future.wait()
-    if (supplemental.isNotEmpty) {
-      const batchSize = 50;
-      for (var i = 0; i < supplemental.length; i += batchSize) {
-        final batch = supplemental.skip(i).take(batchSize).toList();
-        final checks = await Future.wait(
-          batch.map((item) =>
-              File(item.filePath).exists().catchError((_) => false)),
-        );
-        for (var j = 0; j < batch.length; j++) {
-          if (checks[j]) alive.add(batch[j]);
+      // Verify supplemental (receive-dir) items in batches of 50
+      // to avoid OOM on large libraries from one giant Future.wait().
+      if (supplemental.isNotEmpty) {
+        const batchSize = 50;
+        for (var i = 0; i < supplemental.length; i += batchSize) {
+          final batch = supplemental.skip(i).take(batchSize).toList();
+          final checks = await Future.wait(
+            batch.map(
+              (item) => File(item.filePath).exists().catchError((_) => false),
+            ),
+          );
+          for (var j = 0; j < batch.length; j++) {
+            if (checks[j]) alive.add(batch[j]);
+          }
         }
       }
-    }
 
-    _cachedItems = alive;
+      _cachedItems = alive;
 
-    // Fire-and-forget shelf cache update
-    try {
-      final bundle = ShelfSorter.buildAllShelves(alive);
-      OtyaDatabase.instance
-          .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
-          .ignore();
-      OtyaDatabase.instance
-          .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
-          .ignore();
-    } catch (_) {}
+      // Fire-and-forget shelf cache update.
+      try {
+        final bundle = ShelfSorter.buildAllShelves(alive);
+        OtyaDatabase.instance
+            .cacheShelf('cinema', bundle.cinemaShelf.map((e) => e.id).toList())
+            .ignore();
+        OtyaDatabase.instance
+            .cacheShelf('street', bundle.streetTapesShelf.map((e) => e.id).toList())
+            .ignore();
+      } catch (_) {}
 
-    _scanCompleter?.complete(alive);
-    return alive;
+      _scanCompleter?.complete(alive);
+      return alive;
     } catch (e) {
       _scanCompleter?.completeError(e);
       rethrow;
@@ -82,7 +84,7 @@ class MediaRepository {
   }
 
   List<MediaItem> getRecentlyPlayed({int limit = 30}) {
-    // If cache is ready, filter from it — zero I/O
+    // If cache is ready, filter from it — zero I/O.
     if (_cachedItems != null) {
       final cachedPaths = {for (final e in _cachedItems!) e.filePath};
       final history = OtyaDatabase.instance.getRecentlyPlayed(limit: limit * 2);
@@ -102,7 +104,9 @@ class MediaRepository {
   }
 
   Future<void> recordPlay(MediaItem item) async {
-    try { await OtyaDatabase.instance.recordPlay(item); } catch (_) {}
+    try {
+      await OtyaDatabase.instance.recordPlay(item);
+    } catch (_) {}
   }
 
   void invalidate() => _cachedItems = null;
