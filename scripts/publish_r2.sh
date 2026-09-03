@@ -27,7 +27,8 @@ WORKER_URL="${WORKER_URL%/}"
 
 : "${R2_ENDPOINT:?R2_ENDPOINT is required}"
 : "${R2_BUCKET:?R2_BUCKET is required}"
-: "${OTYA_STORE_ADMIN_TOKEN:?OTYA_STORE_ADMIN_TOKEN is required}"
+: "${CF_ACCOUNT_ID:?CF_ACCOUNT_ID is required}"
+: "${CF_API_TOKEN:?CF_API_TOKEN is required}"
 
 ARM64_APK="${ARM64_APK:-build/app/outputs/flutter-apk/app-arm64-v8a-release.apk}"
 ARM32_APK="${ARM32_APK:-build/app/outputs/flutter-apk/app-armeabi-v7a-release.apk}"
@@ -70,7 +71,7 @@ ARM32_VERSIONED="releases/${RAW_TAG}/Otya-arm32.apk"
 upload_and_verify "$ARM64_APK" "$ARM64_VERSIONED" "public, max-age=31536000, immutable"
 upload_and_verify "$ARM32_APK" "$ARM32_VERSIONED" "public, max-age=31536000, immutable"
 
-export RAW_TAG VERSION VERSION_CODE MIN_SDK TARGET_SDK WORKER_URL CHANGELOG_FILE ARM64_VERSIONED ARM32_VERSIONED OTYA_STORE_ADMIN_TOKEN
+export RAW_TAG VERSION VERSION_CODE MIN_SDK TARGET_SDK WORKER_URL CHANGELOG_FILE ARM64_VERSIONED ARM32_VERSIONED CF_ACCOUNT_ID CF_API_TOKEN
 WORKFLOW_ID=$(python3 - <<'PYEOF'
 import json, os, sys, urllib.request, urllib.error
 with open(os.environ['CHANGELOG_FILE']) as f:
@@ -86,14 +87,17 @@ payload = {
     'targetSdk': int(os.environ['TARGET_SDK']),
     'workerUrl': os.environ['WORKER_URL'],
 }
-req = urllib.request.Request(
-    os.environ['WORKER_URL'] + '/api/admin/release-workflow',
-    data=json.dumps(payload).encode(), method='POST',
-    headers={
-        'Content-Type': 'application/json',
-        'Authorization': 'Bearer ' + os.environ['OTYA_STORE_ADMIN_TOKEN'],
-    },
+workflow_url = (
+    'https://api.cloudflare.com/client/v4/accounts/'
+    + os.environ['CF_ACCOUNT_ID']
+    + '/workflows/otya-release/instances'
 )
+req = urllib.request.Request(workflow_url, data=json.dumps({
+    'params': json.dumps(payload, separators=(',', ':')),
+}).encode(), method='POST', headers={
+    'Content-Type': 'application/json',
+    'Authorization': 'Bearer ' + os.environ['CF_API_TOKEN'],
+})
 try:
     with urllib.request.urlopen(req, timeout=20) as resp:
         data = json.load(resp)
@@ -103,7 +107,10 @@ except urllib.error.HTTPError as e:
 except Exception as e:
     sys.stderr.write(f'ERROR: release workflow start failed: {type(e).__name__}\n')
     sys.exit(1)
-instance_id = data.get('instanceId')
+if data.get('success') is not True:
+    sys.stderr.write('ERROR: Cloudflare rejected the release workflow request\n')
+    sys.exit(1)
+instance_id = (data.get('result') or {}).get('id')
 if not instance_id:
     sys.stderr.write('ERROR: release workflow returned no instanceId\n')
     sys.exit(1)
@@ -116,8 +123,14 @@ export WORKFLOW_ID
 
 python3 - <<'PYEOF'
 import json, os, sys, time, urllib.parse, urllib.request
-base = os.environ['WORKER_URL'] + '/api/admin/release-workflow/status?id=' + urllib.parse.quote(os.environ['WORKFLOW_ID'])
-headers = {'Authorization': 'Bearer ' + os.environ['OTYA_STORE_ADMIN_TOKEN']}
+base = (
+    'https://api.cloudflare.com/client/v4/accounts/'
+    + os.environ['CF_ACCOUNT_ID']
+    + '/workflows/otya-release/instances/'
+    + urllib.parse.quote(os.environ['WORKFLOW_ID'], safe='')
+    + '?simple=true'
+)
+headers = {'Authorization': 'Bearer ' + os.environ['CF_API_TOKEN']}
 terminal_fail = {'errored', 'terminated', 'unknown'}
 for attempt in range(60):
     req = urllib.request.Request(base, headers=headers)
@@ -130,11 +143,22 @@ for attempt in range(60):
             sys.exit(1)
         time.sleep(5)
         continue
-    workflow = data.get('workflow') or {}
+    if data.get('success') is not True:
+        if attempt >= 59:
+            sys.stderr.write('ERROR: Cloudflare rejected the workflow status request\n')
+            sys.exit(1)
+        time.sleep(5)
+        continue
+    workflow = data.get('result') or {}
     status = workflow.get('status')
     print(f'Release status: {status}')
     if status == 'complete':
         output = workflow.get('output')
+        if isinstance(output, str):
+            try:
+                output = json.loads(output)
+            except json.JSONDecodeError:
+                pass
         if isinstance(output, dict) and output.get('ok') is False:
             sys.stderr.write('ERROR: release finished with an error\n')
             sys.exit(1)
