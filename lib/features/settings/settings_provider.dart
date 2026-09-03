@@ -166,6 +166,8 @@ class AppSettings {
 class SettingsNotifier extends StateNotifier<AppSettings> {
   SettingsNotifier(super.initial);
 
+  static const _searchHistoryDataKey = 'otya_search_history';
+
   final Completer<AppSettings> _startupHydration = Completer<AppSettings>();
   Future<void> _saveChain = Future<void>.value();
 
@@ -196,6 +198,13 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
         });
   }
 
+  Future<void> _clearSavedSearchHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_searchHistoryDataKey);
+    } catch (_) {}
+  }
+
   void setThemeMode(AppThemeMode v) => _update(state.copyWith(themeMode: v));
   void setAutoResume(bool v) => _update(state.copyWith(autoResume: v));
   void setDefaultBatterySaver(bool v) =>
@@ -219,8 +228,11 @@ class SettingsNotifier extends StateNotifier<AppSettings> {
 
   void setAutoLoadSubtitles(bool v) =>
       _update(state.copyWith(autoLoadSubtitles: v));
-  void setSearchHistory(bool v) =>
-      _update(state.copyWith(searchHistory: v));
+  void setSearchHistory(bool v) {
+    _update(state.copyWith(searchHistory: v));
+    if (!v) unawaited(_clearSavedSearchHistory());
+  }
+
   void setOrientationLocked(bool v) =>
       _update(state.copyWith(orientationLocked: v));
   void setContinuousPlayback(bool v) =>
