@@ -108,7 +108,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event_name == 'workflow_dispatch' && format('refs/tags/{0}', inputs.tag) || github.ref }}
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'refs/heads/main' || github.ref }}
 
       - name: Check release tag
         shell: bash
@@ -145,6 +145,33 @@ jobs:
             echo "ERROR: release build number must be a positive integer"
             exit 1
           }
+
+      - name: Align first-release tag to validated main
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release.outputs.tag }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          HEAD_SHA="$(git rev-parse HEAD)"
+          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
+            echo "$RELEASE_TAG already points to the validated release commit."
+            exit 0
+          fi
+
+          ASSET_COUNT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets | length' 2>/dev/null || printf '0')"
+          test "$ASSET_COUNT" = '0' || {
+            echo "ERROR: refusing to move $RELEASE_TAG because its GitHub Release already has assets"
+            exit 1
+          }
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git tag -f "$RELEASE_TAG" "$HEAD_SHA"
+          git push --force origin "refs/tags/$RELEASE_TAG"
+          echo "$RELEASE_TAG now points to validated main commit $HEAD_SHA."
 
       - name: Set up Java 17
         uses: actions/setup-java@v5
