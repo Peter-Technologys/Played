@@ -1,7 +1,10 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../shared/widgets/album_art_thumb.dart';
@@ -23,9 +26,10 @@ final _miniDurationProvider = Provider<Duration>((ref) {
 
 /// Persistent Now Playing surface used across the app.
 ///
-/// Design rule: media artwork is the visual focus; OTYA purple is reserved for
-/// playback state/progress. The player intentionally avoids feature-card colors
-/// so it matches the approved charcoal + purple product system.
+/// Design rule: media artwork is the visual focus; OTYA blue is reserved for
+/// playback state/progress. The surface uses restrained glass treatment so it
+/// remains visually connected to the content behind it without hurting text or
+/// control contrast.
 class MiniPlayer extends ConsumerStatefulWidget {
   const MiniPlayer({super.key});
 
@@ -71,6 +75,11 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
     ref.read(audioPlayerProvider.notifier).pause();
     ref.read(miniPlayerItemProvider.notifier).state = null;
     setState(() => _dragOffset = 0);
+  }
+
+  void _skipNext() {
+    HapticFeedback.selectionClick();
+    ref.read(audioPlayerProvider.notifier).skipNext();
   }
 
   @override
@@ -133,95 +142,101 @@ class _MiniPlayerState extends ConsumerState<MiniPlayer>
           child: Opacity(
             opacity: (1 - _dragOffset / (_dismissThreshold * 1.5))
                 .clamp(0.0, 1.0),
-            child: DecoratedBox(
-              decoration: BoxDecoration(
-                color: const Color(0xFF15151C),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: const Color(0xFF292933)),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.40),
-                    blurRadius: 24,
-                    offset: const Offset(0, 10),
-                  ),
-                  BoxShadow(
-                    color: AppColors.accent.withValues(alpha: 0.08),
-                    blurRadius: 28,
-                    spreadRadius: -8,
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(19),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    SizedBox(
-                      height: 72,
-                      child: Row(
-                        children: [
-                          Padding(
-                            padding: const EdgeInsets.all(8),
-                            child: ClipRRect(
-                              borderRadius: BorderRadius.circular(13),
-                              child: AlbumArtThumb(
-                                albumArtPath: displayItem.albumArtPath,
-                                size: 56,
-                                borderRadius: 0,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 3),
-                          Expanded(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 7),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    displayItem.title,
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFFF7F5FF),
-                                      fontSize: 13.5,
-                                      fontWeight: FontWeight.w700,
-                                      letterSpacing: -0.15,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    displayItem.artist ?? 'Unknown artist',
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                    style: const TextStyle(
-                                      color: Color(0xFF92909F),
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.w500,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: 'Queue',
-                            visualDensity: VisualDensity.compact,
-                            onPressed: () => _openPlayer(displayItem),
-                            icon: const Icon(
-                              Icons.queue_music_rounded,
-                              color: Color(0xFF92909F),
-                              size: 19,
-                            ),
-                          ),
-                          const _PlayPauseButton(),
-                          const SizedBox(width: 4),
-                        ],
-                      ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(20),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    color: AppColors.surface.withValues(alpha: 0.84),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.08),
                     ),
-                    const _MiniSeekBar(),
-                  ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: 0.28),
+                        blurRadius: 22,
+                        offset: const Offset(0, 10),
+                      ),
+                      BoxShadow(
+                        color: AppColors.accent.withValues(alpha: 0.07),
+                        blurRadius: 26,
+                        spreadRadius: -10,
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(
+                        height: 70,
+                        child: Row(
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.all(8),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(13),
+                                child: AlbumArtThumb(
+                                  albumArtPath: displayItem.albumArtPath,
+                                  size: 54,
+                                  borderRadius: 0,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 3),
+                            Expanded(
+                              child: Padding(
+                                padding:
+                                    const EdgeInsets.symmetric(horizontal: 7),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      displayItem.title,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.textPrimary,
+                                        fontSize: 13.5,
+                                        fontWeight: FontWeight.w700,
+                                        letterSpacing: -0.15,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      displayItem.artist ?? 'Unknown artist',
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        color: AppColors.textMuted,
+                                        fontSize: 11,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                            IconButton(
+                              tooltip: 'Next',
+                              visualDensity: VisualDensity.compact,
+                              onPressed: _skipNext,
+                              icon: const Icon(
+                                Icons.skip_next_rounded,
+                                color: AppColors.textSecondary,
+                                size: 23,
+                              ),
+                            ),
+                            const _PlayPauseButton(),
+                            const SizedBox(width: 5),
+                          ],
+                        ),
+                      ),
+                      const _MiniSeekBar(),
+                    ],
+                  ),
                 ),
               ),
             ),
@@ -256,8 +271,8 @@ class _PlayPauseButton extends ConsumerWidget {
             color: AppColors.accent,
             boxShadow: [
               BoxShadow(
-                color: AppColors.accent.withValues(alpha: 0.22),
-                blurRadius: 16,
+                color: AppColors.accent.withValues(alpha: 0.20),
+                blurRadius: 15,
               ),
             ],
           ),
@@ -342,7 +357,7 @@ class _MiniSeekBarState extends ConsumerState<_MiniSeekBar> {
                 child: LinearProgressIndicator(
                   value: progress,
                   minHeight: _isDragging ? 4 : 3,
-                  backgroundColor: const Color(0xFF292933),
+                  backgroundColor: Colors.white.withValues(alpha: 0.10),
                   valueColor: const AlwaysStoppedAnimation<Color>(
                     AppColors.accent,
                   ),
