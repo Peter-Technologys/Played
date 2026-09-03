@@ -11,7 +11,7 @@ OTYA has one canonical logo with two states, not two different logos.
 
 ## AI thinking state
 
-- Use `OtyaThinkingMark` only while Ask OTYA is actively processing.
+- Use `OtyaThinkingMark` only while Next is actively processing.
 - The large O never rotates or spins.
 - Only the blue, red and yellow balls move.
 - The balls travel continuously around the full curved inner route of the O.

@@ -23,7 +23,7 @@ Physical-device testing starts only after every **required v1** row below is `co
 | Storage | storage report, cache clear, read-only Duplicate Finder | complete |
 | Personalize | light/dark/AMOLED, themes, wallpaper, seasonal artwork | complete |
 | App Lock | persisted setting, root app gate, device authentication, background relock | complete |
-| Ask OTYA | chat UI, scrolling, history within chat, model selection when available, copy, new chat, support handoff, offline-safe failure | complete |
+| Next | chat UI, scrolling, history within chat, copy, new chat, support handoff, offline-safe failure | complete |
 | Account | email registration/login, Google sign-in, verification/recovery flows, consent, 2FA/recovery code, profile/session | complete |
 | Backup | supported Google Drive playlist backup/restore | complete |
 | Notifications | contextual permission, Now Playing/local task notifications, FCM registration, foreground/background push, safe route allow-list | complete |
@@ -60,6 +60,6 @@ These are valid future additions but were not present as working features in the
 
 ## Physical acceptance stage
 
-After the final pre-device CI gate passes, test clean installs and upgrades across supported Android versions and real devices. Verify playback, gestures, accessibility, interruptions/headsets, PiP, notifications, Transfer, Private, App Lock, tools, auth/Google/Firebase/FCM/App Check, Ask OTYA, offline/outage behavior, website/account/admin, signed APKs and Play AAB behavior.
+After the final pre-device CI gate passes, test clean installs and upgrades across supported Android versions and real devices. Verify playback, gestures, accessibility, interruptions/headsets, PiP, notifications, Transfer, Private, App Lock, tools, auth/Google/Firebase/FCM/App Check, Next, offline/outage behavior, website/account/admin, signed APKs and Play AAB behavior.
 
 Do not merge, tag or publish until that acceptance stage passes.

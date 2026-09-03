@@ -1,12 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">OTYA Player</string>
-    <string name="otya_audio_channel_name">OTYA Player \u2014 Now Playing</string>
+    <string name="app_name">Otya</string>
+    <string name="otya_audio_channel_name">Otya \u2014 Now Playing</string>
     <string name="otya_audio_channel_desc">Media playback controls and lock screen notification</string>
-    <string name="otya_media_channel_name">OTYA Player Media</string>
+    <string name="otya_media_channel_name">Otya Media</string>
     <string name="otya_media_channel_desc">Now playing controls and media session</string>
-    <string name="otya_tools_channel_name">OTYA Player Tools</string>
+    <string name="otya_tools_channel_name">Otya Tools</string>
     <string name="otya_tools_channel_desc">Audio extraction and video trim progress</string>
-    <string name="otya_updates_channel_name">OTYA Player Updates</string>
-    <string name="otya_updates_channel_desc">Alerts when a new version of OTYA Player is available</string>
+    <string name="otya_updates_channel_name">Otya Updates</string>
+    <string name="otya_updates_channel_desc">Alerts when a new version of Otya is available</string>
 </resources>

@@ -38,25 +38,17 @@ Secondary capabilities are grouped beneath them instead of competing as equal ti
 - Activity: History and relevant downloaded/recent activity.
 - Tools: Converter, Trim, Storage analysis and similar utilities.
 - Account & Settings: account, playback/privacy/device settings and Personalize.
-- Help & Product: Ask OTYA and About.
+- Help & Product: Next and About.
 
 Playlists primarily belong in Music. Personalize and Storage primarily belong in Settings. Converter/Trim remain available in Tools but should also appear contextually on suitable media.
 
-## Music and online enrichment
+## Music
 
 Music remains a local-library destination: Songs, Albums, Artists, Folders, Playlists and Now Playing.
 
-Online music must not turn OTYA into a streaming-first application.
-
-- Global/local Music Search runs locally first.
-- When `onlineMusic` is enabled and internet/provider access succeeds, online tracks may be appended below local results.
-- Provider failure/offline state must not replace local Search with an error.
-- A permanent Online Music tab/screen is not a primary navigation concept.
-- A small discovery row may appear only when online content is actually available and useful; it disappears cleanly offline.
-- Online tracks use the normal OTYA playback/queue experience.
-- Download is shown only when the provider explicitly permits downloading and supplies a valid download URL. Non-downloadable tracks show no Download action.
-- Downloaded tracks become normal local music and should be discoverable through the regular library after media indexing.
-- Jamendo/OAuth/provider details must not become required knowledge for ordinary users.
+The v1 product has no built-in streaming provider. Retired Jamendo and Spotify
+paths must not return through stale configuration. A future online provider
+requires a separate product, licensing, security and privacy review.
 
 ## Transfer
 
@@ -64,9 +56,9 @@ Transfer is one capability group. Send, receive, nearby discovery, QR pairing, c
 
 ## AI
 
-AI is an optional intelligence layer, not a permanent app tab. Local Search runs first. Ask OTYA may help with OTYA features and general questions while online, but it must never become required for finding or playing local media.
+AI is an optional intelligence layer, not a permanent app tab. Local Search runs first. Next may help with Otya features and general questions while online, but it must never become required for finding or playing local media.
 
-Ask OTYA product knowledge must match current OTYA behavior, including Online Music: local-first, Jamendo login optional, provider outages non-fatal, and downloads only when provider-authorized.
+Next product knowledge must match current Otya behavior and must not describe retired Online Music providers as active features.
 
 ## Notifications and errors
 
@@ -81,7 +73,7 @@ OTYA should not feel noisy or technical.
 
 ## Offline boundary
 
-The following must remain useful without Cloudflare, Firebase, Jamendo, sign-in or internet:
+The following must remain useful without Cloudflare, Firebase, sign-in or internet:
 
 - app startup
 - local video and music playback
@@ -93,7 +85,7 @@ The following must remain useful without Cloudflare, Firebase, Jamendo, sign-in 
 - local file/private-media operations
 - downloaded media
 
-Remote configuration, account services, online music, online AI, update metadata and cloud notifications may enhance the experience but must not block the offline core.
+Remote configuration, account services, Next, update metadata and cloud notifications may enhance the experience but must not block the offline core.
 
 Remote config is loaded after first paint and can use cached state. Any remote feature switch must have a safe local fallback.
 

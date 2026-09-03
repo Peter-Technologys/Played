@@ -1,38 +1,53 @@
-# OTYA Player Security Policy
+# Otya Security Policy
 
 ## Supported version
 
-Security fixes are maintained for the current production release line. The current source version is `1.6.0+10`.
+Security fixes are maintained for the current public Otya release. The first
+public release line is `1.0.0`; the Android build number may increase without
+changing that public version while first-release fixes are validated.
 
 ## Reporting a vulnerability
 
-Do not publish secrets, credentials, private user data, exploit details, account-recovery material, signing information, OTPs or tokens in a public issue.
+Do not publish secrets, credentials, private user data, exploit details,
+account-recovery material, signing information, OTPs or tokens in a public
+issue.
 
-Use a private GitHub security advisory when available, or the official support/contact channel published on `petersmartlink.com`.
+Use a private GitHub security advisory when available, or contact
+**support@petersmartlink.com** through an official `petersmartlink.com` channel.
 
 Please include:
-- affected OTYA version and build number;
-- device and Android version when relevant;
-- reproducible steps;
-- expected and actual behavior;
-- security impact;
+
+- the affected Otya version and build number;
+- the device and Android version when relevant;
+- reproducible steps and the security impact;
+- expected and actual behaviour; and
 - sanitized logs or screenshots with personal data and secrets removed.
 
 ## Security-sensitive areas
 
 The following require extra review:
+
 - authentication, JWT and refresh-token handling;
-- Google Sign-In and Drive App Data recovery;
-- Safe/vault encryption, biometric and PIN access;
-- Beam local transfer authorization;
+- Google Sign-In and Drive app-data recovery;
+- Private storage, biometric/device authentication and PIN access;
+- local Transfer authorization and file validation;
+- Next request isolation and provider routing;
 - update/download integrity and APK signing;
-- backend URLs, remote configuration and cloud synchronization;
+- backend URLs, remote configuration and cloud synchronization; and
 - dependency and GitHub Actions changes.
 
 ## Security boundaries
 
-OTYA must never commit or bundle production secrets in Flutter. Authentication secrets, Resend keys, Cloudflare credentials, signing keys and internal service secrets belong in GitHub/Cloudflare secret storage or server-side runtime configuration.
+Otya must never commit or bundle production secrets in Flutter. Authentication,
+Resend, Cloudflare, Firebase service-account, signing and internal-service
+credentials belong only in protected server-side or CI secret storage.
 
-Google Drive recovery requires explicit user action and must not upload raw music/video files or Safe/private media. Production releases must fail closed when release signing credentials are missing.
+Google Drive recovery requires explicit user action and must not upload raw
+music/video files or Private media. Production releases must fail closed when
+release signing credentials are missing.
 
-Third-party dependency vulnerabilities should still be reported when they materially affect OTYA so the project can update, mitigate or document the risk.
+Internet-facing Otya services use HTTPS. Cleartext HTTP is limited to
+authenticated Transfer connections on private/local network addresses.
+
+Third-party dependency vulnerabilities should be reported when they materially
+affect Otya so the project can update, mitigate or document the risk.

@@ -88,7 +88,7 @@ class _MediaKitEngineState extends State<MediaKitEngine> {
     try {
       _player = Player(
         configuration: const PlayerConfiguration(
-          title: 'OTYA Player',
+          title: 'Otya',
           logLevel: MPVLogLevel.error,
         ),
       );
@@ -728,5 +728,4 @@ class _NeonHud extends StatelessWidget {
     );
   }
 }
-
 

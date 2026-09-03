@@ -1,12 +1,12 @@
 name: Bug report
-description: Report a reproducible OTYA Player problem
+description: Report a reproducible Otya problem
 title: "[Bug]: "
 labels:
   - bug
 body:
   - type: markdown
     attributes:
-      value: Thanks for helping improve OTYA Player. Do not include passwords, API keys, tokens, or private user data.
+      value: Thanks for helping improve Otya. Do not include passwords, API keys, tokens, or private user data.
   - type: textarea
     id: problem
     attributes:
@@ -27,8 +27,8 @@ body:
   - type: input
     id: version
     attributes:
-      label: OTYA version
-      placeholder: e.g. 1.6.0+10
+      label: Otya version
+      placeholder: e.g. 1.0.0+1
   - type: input
     id: device
     attributes:

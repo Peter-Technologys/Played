@@ -22,7 +22,7 @@ Me contains exactly:
 8. Personalize
 9. Storage
 
-Downloads are a Files/local-media view, not a fourth primary destination. Ask OTYA is reached through Search/Support, not a bottom-navigation tab.
+Downloads are a Files/local-media view, not a fourth primary destination. Next is reached through Search/Support, not a bottom-navigation tab.
 
 ## Offline-first startup
 
@@ -31,7 +31,7 @@ Local playback and local library access are the critical path. OTYA must reach a
 - Cloudflare
 - Firebase
 - authentication
-- Ask OTYA
+- Next
 - Resend
 - remote config
 - update checks
@@ -54,7 +54,7 @@ Remote services start after the first Flutter frame and fail non-fatally.
 | Canonical application/account data | D1 |
 | Sessions/rate limits/fallback config | KV |
 | Release/file objects | R2 |
-| Ask OTYA | OTYA AI/Cloudflare backend |
+| Next | Otya AI/Cloudflare backend |
 | Crash diagnostics | OTYA Cloudflare CrashReporter |
 | Client experiment/presentation config | Firebase Remote Config, proxied/cached by Cloudflare |
 | Server safety config | Cloudflare |
@@ -83,7 +83,7 @@ There is one OTYA Search. It searches local content first:
 - playlists
 - offline OTYA help
 
-Ask OTYA is a friendly general-purpose assistant with additional OTYA product context. It is offered after local/help results or when the user explicitly opens Ask OTYA. Public Ask OTYA does not receive unrestricted D1/R2/Firebase/admin credentials.
+Next is a friendly general-purpose assistant with additional Otya product context. It is offered after local/help results or when the user explicitly opens Next. Public Next does not receive unrestricted D1/R2/Firebase/admin credentials.
 
 Private Admin AI uses separately authorized, approved internal tools. Secrets, OTPs, refresh tokens and service-account keys are never exposed to the model.
 

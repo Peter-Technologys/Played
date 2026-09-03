@@ -1,99 +1,50 @@
-# Architecture — Played
+# Otya Architecture
 
-## Overview
+Otya is an offline-first Flutter Android application with optional connected
+services. Local media playback remains usable when Cloudflare, Firebase, Google
+or Next is unavailable.
 
-Played follows **Clean Architecture** with a **Feature-First** folder structure.
-State is managed entirely with **Riverpod**. Navigation uses **go_router**.
-All data is stored offline with **Hive**.
+## Application structure
 
----
+- `lib/features/` contains user journeys such as Video, Music, Me, Transfer,
+  Private, account, tools and Next.
+- `lib/core/` contains shared models, local persistence, playback, networking,
+  security and platform services.
+- `lib/shared/` contains reusable product UI.
+- `packages/otya_media_tools/` contains Otya's Android media-tool bridge.
+- `test/` contains regression and release-contract tests.
 
-## Layers
+Riverpod owns application state, `go_router` owns navigation, Hive stores local
+models and `media_kit` is the shared audio/video playback engine.
 
-```
-┌─────────────────────────────────────────┐
-│           Presentation Layer            │
-│  Screens · Widgets · Providers (UI)     │
-├─────────────────────────────────────────┤
-│             Domain Layer                │
-│         Use Cases · Entities            │
-├─────────────────────────────────────────┤
-│              Data Layer                 │
-│   Repositories · Data Sources · Models  │
-├─────────────────────────────────────────┤
-│              Core Layer                 │
-│  Database · Services · Utils · Models   │
-└─────────────────────────────────────────┘
-```
+## Local data boundary
 
----
+The media library, playback state, playlists, preferences and Private index are
+stored on-device. Private media is moved into app-private storage and protected
+by device authentication/PIN controls. Otya does not claim to receive or store
+Android biometric templates.
 
-## Feature Structure
+Transfer is an authenticated same-Wi-Fi/hotspot protocol. It validates the Otya
+sender marker, supported media types, declared sizes and local/private network
+addresses. It is not a cloud file relay.
 
-Each feature follows this pattern:
+## Connected services
 
-```
-lib/features/<feature_name>/
-├── data/
-│   └── <feature>_repository.dart     # Data access
-├── domain/
-│   └── <feature>_use_case.dart       # Business logic
-└── presentation/
-    ├── <feature>_screen.dart          # Main screen
-    ├── providers/
-    │   └── <feature>_provider.dart   # Riverpod providers
-    └── widgets/
-        └── <widget>.dart             # Screen-specific widgets
-```
+The Android app talks only to public HTTPS Otya surfaces. Cloudflare Workers own
+the account, application API, release delivery and Next control plane. Firebase
+provides optional messaging, App Check, analytics and performance collection.
+Google Identity and the Drive app-data folder are used only for user-selected
+sign-in/recovery flows. Resend handles service email.
 
----
+Production secrets and privileged provider credentials remain server-side or in
+protected CI storage. They must never be compiled into the APK.
 
-## State Management
+## Release model
 
-- **Riverpod** is used exclusively — no `setState` in feature screens.
-- `FutureProvider` for async data (media scanning).
-- `StateNotifierProvider` for mutable state (player, settings, queue).
-- `StateProvider` for simple toggles (battery saver, controls visible).
+`main` is the only release branch. Every candidate must pass strict Flutter
+analysis, tests, Android build checks and artifact-signature verification. The
+`v1.0.0` tag builds signed ARM64/ARM32 APKs and an AAB, publishes versioned APKs
+to Cloudflare R2, updates Otya release metadata and creates the GitHub Release.
 
----
-
-## Navigation
-
-All routes are defined in `lib/app/router.dart` using `go_router`.
-
-| Route | Screen |
-|---|---|
-| `/` | My Space (home) |
-| `/airdrop` | Air-Drop |
-| `/studio` | Studio |
-| `/settings` | Settings |
-| `/vault` | Vault Lock Screen |
-| `/player/audio` | Audio Player |
-| `/player/video` | Video Player |
-| `/player/equalizer` | Equalizer |
-| `/tools/whatsapp` | WhatsApp Trimmer |
-
----
-
-## Database
-
-Hive is used for all local persistence:
-
-| Box | Contents |
-|---|---|
-| `media_items` | Scanned media metadata |
-| `playlists` | User playlists |
-| `vault_items` | Encrypted vault entries |
-| `stem_cache` | Cached stem split results |
-| `seek_positions` | Resume positions per file |
-
-The vault box uses AES-256 encryption via the `encrypt` package.
-
----
-
-## Security
-
-- Vault media is AES-256 encrypted at rest.
-- Biometric authentication via `local_auth`.
-- PIN fallback stored as a hashed value.
-- Vault files are stored in the app's private directory (not accessible to other apps).
+The app version remains `1.0.0`; the build number may increase for first-release
+fixes without changing the public version.

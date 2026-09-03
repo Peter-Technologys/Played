@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../services/feedback_service.dart';
 import '../../app/theme/app_colors.dart';
 
-/// Bottom sheet for reporting a problem in OTYA Player.
+/// Bottom sheet for reporting a problem in Otya.
 /// Usage: ReportProblemSheet.show(context);
 class ReportProblemSheet extends StatefulWidget {
   const ReportProblemSheet._();
