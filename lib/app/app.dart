@@ -86,19 +86,23 @@ class _OtyaPlayerAppState extends ConsumerState<OtyaPlayerApp> {
 
   Future<void> _showStartupDialogsSequentially() async {
     try {
-      var navigatorContext = AppRouter.navigatorKey.currentContext;
-      if (!mounted || navigatorContext == null) return;
+      final announcementContext = AppRouter.navigatorKey.currentContext;
+      if (!mounted ||
+          announcementContext == null ||
+          !announcementContext.mounted) {
+        return;
+      }
 
       // Announcements have priority and must finish before an update prompt is
-      // considered. This prevents two modal routes from being stacked during
-      // startup and uses a context that actually belongs to the root Navigator.
-      await AnnouncementDialog.showIfPending(navigatorContext);
+      // considered. Each dialog receives a fresh root-Navigator context so no
+      // BuildContext is carried across the async gap between the two modals.
+      await AnnouncementDialog.showIfPending(announcementContext);
       if (!mounted) return;
 
       await Future<void>.delayed(const Duration(seconds: 2));
-      navigatorContext = AppRouter.navigatorKey.currentContext;
-      if (!mounted || navigatorContext == null) return;
-      await UpdateDialog.checkAndShow(navigatorContext);
+      final updateContext = AppRouter.navigatorKey.currentContext;
+      if (!mounted || updateContext == null || !updateContext.mounted) return;
+      await UpdateDialog.checkAndShow(updateContext);
     } catch (_) {
       // Startup notices are non-critical. Local playback and navigation must
       // remain available even when a remote announcement/update check fails.
