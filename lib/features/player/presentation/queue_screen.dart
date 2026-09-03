@@ -1,6 +1,9 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
@@ -129,234 +132,245 @@ class QueueScreen extends ConsumerWidget {
     final height = MediaQuery.of(context).size.width > 600
         ? MediaQuery.of(context).size.height * 0.64
         : MediaQuery.of(context).size.height * 0.82;
+    const radius = BorderRadius.vertical(top: Radius.circular(30));
 
-    return Container(
-      height: height,
-      decoration: BoxDecoration(
-        color: cs.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(30)),
-        border: Border(
-          top: BorderSide(color: AppColors.accent.withValues(alpha: 0.22)),
-        ),
-      ),
-      child: Column(
-        children: [
-          const SizedBox(height: 10),
-          Container(
-            width: 38,
-            height: 4,
-            decoration: BoxDecoration(
-              color: cs.onSurface.withValues(alpha: 0.16),
-              borderRadius: BorderRadius.circular(999),
+    return ClipRRect(
+      borderRadius: radius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          height: height,
+          decoration: BoxDecoration(
+            color: cs.surface.withValues(alpha: 0.92),
+            borderRadius: radius,
+            border: Border(
+              top: BorderSide(
+                color: Colors.white.withValues(alpha: 0.08),
+              ),
             ),
           ),
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'QUEUE',
-                        style: TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.w700,
-                          letterSpacing: 1.8,
-                          color: AppColors.accent,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                      const SizedBox(height: 5),
-                      Text(
-                        queue.items.isEmpty
-                            ? 'Nothing up next'
-                            : '${queue.items.length} ${queue.items.length == 1 ? 'track' : 'tracks'} up next',
-                        style: TextStyle(
-                          fontSize: 19,
-                          fontWeight: FontWeight.w800,
-                          color: cs.onSurface,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ],
-                  ),
+          child: Column(
+            children: [
+              const SizedBox(height: 10),
+              Container(
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: cs.onSurface.withValues(alpha: 0.16),
+                  borderRadius: BorderRadius.circular(999),
                 ),
-                _HeaderAction(
-                  icon: Icons.shuffle_rounded,
-                  active: queue.shuffle,
-                  tooltip: 'Shuffle',
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    ref.read(queueProvider.notifier).toggleShuffle();
-                  },
-                ),
-                const SizedBox(width: 8),
-                _HeaderAction(
-                  icon: Icons.delete_sweep_outlined,
-                  tooltip: 'Clear queue',
-                  onTap: queue.items.isEmpty
-                      ? null
-                      : () {
-                          HapticFeedback.mediumImpact();
-                          ref.read(queueProvider.notifier).clear();
-                        },
-                ),
-              ],
-            ),
-          ),
-          Divider(height: 1, color: AppColors.borderOf(context)),
-          Expanded(
-            child: queue.items.isEmpty
-                ? _EmptyQueue(colorScheme: cs)
-                : ReorderableListView.builder(
-                    padding: EdgeInsets.fromLTRB(
-                      12,
-                      10,
-                      12,
-                      MediaQuery.of(context).padding.bottom + 24,
-                    ),
-                    itemCount: queue.items.length,
-                    onReorder: (oldIndex, newIndex) {
-                      HapticFeedback.mediumImpact();
-                      final adjusted =
-                          newIndex > oldIndex ? newIndex - 1 : newIndex;
-                      ref
-                          .read(queueProvider.notifier)
-                          .reorder(oldIndex, adjusted);
-                    },
-                    proxyDecorator: (child, index, animation) => Material(
-                      color: Colors.transparent,
-                      elevation: 0,
-                      child: ScaleTransition(
-                        scale:
-                            Tween(begin: 1.0, end: 1.02).animate(animation),
-                        child: child,
-                      ),
-                    ),
-                    itemBuilder: (context, i) {
-                      final item = queue.items[i];
-                      final isCurrent = i == queue.currentIndex;
-                      return Container(
-                        key: ValueKey('${item.id}-$i'),
-                        margin: const EdgeInsets.only(bottom: 6),
-                        decoration: BoxDecoration(
-                          color: isCurrent
-                              ? AppColors.accent.withValues(alpha: 0.10)
-                              : Colors.transparent,
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: isCurrent
-                                ? AppColors.accent.withValues(alpha: 0.28)
-                                : Colors.transparent,
-                          ),
-                        ),
-                        child: ListTile(
-                          minTileHeight: 66,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 3,
-                          ),
-                          leading: Stack(
-                            alignment: Alignment.bottomRight,
-                            children: [
-                              ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: AlbumArtThumb(
-                                  albumArtPath: item.albumArtPath,
-                                  size: 48,
-                                  borderRadius: 12,
-                                ),
-                              ),
-                              if (isCurrent)
-                                Container(
-                                  width: 19,
-                                  height: 19,
-                                  decoration: const BoxDecoration(
-                                    color: AppColors.accent,
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.graphic_eq_rounded,
-                                    color: Colors.black,
-                                    size: 12,
-                                  ),
-                                ),
-                            ],
-                          ),
-                          title: Text(
-                            item.title,
+              ),
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 14, 14),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text(
+                            'UP NEXT',
                             style: TextStyle(
-                              fontSize: 13,
-                              fontWeight: isCurrent
-                                  ? FontWeight.w700
-                                  : FontWeight.w600,
-                              color:
-                                  isCurrent ? AppColors.accent : cs.onSurface,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w700,
+                              letterSpacing: 1.8,
+                              color: AppColors.accent,
                               fontFamily: 'Inter',
                             ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
                           ),
-                          subtitle: Padding(
-                            padding: const EdgeInsets.only(top: 3),
-                            child: Text(
-                              item.artist ?? item.formattedDuration,
-                              style: TextStyle(
-                                fontSize: 11,
-                                color:
-                                    cs.onSurface.withValues(alpha: 0.50),
-                                fontFamily: 'Inter',
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                          const SizedBox(height: 5),
+                          Text(
+                            queue.items.isEmpty
+                                ? 'Nothing queued'
+                                : '${queue.items.length} ${queue.items.length == 1 ? 'track' : 'tracks'} in queue',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w800,
+                              color: cs.onSurface,
+                              fontFamily: 'Inter',
+                              letterSpacing: -0.2,
                             ),
                           ),
-                          trailing: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              if (isCurrent)
-                                const Padding(
-                                  padding: EdgeInsets.only(right: 10),
-                                  child: Text(
-                                    'PLAYING',
-                                    style: TextStyle(
-                                      fontSize: 8,
-                                      letterSpacing: 1.1,
-                                      fontWeight: FontWeight.w800,
-                                      color: AppColors.accent,
-                                      fontFamily: 'Inter',
-                                    ),
-                                  ),
-                                ),
-                              IconButton(
-                                tooltip: 'Remove',
-                                visualDensity: VisualDensity.compact,
-                                icon: Icon(
-                                  Icons.close_rounded,
-                                  color:
-                                      cs.onSurface.withValues(alpha: 0.42),
-                                  size: 19,
-                                ),
-                                onPressed: () {
-                                  HapticFeedback.lightImpact();
-                                  ref.read(queueProvider.notifier).removeAt(i);
-                                },
-                              ),
-                              Icon(
-                                Icons.drag_handle_rounded,
-                                color: cs.onSurface.withValues(alpha: 0.28),
-                                size: 18,
-                              ),
-                            ],
+                        ],
+                      ),
+                    ),
+                    _HeaderAction(
+                      icon: Icons.shuffle_rounded,
+                      active: queue.shuffle,
+                      tooltip: 'Shuffle',
+                      onTap: () {
+                        HapticFeedback.selectionClick();
+                        ref.read(queueProvider.notifier).toggleShuffle();
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    _HeaderAction(
+                      icon: Icons.delete_sweep_outlined,
+                      tooltip: 'Clear queue',
+                      onTap: queue.items.isEmpty
+                          ? null
+                          : () {
+                              HapticFeedback.mediumImpact();
+                              ref.read(queueProvider.notifier).clear();
+                            },
+                    ),
+                  ],
+                ),
+              ),
+              Divider(height: 1, color: AppColors.borderOf(context)),
+              Expanded(
+                child: queue.items.isEmpty
+                    ? _EmptyQueue(colorScheme: cs)
+                    : ReorderableListView.builder(
+                        padding: EdgeInsets.fromLTRB(
+                          12,
+                          10,
+                          12,
+                          MediaQuery.of(context).padding.bottom + 24,
+                        ),
+                        itemCount: queue.items.length,
+                        onReorder: (oldIndex, newIndex) {
+                          HapticFeedback.mediumImpact();
+                          final adjusted =
+                              newIndex > oldIndex ? newIndex - 1 : newIndex;
+                          ref
+                              .read(queueProvider.notifier)
+                              .reorder(oldIndex, adjusted);
+                        },
+                        proxyDecorator: (child, index, animation) => Material(
+                          color: Colors.transparent,
+                          elevation: 0,
+                          child: ScaleTransition(
+                            scale: Tween(begin: 1.0, end: 1.02)
+                                .animate(animation),
+                            child: child,
                           ),
                         ),
-                      );
-                    },
-                  ),
+                        itemBuilder: (context, i) {
+                          final item = queue.items[i];
+                          final isCurrent = i == queue.currentIndex;
+                          return Container(
+                            key: ValueKey('${item.id}-$i'),
+                            margin: const EdgeInsets.only(bottom: 6),
+                            decoration: BoxDecoration(
+                              color: isCurrent
+                                  ? AppColors.accent.withValues(alpha: 0.085)
+                                  : Colors.transparent,
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(
+                                color: isCurrent
+                                    ? AppColors.accent.withValues(alpha: 0.24)
+                                    : Colors.transparent,
+                              ),
+                            ),
+                            child: ListTile(
+                              minTileHeight: 66,
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 10,
+                                vertical: 3,
+                              ),
+                              leading: Stack(
+                                alignment: Alignment.bottomRight,
+                                children: [
+                                  ClipRRect(
+                                    borderRadius: BorderRadius.circular(12),
+                                    child: AlbumArtThumb(
+                                      albumArtPath: item.albumArtPath,
+                                      size: 48,
+                                      borderRadius: 12,
+                                    ),
+                                  ),
+                                  if (isCurrent)
+                                    Container(
+                                      width: 19,
+                                      height: 19,
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.accent,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.graphic_eq_rounded,
+                                        color: Colors.white,
+                                        size: 12,
+                                      ),
+                                    ),
+                                ],
+                              ),
+                              title: Text(
+                                item.title,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: isCurrent
+                                      ? FontWeight.w700
+                                      : FontWeight.w600,
+                                  color: cs.onSurface,
+                                  fontFamily: 'Inter',
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              subtitle: Padding(
+                                padding: const EdgeInsets.only(top: 3),
+                                child: Text(
+                                  item.artist ?? item.formattedDuration,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color:
+                                        cs.onSurface.withValues(alpha: 0.50),
+                                    fontFamily: 'Inter',
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (isCurrent)
+                                    const Padding(
+                                      padding: EdgeInsets.only(right: 10),
+                                      child: Text(
+                                        'PLAYING',
+                                        style: TextStyle(
+                                          fontSize: 8,
+                                          letterSpacing: 1.1,
+                                          fontWeight: FontWeight.w800,
+                                          color: AppColors.accent,
+                                          fontFamily: 'Inter',
+                                        ),
+                                      ),
+                                    ),
+                                  IconButton(
+                                    tooltip: 'Remove',
+                                    visualDensity: VisualDensity.compact,
+                                    icon: Icon(
+                                      Icons.close_rounded,
+                                      color:
+                                          cs.onSurface.withValues(alpha: 0.42),
+                                      size: 19,
+                                    ),
+                                    onPressed: () {
+                                      HapticFeedback.lightImpact();
+                                      ref
+                                          .read(queueProvider.notifier)
+                                          .removeAt(i);
+                                    },
+                                  ),
+                                  Icon(
+                                    Icons.drag_handle_rounded,
+                                    color: cs.onSurface.withValues(alpha: 0.28),
+                                    size: 18,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
     );
   }
