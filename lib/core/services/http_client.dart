@@ -17,6 +17,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 
+import '../config/environment.dart';
 import 'firebase_platform_service.dart';
 
 class AppHttpClient {
@@ -133,7 +134,16 @@ class _OtyaProtectedClient extends http.BaseClient {
   ];
 
   static bool _shouldAttest(Uri uri) {
-    if (uri.scheme != 'https') return false;
+    // Never send an App Check token to an arbitrary HTTPS host that happens to
+    // use one of Otya's protected path names. The shared HTTP client is exposed
+    // to the rest of the app, so origin pinning is the final credential guard.
+    final workerUri = Uri.tryParse(Environment.workerUrl);
+    if (workerUri == null || workerUri.scheme != 'https') return false;
+    if (uri.scheme != workerUri.scheme ||
+        uri.host.toLowerCase() != workerUri.host.toLowerCase() ||
+        uri.port != workerUri.port) {
+      return false;
+    }
     return _protectedPrefixes.any(uri.path.startsWith);
   }
 
