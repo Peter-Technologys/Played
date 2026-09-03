@@ -127,6 +127,16 @@ jobs:
             exit 1
           }
 
+          if [ "${{ github.event_name }}" = "push" ]; then
+            git fetch origin refs/heads/main:refs/remotes/origin/main
+            HEAD_SHA="$(git rev-parse HEAD)"
+            MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+            test "$HEAD_SHA" = "$MAIN_SHA" || {
+              echo "ERROR: tag-triggered releases must point to current main; tag=$HEAD_SHA main=$MAIN_SHA"
+              exit 1
+            }
+          fi
+
           APP_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' pubspec.yaml)"
           test -n "$APP_VERSION" || {
             echo "ERROR: pubspec.yaml version is missing"
