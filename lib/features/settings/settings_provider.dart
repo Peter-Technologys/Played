@@ -29,7 +29,7 @@ class AppSettings {
   final int maxConcurrentDownloads;
 
   const AppSettings({
-    this.themeMode = AppThemeMode.system,
+    this.themeMode = AppThemeMode.dark,
     this.autoResume = true,
     this.defaultBatterySaver = false,
     this.shuffle = false,
@@ -118,7 +118,7 @@ class AppSettings {
 
   static Future<AppSettings> load() async {
     final p = await _getPrefs();
-    final themeIndex = (p.getInt(_kTheme) ?? AppThemeMode.system.index)
+    final themeIndex = (p.getInt(_kTheme) ?? AppThemeMode.dark.index)
         .clamp(0, AppThemeMode.values.length - 1);
     return AppSettings(
       themeMode: AppThemeMode.values[themeIndex],
