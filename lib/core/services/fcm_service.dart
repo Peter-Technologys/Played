@@ -87,6 +87,7 @@ class FcmService {
 
       final messaging = FirebaseMessaging.instance;
       await messaging.setAutoInitEnabled(true);
+      await _ensureNotificationPermission(messaging);
 
       if (!_listenersAttached) {
         FirebaseMessaging.onBackgroundMessage(otyaFirebaseBackgroundHandler);
@@ -131,6 +132,24 @@ class FcmService {
     } catch (e, st) {
       debugPrint('[FCM] init error (non-fatal): $e\n$st');
     }
+  }
+
+  Future<void> _ensureNotificationPermission(
+    FirebaseMessaging messaging,
+  ) async {
+    final settings = await messaging.getNotificationSettings();
+    if (settings.authorizationStatus != AuthorizationStatus.notDetermined) {
+      return;
+    }
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      announcement: false,
+      carPlay: false,
+      criticalAlert: false,
+      provisional: false,
+    );
   }
 
   Future<void> syncRegistration() async {
@@ -266,7 +285,7 @@ class FcmService {
     }
 
     final uri = Uri.tryParse(rawUrl);
-    if (uri == null || !{'https', 'http'}.contains(uri.scheme)) return;
+    if (uri == null || !_isOfficialHttpsUri(uri)) return;
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -274,5 +293,12 @@ class FcmService {
     } catch (e) {
       debugPrint('[FCM] notification URL open failed: $e');
     }
+  }
+
+  bool _isOfficialHttpsUri(Uri uri) {
+    if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) return false;
+    final host = uri.host.toLowerCase();
+    return host == 'petersmartlink.com' ||
+        host.endsWith('.petersmartlink.com');
   }
 }

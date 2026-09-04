@@ -23,8 +23,56 @@ Future<void> initSharedNotificationsPlugin() async {
     const InitializationSettings(android: androidSettings),
     onDidReceiveNotificationResponse: sharedNotificationRouter,
   );
+  final android = sharedNotificationsPlugin
+      .resolvePlatformSpecificImplementation<
+          AndroidFlutterLocalNotificationsPlugin>();
+  if (android != null) {
+    for (final channel in _androidChannels) {
+      await android.createNotificationChannel(channel);
+    }
+  }
   _sharedPluginInitialized = true;
+
+  final launch = await sharedNotificationsPlugin
+      .getNotificationAppLaunchDetails();
+  final response = launch?.notificationResponse;
+  if (launch?.didNotificationLaunchApp == true && response != null) {
+    sharedNotificationRouter(response);
+  }
 }
+
+const _androidChannels = <AndroidNotificationChannel>[
+  AndroidNotificationChannel(
+    'otya_updates',
+    'Otya — Updates',
+    description: 'Important Otya product and security updates',
+    importance: Importance.high,
+  ),
+  AndroidNotificationChannel(
+    'otya_announcements',
+    'Otya — Announcements',
+    description: 'Useful Otya announcements and account notices',
+    importance: Importance.defaultImportance,
+  ),
+  AndroidNotificationChannel(
+    'com.otyaplayer.app.tools.progress',
+    'Otya Tools — Progress',
+    description: 'Silent progress for active media tools',
+    importance: Importance.low,
+  ),
+  AndroidNotificationChannel(
+    'com.otyaplayer.app.tools.complete',
+    'Otya Tools — Complete',
+    description: 'Alerts when an Otya media task finishes',
+    importance: Importance.high,
+  ),
+  AndroidNotificationChannel(
+    'com.otyaplayer.app.tools.error',
+    'Otya Tools — Errors',
+    description: 'Alerts when an Otya media task needs attention',
+    importance: Importance.high,
+  ),
+];
 
 void sharedNotificationRouter(NotificationResponse response) {
   final id = response.id ?? -1;
