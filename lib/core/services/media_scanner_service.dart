@@ -236,10 +236,13 @@ class MediaScannerService {
   Future<List<MediaItem>> scanAll() async {
     final hasPermission = await PermissionHelper.hasMediaPermissions();
     if (!hasPermission) {
-      final granted = await PermissionHelper.requestMediaPermissions();
-      if (!granted) {
-        throw Exception('permission: Storage permission denied. Grant access to scan your media library.');
-      }
+      // Scans run from provider initialization, lifecycle refreshes and Android
+      // MediaStore observers. Those background paths must never open a system
+      // permission dialog. User-facing screens own the contextual permission
+      // request and retry the scan after access is granted.
+      throw Exception(
+        'permission: Media access is required to scan the local library.',
+      );
     }
 
     final storeItems = await _queryMediaStore();
