@@ -10,6 +10,7 @@ import '../../../../core/database/otya_database.dart';
 import '../../../../core/models/media_item.dart';
 import '../../../../core/providers/duplicates_provider.dart';
 import '../../../../core/services/duplicate_detector_service.dart';
+import '../../../../core/services/media_scanner_service.dart';
 import '../../data/media_repository.dart';
 
 /// Live media change event stream from Android MediaStore.
@@ -113,6 +114,17 @@ class MediaLibraryNotifier extends AsyncNotifier<List<MediaItem>> {
       unawaited(_detectDuplicates(fresh));
     } catch (error, stack) {
       debugPrint('[MediaLibrary] Background refresh failed: $error');
+
+      // Permission loss is authoritative. Keeping cached/history items visible
+      // after Android revokes media access makes them look playable even though
+      // the next file open can fail. Surface the existing recovery UI instead.
+      if (error is MediaPermissionRequiredException) {
+        try {
+          state = AsyncError(error, stack);
+        } catch (_) {}
+        return;
+      }
+
       final currentItems = state.valueOrNull ?? const <MediaItem>[];
       if (currentItems.isEmpty) {
         try {
