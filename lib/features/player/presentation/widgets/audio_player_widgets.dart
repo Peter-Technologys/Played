@@ -327,12 +327,18 @@ class _ToggleIconBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
+    final tooltip = icon == Icons.shuffle_rounded
+        ? (active ? 'Shuffle on' : 'Shuffle off')
+        : (active ? 'Option on' : 'Option off');
+    return IconButton(
+      tooltip: tooltip,
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+      padding: EdgeInsets.zero,
+      onPressed: () {
         HapticFeedback.selectionClick();
         onTap();
       },
-      child: Icon(
+      icon: Icon(
         icon,
         color: active ? AppColors.accent : AppColors.textSecondary,
         size: 24,
@@ -352,12 +358,20 @@ class _RepeatBtn extends StatelessWidget {
     final icon = repeat == RepeatState.one
         ? Icons.repeat_one_rounded
         : Icons.repeat_rounded;
-    return GestureDetector(
-      onTap: () {
+    final tooltip = switch (repeat) {
+      RepeatState.off => 'Repeat off',
+      RepeatState.one => 'Repeat one',
+      RepeatState.all => 'Repeat all',
+    };
+    return IconButton(
+      tooltip: tooltip,
+      constraints: const BoxConstraints.tightFor(width: 48, height: 48),
+      padding: EdgeInsets.zero,
+      onPressed: () {
         HapticFeedback.selectionClick();
         onTap();
       },
-      child: Icon(
+      icon: Icon(
         icon,
         color: repeat == RepeatState.off
             ? AppColors.textSecondary
@@ -381,34 +395,50 @@ class _SecondaryBtn extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: AppColors.surfaceElevated.withValues(alpha: 0.88),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: Colors.white.withValues(alpha: 0.07),
-              ),
+    return Tooltip(
+      message: label,
+      child: Semantics(
+        button: true,
+        label: label,
+        excludeSemantics: true,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.selectionClick();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(16),
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minWidth: 56, minHeight: 64),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: AppColors.surfaceElevated.withValues(alpha: 0.88),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.07),
+                    ),
+                  ),
+                  child: Icon(icon, color: AppColors.textSecondary, size: 20),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Inter',
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ),
-            child: Icon(icon, color: AppColors.textSecondary, size: 20),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: const TextStyle(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-              fontFamily: 'Inter',
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }
