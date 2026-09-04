@@ -1,0 +1,89 @@
+name: Sync OTYA brand assets to Cloudflare R2
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'assets/branding/**'
+      - '.github/workflows/sync-brand-assets.yml'
+  workflow_dispatch:
+
+concurrency:
+  group: sync-otya-brand-assets
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  sync:
+    name: Sync approved OTYA branding
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: production
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Validate Cloudflare R2 configuration
+        shell: bash
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          for name in R2_ACCESS_KEY_ID R2_SECRET_ACCESS_KEY R2_ENDPOINT R2_BUCKET; do
+            test -n "${!name:-}" || { echo "ERROR: Missing $name"; exit 1; }
+          done
+          [[ "$R2_ENDPOINT" == https://* ]] || { echo "ERROR: R2_ENDPOINT must use HTTPS"; exit 1; }
+
+      - name: Install AWS CLI
+        run: pip install awscli --quiet
+
+      - name: Upload and verify OTYA app icon
+        shell: bash
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: auto
+          R2_ENDPOINT: ${{ vars.R2_ENDPOINT }}
+          R2_BUCKET: ${{ vars.R2_BUCKET }}
+        run: |
+          set -euo pipefail
+          SRC='assets/branding/otya_app_icon.webp'
+          STABLE_KEY='assets/branding/otya-app-icon.webp'
+          test -s "$SRC" || { echo "ERROR: Missing approved OTYA icon"; exit 1; }
+
+          SHA256="$(sha256sum "$SRC" | awk '{print $1}')"
+          VERSIONED_KEY="assets/branding/otya-app-icon-${SHA256:0:12}.webp"
+          LOCAL_SIZE="$(stat -c%s "$SRC")"
+
+          aws s3 cp "$SRC" "s3://${R2_BUCKET}/${VERSIONED_KEY}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type image/webp \
+            --cache-control 'public, max-age=31536000, immutable'
+
+          aws s3 cp "$SRC" "s3://${R2_BUCKET}/${STABLE_KEY}" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type image/webp \
+            --cache-control 'public, max-age=300, must-revalidate'
+
+          REMOTE_SIZE="$(aws s3api head-object \
+            --bucket "$R2_BUCKET" \
+            --key "$STABLE_KEY" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --query ContentLength \
+            --output text)"
+
+          test "$REMOTE_SIZE" = "$LOCAL_SIZE" || {
+            echo "ERROR: R2 verification failed: local=$LOCAL_SIZE remote=$REMOTE_SIZE"
+            exit 1
+          }
+
+          echo "Uploaded $STABLE_KEY"
+          echo "Uploaded $VERSIONED_KEY"
+          echo "SHA256=$SHA256"
