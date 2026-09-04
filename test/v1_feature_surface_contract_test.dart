@@ -104,9 +104,13 @@ void main() {
   });
 
   test('Music keeps queue, favorites, repeat, lyrics, EQ, sleep and Drive Mode', () {
-    final player = File(
+    final screen = File(
       'lib/features/player/presentation/audio_player_screen.dart',
     ).readAsStringSync();
+    final widgets = File(
+      'lib/features/player/presentation/widgets/audio_player_widgets.dart',
+    ).readAsStringSync();
+    final player = '$screen\n$widgets';
 
     for (final marker in [
       'toggleFavorite()',
