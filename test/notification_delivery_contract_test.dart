@@ -15,13 +15,19 @@ void main() {
     expect(source, contains('didNotificationLaunchApp'));
   });
 
-  test('existing installs receive the Android notification permission flow', () {
-    final source =
-        File('lib/core/services/fcm_service.dart').readAsStringSync();
+  test('ordinary notification permission remains user-driven', () {
+    final fcm = File('lib/core/services/fcm_service.dart').readAsStringSync();
+    final settings = File(
+      'lib/features/settings/presentation/settings_detail_screen.dart',
+    ).readAsStringSync();
 
-    expect(source, contains('getNotificationSettings'));
-    expect(source, contains('AuthorizationStatus.notDetermined'));
-    expect(source, contains('messaging.requestPermission'));
+    expect(fcm, isNot(contains('messaging.requestPermission')));
+    expect(fcm, isNot(contains('_ensureNotificationPermission')));
+    expect(settings, contains("title: 'Notification permission'"));
+    expect(
+      settings,
+      contains('NotificationService.instance.requestPermission()'),
+    );
   });
 
   test('remote notification links are limited to official HTTPS hosts', () {
