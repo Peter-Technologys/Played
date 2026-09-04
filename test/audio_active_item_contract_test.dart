@@ -24,7 +24,7 @@ void main() {
 
   test('album art resolution ignores stale async completions', () {
     final player = File(
-      'lib/features/player/presentation/audio_player_screen.dart',
+      'lib/features/player/presentation/widgets/audio_player_widgets.dart',
     ).readAsStringSync();
 
     expect(player, contains('int _resolveGeneration = 0;'));
