@@ -9,6 +9,15 @@ import '../models/media_item.dart';
 import '../permissions/permission_helper.dart';
 import 'new_media_tracker.dart';
 
+/// Signals that Android media access is unavailable without opening any UI.
+/// User-facing Music/Video surfaces own the contextual permission request.
+class MediaPermissionRequiredException implements Exception {
+  const MediaPermissionRequiredException();
+
+  @override
+  String toString() => 'Media access is required to scan the local library.';
+}
+
 Future<List<MediaItem>> _filesystemScanIsolate(List<String> roots) async {
   final results = <MediaItem>[];
   for (final root in roots) {
@@ -240,9 +249,7 @@ class MediaScannerService {
       // MediaStore observers. Those background paths must never open a system
       // permission dialog. User-facing screens own the contextual permission
       // request and retry the scan after access is granted.
-      throw Exception(
-        'permission: Media access is required to scan the local library.',
-      );
+      throw const MediaPermissionRequiredException();
     }
 
     final storeItems = await _queryMediaStore();
