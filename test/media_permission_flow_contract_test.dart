@@ -9,10 +9,8 @@ void main() {
 
     expect(scanner, contains('PermissionHelper.hasMediaPermissions()'));
     expect(scanner, isNot(contains('PermissionHelper.requestMediaPermissions()')));
-    expect(
-      scanner,
-      contains('permission: Media access is required to scan the local library.'),
-    );
+    expect(scanner, contains('class MediaPermissionRequiredException'));
+    expect(scanner, contains('throw const MediaPermissionRequiredException();'));
   });
 
   test('permission recovery remains explicit and user-driven', () {
@@ -35,7 +33,7 @@ void main() {
 
     expect(
       provider,
-      contains("error.toString().toLowerCase().contains('permission')"),
+      contains('if (error is MediaPermissionRequiredException)'),
     );
     expect(provider, contains('state = AsyncError(error, stack);'));
     expect(
