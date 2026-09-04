@@ -19,9 +19,28 @@ void main() {
     final screen = File('lib/shared/widgets/permission_denied_screen.dart')
         .readAsStringSync();
 
-    expect(screen, contains('PermissionHelper.showMediaPermissionRationale(context)'));
+    expect(
+      screen,
+      contains('PermissionHelper.showMediaPermissionRationale(context)'),
+    );
     expect(screen, contains("'Allow media access'"));
     expect(screen, contains('openAppSettings()'));
     expect(screen, contains('if (_requesting) return;'));
+  });
+
+  test('revoked media access is not hidden behind stale library cache', () {
+    final provider = File(
+      'lib/features/my_space/presentation/providers/my_space_provider.dart',
+    ).readAsStringSync();
+
+    expect(
+      provider,
+      contains("error.toString().toLowerCase().contains('permission')"),
+    );
+    expect(provider, contains('state = AsyncError(error, stack);'));
+    expect(
+      provider,
+      contains('Permission loss is authoritative.'),
+    );
   });
 }
