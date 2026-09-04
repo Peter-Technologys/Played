@@ -80,6 +80,32 @@ class AudioSessionService {
     }
   }
 
+  /// Claims platform audio focus immediately before user-initiated playback.
+  ///
+  /// MediaKit can start audio without this explicit handshake on many devices,
+  /// but doing so is unreliable after calls, Bluetooth route changes, or after
+  /// Android has removed and recreated the media notification.
+  Future<bool> activate() async {
+    final session = _session ?? await AudioSession.instance;
+    _session = session;
+    try {
+      return await session.setActive(true);
+    } catch (error) {
+      debugPrint('[AudioSession] focus activation failed: $error');
+      return false;
+    }
+  }
+
+  Future<void> deactivate() async {
+    final session = _session;
+    if (session == null) return;
+    try {
+      await session.setActive(false);
+    } catch (error) {
+      debugPrint('[AudioSession] focus release failed: $error');
+    }
+  }
+
   void _handleInterruption(AudioInterruptionEvent event) {
     if (!_pauseDuringCalls) return;
     final player = PlaybackCoordinator.instance.activePlayer;
