@@ -91,12 +91,16 @@ void main() {
     final receiver = File(
       'lib/features/transfer/data/media_receiver.dart',
     ).readAsStringSync();
+    final policy = File(
+      'lib/features/transfer/data/transfer_security_policy.dart',
+    ).readAsStringSync();
     final screen = File(
       'lib/features/transfer/presentation/transfer_screen.dart',
     ).readAsStringSync();
 
-    expect(receiver, contains("uri.path != '/media'"));
-    expect(receiver, contains(r"RegExp(r'^[a-f0-9]{64}$')"));
+    expect(receiver, contains('isAllowedTransferUri(uri)'));
+    expect(policy, contains("uri.path != '/media'"));
+    expect(policy, contains("RegExp(r'^[a-f0-9]{64}\$')"));
     expect(receiver, contains('FileMode.append'));
     expect(receiver, contains('.otya-transfer'));
     expect(receiver, contains('TransferCancelledException'));
