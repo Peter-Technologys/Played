@@ -1,12 +1,37 @@
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
-import '../../app/theme/app_colors.dart';
 
-/// Recovery UI shown when Android media permission is denied.
-class PermissionDeniedScreen extends StatelessWidget {
+import '../../app/theme/app_colors.dart';
+import '../../core/permissions/permission_helper.dart';
+
+/// Recovery UI shown when Android media permission is unavailable.
+///
+/// The scanner itself never requests permission because it also runs from
+/// background refreshes. This surface keeps the request contextual and
+/// user-driven.
+class PermissionDeniedScreen extends StatefulWidget {
   final VoidCallback? onRetry;
 
   const PermissionDeniedScreen({super.key, this.onRetry});
+
+  @override
+  State<PermissionDeniedScreen> createState() => _PermissionDeniedScreenState();
+}
+
+class _PermissionDeniedScreenState extends State<PermissionDeniedScreen> {
+  bool _requesting = false;
+
+  Future<void> _requestMediaAccess() async {
+    if (_requesting) return;
+    setState(() => _requesting = true);
+    try {
+      final granted = await PermissionHelper.showMediaPermissionRationale(context);
+      if (!mounted || !granted) return;
+      widget.onRetry?.call();
+    } finally {
+      if (mounted) setState(() => _requesting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -38,7 +63,7 @@ class PermissionDeniedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 22),
               const Text(
-                'Allow media access',
+                'Show your media library',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 21,
@@ -50,7 +75,7 @@ class PermissionDeniedScreen extends StatelessWidget {
               ),
               const SizedBox(height: 10),
               const Text(
-                'OTYA needs Android media permission to discover songs and videos on this phone. Your local files are not uploaded just to build your library.',
+                'Otya needs Android media access to discover songs and videos on this phone. You can allow only the media categories you want, and local files are not uploaded just to build your library.',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   fontSize: 13,
@@ -64,13 +89,26 @@ class PermissionDeniedScreen extends StatelessWidget {
                 width: double.infinity,
                 height: 52,
                 child: FilledButton.icon(
-                  onPressed: () async {
-                    await openAppSettings();
-                    onRetry?.call();
-                  },
-                  icon: const Icon(Icons.settings_rounded, size: 18),
-                  label: const Text('Open app settings'),
+                  onPressed: _requesting ? null : _requestMediaAccess,
+                  icon: _requesting
+                      ? const SizedBox.square(
+                          dimension: 18,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Icons.folder_open_rounded, size: 18),
+                  label: Text(_requesting ? 'Requesting access…' : 'Allow media access'),
                 ),
+              ),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _requesting
+                    ? null
+                    : () async {
+                        await openAppSettings();
+                        if (mounted) widget.onRetry?.call();
+                      },
+                icon: const Icon(Icons.settings_rounded, size: 18),
+                label: const Text('Open app settings'),
               ),
             ],
           ),
