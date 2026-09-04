@@ -19,13 +19,18 @@ void main() {
   });
 
   test('OTYA Transfer rejects arbitrary cleartext internet URLs', () {
-    final source = File(
+    final policy = File(
+      'lib/features/transfer/data/transfer_security_policy.dart',
+    ).readAsStringSync();
+    final receiver = File(
       'lib/features/transfer/data/media_receiver.dart',
     ).readAsStringSync();
-    expect(source, contains("uri.scheme != 'http'"));
-    expect(source, contains("uri.path != '/media'"));
-    expect(source, contains("RegExp(r'^[a-f0-9]{64}\$')"));
-    expect(source, contains('(a == 192 && b == 168)'));
+
+    expect(receiver, contains('isAllowedTransferUri(uri)'));
+    expect(policy, contains("uri.scheme != 'http'"));
+    expect(policy, contains("uri.path != '/media'"));
+    expect(policy, contains("RegExp(r'^[a-f0-9]{64}\$')"));
+    expect(policy, contains('(a == 192 && b == 168)'));
   });
 
   test('OTYA WebView and updater are confined to official HTTPS origins', () {

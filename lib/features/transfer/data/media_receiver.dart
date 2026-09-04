@@ -2,6 +2,8 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 
+import 'transfer_security_policy.dart';
+
 typedef ProgressCallback = void Function(int bytesDownloaded, int totalBytes);
 
 /// MediaReceiver — restricted local HTTP downloader for Otya Transfer.
@@ -26,7 +28,7 @@ class MediaReceiver {
   }) async {
     _cancelled = false;
     final uri = Uri.parse(url);
-    if (!_isAllowedTransferUri(uri)) {
+    if (!isAllowedTransferUri(uri)) {
       throw const FormatException(
         'Otya Transfer only accepts authenticated private local-network links.',
       );
@@ -202,32 +204,6 @@ class MediaReceiver {
     final match = RegExp(r'^bytes \*/(\d+)$').firstMatch(header.trim());
     if (match == null) return null;
     return int.tryParse(match.group(1)!);
-  }
-
-  bool _isAllowedTransferUri(Uri uri) {
-    if (uri.scheme != 'http' ||
-        uri.path != '/media' ||
-        uri.userInfo.isNotEmpty ||
-        uri.fragment.isNotEmpty ||
-        uri.port <= 0 ||
-        uri.port > 65535) {
-      return false;
-    }
-    final token = uri.queryParameters['t'] ?? '';
-    if (!RegExp(r'^[a-f0-9]{64}$').hasMatch(token)) return false;
-
-    final parts = uri.host.split('.');
-    if (parts.length != 4) return false;
-    final octets = parts.map(int.tryParse).toList(growable: false);
-    if (octets.any((value) => value == null || value < 0 || value > 255)) {
-      return false;
-    }
-    final a = octets[0]!;
-    final b = octets[1]!;
-    return a == 10 ||
-        a == 127 ||
-        (a == 172 && b >= 16 && b <= 31) ||
-        (a == 192 && b == 168);
   }
 
   String _fingerprint(Uri uri) {
