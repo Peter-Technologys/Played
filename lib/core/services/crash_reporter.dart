@@ -4,6 +4,8 @@
 // when offline, and uploads them to /api/crash-report when online.
 //
 // Fire-and-forget safe: all errors are caught and logged, never thrown.
+// Repeating framework errors are deduplicated so one bad frame cannot flood
+// telemetry, email alerts, D1, or the network with hundreds of identical rows.
 
 import 'dart:async';
 import 'dart:convert';
@@ -24,12 +26,23 @@ class CrashReporter {
 
   static const String _kPendingCrashes = 'otya_pending_crashes';
   static const int _maxStoredCrashes = 20;
+  static const int _maxReportsPerSession = 30;
+  static const Duration _duplicateWindow = Duration(minutes: 2);
+  static const Duration _fingerprintRetention = Duration(minutes: 10);
+
+  final Map<String, DateTime> _recentFingerprints = <String, DateTime>{};
+  final Set<String> _uploadsInFlight = <String>{};
+  int _sessionReportCount = 0;
 
   Future<void> init() async {
     debugPrint('[CrashReporter] Initialising error handlers…');
     final previousFlutterHandler = FlutterError.onError;
     FlutterError.onError = (FlutterErrorDetails details) {
-      recordCrash('FlutterError', details.summary.toString(), details.stack).ignore();
+      recordCrash(
+        'FlutterError',
+        details.summary.toString(),
+        details.stack,
+      ).ignore();
       if (previousFlutterHandler != null) {
         previousFlutterHandler(details);
       } else {
@@ -56,6 +69,25 @@ class CrashReporter {
     StackTrace? stack,
   ) async {
     try {
+      final now = DateTime.now();
+      final fingerprint = _fingerprint(errorType, description, stack);
+      _pruneFingerprints(now);
+
+      final previous = _recentFingerprints[fingerprint];
+      if (previous != null && now.difference(previous) < _duplicateWindow) {
+        debugPrint('[CrashReporter] Suppressed duplicate $errorType.');
+        return;
+      }
+      if (_sessionReportCount >= _maxReportsPerSession) {
+        debugPrint('[CrashReporter] Session telemetry cap reached.');
+        return;
+      }
+
+      // Reserve the fingerprint before awaiting platform services. Multiple
+      // framework callbacks can arrive in the same frame.
+      _recentFingerprints[fingerprint] = now;
+      _sessionReportCount += 1;
+
       final deviceId = await DeviceService.instance.getDeviceId();
       final packageInfo = await PackageInfo.fromPlatform();
       final crash = <String, dynamic>{
@@ -71,7 +103,7 @@ class CrashReporter {
                 ? stack.toString().substring(0, 1000)
                 : stack.toString())
             : '',
-        'timestamp': DateTime.now().toIso8601String(),
+        'timestamp': now.toIso8601String(),
       };
       await _appendToPending(crash);
       unawaited(_uploadSingle(crash));
@@ -86,6 +118,42 @@ class CrashReporter {
 
   void report(Object error, StackTrace stack) {
     recordCrash(error.runtimeType.toString(), error.toString(), stack).ignore();
+  }
+
+  void _pruneFingerprints(DateTime now) {
+    _recentFingerprints.removeWhere(
+      (_, seenAt) => now.difference(seenAt) >= _fingerprintRetention,
+    );
+  }
+
+  String _fingerprint(
+    String errorType,
+    String description,
+    StackTrace? stack,
+  ) {
+    String normalize(String value) => value
+        .replaceAll(RegExp(r'0x[0-9a-fA-F]+'), '<addr>')
+        .replaceAll(RegExp(r'\b\d{5,}\b'), '<n>')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+
+    final stackLines = stack
+            ?.toString()
+            .split('\n')
+            .where((line) => line.trim().isNotEmpty)
+            .take(3)
+            .join(' ') ??
+        '';
+    return '${normalize(errorType)}|${normalize(description)}|${normalize(stackLines)}';
+  }
+
+  String _fingerprintFromCrash(Map<String, dynamic> crash) {
+    final stackText = (crash['stack_trace'] as String?) ?? '';
+    return _fingerprint(
+      (crash['error_type'] as String?) ?? 'Unknown',
+      (crash['description'] as String?) ?? '',
+      stackText.isEmpty ? null : StackTrace.fromString(stackText),
+    );
   }
 
   Future<void> _appendToPending(Map<String, dynamic> crash) async {
@@ -123,6 +191,9 @@ class CrashReporter {
   }
 
   Future<void> _uploadSingle(Map<String, dynamic> crash) async {
+    final uploadKey = (crash['timestamp'] as String?) ?? jsonEncode(crash);
+    if (!_uploadsInFlight.add(uploadKey)) return;
+
     try {
       const path = '/api/crash-report';
       final deviceId = (crash['device_id'] as String?) ?? '';
@@ -149,6 +220,8 @@ class CrashReporter {
       }
     } catch (e) {
       debugPrint('[CrashReporter] _uploadSingle error (non-fatal): $e');
+    } finally {
+      _uploadsInFlight.remove(uploadKey);
     }
   }
 
@@ -156,7 +229,14 @@ class CrashReporter {
     try {
       final prefs = await SharedPreferences.getInstance();
       final pending = _loadPendingFromPrefs(prefs);
+      final seen = <String>{};
       for (final crash in pending) {
+        final fingerprint = _fingerprintFromCrash(crash);
+        if (!seen.add(fingerprint)) {
+          // Keep one representative report, discard duplicate offline copies.
+          await _removeFromPending(crash);
+          continue;
+        }
         await _uploadSingle(crash);
         await Future<void>.delayed(const Duration(milliseconds: 500));
       }

@@ -32,6 +32,18 @@ void main() {
     expectNotContains(main, 'PlatformDispatcher.instance.onError =');
   });
 
+  test('crash reporting suppresses duplicate telemetry storms', () {
+    final reporter =
+        File('lib/core/services/crash_reporter.dart').readAsStringSync();
+
+    expect(reporter, contains('_duplicateWindow'));
+    expect(reporter, contains('_maxReportsPerSession'));
+    expect(reporter, contains('_recentFingerprints'));
+    expect(reporter, contains('_uploadsInFlight'));
+    expect(reporter, contains('Suppressed duplicate'));
+    expect(reporter, contains('if (!_uploadsInFlight.add(uploadKey)) return;'));
+  });
+
   test('update checks do not pretend disabled or failed checks mean current', () {
     final updates = File('lib/core/services/update_service.dart').readAsStringSync();
 
