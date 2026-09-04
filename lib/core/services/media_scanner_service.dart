@@ -15,7 +15,8 @@ class MediaPermissionRequiredException implements Exception {
   const MediaPermissionRequiredException();
 
   @override
-  String toString() => 'Media access is required to scan the local library.';
+  String toString() =>
+      'permission: Media access is required to scan the local library.';
 }
 
 Future<List<MediaItem>> _filesystemScanIsolate(List<String> roots) async {
