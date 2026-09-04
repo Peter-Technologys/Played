@@ -138,23 +138,30 @@ base = (
     + os.environ['CF_ACCOUNT_ID']
     + '/workflows/otya-release/instances/'
     + urllib.parse.quote(os.environ['WORKFLOW_ID'], safe='')
-    + '?simple=true'
+    + '?simple=false&order=asc'
 )
 headers = {'Authorization': 'Bearer ' + os.environ['CF_API_TOKEN']}
 terminal_fail = {'errored', 'terminated', 'unknown'}
-for attempt in range(60):
+poll_interval = 5
+try:
+    timeout_seconds = max(30, int(os.environ.get('WORKFLOW_TIMEOUT_SECONDS', '900')))
+except ValueError:
+    sys.stderr.write('ERROR: WORKFLOW_TIMEOUT_SECONDS must be an integer\n')
+    sys.exit(1)
+attempts = max(1, (timeout_seconds + poll_interval - 1) // poll_interval)
+for attempt in range(attempts):
     req = urllib.request.Request(base, headers=headers)
     try:
         with urllib.request.urlopen(req, timeout=20) as resp:
             data = json.load(resp)
     except Exception as e:
-        if attempt >= 59:
+        if attempt >= attempts - 1:
             sys.stderr.write(f'ERROR: could not read workflow status: {type(e).__name__}\n')
             sys.exit(1)
         time.sleep(5)
         continue
     if data.get('success') is not True:
-        if attempt >= 59:
+        if attempt >= attempts - 1:
             sys.stderr.write('ERROR: Cloudflare rejected the workflow status request\n')
             sys.exit(1)
         time.sleep(5)
@@ -175,10 +182,22 @@ for attempt in range(60):
         sys.exit(0)
     if status in terminal_fail:
         error = workflow.get('error') or {}
-        sys.stderr.write('ERROR: release failed: ' + str(error.get('message') or status) + '\n')
+        message = error.get('message')
+        if not message:
+            for failed_step in reversed(workflow.get('steps') or []):
+                for attempt_info in reversed(failed_step.get('attempts') or []):
+                    step_error = attempt_info.get('error') or {}
+                    if step_error.get('message'):
+                        message = f"{failed_step.get('name', 'workflow step')}: {step_error['message']}"
+                        break
+                if message:
+                    break
+        sys.stderr.write('ERROR: release failed: ' + str(message or status) + '\n')
         sys.exit(1)
-    time.sleep(5)
-sys.stderr.write('ERROR: release did not finish in time\n')
+    time.sleep(poll_interval)
+sys.stderr.write(
+    f"ERROR: release workflow {os.environ['WORKFLOW_ID']} did not finish within {timeout_seconds} seconds\n"
+)
 sys.exit(1)
 PYEOF
 
