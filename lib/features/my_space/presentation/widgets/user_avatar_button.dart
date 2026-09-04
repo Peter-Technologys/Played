@@ -16,7 +16,7 @@ class UserAvatarButton extends ConsumerWidget {
     final isSignedIn = ref.watch(isSignedInProvider);
     final displayName = ref.watch(displayNameProvider);
     final initials = _initials(isSignedIn ? displayName : null);
-    final tooltip = isSignedIn && displayName.trim().isNotEmpty
+    final tooltip = isSignedIn && (displayName?.trim().isNotEmpty ?? false)
         ? 'Open settings for $displayName'
         : 'Open settings';
 
