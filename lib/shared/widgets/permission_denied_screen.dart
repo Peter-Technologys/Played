@@ -103,12 +103,12 @@ class _PermissionDeniedScreenState extends State<PermissionDeniedScreen> {
               TextButton.icon(
                 onPressed: _requesting
                     ? null
-                    : () {
+                    : () async {
                         // Do not retry immediately: openAppSettings returns as
                         // Android opens Settings, before the user can change
                         // anything. Music/Video lifecycle refresh runs when the
                         // user comes back to Otya.
-                        openAppSettings();
+                        await openAppSettings();
                       },
                 icon: const Icon(Icons.settings_rounded, size: 18),
                 label: const Text('Open app settings'),
