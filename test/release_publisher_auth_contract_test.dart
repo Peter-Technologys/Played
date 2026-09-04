@@ -11,6 +11,9 @@ void main() {
     expect(workflow, contains('CF_API_TOKEN: \${{ secrets.CF_API_TOKEN }}'));
     expect(publisher, contains('/workflows/otya-release/instances'));
     expect(publisher, contains("'params': json.dumps(payload"));
+    expect(publisher, contains('?simple=false&order=asc'));
+    expect(publisher, contains("WORKFLOW_TIMEOUT_SECONDS', '900'"));
+    expect(publisher, contains("failed_step.get('attempts')"));
     expect(
       publisher,
       contains("'Authorization': 'Bearer ' + os.environ['CF_API_TOKEN']"),
