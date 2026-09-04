@@ -16,6 +16,7 @@ import '../../../core/services/vault_service.dart';
 import '../../../core/services/speed_memory_service.dart';
 import '../../../core/services/album_art_service.dart';
 import '../../../core/services/audio_handler.dart';
+import '../../../core/services/audio_session_service.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../core/services/media_notification_service.dart';
 import '../../../core/services/new_media_tracker.dart';
@@ -213,6 +214,8 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
       await PlaybackCoordinator.instance.register(_player, 'audio');
       if (!isCurrent()) return false;
+      await AudioSessionService.instance.activate();
+      if (!isCurrent()) return false;
       await _player.play();
       return isCurrent();
     } catch (error) {
@@ -299,12 +302,18 @@ class AudioPlayerNotifier extends StateNotifier<AudioPlayerState> {
 
   bool _loadFavorite(String id) => OtyaDatabase.instance.getFavoriteFlag(id);
 
-  void togglePlay() {
+  Future<void> togglePlay() async {
     final willPlay = !state.isPlaying;
     if (willPlay) {
-      _player.play();
+      // A dismissed notification or system Stop action detaches the handler.
+      // Reattaching here restores lock-screen, Bluetooth and headset controls
+      // before playback resumes without recreating the player.
+      AudioHandlerSingleton.instance.attachPlayer(_player);
+      await PlaybackCoordinator.instance.register(_player, 'audio');
+      await AudioSessionService.instance.activate();
+      await _player.play();
     } else {
-      _player.pause();
+      await _player.pause();
     }
   }
 

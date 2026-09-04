@@ -100,7 +100,8 @@ class FcmService {
 
       // The transport is ready now. Initial-message lookup and token sync are
       // recoverable follow-up work and must not attach duplicate listeners on a
-      // later init attempt.
+      // later init attempt. Ordinary notification consent remains user-driven
+      // from Settings; media-session playback does not need POST_NOTIFICATIONS.
       _initialized = true;
 
       try {
@@ -266,7 +267,7 @@ class FcmService {
     }
 
     final uri = Uri.tryParse(rawUrl);
-    if (uri == null || !{'https', 'http'}.contains(uri.scheme)) return;
+    if (uri == null || !_isOfficialHttpsUri(uri)) return;
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -274,5 +275,12 @@ class FcmService {
     } catch (e) {
       debugPrint('[FCM] notification URL open failed: $e');
     }
+  }
+
+  bool _isOfficialHttpsUri(Uri uri) {
+    if (uri.scheme != 'https' || uri.userInfo.isNotEmpty) return false;
+    final host = uri.host.toLowerCase();
+    return host == 'petersmartlink.com' ||
+        host.endsWith('.petersmartlink.com');
   }
 }

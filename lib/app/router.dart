@@ -586,26 +586,55 @@ class _MainShellState extends ConsumerState<_MainShell> {
             mainAxisSize: MainAxisSize.min,
             children: [
               _miniPlayer(),
-              NavigationBar(
-                selectedIndex: currentIndex,
-                onDestinationSelected: _onTap,
-                destinations: const [
-                  NavigationDestination(
-                    icon: Icon(Icons.video_library_outlined),
-                    selectedIcon: Icon(Icons.video_library_rounded),
-                    label: 'Video',
+              SafeArea(
+                top: false,
+                minimum: const EdgeInsets.fromLTRB(12, 8, 12, 10),
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(28),
+                    border: Border.all(
+                      color: Theme.of(context)
+                          .colorScheme
+                          .outlineVariant
+                          .withValues(alpha: .55),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withValues(
+                          alpha: Theme.of(context).brightness == Brightness.dark
+                              ? .30
+                              : .10,
+                        ),
+                        blurRadius: 28,
+                        offset: const Offset(0, 10),
+                      ),
+                    ],
                   ),
-                  NavigationDestination(
-                    icon: Icon(Icons.library_music_outlined),
-                    selectedIcon: Icon(Icons.library_music_rounded),
-                    label: 'Music',
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(27),
+                    child: NavigationBar(
+                      selectedIndex: currentIndex,
+                      onDestinationSelected: _onTap,
+                      destinations: const [
+                        NavigationDestination(
+                          icon: Icon(Icons.video_library_outlined),
+                          selectedIcon: Icon(Icons.video_library_rounded),
+                          label: 'Video',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.library_music_outlined),
+                          selectedIcon: Icon(Icons.library_music_rounded),
+                          label: 'Music',
+                        ),
+                        NavigationDestination(
+                          icon: Icon(Icons.person_outline_rounded),
+                          selectedIcon: Icon(Icons.person_rounded),
+                          label: 'Me',
+                        ),
+                      ],
+                    ),
                   ),
-                  NavigationDestination(
-                    icon: Icon(Icons.person_outline_rounded),
-                    selectedIcon: Icon(Icons.person_rounded),
-                    label: 'Me',
-                  ),
-                ],
+                ),
               ),
             ],
           ),

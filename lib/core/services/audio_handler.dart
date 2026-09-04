@@ -5,6 +5,7 @@ import 'package:flutter/foundation.dart';
 import 'package:media_kit/media_kit.dart';
 
 import 'media_notification_service.dart';
+import 'audio_session_service.dart';
 
 /// Bridges media_kit's [Player] to Android's MediaSession/foreground service.
 class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
@@ -134,7 +135,11 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   }
 
   @override
-  Future<void> play() async => _player?.play();
+  Future<void> play() async {
+    if (_player == null) return;
+    await AudioSessionService.instance.activate();
+    await _player!.play();
+  }
 
   @override
   Future<void> pause() async => _player?.pause();
@@ -143,6 +148,7 @@ class OtyaAudioHandler extends BaseAudioHandler with SeekHandler {
   Future<void> stop() async {
     await _player?.pause();
     detachPlayer();
+    await AudioSessionService.instance.deactivate();
     await super.stop();
   }
 

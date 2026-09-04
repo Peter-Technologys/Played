@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/widgets.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -23,10 +23,7 @@ class PushNotificationService {
 
   static const _prefixUpdate = 'update:';
   static const _prefixUrl = 'url:';
-  static const _officialUpdateHosts = <String>{
-    'petersmartlink.com',
-    'www.petersmartlink.com',
-  };
+  static const _officialHost = 'petersmartlink.com';
 
   bool _initialized = false;
 
@@ -37,13 +34,16 @@ class PushNotificationService {
     debugPrint('[PushNotificationService] Initialized.');
   }
 
-  void handleTap(NotificationResponse response) => _onTap(response);
+  void handleTap(NotificationResponse response) {
+    WidgetsBinding.instance.addPostFrameCallback((_) => _onTap(response));
+  }
 
   bool _isOfficialUpdateUri(Uri? uri) {
     if (uri == null || uri.scheme != 'https' || uri.userInfo.isNotEmpty) {
       return false;
     }
-    return _officialUpdateHosts.contains(uri.host.toLowerCase());
+    final host = uri.host.toLowerCase();
+    return host == _officialHost || host.endsWith('.$_officialHost');
   }
 
   void _onTap(NotificationResponse response) {
@@ -78,8 +78,10 @@ class PushNotificationService {
       return;
     }
 
-    if (uri.scheme == 'https') {
+    if (_isOfficialUpdateUri(uri)) {
       launchUrl(uri, mode: LaunchMode.externalApplication).ignore();
+    } else {
+      debugPrint('[PushNotif] blocked untrusted notification URL.');
     }
   }
 
