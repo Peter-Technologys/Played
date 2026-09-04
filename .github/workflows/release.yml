@@ -112,7 +112,7 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && 'refs/heads/main' || github.ref }}
 
-      - name: Check first-release identity
+      - name: Check immutable first-release identity
         shell: bash
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
@@ -127,15 +127,20 @@ jobs:
             exit 1
           }
 
-          if [ "${{ github.event_name }}" = "push" ]; then
-            git fetch origin refs/heads/main:refs/remotes/origin/main
-            HEAD_SHA="$(git rev-parse HEAD)"
-            MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
-            test "$HEAD_SHA" = "$MAIN_SHA" || {
-              echo "ERROR: tag-triggered releases must point to current main; tag=$HEAD_SHA main=$MAIN_SHA"
-              exit 1
-            }
-          fi
+          git fetch origin refs/heads/main:refs/remotes/origin/main --force
+          HEAD_SHA="$(git rev-parse HEAD)"
+          MAIN_SHA="$(git rev-parse refs/remotes/origin/main)"
+          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
+
+          test "$HEAD_SHA" = "$MAIN_SHA" || {
+            echo "ERROR: release checkout must be current main; checkout=$HEAD_SHA main=$MAIN_SHA"
+            exit 1
+          }
+          test "$TAG_SHA" = "$MAIN_SHA" || {
+            echo "ERROR: refusing to publish because $RELEASE_TAG does not already point to current main; tag=$TAG_SHA main=$MAIN_SHA"
+            echo "Align the release tag explicitly before starting the publish workflow. The workflow will not move tags."
+            exit 1
+          }
 
           APP_VERSION="$(awk '/^version:[[:space:]]*/ { print $2; exit }' pubspec.yaml)"
           test -n "$APP_VERSION" || {
@@ -356,33 +361,6 @@ jobs:
             ${{ steps.artifacts.outputs.arm32_signing }}
             ${{ steps.artifacts.outputs.aab_signing }}
             build/flutter-analyze-release.log
-
-      - name: Align v1.0.0 tag to verified main
-        if: github.event_name == 'workflow_dispatch'
-        shell: bash
-        env:
-          RELEASE_TAG: ${{ steps.release.outputs.tag }}
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          HEAD_SHA="$(git rev-parse HEAD)"
-          TAG_SHA="$(git rev-list -n 1 "$RELEASE_TAG")"
-          if [ "$TAG_SHA" = "$HEAD_SHA" ]; then
-            echo "$RELEASE_TAG already points to the verified release commit."
-            exit 0
-          fi
-
-          ASSET_COUNT="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.assets | length')"
-          test "$ASSET_COUNT" = '0' || {
-            echo "ERROR: refusing to move $RELEASE_TAG because its GitHub Release already has assets"
-            exit 1
-          }
-
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git tag -f "$RELEASE_TAG" "$HEAD_SHA"
-          git push --force origin "refs/tags/$RELEASE_TAG"
-          echo "$RELEASE_TAG now points to verified main commit $HEAD_SHA."
 
       - name: Publish Otya APKs
         env:
