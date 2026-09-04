@@ -6,11 +6,12 @@ void main() {
   test('sender and receiver use the same 256-bit transfer token contract', () {
     final sender = File('lib/features/transfer/data/media_sender.dart')
         .readAsStringSync();
-    final receiver = File('lib/features/transfer/data/media_receiver.dart')
-        .readAsStringSync();
+    final policy = File(
+      'lib/features/transfer/data/transfer_security_policy.dart',
+    ).readAsStringSync();
 
     expect(sender, contains('List.generate(\n      32,'));
-    expect(receiver, contains("RegExp(r'^[a-f0-9]{64}\$')"));
+    expect(policy, contains("RegExp(r'^[a-f0-9]{64}\$')"));
   });
 
   test('a 416 response is accepted only for a bounded exact length match', () {
