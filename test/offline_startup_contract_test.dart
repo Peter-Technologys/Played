@@ -106,18 +106,22 @@ void main() {
     final receiver = File(
       'lib/features/transfer/data/media_receiver.dart',
     ).readAsStringSync();
+    final policy = File(
+      'lib/features/transfer/data/transfer_security_policy.dart',
+    ).readAsStringSync();
     final sender = File(
       'lib/features/transfer/data/media_sender.dart',
     ).readAsStringSync();
 
+    expect(receiver, contains('isAllowedTransferUri(uri)'));
     expect(receiver, contains('request.followRedirects = false'));
     expect(receiver, contains("response.headers.value('X-Otya-Transfer')"));
     expect(receiver, contains("contentType.startsWith('audio/')"));
     expect(receiver, contains("contentType.startsWith('video/')"));
     expect(receiver, contains('_maxTransferBytes'));
-    expect(receiver, contains("RegExp(r'^[a-f0-9]{64}\$')"));
-    expect(receiver, contains('a == 10'));
-    expect(receiver, contains('a == 192 && b == 168'));
+    expect(policy, contains("RegExp(r'^[a-f0-9]{64}\$')"));
+    expect(policy, contains('a == 10'));
+    expect(policy, contains('a == 192 && b == 168'));
     expect(sender, contains("headers.set('X-Otya-Transfer', '1')"));
     expect(sender, contains("'X-Content-Type-Options', 'nosniff'"));
     expect(sender, contains('_supportedExtensions'));
