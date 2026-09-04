@@ -87,7 +87,6 @@ class FcmService {
 
       final messaging = FirebaseMessaging.instance;
       await messaging.setAutoInitEnabled(true);
-      await _ensureNotificationPermission(messaging);
 
       if (!_listenersAttached) {
         FirebaseMessaging.onBackgroundMessage(otyaFirebaseBackgroundHandler);
@@ -101,7 +100,8 @@ class FcmService {
 
       // The transport is ready now. Initial-message lookup and token sync are
       // recoverable follow-up work and must not attach duplicate listeners on a
-      // later init attempt.
+      // later init attempt. Ordinary notification consent remains user-driven
+      // from Settings; media-session playback does not need POST_NOTIFICATIONS.
       _initialized = true;
 
       try {
@@ -132,24 +132,6 @@ class FcmService {
     } catch (e, st) {
       debugPrint('[FCM] init error (non-fatal): $e\n$st');
     }
-  }
-
-  Future<void> _ensureNotificationPermission(
-    FirebaseMessaging messaging,
-  ) async {
-    final settings = await messaging.getNotificationSettings();
-    if (settings.authorizationStatus != AuthorizationStatus.notDetermined) {
-      return;
-    }
-    await messaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-      announcement: false,
-      carPlay: false,
-      criticalAlert: false,
-      provisional: false,
-    );
   }
 
   Future<void> syncRegistration() async {
