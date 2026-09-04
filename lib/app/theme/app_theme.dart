@@ -10,11 +10,11 @@ class AppTheme {
 
   static ThemeData _build(Brightness brightness) {
     final isDark = brightness == Brightness.dark;
-    final background = isDark ? AppColors.background : const Color(0xFFF7F8FB);
+    final background = isDark ? const Color(0xFF070A10) : const Color(0xFFF6F8FC);
     final surface = isDark ? AppColors.surface : const Color(0xFFFFFFFF);
-    final containerLow = isDark ? const Color(0xFF101620) : const Color(0xFFF2F4F8);
-    final container = isDark ? AppColors.surfaceElevated : const Color(0xFFECEFF5);
-    final containerHigh = isDark ? AppColors.surfaceHighlight : const Color(0xFFE4E8F0);
+    final containerLow = isDark ? const Color(0xFF0D131C) : const Color(0xFFF0F4FA);
+    final container = isDark ? const Color(0xFF131B27) : const Color(0xFFE8EEF7);
+    final containerHigh = isDark ? const Color(0xFF192433) : const Color(0xFFDEE7F3);
     final onSurface = isDark ? AppColors.textPrimary : const Color(0xFF15171C);
     final onSurfaceVariant = isDark ? AppColors.textSecondary : const Color(0xFF5F6672);
     final outline = isDark ? AppColors.border : const Color(0xFFD7DDE7);
@@ -101,9 +101,11 @@ class AppTheme {
         iconTheme: IconThemeData(color: onSurface, size: 24),
       ),
       navigationBarTheme: NavigationBarThemeData(
-        backgroundColor: surface,
+        backgroundColor: isDark
+            ? const Color(0xF20E141E)
+            : const Color(0xF7FFFFFF),
         surfaceTintColor: Colors.transparent,
-        indicatorColor: scheme.primaryContainer,
+        indicatorColor: scheme.primary,
         indicatorShape: const StadiumBorder(),
         labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
         labelTextStyle: WidgetStateProperty.resolveWith((states) => TextStyle(
@@ -113,8 +115,10 @@ class AppTheme {
           fontFamily: 'Inter',
         )),
         iconTheme: WidgetStateProperty.resolveWith((states) => IconThemeData(
-          color: states.contains(WidgetState.selected) ? scheme.primary : onSurfaceVariant,
-          size: states.contains(WidgetState.selected) ? 26 : 24,
+          color: states.contains(WidgetState.selected)
+              ? scheme.onPrimary
+              : onSurfaceVariant,
+          size: states.contains(WidgetState.selected) ? 25 : 23,
         )),
         elevation: 0,
         height: AppDimensions.bottomNavHeight,
@@ -254,11 +258,15 @@ class AppTheme {
         labelStyle: TextStyle(color: onSurface, fontSize: 13, fontFamily: 'Inter', fontWeight: FontWeight.w600),
       ),
       cardTheme: CardThemeData(
-        color: scheme.surfaceContainerLow,
+        color: surface,
         surfaceTintColor: Colors.transparent,
-        elevation: 0,
+        shadowColor: Colors.black.withValues(alpha: isDark ? .28 : .08),
+        elevation: isDark ? 1 : 2,
         margin: EdgeInsets.zero,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(AppDimensions.radiusLarge)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppDimensions.radiusXLarge),
+          side: BorderSide(color: scheme.outlineVariant.withValues(alpha: .42)),
+        ),
       ),
       popupMenuTheme: PopupMenuThemeData(
         color: scheme.surfaceContainerHigh,
