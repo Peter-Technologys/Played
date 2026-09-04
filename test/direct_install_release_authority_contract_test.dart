@@ -8,7 +8,10 @@ void main() {
         File('.github/workflows/release-apk.yml').readAsStringSync();
 
     expect(source, contains('Verify direct-install build authority'));
-    expect(source, contains(r"test \"$REQUESTED_REF\" = 'refs/heads/main'"));
+    expect(
+      source,
+      contains(r'''test "$REQUESTED_REF" = 'refs/heads/main' '''),
+    );
     expect(source, contains('Checkout exact current main'));
     expect(source, contains('ref: refs/heads/main'));
     expect(source, contains('Verify checkout is current main'));
