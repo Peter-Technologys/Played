@@ -1,11 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- Density-specific transparent foreground derived from the current
-         approved Otya cyan/blue app mark. The adaptive background remains a
-         separate launcher layer so Android can apply its own system mask. -->
+    <!-- One reviewed high-resolution transparent mark is scaled by the
+         adaptive-icon layer. Android still owns the final launcher mask. -->
     <item>
         <bitmap
-            android:src="@mipmap/ic_launcher_foreground"
+            android:src="@drawable/otya_launcher_foreground_bitmap"
             android:gravity="fill" />
     </item>
 </layer-list>
