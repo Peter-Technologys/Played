@@ -21,7 +21,7 @@ import '../../together/application/nearby_together_runtime.dart';
 import '../../together/application/nearby_together_session.dart';
 import '../../together/presentation/nearby_together_host_sheet.dart';
 import '../../together/presentation/nearby_together_join_sheet.dart';
-import '../../together/presentation/together_surface.dart';
+import '../../together/presentation/nearby_together_live_surface.dart';
 import '../../transfer/data/transfer_security_policy.dart';
 import 'queue_screen.dart';
 import 'widgets/video_gesture_layer.dart';
@@ -386,17 +386,11 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
 
   Future<void> _showActiveTogetherRoom() async {
     final runtime = NearbyTogetherRuntime.instance;
-    final session = runtime.state.session;
-    final localId = runtime.localParticipantId;
-    if (!mounted || session == null || localId == null || !session.isActive) return;
+    if (!mounted || !runtime.active) return;
 
-    runtime.markConversationRead();
-    await showTogetherRoomSurface(
+    await showNearbyTogetherLiveRoomSurface(
       context: context,
-      session: session,
-      messages: runtime.state.messages,
-      localParticipantId: localId,
-      onSendMessage: (text) => unawaited(runtime.sendChat(text)),
+      runtime: runtime,
       onMomentTap: (position) => _player?.seek(position),
       onInvite: () {
         if (!runtime.isHost || _player == null) return;
@@ -421,7 +415,6 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         _next();
       },
     );
-    runtime.markConversationRead();
   }
 
   void _showMoreOptions() {
