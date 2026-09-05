@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import '../../app/theme/app_colors.dart';
 import '../../core/services/otya_support_service.dart';
 import '../../shared/widgets/otya_logo.dart';
+import '../../shared/widgets/wallpaper_scaffold.dart';
 
 class OtyaSupportScreen extends StatefulWidget {
   const OtyaSupportScreen({super.key});
@@ -234,8 +235,10 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         ? (_messages.isNotEmpty && !_messages.last.fromUser && _messages.last.text.isNotEmpty ? 'Responding…' : 'Thinking…')
         : (_activeModelName ?? _selectedModel?.name ?? (_loadingModels ? 'Connecting…' : 'Ready'));
 
-    return Scaffold(
+    return WallpaperScaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         title: Row(children: [
           if (_busy) const OtyaThinkingMark(size: 30) else const OtyaAiMark(size: 30),
           const SizedBox(width: 10),
@@ -258,6 +261,7 @@ class _OtyaSupportScreenState extends State<OtyaSupportScreen> {
         ],
       ),
       body: SafeArea(
+        top: false,
         child: Column(children: [
           Expanded(
             child: _messages.isEmpty
@@ -380,7 +384,10 @@ class _Composer extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Container(
         padding: EdgeInsets.fromLTRB(12, 10, 12, 10 + MediaQuery.paddingOf(context).bottom),
-        decoration: BoxDecoration(border: Border(top: BorderSide(color: AppColors.borderOf(context)))),
+        decoration: BoxDecoration(
+          color: AppColors.surface.withValues(alpha: .82),
+          border: Border(top: BorderSide(color: AppColors.borderOf(context))),
+        ),
         child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
           Expanded(
             child: TextField(
