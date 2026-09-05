@@ -70,7 +70,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
     final uri = Uri.tryParse(rawInvite.trim());
     if (uri == null || uri.scheme != 'ws') {
       setState(() {
-        _error = 'That is not a valid OTYA Together invite.';
+        _error = 'That is not a valid Otya Together invite.';
         _scanLocked = false;
       });
       return;
@@ -104,7 +104,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
       setState(() {
         _error = NearbyTogetherRuntime.instance.lastError ??
             TogetherGuestMediaSession.instance.lastError ??
-            'OTYA could not join this Together session.';
+            'Otya could not join this Together session.';
         _joining = false;
         _scanLocked = false;
       });
@@ -166,7 +166,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Scan the private invite from your friend’s OTYA.',
+                        'Scan the private invite from your friend’s Otya.',
                         style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
                       ),
                     ],
@@ -306,7 +306,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                 ),
                 subtitle: Text(
                   _keepVideo
-                      ? 'OTYA reuses what you already watched, finishes only missing parts, and keeps progress if the connection stops.'
+                      ? 'Otya reuses what you already watched, finishes only missing parts, and keeps progress if the connection stops.'
                       : 'Watch without keeping the movie. Temporary playback data is removed when the session ends.',
                   style: const TextStyle(fontSize: 11.5, height: 1.35),
                 ),
