@@ -22,13 +22,15 @@ void main() {
       'lib/features/settings/presentation/settings_detail_screen.dart',
     ).readAsStringSync();
 
-    expect(source, contains("const _SectionTitle('OTYA')"));
+    expect(source, contains("const _SectionTitle('Otya')"));
     expect(source, contains("title: 'Check for updates'"));
     expect(source, contains("title: 'Privacy policy'"));
-    expect(source, contains("title: 'About OTYA'"));
+    expect(source, contains("title: 'About Otya'"));
     expect(source, isNot(contains("title: 'Next'")));
     expect(source, isNot(contains("context.push('/support')")));
     expect(source, isNot(contains('Icons.auto_awesome_rounded')));
+    expect(source, isNot(contains("'About OTYA'")));
+    expect(source, isNot(contains("'OTYA Account'")));
   });
 
   test('legacy AI links fail soft while main navigation stays one app', () {
