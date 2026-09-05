@@ -11,13 +11,16 @@ import '../domain/together_message.dart';
 import '../domain/together_session.dart';
 import 'media_kit_together_adapter.dart';
 import 'nearby_together_session.dart';
+import 'playback_sync_engine.dart';
 import 'together_session_controller.dart';
 
-/// Process-local owner for an active Nearby Together host room.
+enum NearbyTogetherRole { host, guest }
+
+/// Process-local owner for one active Nearby Together room.
 ///
-/// The runtime deliberately outlives the invite sheet so closing the sheet does
-/// not stop the watch party. It owns only Together resources and attaches to the
-/// Player that already exists; normal local playback never depends on it.
+/// The runtime deliberately outlives the invite/scanner sheet so dismissing UI
+/// never kills the peer session. It owns only Together resources and attaches
+/// to the Player OTYA already created; normal local playback never depends on it.
 class NearbyTogetherRuntime extends ChangeNotifier {
   NearbyTogetherRuntime._();
 
@@ -26,6 +29,9 @@ class NearbyTogetherRuntime extends ChangeNotifier {
   final TogetherSessionController _room = TogetherSessionController();
 
   NearbyTogetherHostSession? _host;
+  NearbyTogetherGuestSession? _guest;
+  NearbyTogetherRole? _role;
+  NearbyPlaybackPlan? _guestPlan;
   MediaKitTogetherAdapter? _adapter;
   NearbyTogetherInvite? _invite;
   StreamSubscription<NearbyTogetherMessage>? _messageSub;
@@ -33,6 +39,7 @@ class NearbyTogetherRuntime extends ChangeNotifier {
   StreamSubscription<bool>? _playingSub;
   StreamSubscription<bool>? _completedSub;
   Timer? _heartbeat;
+  Timer? _clockTimer;
 
   String? _localParticipantId;
   String? _lastError;
@@ -40,33 +47,27 @@ class NearbyTogetherRuntime extends ChangeNotifier {
 
   TogetherSessionState get state => _room.state;
   NearbyTogetherInvite? get invite => _invite;
+  NearbyPlaybackPlan? get guestPlan => _guestPlan;
+  NearbyTogetherRole? get role => _role;
   String? get localParticipantId => _localParticipantId;
   String? get lastError => _lastError;
   bool get starting => _starting;
   bool get active => state.hasActiveSession;
+  bool get isHost => _role == NearbyTogetherRole.host;
+  bool get isGuest => _role == NearbyTogetherRole.guest;
 
   Future<NearbyTogetherInvite> startHost({
     required MediaItem mediaItem,
     required Player player,
     String? displayName,
   }) async {
-    if (_starting) {
-      throw StateError('Together is already starting.');
-    }
-    _starting = true;
-    _lastError = null;
-    notifyListeners();
-
+    _beginStart();
     try {
       await stop(notify: false);
 
       final username = await OtyaIdentityService.instance.cachedUsername();
       final host = NearbyTogetherHostSession();
-      final resolvedName = displayName?.trim().isNotEmpty == true
-          ? displayName!.trim()
-          : username?.isNotEmpty == true
-              ? '@$username'
-              : 'OTYA user';
+      final resolvedName = _displayName(displayName, username);
 
       final invite = await host.start(
         filePath: mediaItem.filePath,
@@ -81,8 +82,8 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       }
 
       _host = host;
+      _role = NearbyTogetherRole.host;
       _invite = invite;
-      _adapter = MediaKitTogetherAdapter(player: player);
       _localParticipantId = _ephemeralId('host');
 
       final now = DateTime.now().toUtc();
@@ -107,16 +108,8 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       );
 
       _messageSub = host.channel.messages.listen(_handleGuestMessage);
-      _connectionSub = host.channel.connected.listen(_handleConnection);
-      _playingSub = player.stream.playing.listen((_) => unawaited(_sendHostState()));
-      _completedSub = player.stream.completed.listen((completed) {
-        if (!completed || !state.hasActiveSession) return;
-        try {
-          _room.playbackEnded(DateTime.now().toUtc());
-          notifyListeners();
-          unawaited(_sendHostState());
-        } catch (_) {}
-      });
+      _connectionSub = host.channel.connected.listen(_handleHostConnection);
+      _bindHostPlayer(player);
       _heartbeat = Timer.periodic(
         const Duration(milliseconds: 250),
         (_) => unawaited(_sendHostState()),
@@ -128,8 +121,114 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       _lastError = _friendlyError(error);
       rethrow;
     } finally {
-      _starting = false;
+      _finishStart();
+    }
+  }
+
+  /// Joins a Nearby Together room and decides whether this phone can play its
+  /// own matching copy or needs the host's authenticated LAN Range source.
+  ///
+  /// When [kind] is [NearbyPlaybackSourceKind.hostLanStream], the caller should
+  /// hand the returned URL into OTYA's player and then call [attachPlayer].
+  Future<NearbyPlaybackPlan> joinGuest({
+    required Uri inviteUri,
+    required MediaItem candidateMediaItem,
+    required Player player,
+    String? displayName,
+  }) async {
+    _beginStart();
+    try {
+      await stop(notify: false);
+
+      final username = await OtyaIdentityService.instance.cachedUsername();
+      final resolvedName = _displayName(displayName, username);
+      final guest = NearbyTogetherGuestSession();
+      final plan = await guest.join(
+        inviteUri: inviteUri,
+        displayName: resolvedName,
+        username: username,
+        candidateLocalFilePath: candidateMediaItem.filePath,
+        candidateDuration: candidateMediaItem.duration,
+      );
+
+      _guest = guest;
+      _guestPlan = plan;
+      _role = NearbyTogetherRole.guest;
+      _localParticipantId = _ephemeralId('guest');
+
+      final now = DateTime.now().toUtc();
+      const hostId = 'nearby-host';
+      _room.start(
+        TogetherSession(
+          id: _ephemeralId('room'),
+          hostParticipantId: hostId,
+          activeMediaFingerprint: plan.remoteMedia.fingerprint,
+          phase: TogetherSessionPhase.watching,
+          connectionPath: TogetherConnectionPath.nearby,
+          participants: [
+            TogetherParticipant(
+              id: hostId,
+              displayName: plan.hostDisplayName,
+              username: plan.hostUsername,
+              role: TogetherParticipantRole.host,
+              isConnected: true,
+              joinedAt: now,
+            ),
+            TogetherParticipant(
+              id: _localParticipantId!,
+              displayName: resolvedName,
+              username: username,
+              role: TogetherParticipantRole.guest,
+              isConnected: true,
+              joinedAt: now,
+            ),
+          ],
+          createdAt: now,
+        ),
+      );
+
+      _messageSub = guest.channel.messages.listen(_handleHostMessage);
+      _connectionSub = guest.channel.connected.listen(_handleGuestConnection);
+      if (plan.kind == NearbyPlaybackSourceKind.localCopy) {
+        attachPlayer(player);
+      }
+      _clockTimer = Timer.periodic(
+        const Duration(seconds: 3),
+        (_) => unawaited(_sendClockPing()),
+      );
+      unawaited(_sendClockPing());
+
       notifyListeners();
+      return plan;
+    } catch (error) {
+      _lastError = _friendlyError(error);
+      rethrow;
+    } finally {
+      _finishStart();
+    }
+  }
+
+  /// Attaches Together to an already-created OTYA Player. This is used for the
+  /// initial local-copy path and later for a safe guest stream handoff.
+  void attachPlayer(Player player) {
+    final session = state.session;
+    if (session == null || !session.isActive) return;
+    if (_adapter?.player == player) return;
+
+    _adapter = MediaKitTogetherAdapter(player: player)
+      ..resetForMediaRevision(session.mediaRevision);
+    if (isHost) _bindHostPlayer(player, replaceAdapter: false);
+    if (isGuest) unawaited(_sendClockPing());
+  }
+
+  void detachPlayer(Player player) {
+    if (_adapter?.player != player) return;
+    _adapter = null;
+    if (isHost) {
+      unawaited(_playingSub?.cancel());
+      unawaited(_completedSub?.cancel());
+      _playingSub = null;
+      _completedSub = null;
     }
   }
 
@@ -137,8 +236,7 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     final text = rawText.trim();
     final session = state.session;
     final sender = _localParticipantId;
-    final host = _host;
-    if (session == null || sender == null || host == null || text.isEmpty) return;
+    if (session == null || sender == null || text.isEmpty) return;
     if (text.length > TogetherMessage.maxTextLength) {
       throw ArgumentError('Together messages are limited to ${TogetherMessage.maxTextLength} characters.');
     }
@@ -156,14 +254,13 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       conversationVisible: true,
     );
     notifyListeners();
-    await host.channel.send('chat', {'text': text});
+    await _sendPeer('chat', {'text': text});
   }
 
   Future<void> sendMoment(Duration position, {String text = 'Look at this moment'}) async {
     final session = state.session;
     final sender = _localParticipantId;
-    final host = _host;
-    if (session == null || sender == null || host == null) return;
+    if (session == null || sender == null) return;
 
     final now = DateTime.now().toUtc();
     final cleanText = text.trim().isEmpty ? 'Look at this moment' : text.trim();
@@ -180,7 +277,7 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       conversationVisible: true,
     );
     notifyListeners();
-    await host.channel.send('moment', {
+    await _sendPeer('moment', {
       'text': cleanText,
       'position_ms': position.inMilliseconds,
     });
@@ -193,7 +290,9 @@ class NearbyTogetherRuntime extends ChangeNotifier {
 
   Future<void> stop({bool notify = true}) async {
     _heartbeat?.cancel();
+    _clockTimer?.cancel();
     _heartbeat = null;
+    _clockTimer = null;
     await _messageSub?.cancel();
     await _connectionSub?.cancel();
     await _playingSub?.cancel();
@@ -204,13 +303,16 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     _completedSub = null;
 
     final host = _host;
+    final guest = _guest;
     _host = null;
+    _guest = null;
+    _role = null;
+    _guestPlan = null;
     _adapter = null;
     _invite = null;
     _localParticipantId = null;
-    if (host != null) {
-      await host.dispose();
-    }
+    if (host != null) await host.dispose();
+    if (guest != null) await guest.dispose();
 
     if (_room.state.session != null) {
       _room.close(DateTime.now().toUtc());
@@ -219,7 +321,26 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     if (notify) notifyListeners();
   }
 
-  void _handleConnection(bool connected) {
+  void _bindHostPlayer(Player player, {bool replaceAdapter = true}) {
+    if (replaceAdapter) {
+      final session = state.session;
+      _adapter = MediaKitTogetherAdapter(player: player);
+      if (session != null) _adapter!.resetForMediaRevision(session.mediaRevision);
+    }
+    unawaited(_playingSub?.cancel());
+    unawaited(_completedSub?.cancel());
+    _playingSub = player.stream.playing.listen((_) => unawaited(_sendHostState()));
+    _completedSub = player.stream.completed.listen((completed) {
+      if (!completed || !state.hasActiveSession) return;
+      try {
+        _room.playbackEnded(DateTime.now().toUtc());
+        notifyListeners();
+        unawaited(_sendHostState());
+      } catch (_) {}
+    });
+  }
+
+  void _handleHostConnection(bool connected) {
     final session = state.session;
     if (session == null || !session.isActive) return;
     final now = DateTime.now().toUtc();
@@ -245,6 +366,27 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         if (existing != null) {
           _room.addParticipant(existing.copyWith(isConnected: false), now);
         }
+        _room.reconnecting(now);
+      }
+      notifyListeners();
+    } catch (_) {}
+  }
+
+  void _handleGuestConnection(bool connected) {
+    final session = state.session;
+    if (session == null || !session.isActive) return;
+    final host = session.participants
+        .where((item) => item.role == TogetherParticipantRole.host)
+        .firstOrNull;
+    final now = DateTime.now().toUtc();
+    try {
+      if (host != null) {
+        _room.addParticipant(host.copyWith(isConnected: connected), now);
+      }
+      if (connected) {
+        _room.connected(TogetherConnectionPath.nearby, now);
+        unawaited(_sendClockPing());
+      } else {
         _room.reconnecting(now);
       }
       notifyListeners();
@@ -279,38 +421,10 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         } catch (_) {}
         break;
       case 'chat':
-        final text = _text(message.payload['text']);
-        if (text == null || text.length > TogetherMessage.maxTextLength) return;
-        _room.receiveMessage(
-          TogetherMessage(
-            id: message.id,
-            sessionId: session.id,
-            senderParticipantId: guestId,
-            text: text,
-            kind: TogetherMessageKind.text,
-            createdAt: message.sentAt,
-          ),
-          conversationVisible: false,
-        );
-        notifyListeners();
+        _receivePeerText(message, guestId, TogetherMessageKind.text);
         break;
       case 'moment':
-        final text = _text(message.payload['text']) ?? 'Look at this moment';
-        final positionMs = message.payload['position_ms'];
-        if (positionMs is! int || positionMs < 0) return;
-        _room.receiveMessage(
-          TogetherMessage(
-            id: message.id,
-            sessionId: session.id,
-            senderParticipantId: guestId,
-            text: text,
-            kind: TogetherMessageKind.moment,
-            mediaPosition: Duration(milliseconds: positionMs),
-            createdAt: message.sentAt,
-          ),
-          conversationVisible: false,
-        );
-        notifyListeners();
+        _receivePeerMoment(message, guestId);
         break;
       case 'ping':
         final host = _host;
@@ -323,9 +437,90 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         }
         break;
       case 'bye':
-        _handleConnection(false);
+        _handleHostConnection(false);
         break;
     }
+  }
+
+  void _handleHostMessage(NearbyTogetherMessage message) {
+    final session = state.session;
+    if (session == null || !session.isActive) return;
+    const hostId = 'nearby-host';
+
+    switch (message.type) {
+      case 'state':
+        final remote = TogetherPlaybackState.tryParse(message.payload);
+        final adapter = _adapter;
+        if (remote != null && adapter != null) {
+          unawaited(adapter.applyRemoteState(remote));
+        }
+        break;
+      case 'chat':
+        _receivePeerText(message, hostId, TogetherMessageKind.text);
+        break;
+      case 'moment':
+        _receivePeerMoment(message, hostId);
+        break;
+      case 'pong':
+        final guestSendUs = message.payload['guest_send_us'];
+        final hostReplyUs = message.payload['host_reply_us'];
+        final adapter = _adapter;
+        if (guestSendUs is int && hostReplyUs is int && adapter != null) {
+          adapter.addClockSample(
+            TogetherClockSample(
+              guestSendUs: guestSendUs,
+              hostReplyUs: hostReplyUs,
+              guestReceiveUs: adapter.monotonicClock.elapsedMicroseconds,
+            ),
+          );
+        }
+        break;
+      case 'bye':
+        _handleGuestConnection(false);
+        break;
+    }
+  }
+
+  void _receivePeerText(
+    NearbyTogetherMessage message,
+    String senderId,
+    TogetherMessageKind kind,
+  ) {
+    final session = state.session;
+    final text = _text(message.payload['text']);
+    if (session == null || text == null || text.length > TogetherMessage.maxTextLength) return;
+    _room.receiveMessage(
+      TogetherMessage(
+        id: message.id,
+        sessionId: session.id,
+        senderParticipantId: senderId,
+        text: text,
+        kind: kind,
+        createdAt: message.sentAt,
+      ),
+      conversationVisible: false,
+    );
+    notifyListeners();
+  }
+
+  void _receivePeerMoment(NearbyTogetherMessage message, String senderId) {
+    final session = state.session;
+    final text = _text(message.payload['text']) ?? 'Look at this moment';
+    final positionMs = message.payload['position_ms'];
+    if (session == null || positionMs is! int || positionMs < 0) return;
+    _room.receiveMessage(
+      TogetherMessage(
+        id: message.id,
+        sessionId: session.id,
+        senderParticipantId: senderId,
+        text: text,
+        kind: TogetherMessageKind.moment,
+        mediaPosition: Duration(milliseconds: positionMs),
+        createdAt: message.sentAt,
+      ),
+      conversationVisible: false,
+    );
+    notifyListeners();
   }
 
   Future<void> _sendHostState() async {
@@ -347,9 +542,49 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         adapter.captureHostState(mediaRevision: session.mediaRevision).toJson(),
       );
     } catch (_) {
-      // Connection changes are reflected by the channel stream. A heartbeat
-      // failure must never bubble into or interrupt local playback.
+      // A heartbeat failure must never interrupt local playback.
     }
+  }
+
+  Future<void> _sendClockPing() async {
+    final guest = _guest;
+    final adapter = _adapter;
+    if (guest == null || adapter == null || !state.hasActiveSession) return;
+    try {
+      await guest.channel.send('ping', {
+        'guest_send_us': adapter.monotonicClock.elapsedMicroseconds,
+      });
+    } catch (_) {}
+  }
+
+  Future<void> _sendPeer(String type, Map<String, dynamic> payload) async {
+    final host = _host;
+    if (host != null) {
+      await host.channel.send(type, payload);
+      return;
+    }
+    final guest = _guest;
+    if (guest != null) {
+      await guest.channel.send(type, payload);
+    }
+  }
+
+  void _beginStart() {
+    if (_starting) throw StateError('Together is already starting.');
+    _starting = true;
+    _lastError = null;
+    notifyListeners();
+  }
+
+  void _finishStart() {
+    _starting = false;
+    notifyListeners();
+  }
+
+  static String _displayName(String? displayName, String? username) {
+    if (displayName?.trim().isNotEmpty == true) return displayName!.trim();
+    if (username?.isNotEmpty == true) return '@$username';
+    return 'OTYA user';
   }
 
   static String _ephemeralId(String prefix) {
@@ -366,12 +601,17 @@ class NearbyTogetherRuntime extends ChangeNotifier {
 
   static String _friendlyError(Object error) {
     final message = error.toString();
-    if (message.contains('Wi-Fi') || message.contains('hotspot')) {
-      return 'Connect both phones to the same Wi-Fi or hotspot, then try again.';
+    if (message.contains('Wi-Fi') ||
+        message.contains('hotspot') ||
+        message.contains('timed out')) {
+      return 'Keep both phones on the same Wi-Fi or hotspot, then try again.';
     }
     if (message.contains('not found') || message.contains('empty')) {
       return 'That video is no longer available on this device.';
     }
-    return 'OTYA could not start Together. Check the local connection and try again.';
+    if (message.contains('invalid Nearby Together invite')) {
+      return 'That Together invite is not valid anymore. Ask the host to show a new one.';
+    }
+    return 'OTYA could not connect Together. Check the local connection and try again.';
   }
 }
