@@ -777,12 +777,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       return;
     }
 
-    ref.read(queueProvider.notifier).previous();
+    final beforeIndex = ref.read(queueProvider).currentIndex;
+    final queue = ref.read(queueProvider.notifier);
+    queue.previous();
     final previous = ref.read(queueProvider).current;
     if (previous != null && context.mounted) {
       final opened = await _openQueuedVideo(previous);
       if (!opened && context.mounted) {
-        ref.read(queueProvider.notifier).next();
+        queue.restoreCurrentIndex(beforeIndex);
       }
     }
   }
@@ -802,12 +804,14 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
       return;
     }
 
-    ref.read(queueProvider.notifier).next();
+    final beforeIndex = ref.read(queueProvider).currentIndex;
+    final queue = ref.read(queueProvider.notifier);
+    queue.next();
     final next = ref.read(queueProvider).current;
     if (next != null && context.mounted) {
       final opened = await _openQueuedVideo(next);
       if (!opened && context.mounted) {
-        ref.read(queueProvider.notifier).previous();
+        queue.restoreCurrentIndex(beforeIndex);
       }
     }
   }
