@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../my_space/presentation/providers/my_space_provider.dart';
 import '../../player/presentation/mini_player.dart';
 import '../../player/presentation/queue_screen.dart';
@@ -16,8 +17,10 @@ class FolderBrowserScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final library = ref.watch(mediaLibraryProvider);
-    return Scaffold(
+    return WallpaperScaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.canPop() ? context.pop() : context.go('/myspace'),
@@ -171,8 +174,10 @@ class FolderDetailScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final queue = List<MediaItem>.from(items)
       ..sort((a, b) => a.title.toLowerCase().compareTo(b.title.toLowerCase()));
-    return Scaffold(
+    return WallpaperScaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded),
           onPressed: () => context.canPop() ? context.pop() : context.go('/tools/folders'),
