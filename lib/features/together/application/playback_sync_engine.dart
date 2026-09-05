@@ -190,12 +190,15 @@ class PlaybackSyncEngine {
         shouldPlay: true,
         expectedPositionMs: expected,
         driftMs: drift,
-        playbackSpeed: (remote.rate * correction).clamp(0.25, 4.0),
+        playbackSpeed: (remote.rate * correction).clamp(0.25, 4.0).toDouble(),
       );
     }
 
     // Even with negligible position drift, play/pause is authoritative. The
     // adapter compares shouldPlay with its local state and acts only if needed.
+    // Reading currentPlaying here documents that local state is intentionally
+    // not used to reject an otherwise fresh authoritative packet.
+    final _ = currentPlaying;
     return PlaybackSyncCorrection(
       kind: PlaybackCorrectionKind.none,
       shouldPlay: remote.playing,
