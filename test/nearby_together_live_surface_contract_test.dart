@@ -6,6 +6,9 @@ void main() {
   final source = File(
     'lib/features/together/presentation/nearby_together_live_surface.dart',
   ).readAsStringSync();
+  final runtime = File(
+    'lib/features/together/application/nearby_together_runtime.dart',
+  ).readAsStringSync();
   final player = File(
     'lib/features/player/presentation/video_player_screen.dart',
   ).readAsStringSync();
@@ -24,6 +27,15 @@ void main() {
     expect(source, contains('showGeneralDialog<void>'));
     expect(source, isNot(contains('GoRoute(')));
     expect(source, isNot(contains('Navigator.push')));
+  });
+
+  test('Together exposes lightweight Moment and reaction actions', () {
+    expect(source, contains('_TogetherQuickActions('));
+    expect(source, contains('runtime.sendCurrentMoment()'));
+    expect(source, contains('runtime.sendReaction(reaction)'));
+    expect(runtime, contains('supportedReactions'));
+    expect(runtime, contains("_sendPeer('reaction'"));
+    expect(runtime, contains("case 'reaction':"));
   });
 
   test('video player opens the live Nearby Together surface', () {
