@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 import '../../../app/theme/app_colors.dart';
-import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/ffmpeg_service.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 enum TrimStatus { idle, trimming, done, error }
 
@@ -33,10 +35,14 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
     final card = AppColors.cardOf(context);
     final border = AppColors.borderOf(context);
 
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      appBar: AppBar(title: const Text('Trim video')),
+    return WallpaperScaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: const Text('Trim video'),
+      ),
       body: SafeArea(
+        top: false,
         child: Padding(
           padding: const EdgeInsets.all(20),
           child: Column(
@@ -53,7 +59,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                   children: [
                     const Icon(
                       Icons.info_outline_rounded,
-                      color: AppColors.accent,
+                      color: AppColors.brandCyan,
                       size: 20,
                     ),
                     const SizedBox(width: 12),
@@ -135,14 +141,14 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                         vertical: 5,
                       ),
                       decoration: BoxDecoration(
-                        color: AppColors.accent.withValues(alpha: .12),
+                        color: AppColors.brandBlue.withValues(alpha: .12),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       child: Text(
                         '${clipLength.round()} sec',
                         style: const TextStyle(
                           fontSize: 11,
-                          color: AppColors.accent,
+                          color: AppColors.brandCyan,
                           fontWeight: FontWeight.w800,
                         ),
                       ),
@@ -158,7 +164,7 @@ class WhatsAppTrimmerScreen extends ConsumerWidget {
                     value: progress,
                     backgroundColor: border,
                     valueColor: const AlwaysStoppedAnimation<Color>(
-                      AppColors.accent,
+                      AppColors.brandCyan,
                     ),
                     minHeight: 5,
                   ),
@@ -296,7 +302,7 @@ class _RangeLabel extends StatelessWidget {
           '$m:$s',
           style: const TextStyle(
             fontSize: 12,
-            color: AppColors.accent,
+            color: AppColors.brandCyan,
             fontWeight: FontWeight.w800,
           ),
         ),
