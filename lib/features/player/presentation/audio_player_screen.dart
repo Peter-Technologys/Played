@@ -32,6 +32,7 @@ import 'car_mode_screen.dart';
 import 'widgets/sleep_timer.dart';
 
 part 'widgets/audio_player_widgets.dart';
+part 'widgets/audio_player_now_playing_view.dart';
 
 enum RepeatState { off, one, all }
 
@@ -512,326 +513,63 @@ class _AudioPlayerScreenState extends ConsumerState<AudioPlayerScreen>
     final isSmall = screenHeight < 680;
     final isMedium = screenHeight < 780;
     final isTablet = screenWidth > 600;
-    final artPadding = isTablet ? 80.0 : isSmall ? 12.0 : isMedium ? 24.0 : 36.0;
+    final artPadding =
+        isTablet ? 80.0 : isSmall ? 12.0 : isMedium ? 24.0 : 36.0;
     final playButtonSize = isTablet ? 80.0 : isSmall ? 56.0 : 68.0;
     final skipIconSize = isTablet ? 34.0 : isSmall ? 24.0 : 30.0;
     final spacing = isSmall ? 4.0 : isMedium ? 8.0 : 16.0;
     final showRetry = _showRetry || playerState.hasLoadError;
 
-    return WallpaperScaffold(
-      body: SafeArea(
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.keyboard_arrow_down_rounded,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      size: 30,
-                    ),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'NOW PLAYING',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.5,
-                      fontFamily: 'Inter',
-                    ),
-                  ),
-                  const Spacer(),
-                  SleepTimerButton(
-                    onExpire: () => ref.read(audioPlayerProvider.notifier).pause(),
-                  ),
-                  const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(
-                      Icons.more_vert_rounded,
-                      color: AppColors.textSecondary,
-                      size: 22,
-                    ),
-                    onPressed: () => _showOptions(activeItem),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: EdgeInsets.symmetric(horizontal: artPadding, vertical: 8),
-                child: _AlbumArt(
-                  albumArtPath: activeItem.albumArtPath,
-                  isPlaying: playerState.isPlaying,
-                  title: activeItem.title,
-                  onSwipeLeft: () =>
-                      ref.read(audioPlayerProvider.notifier).skipNext(),
-                  onSwipeRight: () =>
-                      ref.read(audioPlayerProvider.notifier).skipPrevious(),
-                ),
-              ),
-            ),
-            SizedBox(height: spacing),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          activeItem.title,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          activeItem.artist ?? 'Unknown Artist',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () =>
-                        ref.read(audioPlayerProvider.notifier).toggleFavorite(),
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      child: Icon(
-                        playerState.isFavorite
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        key: ValueKey(playerState.isFavorite),
-                        color: playerState.isFavorite
-                            ? AppColors.brandRed
-                            : AppColors.textSecondary,
-                        size: 26,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: spacing),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _SeekBar(
-                position: playerState.position,
-                duration: playerState.duration,
-                onSeek: (position) =>
-                    ref.read(audioPlayerProvider.notifier).seek(position),
-              ),
-            ),
-            SizedBox(height: spacing / 2),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _ToggleIconBtn(
-                    icon: Icons.shuffle_rounded,
-                    active: isShuffle,
-                    onTap: () =>
-                        ref.read(audioPlayerProvider.notifier).toggleShuffle(),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
-                      final index = speeds.indexOf(playerState.speed);
-                      ref
-                          .read(audioPlayerProvider.notifier)
-                          .setSpeed(speeds[(index + 1) % speeds.length]);
-                    },
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.borderOf(context)),
-                      ),
-                      child: Text(
-                        _formatSpeed(playerState.speed),
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
-                          fontFamily: 'Inter',
-                        ),
-                      ),
-                    ),
-                  ),
-                  _RepeatBtn(
-                    repeat: playerState.repeat,
-                    onTap: () =>
-                        ref.read(audioPlayerProvider.notifier).cycleRepeat(),
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: spacing / 2),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                crossAxisAlignment: CrossAxisAlignment.center,
-                children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.skip_previous_rounded,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      size: skipIconSize,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      ref.read(audioPlayerProvider.notifier).skipPrevious();
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.replay_10_rounded,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      size: skipIconSize,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      ref.read(audioPlayerProvider.notifier).skipBack();
-                    },
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      if (showRetry) {
-                        setState(() => _showRetry = false);
-                        _startLoad(activeItem);
-                      } else {
-                        HapticFeedback.mediumImpact();
-                        ref.read(audioPlayerProvider.notifier).togglePlay();
-                      }
-                    },
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 200),
-                      width: playButtonSize,
-                      height: playButtonSize,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.accent,
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.24),
-                            blurRadius: 18,
-                            spreadRadius: 1,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: playerState.isLoading && !showRetry
-                          ? const Padding(
-                              padding: EdgeInsets.all(20),
-                              child: CircularProgressIndicator(
-                                color: Colors.white,
-                                strokeWidth: 2,
-                              ),
-                            )
-                          : showRetry
-                              ? const Padding(
-                                  padding: EdgeInsets.all(14),
-                                  child: Icon(
-                                    Icons.refresh_rounded,
-                                    color: Colors.white,
-                                    size: 30,
-                                  ),
-                                )
-                              : Icon(
-                                  playerState.isPlaying
-                                      ? Icons.pause_rounded
-                                      : Icons.play_arrow_rounded,
-                                  color: Colors.white,
-                                  size: 38,
-                                ),
-                    ),
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.forward_10_rounded,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      size: skipIconSize,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      ref.read(audioPlayerProvider.notifier).skipForward();
-                    },
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      Icons.skip_next_rounded,
-                      color: Theme.of(context).colorScheme.onSurface,
-                      size: skipIconSize,
-                    ),
-                    onPressed: () {
-                      HapticFeedback.lightImpact();
-                      ref.read(audioPlayerProvider.notifier).skipNext();
-                    },
-                  ),
-                ],
-              ),
-            ),
-            SizedBox(height: spacing),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: FittedBox(
-                fit: BoxFit.scaleDown,
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _SecondaryBtn(
-                      icon: Icons.lyrics_rounded,
-                      label: 'Lyrics',
-                      onTap: () => _showLyrics(activeItem, playerState.position),
-                    ),
-                    _SecondaryBtn(
-                      icon: Icons.graphic_eq_rounded,
-                      label: 'Equalizer',
-                      onTap: () => context.push('/player/equalizer'),
-                    ),
-                    _SecondaryBtn(
-                      icon: Icons.queue_music_rounded,
-                      label: 'Up Next',
-                      onTap: _showQueue,
-                    ),
-                    _SecondaryBtn(
-                      icon: Icons.share_rounded,
-                      label: 'Share',
-                      onTap: () => Share.shareXFiles(
-                        [XFile(activeItem.filePath)],
-                        text: activeItem.title,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-            SizedBox(height: MediaQuery.of(context).padding.bottom + 8),
-          ],
-        ),
+    return _AudioPlayerNowPlayingView(
+      activeItem: activeItem,
+      playerState: playerState,
+      isShuffle: isShuffle,
+      showRetry: showRetry,
+      artPadding: artPadding,
+      playButtonSize: playButtonSize,
+      skipIconSize: skipIconSize,
+      spacing: spacing,
+      speedLabel: _formatSpeed(playerState.speed),
+      onBack: () => Navigator.of(context).pop(),
+      onSleepExpire: () => ref.read(audioPlayerProvider.notifier).pause(),
+      onOptions: () => _showOptions(activeItem),
+      onSwipeNext: () => ref.read(audioPlayerProvider.notifier).skipNext(),
+      onSwipePrevious: () =>
+          ref.read(audioPlayerProvider.notifier).skipPrevious(),
+      onFavorite: () =>
+          ref.read(audioPlayerProvider.notifier).toggleFavorite(),
+      onSeek: (position) =>
+          ref.read(audioPlayerProvider.notifier).seek(position),
+      onShuffle: () => ref.read(audioPlayerProvider.notifier).toggleShuffle(),
+      onSpeed: () {
+        const speeds = [0.5, 0.75, 1.0, 1.25, 1.5, 2.0];
+        final index = speeds.indexOf(playerState.speed);
+        ref
+            .read(audioPlayerProvider.notifier)
+            .setSpeed(speeds[(index + 1) % speeds.length]);
+      },
+      onRepeat: () => ref.read(audioPlayerProvider.notifier).cycleRepeat(),
+      onPrevious: () =>
+          ref.read(audioPlayerProvider.notifier).skipPrevious(),
+      onSkipBack: () => ref.read(audioPlayerProvider.notifier).skipBack(),
+      onPlayPause: () {
+        if (showRetry) {
+          setState(() => _showRetry = false);
+          _startLoad(activeItem);
+        } else {
+          HapticFeedback.mediumImpact();
+          ref.read(audioPlayerProvider.notifier).togglePlay();
+        }
+      },
+      onSkipForward: () =>
+          ref.read(audioPlayerProvider.notifier).skipForward(),
+      onNext: () => ref.read(audioPlayerProvider.notifier).skipNext(),
+      onLyrics: () => _showLyrics(activeItem, playerState.position),
+      onEqualizer: () => context.push('/player/equalizer'),
+      onQueue: _showQueue,
+      onShare: () => Share.shareXFiles(
+        [XFile(activeItem.filePath)],
+        text: activeItem.title,
       ),
     );
   }
