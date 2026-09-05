@@ -8,10 +8,10 @@ void main() {
         File('lib/features/search/smart_search_sheet.dart').readAsStringSync();
 
     expect(search, isNot(contains('otya_support_service.dart')));
-    expect(search, isNot(contains('OtyaSupportService')));
+    expect(search, isNot(contains('OtyaSupportService'));
     expect(search, isNot(contains('_askAi')));
     expect(search, isNot(contains("_SectionLabel('Next'")));
-    expect(search, isNot(contains('Optional online help')));
+    expect(search, isNot(contains('Optional online help'));
     expect(search, contains("'Send files'"));
     expect(search, contains('Open Me → Send.'));
     expect(search, contains('Search stays local'));
@@ -24,7 +24,8 @@ void main() {
     ).readAsStringSync();
 
     expect(privacy, contains('Core playback and Smart Search are offline-first'));
-    expect(privacy, contains('Smart Search and nearby Send'));
+    expect(privacy, contains('An Otya account is optional for local playback, Smart Search'));
+    expect(privacy, contains('and nearby Send. Google Sign-In'));
     expect(privacy, contains('The Otya Together control plane does not store'));
     expect(privacy, isNot(contains('Messages you send to Next')));
     expect(privacy, isNot(contains('Transfer sends supported files')));
