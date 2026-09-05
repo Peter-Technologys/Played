@@ -132,6 +132,8 @@ class NearbyTogetherGuestSession {
 
   Future<NearbyPlaybackPlan> join({
     required Uri inviteUri,
+    required String displayName,
+    String? username,
     String? candidateLocalFilePath,
     Duration? candidateDuration,
     String? candidateMimeType,
@@ -160,9 +162,17 @@ class NearbyTogetherGuestSession {
       candidateMimeType: candidateMimeType,
     );
 
+    final cleanName = displayName.trim().isEmpty ? 'OTYA user' : displayName.trim();
+    final cleanUsername = username
+        ?.trim()
+        .replaceFirst(RegExp(r'^@+'), '')
+        .toLowerCase();
     await channel.send('ready', {
       'source': plan.kind.name,
       'has_complete_media': plan.kind == NearbyPlaybackSourceKind.localCopy,
+      'display_name': cleanName,
+      if (cleanUsername != null && cleanUsername.isNotEmpty)
+        'username': cleanUsername,
     });
     return plan;
   }
