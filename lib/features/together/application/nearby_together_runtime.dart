@@ -26,6 +26,10 @@ class NearbyTogetherRuntime extends ChangeNotifier {
 
   static final instance = NearbyTogetherRuntime._();
 
+  /// Keep reactions deliberately tiny and first-party. No sticker/image pack or
+  /// chat SDK is needed for Together v1.
+  static const Set<String> supportedReactions = {'❤️', '😂', '😮', '👏'};
+
   final TogetherSessionController _room = TogetherSessionController();
 
   NearbyTogetherHostSession? _host;
@@ -257,7 +261,10 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     await _sendPeer('chat', {'text': text});
   }
 
-  Future<void> sendMoment(Duration position, {String text = 'Look at this moment'}) async {
+  Future<void> sendMoment(
+    Duration position, {
+    String text = 'Look at this moment',
+  }) async {
     final session = state.session;
     final sender = _localParticipantId;
     if (session == null || sender == null) return;
@@ -281,6 +288,43 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       'text': cleanText,
       'position_ms': position.inMilliseconds,
     });
+  }
+
+  /// Creates a Moment at the position already owned by OTYA's single player.
+  /// The Together UI never creates or reaches into a second media engine.
+  Future<void> sendCurrentMoment({String text = 'Look at this moment'}) async {
+    final player = _adapter?.player;
+    if (player == null) return;
+    await sendMoment(player.state.position, text: text);
+  }
+
+  Future<void> sendReaction(String rawReaction) async {
+    final reaction = rawReaction.trim();
+    final session = state.session;
+    final sender = _localParticipantId;
+    if (session == null || sender == null || reaction.isEmpty) return;
+    if (!supportedReactions.contains(reaction)) {
+      throw ArgumentError.value(
+        rawReaction,
+        'reaction',
+        'Unsupported Together reaction',
+      );
+    }
+
+    final now = DateTime.now().toUtc();
+    _room.receiveMessage(
+      TogetherMessage(
+        id: _ephemeralId('reaction'),
+        sessionId: session.id,
+        senderParticipantId: sender,
+        text: reaction,
+        kind: TogetherMessageKind.reaction,
+        createdAt: now,
+      ),
+      conversationVisible: true,
+    );
+    notifyListeners();
+    await _sendPeer('reaction', {'reaction': reaction});
   }
 
   void markConversationRead() {
@@ -426,6 +470,9 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       case 'moment':
         _receivePeerMoment(message, guestId);
         break;
+      case 'reaction':
+        _receivePeerReaction(message, guestId);
+        break;
       case 'ping':
         final host = _host;
         final adapter = _adapter;
@@ -460,6 +507,9 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         break;
       case 'moment':
         _receivePeerMoment(message, hostId);
+        break;
+      case 'reaction':
+        _receivePeerReaction(message, hostId);
         break;
       case 'pong':
         final guestSendUs = message.payload['guest_send_us'];
@@ -516,6 +566,28 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         text: text,
         kind: TogetherMessageKind.moment,
         mediaPosition: Duration(milliseconds: positionMs),
+        createdAt: message.sentAt,
+      ),
+      conversationVisible: false,
+    );
+    notifyListeners();
+  }
+
+  void _receivePeerReaction(NearbyTogetherMessage message, String senderId) {
+    final session = state.session;
+    final reaction = _text(message.payload['reaction']);
+    if (session == null ||
+        reaction == null ||
+        !supportedReactions.contains(reaction)) {
+      return;
+    }
+    _room.receiveMessage(
+      TogetherMessage(
+        id: message.id,
+        sessionId: session.id,
+        senderParticipantId: senderId,
+        text: reaction,
+        kind: TogetherMessageKind.reaction,
         createdAt: message.sentAt,
       ),
       conversationVisible: false,
