@@ -4,7 +4,9 @@
 // Displays an error icon, a human-readable message, and a Go Back button.
 
 import 'package:flutter/material.dart';
+
 import '../../app/theme/app_colors.dart';
+import 'wallpaper_scaffold.dart';
 
 class ErrorScreen extends StatelessWidget {
   /// The error message to display. Defaults to a generic message.
@@ -25,10 +27,10 @@ class ErrorScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+    return WallpaperScaffold(
       appBar: AppBar(
-        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: Icon(
@@ -45,13 +47,15 @@ class ErrorScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Error icon
               Container(
                 width: 88,
                 height: 88,
                 decoration: BoxDecoration(
                   color: AppColors.error.withValues(alpha: 0.12),
                   shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.error.withValues(alpha: .22),
+                  ),
                 ),
                 child: const Icon(
                   Icons.error_outline_rounded,
@@ -60,7 +64,6 @@ class ErrorScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 24),
-              // Title
               Text(
                 title ?? 'Something went wrong',
                 textAlign: TextAlign.center,
@@ -72,7 +75,6 @@ class ErrorScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 10),
-              // Message
               Text(
                 message ??
                     'An unexpected error occurred. Please go back and try again.',
@@ -85,7 +87,6 @@ class ErrorScreen extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 32),
-              // Go Back button
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
@@ -99,8 +100,8 @@ class ErrorScreen extends StatelessWidget {
                     ),
                   ),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.accent,
-                    foregroundColor: Colors.black,
+                    backgroundColor: AppColors.brandBlue,
+                    foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
