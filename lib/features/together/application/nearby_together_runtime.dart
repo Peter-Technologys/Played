@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/otya_identity_service.dart';
 import '../data/nearby_together_channel.dart';
+import '../domain/media_identity.dart';
 import '../domain/together_message.dart';
 import '../domain/together_session.dart';
 import 'media_kit_together_adapter.dart';
@@ -48,6 +49,7 @@ class NearbyTogetherRuntime extends ChangeNotifier {
   String? _localParticipantId;
   String? _lastError;
   bool _starting = false;
+  bool _hostMediaHandoffPending = false;
 
   TogetherSessionState get state => _room.state;
   NearbyTogetherInvite? get invite => _invite;
@@ -59,6 +61,8 @@ class NearbyTogetherRuntime extends ChangeNotifier {
   bool get active => state.hasActiveSession;
   bool get isHost => _role == NearbyTogetherRole.host;
   bool get isGuest => _role == NearbyTogetherRole.guest;
+  bool get guestStreaming =>
+      isGuest && _guestPlan?.kind == NearbyPlaybackSourceKind.hostLanStream;
 
   Future<NearbyTogetherInvite> startHost({
     required MediaItem mediaItem,
@@ -212,8 +216,58 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     }
   }
 
+  /// Prepares a host-selected next video without replacing the Together room.
+  /// The media sender rotates its file/token, the room revision advances, and
+  /// the guest is told to switch its existing player. Heartbeats stay paused
+  /// until the host's new local Player attaches after the route handoff.
+  Future<void> prepareHostNextMedia(MediaItem mediaItem) async {
+    final host = _host;
+    final session = state.session;
+    if (!isHost || host == null || session == null || !session.isActive) {
+      throw StateError('Only an active Together host can choose the next video.');
+    }
+    if (_hostMediaHandoffPending) {
+      throw StateError('Together is already changing video.');
+    }
+
+    _hostMediaHandoffPending = true;
+    _lastError = null;
+    try {
+      await _adapter?.player.pause();
+      final hosted = await host.switchMedia(
+        filePath: mediaItem.filePath,
+        duration: mediaItem.duration,
+      );
+      final now = DateTime.now().toUtc();
+      _room.startNextMedia(hosted.media.fingerprint, now);
+      final nextSession = state.session!;
+      _adapter?.resetForMediaRevision(nextSession.mediaRevision);
+      notifyListeners();
+
+      if (host.channel.hasGuest) {
+        try {
+          await host.channel.send(
+            'media',
+            _mediaChangePayload(
+              hosted.media,
+              hosted.hostMediaUrl,
+              nextSession.mediaRevision,
+            ),
+          );
+        } catch (_) {
+          // A disconnected guest must not prevent the host from moving on.
+        }
+      }
+    } catch (error) {
+      _hostMediaHandoffPending = false;
+      _lastError = _friendlyError(error);
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   /// Attaches Together to an already-created OTYA Player. This is used for the
-  /// initial local-copy path and later for a safe guest stream handoff.
+  /// initial local-copy path and later for a safe guest or host media handoff.
   void attachPlayer(Player player) {
     final session = state.session;
     if (session == null || !session.isActive) return;
@@ -221,8 +275,13 @@ class NearbyTogetherRuntime extends ChangeNotifier {
 
     _adapter = MediaKitTogetherAdapter(player: player)
       ..resetForMediaRevision(session.mediaRevision);
-    if (isHost) _bindHostPlayer(player, replaceAdapter: false);
+    if (isHost) {
+      _bindHostPlayer(player, replaceAdapter: false);
+      _hostMediaHandoffPending = false;
+      unawaited(_sendHostState());
+    }
     if (isGuest) unawaited(_sendClockPing());
+    notifyListeners();
   }
 
   void detachPlayer(Player player) {
@@ -355,6 +414,7 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     _adapter = null;
     _invite = null;
     _localParticipantId = null;
+    _hostMediaHandoffPending = false;
     if (host != null) await host.dispose();
     if (guest != null) await guest.dispose();
 
@@ -502,6 +562,9 @@ class NearbyTogetherRuntime extends ChangeNotifier {
           unawaited(adapter.applyRemoteState(remote));
         }
         break;
+      case 'media':
+        unawaited(_handleGuestMediaChange(message));
+        break;
       case 'chat':
         _receivePeerText(message, hostId, TogetherMessageKind.text);
         break;
@@ -528,6 +591,56 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       case 'bye':
         _handleGuestConnection(false);
         break;
+    }
+  }
+
+  Future<void> _handleGuestMediaChange(NearbyTogetherMessage message) async {
+    final guest = _guest;
+    final session = state.session;
+    final revision = message.payload['media_revision'];
+    if (guest == null ||
+        session == null ||
+        !session.isActive ||
+        revision is! int ||
+        revision <= session.mediaRevision) {
+      return;
+    }
+    if (revision != session.mediaRevision + 1) {
+      _lastError = 'Together changed video out of sequence. Reconnect to the host.';
+      try {
+        _room.reconnecting(message.sentAt);
+      } catch (_) {}
+      notifyListeners();
+      return;
+    }
+
+    try {
+      final plan = await guest.planMediaChange(message);
+      final uri = plan.hostMediaUrl;
+      final adapter = _adapter;
+      if (uri == null || adapter == null) {
+        throw StateError('Together player is not ready for the next video.');
+      }
+
+      _room.startNextMedia(plan.remoteMedia.fingerprint, message.sentAt);
+      final updated = state.session!;
+      if (updated.mediaRevision != revision) {
+        throw StateError('Together media revision mismatch.');
+      }
+      _guestPlan = plan;
+      _lastError = null;
+      adapter.resetForMediaRevision(revision);
+      notifyListeners();
+
+      await adapter.player.pause();
+      await adapter.player.open(Media(uri.toString()), play: false);
+      unawaited(_sendClockPing());
+    } catch (error) {
+      _lastError = _friendlyError(error);
+      try {
+        _room.reconnecting(DateTime.now().toUtc());
+      } catch (_) {}
+      notifyListeners();
     }
   }
 
@@ -604,6 +717,7 @@ class NearbyTogetherRuntime extends ChangeNotifier {
         session == null ||
         !session.isActive ||
         !host.channel.hasGuest ||
+        _hostMediaHandoffPending ||
         adapter.applyingRemote) {
       return;
     }
@@ -640,6 +754,21 @@ class NearbyTogetherRuntime extends ChangeNotifier {
       await guest.channel.send(type, payload);
     }
   }
+
+  static Map<String, dynamic> _mediaChangePayload(
+    OtyaMediaIdentity media,
+    Uri hostMediaUrl,
+    int mediaRevision,
+  ) => {
+        'media_revision': mediaRevision,
+        'media': {
+          'fingerprint': media.fingerprint,
+          'byte_length': media.byteLength,
+          if (media.duration != null) 'duration_ms': media.duration!.inMilliseconds,
+          if (media.mimeType != null) 'mime_type': media.mimeType,
+        },
+        'media_url': hostMediaUrl.toString(),
+      };
 
   void _beginStart() {
     if (_starting) throw StateError('Together is already starting.');
@@ -683,6 +812,9 @@ class NearbyTogetherRuntime extends ChangeNotifier {
     }
     if (message.contains('invalid Nearby Together invite')) {
       return 'That Together invite is not valid anymore. Ask the host to show a new one.';
+    }
+    if (message.contains('next video') || message.contains('media revision')) {
+      return 'OTYA could not switch the Together video. Keep the room open and try again.';
     }
     return 'OTYA could not connect Together. Check the local connection and try again.';
   }
