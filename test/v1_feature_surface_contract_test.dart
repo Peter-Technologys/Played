@@ -114,7 +114,10 @@ void main() {
     final widgets = File(
       'lib/features/player/presentation/widgets/audio_player_widgets.dart',
     ).readAsStringSync();
-    final player = '$screen\n$widgets';
+    final nowPlaying = File(
+      'lib/features/player/presentation/widgets/audio_player_now_playing_view.dart',
+    ).readAsStringSync();
+    final player = '$screen\n$widgets\n$nowPlaying';
 
     for (final marker in [
       'toggleFavorite()',
