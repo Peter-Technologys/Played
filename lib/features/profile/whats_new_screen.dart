@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/services/update_service.dart';
+import '../../shared/widgets/wallpaper_scaffold.dart';
 
 class WhatsNewScreen extends StatefulWidget {
   const WhatsNewScreen({super.key});
@@ -36,15 +37,27 @@ class _WhatsNewScreenState extends State<WhatsNewScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text("What's new")),
+    return WallpaperScaffold(
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
+        title: const Text("What's new"),
+      ),
       body: _error != null
           ? Center(child: Text(_error!, style: const TextStyle(color: AppColors.textSecondary)))
           : _text == null
               ? const Center(child: CircularProgressIndicator())
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(20),
-                  child: Text(_text!, style: const TextStyle(height: 1.6)),
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: AppColors.surfaceElevated,
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: AppColors.border),
+                    ),
+                    child: Text(_text!, style: const TextStyle(height: 1.6)),
+                  ),
                 ),
     );
   }
