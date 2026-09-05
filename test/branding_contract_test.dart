@@ -30,8 +30,8 @@ void main() {
 
     expect(adaptive, contains('@drawable/otya_launcher_foreground'));
     expect(adaptive, contains('@color/otya_launcher_background'));
-    expect(foreground, contains('@mipmap/ic_launcher_foreground'));
-    expect(monochrome, contains('@mipmap/ic_launcher_monochrome'));
+    expect(foreground, contains('@drawable/otya_launcher_foreground_bitmap'));
+    expect(monochrome, contains('@drawable/otya_launcher_foreground_bitmap'));
 
     expect(logo, contains("'assets/branding/otya_mark_current.png'"));
     expect(logo, contains('Image.asset('));
@@ -41,6 +41,13 @@ void main() {
     expect(colors, contains('colors: [brandCyan, brandBlue, brandDeepBlue]'));
 
     expect(File('assets/branding/otya_mark_current.png').existsSync(), isTrue);
+    expect(
+      File(
+        'android/app/src/main/res/drawable-nodpi/'
+        'otya_launcher_foreground_bitmap.png',
+      ).existsSync(),
+      isTrue,
+    );
     expect(File('assets/branding/otya_app_icon.webp').existsSync(), isTrue);
     expect(File('assets/icons/play_store_512.png').existsSync(), isTrue);
 
