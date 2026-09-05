@@ -58,7 +58,8 @@ Future<void> showNearbyTogetherLiveRoomSurface({
       context: context,
       useSafeArea: true,
       isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface.withValues(alpha: .98),
+      backgroundColor:
+          Theme.of(context).colorScheme.surface.withValues(alpha: .98),
       barrierColor: Colors.black.withValues(alpha: .30),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
@@ -79,12 +80,19 @@ Future<void> showNearbyTogetherLiveRoomSurface({
         child: Align(
           alignment: Alignment.centerRight,
           child: Material(
-            color: Theme.of(dialogContext).colorScheme.surface.withValues(alpha: .96),
+            color: Theme.of(dialogContext)
+                .colorScheme
+                .surface
+                .withValues(alpha: .96),
             elevation: 18,
-            borderRadius: const BorderRadius.horizontal(left: Radius.circular(28)),
+            borderRadius:
+                const BorderRadius.horizontal(left: Radius.circular(28)),
             clipBehavior: Clip.antiAlias,
             child: SizedBox(
-              width: MediaQuery.sizeOf(dialogContext).width.clamp(320, 430).toDouble(),
+              width: MediaQuery.sizeOf(dialogContext)
+                  .width
+                  .clamp(320, 430)
+                  .toDouble(),
               height: double.infinity,
               child: liveContent(dialogContext),
             ),
@@ -95,7 +103,9 @@ Future<void> showNearbyTogetherLiveRoomSurface({
         position: Tween<Offset>(
           begin: const Offset(1, 0),
           end: Offset.zero,
-        ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic)),
+        ).animate(
+          CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
+        ),
         child: child,
       ),
     );
@@ -126,7 +136,7 @@ class _TogetherEndedView extends StatelessWidget {
             ),
             const SizedBox(height: 5),
             Text(
-              'Your normal OTYA playback remains available.',
+              'Your normal Otya playback remains available.',
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: Theme.of(context).colorScheme.onSurfaceVariant,
