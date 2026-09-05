@@ -86,9 +86,23 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
             Duration.zero;
     _position = _savedPosition;
     WidgetsBinding.instance.addObserver(this);
+    NearbyTogetherRuntime.instance.addListener(_handleTogetherRuntimeChanged);
     _initOrientationFromVideo();
     _initPip();
     _resetHideTimer();
+  }
+
+  void _handleTogetherRuntimeChanged() {
+    final runtime = NearbyTogetherRuntime.instance;
+    if (!mounted || !runtime.guestStreaming || _togetherGuestStreamActive) {
+      return;
+    }
+    setState(() {
+      _togetherGuestStreamActive = true;
+      _ccEnabled = false;
+      _position = Duration.zero;
+      _duration = runtime.guestPlan?.remoteMedia.duration ?? Duration.zero;
+    });
   }
 
   Future<void> _initPip() async {
@@ -162,15 +176,50 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
 
-  void _openQueuedVideo(MediaItem item) {
+  Future<bool> _openQueuedVideo(MediaItem item) async {
+    final runtime = NearbyTogetherRuntime.instance;
+    if (runtime.active && runtime.isGuest) {
+      _showHostControlsQueueMessage();
+      return false;
+    }
+
     if (_persistLocalPosition && _position > Duration.zero) {
       OtyaDatabase.instance.saveSeekPosition(widget.mediaItem.id, _position);
     }
-    if (NearbyTogetherRuntime.instance.active) {
-      unawaited(NearbyTogetherRuntime.instance.stop());
+
+    if (runtime.active && runtime.isHost) {
+      try {
+        await runtime.prepareHostNextMedia(item);
+      } catch (_) {
+        await _player?.play();
+        if (!mounted) return false;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              runtime.lastError ??
+                  'Otya could not change the Together video. Try again.',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return false;
+      }
     }
+
+    if (!mounted) return false;
     _handoffToAnotherVideo = true;
     context.pushReplacement('/player/video', extra: item);
+    return true;
+  }
+
+  void _showHostControlsQueueMessage() {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('The host chooses the shared video while Together is active.'),
+        backgroundColor: AppColors.surface,
+      ),
+    );
   }
 
   String get size {
@@ -406,14 +455,18 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         unawaited(runtime.stop());
         Navigator.of(context).pop();
       },
-      onReplay: () {
-        _player?.seek(Duration.zero);
-        _player?.play();
-      },
-      onChooseNext: () {
-        Navigator.of(context).pop();
-        _next();
-      },
+      onReplay: runtime.isHost
+          ? () {
+              _player?.seek(Duration.zero);
+              _player?.play();
+            }
+          : null,
+      onChooseNext: runtime.isHost
+          ? () {
+              Navigator.of(context).pop();
+              unawaited(_next());
+            }
+          : null,
     );
   }
 
@@ -717,11 +770,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     setState(() => _position = position);
   }
 
-  void _previous() {
+  Future<void> _previous() async {
+    final runtime = NearbyTogetherRuntime.instance;
+    if (runtime.active && runtime.isGuest) {
+      _showHostControlsQueueMessage();
+      return;
+    }
+
     ref.read(queueProvider.notifier).previous();
     final previous = ref.read(queueProvider).current;
     if (previous != null && context.mounted) {
-      _openQueuedVideo(previous);
+      final opened = await _openQueuedVideo(previous);
+      if (!opened && context.mounted) {
+        ref.read(queueProvider.notifier).next();
+      }
     }
   }
 
@@ -733,11 +795,20 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     }
   }
 
-  void _next() {
+  Future<void> _next() async {
+    final runtime = NearbyTogetherRuntime.instance;
+    if (runtime.active && runtime.isGuest) {
+      _showHostControlsQueueMessage();
+      return;
+    }
+
     ref.read(queueProvider.notifier).next();
     final next = ref.read(queueProvider).current;
     if (next != null && context.mounted) {
-      _openQueuedVideo(next);
+      final opened = await _openQueuedVideo(next);
+      if (!opened && context.mounted) {
+        ref.read(queueProvider.notifier).previous();
+      }
     }
   }
 
@@ -796,6 +867,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
         unawaited(PipService.instance.setVideoPlaying(playing: playing));
       }
     });
+
+    final runtime = NearbyTogetherRuntime.instance;
+    if (runtime.active) runtime.attachPlayer(player);
   }
 
   Future<void> _leavePlayer() async {
@@ -810,6 +884,7 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     _positionSub?.cancel();
     _durationSub?.cancel();
     _playingSub?.cancel();
+    NearbyTogetherRuntime.instance.removeListener(_handleTogetherRuntimeChanged);
     final player = _player;
     if (player != null) {
       NearbyTogetherRuntime.instance.detachPlayer(player);
@@ -888,9 +963,9 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                     onSeekChanged: _seekChanged,
                     onSeekEnd: _seekEnd,
                     onRewind: _rewind,
-                    onPrevious: _previous,
+                    onPrevious: () => unawaited(_previous()),
                     onPlayPause: _togglePlayback,
-                    onNext: _next,
+                    onNext: () => unawaited(_next()),
                     onForward: _forward,
                     onSpeed: _showSpeedPicker,
                     onAspectRatio: _cycleAspectRatio,
