@@ -171,7 +171,7 @@ Future<void> _initPlaybackPlatform() async {
     builder: () => OtyaAudioHandler(),
     config: AudioServiceConfig(
       androidNotificationChannelId: 'com.otyaplayer.app.audio',
-      androidNotificationChannelName: 'Otya — Now Playing',
+      androidNotificationChannelName: 'OTYA — Now Playing',
       // Keeping the foreground service alive while paused already makes the
       // media notification ongoing. audio_service rejects explicitly enabling
       // both behaviours at once.
