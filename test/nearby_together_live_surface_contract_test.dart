@@ -6,6 +6,9 @@ void main() {
   final source = File(
     'lib/features/together/presentation/nearby_together_live_surface.dart',
   ).readAsStringSync();
+  final player = File(
+    'lib/features/player/presentation/video_player_screen.dart',
+  ).readAsStringSync();
 
   test('Nearby Together reuses the one room UI and repaints from runtime', () {
     expect(source, contains('AnimatedBuilder('));
@@ -21,5 +24,14 @@ void main() {
     expect(source, contains('showGeneralDialog<void>'));
     expect(source, isNot(contains('GoRoute(')));
     expect(source, isNot(contains('Navigator.push')));
+  });
+
+  test('video player opens the live Nearby Together surface', () {
+    expect(
+      player,
+      contains("import '../../together/presentation/nearby_together_live_surface.dart';"),
+    );
+    expect(player, contains('showNearbyTogetherLiveRoomSurface('));
+    expect(player, isNot(contains('showTogetherRoomSurface(')));
   });
 }
