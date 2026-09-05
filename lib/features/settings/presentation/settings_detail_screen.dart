@@ -13,7 +13,7 @@ import '../../../core/widgets/update_dialog.dart';
 import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../settings_provider.dart';
 
-/// OTYA preferences.
+/// Otya preferences.
 ///
 /// This screen intentionally exposes only settings that have a real runtime
 /// owner. Legacy controls that no longer affect playback are not shown.
@@ -60,7 +60,7 @@ class SettingsDetailScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.hide_image_rounded,
               title: 'Remove wallpaper',
-              subtitle: 'Return to the selected OTYA theme background',
+              subtitle: 'Return to the selected Otya theme background',
               onTap: () => _removeWallpaper(context),
             ),
           ]),
@@ -133,7 +133,7 @@ class SettingsDetailScreen extends ConsumerWidget {
             _SwitchTile(
               icon: Icons.phonelink_lock_rounded,
               title: 'App Lock',
-              subtitle: 'Require your Android screen lock, fingerprint or face after OTYA leaves the foreground',
+              subtitle: 'Require your Android screen lock, fingerprint or face after Otya leaves the foreground',
               value: settings.appLockEnabled,
               onChanged: (enabled) => _setAppLock(context, notifier, enabled),
             ),
@@ -141,7 +141,7 @@ class SettingsDetailScreen extends ConsumerWidget {
             _SwitchTile(
               icon: Icons.manage_search_rounded,
               title: 'Search history',
-              subtitle: 'Remember recent OTYA searches on this device',
+              subtitle: 'Remember recent Otya searches on this device',
               value: settings.searchHistory,
               onChanged: notifier.setSearchHistory,
             ),
@@ -149,7 +149,7 @@ class SettingsDetailScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.notifications_active_rounded,
               title: 'Notifications',
-              subtitle: 'Completed tasks, security notices and OTYA updates',
+              subtitle: 'Completed tasks, security notices and Otya updates',
               onTap: () async {
                 HapticFeedback.selectionClick();
                 final granted = await NotificationService.instance.requestPermission();
@@ -176,17 +176,17 @@ class SettingsDetailScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.storage_rounded,
               title: 'Storage',
-              subtitle: 'Inspect OTYA media and device storage',
+              subtitle: 'Inspect Otya media and device storage',
               onTap: () => context.push('/settings/storage'),
             ),
           ]),
           const SizedBox(height: 24),
-          const _SectionTitle('OTYA'),
+          const _SectionTitle('Otya'),
           _Card(children: [
             _NavTile(
               icon: Icons.system_update_rounded,
               title: 'Check for updates',
-              subtitle: 'Check the canonical OTYA release service',
+              subtitle: 'Check the canonical Otya release service',
               onTap: () async {
                 HapticFeedback.selectionClick();
                 await UpdateDialog.checkAndShow(context, forceCheck: true);
@@ -196,13 +196,13 @@ class SettingsDetailScreen extends ConsumerWidget {
             _NavTile(
               icon: Icons.privacy_tip_outlined,
               title: 'Privacy policy',
-              subtitle: 'How OTYA handles account and service data',
+              subtitle: 'How Otya handles account and service data',
               onTap: () => context.push('/privacy'),
             ),
             const _Line(),
             _NavTile(
               icon: Icons.info_outline_rounded,
-              title: 'About OTYA',
+              title: 'About Otya',
               subtitle: 'Version, product information and legal links',
               onTap: () => context.push('/about'),
             ),
@@ -238,7 +238,7 @@ class SettingsDetailScreen extends ConsumerWidget {
       }
 
       final verified = await auth.authenticate(
-        localizedReason: 'Verify your device authentication to enable OTYA App Lock',
+        localizedReason: 'Verify your device authentication to enable Otya App Lock',
         options: const AuthenticationOptions(
           biometricOnly: false,
           stickyAuth: true,
@@ -285,7 +285,7 @@ class SettingsDetailScreen extends ConsumerWidget {
     } catch (_) {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('OTYA could not use that image.')),
+        const SnackBar(content: Text('Otya could not use that image.')),
       );
     }
   }
@@ -307,7 +307,7 @@ class _SectionTitle extends StatelessWidget {
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.fromLTRB(4, 0, 4, 8),
         child: Text(
-          text.toUpperCase(),
+          text,
           style: const TextStyle(
             fontSize: 11,
             letterSpacing: 1.2,
