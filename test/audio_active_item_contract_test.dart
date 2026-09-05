@@ -4,12 +4,16 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('full audio player follows the active queue item after skips', () {
-    final player = File(
+    final screen = File(
       'lib/features/player/presentation/audio_player_screen.dart',
     ).readAsStringSync();
+    final nowPlaying = File(
+      'lib/features/player/presentation/widgets/audio_player_now_playing_view.dart',
+    ).readAsStringSync();
+    final player = '$screen\n$nowPlaying';
 
     expect(
-      player,
+      screen,
       contains(
         'final activeItem = ref.watch(miniPlayerItemProvider) ?? widget.mediaItem;',
       ),
@@ -18,8 +22,8 @@ void main() {
     expect(player, contains('activeItem.title'));
     expect(player, contains("activeItem.artist ?? 'Unknown Artist'"));
     expect(player, contains('[XFile(activeItem.filePath)]'));
-    expect(player, contains('_startLoad(activeItem);'));
-    expect(player, contains('savePosition(_activeItem.id)'));
+    expect(screen, contains('_startLoad(activeItem);'));
+    expect(screen, contains('savePosition(_activeItem.id)'));
   });
 
   test('album art resolution ignores stale async completions', () {
