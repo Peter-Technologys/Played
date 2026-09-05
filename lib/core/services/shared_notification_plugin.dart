@@ -1,4 +1,4 @@
-// One FlutterLocalNotificationsPlugin shared by OTYA's local notification
+// One FlutterLocalNotificationsPlugin shared by Otya's local notification
 // owners so Android channel registration and tap handling stay centralized.
 //
 // Notification routing:
@@ -44,32 +44,32 @@ Future<void> initSharedNotificationsPlugin() async {
 const _androidChannels = <AndroidNotificationChannel>[
   AndroidNotificationChannel(
     'otya_updates',
-    'OTYA — Updates',
-    description: 'Important OTYA product and security updates',
+    'Otya — Updates',
+    description: 'Important Otya product and security updates',
     importance: Importance.high,
   ),
   AndroidNotificationChannel(
     'otya_announcements',
-    'OTYA — Announcements',
-    description: 'Useful OTYA announcements and account notices',
+    'Otya — Announcements',
+    description: 'Useful Otya announcements and account notices',
     importance: Importance.defaultImportance,
   ),
   AndroidNotificationChannel(
     'com.otyaplayer.app.tools.progress',
-    'OTYA Tools — Progress',
+    'Otya Tools — Progress',
     description: 'Silent progress for active media tools',
     importance: Importance.low,
   ),
   AndroidNotificationChannel(
     'com.otyaplayer.app.tools.complete',
-    'OTYA Tools — Complete',
-    description: 'Alerts when an OTYA media task finishes',
+    'Otya Tools — Complete',
+    description: 'Alerts when an Otya media task finishes',
     importance: Importance.high,
   ),
   AndroidNotificationChannel(
     'com.otyaplayer.app.tools.error',
-    'OTYA Tools — Errors',
-    description: 'Alerts when an OTYA media task needs attention',
+    'Otya Tools — Errors',
+    description: 'Alerts when an Otya media task needs attention',
     importance: Importance.high,
   ),
 ];
