@@ -23,13 +23,34 @@ class TransferHotspotService {
 
   OtyaHotspotInfo? get active => _active;
 
+  /// Requests the nearby-device permission only when the user enters Transfer.
+  ///
+  /// Android 13+ uses this permission for Wi-Fi connection management, and
+  /// Android 16's local-network protection path also uses it to restore raw
+  /// LAN socket access. Android 8-12 do not need location for ordinary TCP
+  /// transfer, so their location prompt remains deferred until hotspot
+  /// creation actually needs it.
+  Future<bool> ensureLocalNetworkAccess() async {
+    if (!Platform.isAndroid) return true;
+    final sdk = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
+    if (sdk < 33) return true;
+
+    final current = await Permission.nearbyWifiDevices.status;
+    if (current.isGranted) return true;
+    final requested = await Permission.nearbyWifiDevices.request();
+    return requested.isGranted;
+  }
+
   Future<OtyaHotspotInfo?> start() async {
     if (!Platform.isAndroid) return null;
 
     final sdk = (await DeviceInfoPlugin().androidInfo).version.sdkInt;
     PermissionStatus permission;
     if (sdk >= 33) {
-      permission = await Permission.nearbyWifiDevices.request();
+      final granted = await ensureLocalNetworkAccess();
+      permission = granted
+          ? PermissionStatus.granted
+          : await Permission.nearbyWifiDevices.status;
     } else if (sdk >= 26) {
       permission = await Permission.locationWhenInUse.request();
     } else {
@@ -42,7 +63,7 @@ class TransferHotspotService {
     if (!permission.isGranted) {
       throw TransferHotspotException(
         sdk >= 33
-            ? 'Allow Nearby devices so Otya can create a private local hotspot for Transfer.'
+            ? 'Allow Nearby devices so Otya can connect directly to nearby phones and create an offline Transfer hotspot.'
             : 'Allow location while using Otya. Android requires it for local-only hotspots on this version.',
         code: 'HOTSPOT_PERMISSION_REQUIRED',
       );
@@ -76,7 +97,8 @@ class TransferHotspotService {
     } on PlatformException catch (error) {
       return OtyaShareableApk(
         available: false,
-        reason: error.message ?? 'Android could not prepare Otya for offline sharing.',
+        reason: error.message ??
+            'Android could not prepare Otya for offline sharing.',
       );
     }
   }
