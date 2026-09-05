@@ -63,7 +63,17 @@ class TogetherParticipant {
 class TogetherSession {
   final String id;
   final String hostParticipantId;
-  final String mediaFingerprint;
+
+  /// Fingerprint for the media currently attached to the room. This is not a
+  /// permanent room identifier: the host can choose another movie while the
+  /// same participants and conversation remain connected.
+  final String activeMediaFingerprint;
+
+  /// Increments whenever the host replaces the active media. Playback/control
+  /// packets can carry this value so stale packets from the previous movie are
+  /// ignored without creating a new Together room.
+  final int mediaRevision;
+
   final TogetherSessionPhase phase;
   final TogetherConnectionPath? connectionPath;
   final List<TogetherParticipant> participants;
@@ -73,10 +83,11 @@ class TogetherSession {
   const TogetherSession({
     required this.id,
     required this.hostParticipantId,
-    required this.mediaFingerprint,
+    required this.activeMediaFingerprint,
     required this.phase,
     required this.participants,
     required this.createdAt,
+    this.mediaRevision = 0,
     this.connectionPath,
     this.mediaEndedAt,
   });
@@ -91,6 +102,8 @@ class TogetherSession {
       participants.where((participant) => participant.isConnected).length;
 
   TogetherSession copyWith({
+    String? activeMediaFingerprint,
+    int? mediaRevision,
     TogetherSessionPhase? phase,
     TogetherConnectionPath? connectionPath,
     bool clearConnectionPath = false,
@@ -101,7 +114,9 @@ class TogetherSession {
     return TogetherSession(
       id: id,
       hostParticipantId: hostParticipantId,
-      mediaFingerprint: mediaFingerprint,
+      activeMediaFingerprint:
+          activeMediaFingerprint ?? this.activeMediaFingerprint,
+      mediaRevision: mediaRevision ?? this.mediaRevision,
       phase: phase ?? this.phase,
       connectionPath: clearConnectionPath
           ? null
