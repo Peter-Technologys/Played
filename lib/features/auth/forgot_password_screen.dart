@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/theme/app_colors.dart';
 import '../../core/services/auth_service.dart';
+import '../../shared/widgets/otya_logo.dart';
+import '../../shared/widgets/wallpaper_scaffold.dart';
 
 class ForgotPasswordScreen extends StatefulWidget {
   const ForgotPasswordScreen({super.key});
@@ -127,10 +129,10 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    return Scaffold(
-      backgroundColor: scheme.surface,
+    return WallpaperScaffold(
       appBar: AppBar(
-        backgroundColor: scheme.surface,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: Icon(Icons.arrow_back_ios_new_rounded, color: scheme.onSurfaceVariant, size: 20),
@@ -139,9 +141,57 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         title: Text('Reset Password', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700, color: scheme.onSurface, fontFamily: 'Inter')),
       ),
       body: SafeArea(
+        top: false,
         child: SingleChildScrollView(
-          padding: EdgeInsets.fromLTRB(24, 24, 24, 24 + MediaQuery.paddingOf(context).bottom),
-          child: _step == 1 ? _buildStep1(scheme) : _step == 2 ? _buildStep2(scheme) : _buildStep3(scheme),
+          padding: EdgeInsets.fromLTRB(20, 18, 20, 24 + MediaQuery.paddingOf(context).bottom),
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 520),
+              child: Container(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 24),
+                decoration: BoxDecoration(
+                  color: AppColors.surfaceElevated.withValues(alpha: .94),
+                  borderRadius: BorderRadius.circular(26),
+                  border: Border.all(color: AppColors.border),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.brandBlue.withValues(alpha: .10),
+                      blurRadius: 30,
+                      offset: const Offset(0, 14),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    const Row(
+                      children: [
+                        OtyaMark(size: 34),
+                        SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            'Otya account recovery',
+                            style: TextStyle(
+                              fontSize: 19,
+                              fontWeight: FontWeight.w900,
+                              letterSpacing: -.35,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 24),
+                    if (_step == 1)
+                      _buildStep1(scheme)
+                    else if (_step == 2)
+                      _buildStep2(scheme)
+                    else
+                      _buildStep3(scheme),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       ),
     );
@@ -173,7 +223,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
         const SizedBox(height: 20),
         _GradientButton(label: 'Reset Password', loading: _loading, onPressed: _resetPassword),
         const SizedBox(height: 12),
-        TextButton(onPressed: (_loading || cooldown > 0) ? null : _sendOtp, child: Text(cooldown > 0 ? 'Resend code in ${cooldown}s' : 'Resend code', style: TextStyle(color: cooldown > 0 ? scheme.onSurfaceVariant : AppColors.accent, fontFamily: 'Inter'))),
+        TextButton(onPressed: (_loading || cooldown > 0) ? null : _sendOtp, child: Text(cooldown > 0 ? 'Resend code in ${cooldown}s' : 'Resend code', style: TextStyle(color: cooldown > 0 ? scheme.onSurfaceVariant : AppColors.brandCyan, fontFamily: 'Inter'))),
       ],
     );
   }
@@ -182,7 +232,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
     mainAxisAlignment: MainAxisAlignment.center,
     crossAxisAlignment: CrossAxisAlignment.stretch,
     children: [
-      const SizedBox(height: 48),
+      const SizedBox(height: 18),
       const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 64),
       const SizedBox(height: 20),
       Text('Password reset!', textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800, color: scheme.onSurface, fontFamily: 'Inter')),
@@ -222,7 +272,7 @@ class _Field extends StatelessWidget {
         counterText: '', filled: true, fillColor: scheme.surfaceContainerHighest,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: scheme.outlineVariant)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: BorderSide(color: scheme.outlineVariant)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.accent, width: 1.5)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(14), borderSide: const BorderSide(color: AppColors.brandCyan, width: 1.5)),
       ),
     );
   }
@@ -237,9 +287,9 @@ class _GradientButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) => FilledButton(
     onPressed: loading ? null : onPressed,
-    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), backgroundColor: AppColors.accent, foregroundColor: Colors.black, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
+    style: FilledButton.styleFrom(minimumSize: const Size.fromHeight(52), backgroundColor: AppColors.brandBlue, foregroundColor: Colors.white, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16))),
     child: loading
-        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.accent))
+        ? const SizedBox(width: 22, height: 22, child: CircularProgressIndicator(strokeWidth: 2.5, color: Colors.white))
         : Text(label, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15, fontFamily: 'Inter')),
   );
 }

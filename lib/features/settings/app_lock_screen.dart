@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
 
 import '../../app/theme/app_colors.dart';
+import '../../shared/widgets/otya_logo.dart';
+import '../../shared/widgets/wallpaper_scaffold.dart';
 import 'settings_provider.dart';
 
 /// Application-level privacy gate.
@@ -130,8 +132,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return WallpaperScaffold(
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -139,15 +140,22 @@ class _AppLockScreenState extends State<AppLockScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  'OTYA',
-                  style: const TextStyle(
-                    fontSize: 34,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.accent,
-                    fontFamily: 'Inter',
-                    letterSpacing: 5,
-                  ),
+                const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    OtyaMark(size: 36),
+                    SizedBox(width: 11),
+                    Text(
+                      'Otya',
+                      style: TextStyle(
+                        fontSize: 27,
+                        fontWeight: FontWeight.w900,
+                        color: AppColors.textPrimary,
+                        fontFamily: 'Inter',
+                        letterSpacing: -.8,
+                      ),
+                    ),
+                  ],
                 ).animate().fadeIn(duration: 350.ms),
                 const SizedBox(height: 42),
                 Container(
@@ -156,18 +164,18 @@ class _AppLockScreenState extends State<AppLockScreen> {
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     color: AppColors.surface,
-                    border: Border.all(color: AppColors.accent, width: 2),
+                    border: Border.all(color: AppColors.brandCyan, width: 1.5),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.accent.withValues(alpha: .22),
-                        blurRadius: 24,
-                        spreadRadius: 3,
+                        color: AppColors.brandBlue.withValues(alpha: .24),
+                        blurRadius: 28,
+                        spreadRadius: 2,
                       ),
                     ],
                   ),
                   child: const Icon(
                     Icons.lock_rounded,
-                    color: AppColors.accent,
+                    color: AppColors.brandCyan,
                     size: 36,
                   ),
                 ).animate().scale(
@@ -177,7 +185,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                     ),
                 const SizedBox(height: 24),
                 const Text(
-                  'OTYA is locked',
+                  'Otya is locked',
                   style: TextStyle(
                     fontSize: 21,
                     fontWeight: FontWeight.w800,
@@ -228,7 +236,7 @@ class _AppLockScreenState extends State<AppLockScreen> {
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
                         : const Icon(Icons.fingerprint_rounded),
-                    label: Text(_authenticating ? 'Checking…' : 'Unlock OTYA'),
+                    label: Text(_authenticating ? 'Checking…' : 'Unlock Otya'),
                   ),
                 ),
               ],

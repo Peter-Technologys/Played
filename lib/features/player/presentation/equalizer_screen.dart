@@ -4,6 +4,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../app/theme/app_dimensions.dart';
 import '../../../core/services/media_dsp_service.dart';
 import '../../../core/services/playback_coordinator.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 /// OTYA Sound Tuner.
 ///
@@ -100,8 +101,7 @@ class _EqualizerScreenState extends State<EqualizerScreen> {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundOf(context),
+    return WallpaperScaffold(
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         surfaceTintColor: Colors.transparent,
