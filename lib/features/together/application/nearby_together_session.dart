@@ -154,6 +154,7 @@ class NearbyTogetherGuestSession {
 
     final plan = await _planFromHello(
       hello,
+      expectedHost: inviteUri.host,
       candidateLocalFilePath: candidateLocalFilePath,
       candidateDuration: candidateDuration,
       candidateMimeType: candidateMimeType,
@@ -168,6 +169,7 @@ class NearbyTogetherGuestSession {
 
   Future<NearbyPlaybackPlan> _planFromHello(
     NearbyTogetherMessage hello, {
+    required String expectedHost,
     required String? candidateLocalFilePath,
     required Duration? candidateDuration,
     required String? candidateMimeType,
@@ -224,15 +226,12 @@ class NearbyTogetherGuestSession {
 
     final rawUrl = payload['media_url'];
     final hostUrl = rawUrl is String ? Uri.tryParse(rawUrl) : null;
-    if (hostUrl == null || !isAllowedTransferUri(hostUrl)) {
+    if (hostUrl == null ||
+        !isAllowedTransferUri(hostUrl) ||
+        hostUrl.host != expectedHost) {
       throw const FormatException('Nearby Together host media source is invalid.');
     }
 
-    // The media URL must resolve to the same host device as the control socket,
-    // preventing a valid Together peer from redirecting playback to the public
-    // internet or another LAN machine.
-    // inviteUri host checking occurs at channel connect; the URL itself is still
-    // restricted to RFC1918 by isAllowedTransferUri.
     return NearbyPlaybackPlan.stream(
       remoteMedia: remote,
       hostMediaUrl: hostUrl,
