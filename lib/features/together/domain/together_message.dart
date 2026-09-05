@@ -6,6 +6,7 @@
 enum TogetherMessageKind {
   text,
   moment,
+  reaction,
   system,
 }
 
@@ -37,4 +38,5 @@ class TogetherMessage {
         );
 
   bool get isMoment => kind == TogetherMessageKind.moment;
+  bool get isReaction => kind == TogetherMessageKind.reaction;
 }
