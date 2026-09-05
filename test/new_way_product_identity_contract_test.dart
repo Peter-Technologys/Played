@@ -34,7 +34,7 @@ void main() {
   test('legacy AI links fail soft while main navigation stays one app', () {
     final source = File('lib/app/router.dart').readAsStringSync();
 
-    expect(source, isNot(contains("features/ai/otya_support_screen.dart")));
+    expect(source, isNot(contains('features/ai/otya_support_screen.dart')));
     expect(
       source,
       contains("GoRoute(path: '/support', redirect: (_, __) => '/about')"),
