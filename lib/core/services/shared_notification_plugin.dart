@@ -44,32 +44,32 @@ Future<void> initSharedNotificationsPlugin() async {
 const _androidChannels = <AndroidNotificationChannel>[
   AndroidNotificationChannel(
     'otya_updates',
-    'Otya — Updates',
-    description: 'Important Otya product and security updates',
+    'OTYA — Updates',
+    description: 'Important OTYA product and security updates',
     importance: Importance.high,
   ),
   AndroidNotificationChannel(
     'otya_announcements',
-    'Otya — Announcements',
-    description: 'Useful Otya announcements and account notices',
+    'OTYA — Announcements',
+    description: 'Useful OTYA announcements and account notices',
     importance: Importance.defaultImportance,
   ),
   AndroidNotificationChannel(
     'com.otyaplayer.app.tools.progress',
-    'Otya Tools — Progress',
+    'OTYA Tools — Progress',
     description: 'Silent progress for active media tools',
     importance: Importance.low,
   ),
   AndroidNotificationChannel(
     'com.otyaplayer.app.tools.complete',
-    'Otya Tools — Complete',
-    description: 'Alerts when an Otya media task finishes',
+    'OTYA Tools — Complete',
+    description: 'Alerts when an OTYA media task finishes',
     importance: Importance.high,
   ),
   AndroidNotificationChannel(
     'com.otyaplayer.app.tools.error',
-    'Otya Tools — Errors',
-    description: 'Alerts when an Otya media task needs attention',
+    'OTYA Tools — Errors',
+    description: 'Alerts when an OTYA media task needs attention',
     importance: Importance.high,
   ),
 ];
