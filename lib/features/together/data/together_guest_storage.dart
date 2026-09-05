@@ -10,9 +10,16 @@ class TogetherGuestStorage {
 
   Future<Directory> cacheDirectory(String mediaFingerprint) async {
     final base = await getApplicationSupportDirectory();
-    final safe = mediaFingerprint
-        .replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_')
-        .substring(0, mediaFingerprint.length.clamp(1, 96));
+    final normalized = mediaFingerprint.replaceAll(
+      RegExp(r'[^A-Za-z0-9_-]'),
+      '_',
+    );
+    final safe = normalized.length > 96
+        ? normalized.substring(0, 96)
+        : normalized;
+    if (safe.isEmpty) {
+      throw ArgumentError.value(mediaFingerprint, 'mediaFingerprint');
+    }
     final directory = Directory('${base.path}/together_cache/$safe');
     await directory.create(recursive: true);
     return directory;
