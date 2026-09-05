@@ -231,8 +231,10 @@ class VideoFolderDetailPage extends ConsumerWidget {
     final videos = items.where((item) => item.isVideo).toList()
       ..sort((a, b) => b.addedAt.compareTo(a.addedAt));
 
-    return Scaffold(
+    return WallpaperScaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         leading: IconButton(
           tooltip: 'Back',
           icon: const Icon(Icons.arrow_back_rounded),
