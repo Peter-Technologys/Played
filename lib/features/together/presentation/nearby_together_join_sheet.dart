@@ -166,7 +166,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                       ),
                       SizedBox(height: 2),
                       Text(
-                        'Scan the private invite on your friend’s OTYA.',
+                        'Scan the private invite from your friend’s OTYA.',
                         style: TextStyle(color: AppColors.textSecondary, fontSize: 12.5),
                       ),
                     ],
@@ -275,7 +275,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
               keyboardType: TextInputType.url,
               decoration: InputDecoration(
                 labelText: 'Together invite',
-                hintText: 'ws://192.168…',
+                hintText: 'Paste the invite here',
                 prefixIcon: const Icon(Icons.link_rounded),
                 suffixIcon: IconButton(
                   tooltip: 'Paste invite',
@@ -306,8 +306,8 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                 ),
                 subtitle: Text(
                   _keepVideo
-                      ? 'Reuse watched bytes, fill missing parts while connected, and keep partial progress for resume.'
-                      : 'Stream only. OTYA does not keep a movie copy after the party.',
+                      ? 'OTYA reuses what you already watched, finishes only missing parts, and keeps progress if the connection stops.'
+                      : 'Watch without keeping the movie. Temporary playback data is removed when the session ends.',
                   style: const TextStyle(fontSize: 11.5, height: 1.35),
                 ),
               ),
@@ -322,7 +322,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
             ),
             const SizedBox(height: 7),
             const Text(
-              'Nearby Together works on the same Wi-Fi or hotspot. The video is not uploaded to OTYA.',
+              'Nearby Together works on the same Wi-Fi or hotspot. The video stays between your phones.',
               textAlign: TextAlign.center,
               style: TextStyle(color: AppColors.textSecondary, fontSize: 11.5, height: 1.4),
             ),
