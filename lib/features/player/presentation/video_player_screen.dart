@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
+import '../../../core/services/auth_provider.dart';
 import '../../../core/services/ffmpeg_service.dart';
 import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/native_share_service.dart';
@@ -16,6 +17,7 @@ import '../../../core/services/pip_service.dart';
 import '../../../core/services/playback_coordinator.dart';
 import '../../../features/settings/settings_provider.dart';
 import '../../../shared/widgets/speed_picker_sheet.dart';
+import '../../together/presentation/nearby_together_host_sheet.dart';
 import 'queue_screen.dart';
 import 'widgets/video_gesture_layer.dart';
 import 'widgets/video_player_overlays.dart';
@@ -251,6 +253,48 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
               onTap: () async {
                 Navigator.pop(context);
                 await _shareMedia();
+              },
+            ),
+            ListTile(
+              leading: const Icon(
+                Icons.people_alt_rounded,
+                color: AppColors.accent,
+                size: 22,
+              ),
+              title: const Text(
+                'Watch Together',
+                style: TextStyle(
+                  color: AppColors.textPrimary,
+                  fontFamily: 'Inter',
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              subtitle: const Text(
+                'Watch this video with someone nearby',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                  fontFamily: 'Inter',
+                  fontSize: 12,
+                ),
+              ),
+              onTap: () async {
+                final player = _player;
+                Navigator.pop(context);
+                if (player == null) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('The video is still getting ready. Try again in a moment.'),
+                      backgroundColor: AppColors.surface,
+                    ),
+                  );
+                  return;
+                }
+                await showNearbyTogetherHostSheet(
+                  context: context,
+                  mediaItem: widget.mediaItem,
+                  player: player,
+                  displayName: ref.read(displayNameProvider),
+                );
               },
             ),
             ListTile(
