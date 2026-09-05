@@ -1,9 +1,11 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
@@ -12,11 +14,11 @@ import '../../../core/services/media_kit_engine.dart';
 import '../../../core/services/native_share_service.dart';
 import '../../../core/services/pip_service.dart';
 import '../../../core/services/playback_coordinator.dart';
-import '../../../core/utils/duration_formatter.dart';
-import '../../../features/player/presentation/widgets/video_gesture_layer.dart';
 import '../../../features/settings/settings_provider.dart';
-import 'queue_screen.dart';
 import '../../../shared/widgets/speed_picker_sheet.dart';
+import 'queue_screen.dart';
+import 'widgets/video_gesture_layer.dart';
+import 'widgets/video_player_overlays.dart';
 
 class VideoPlayerScreen extends ConsumerStatefulWidget {
   final MediaItem mediaItem;
@@ -283,10 +285,16 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                       mainAxisSize: MainAxisSize.min,
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        _InfoRow(label: 'Title', value: widget.mediaItem.title),
-                        _InfoRow(label: 'Path', value: widget.mediaItem.filePath),
-                        _InfoRow(label: 'Size', value: size),
-                        _InfoRow(
+                        VideoInfoRow(
+                          label: 'Title',
+                          value: widget.mediaItem.title,
+                        ),
+                        VideoInfoRow(
+                          label: 'Path',
+                          value: widget.mediaItem.filePath,
+                        ),
+                        VideoInfoRow(label: 'Size', value: size),
+                        VideoInfoRow(
                           label: 'Duration',
                           value: widget.mediaItem.formattedDuration,
                         ),
@@ -384,534 +392,122 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
     );
   }
 
-  Widget _buildControlsOverlay() {
-    return Stack(
-      children: [
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Color(0xCC000000), Colors.transparent],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 4, 8, 16),
-                child: Row(
-                  children: [
-                    IconButton(
-                      tooltip: 'Back',
-                      icon: const Icon(
-                        Icons.arrow_back_ios_new_rounded,
-                        color: Colors.white,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        Navigator.of(context).pop();
-                      },
-                    ),
-                    Expanded(
-                      child: Text(
-                        widget.mediaItem.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          fontFamily: 'Inter',
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
-                    IconButton(
-                      icon: Icon(
-                        Icons.closed_caption_rounded,
-                        color:
-                            _ccEnabled ? AppColors.accent : Colors.white70,
-                        size: 20,
-                      ),
-                      tooltip:
-                          _ccEnabled ? 'Turn subtitles off' : 'Turn subtitles on',
-                      onPressed: _toggleSubtitles,
-                    ),
-                    IconButton(
-                      tooltip: 'Audio tracks',
-                      icon: const Icon(
-                        Icons.audiotrack_rounded,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        final player = _player;
-                        if (player == null) return;
-                        final audioTracks = player.state.tracks.audio;
-                        if (audioTracks.length <= 1) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('No other audio tracks'),
-                              backgroundColor: AppColors.surface,
-                            ),
-                          );
-                          return;
-                        }
-                        showModalBottomSheet(
-                          context: context,
-                          useSafeArea: true,
-                          backgroundColor: AppColors.surface,
-                          shape: const RoundedRectangleBorder(
-                            borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(24),
-                            ),
-                          ),
-                          builder: (_) => _AudioTrackSheet(
-                            tracks: audioTracks,
-                            activeTrack: player.state.track.audio,
-                            onSelect: player.setAudioTrack,
-                          ),
-                        );
-                      },
-                    ),
-                    IconButton(
-                      tooltip: 'Equalizer',
-                      icon: const Icon(
-                        Icons.graphic_eq_rounded,
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        context.push('/player/equalizer');
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(
-                        Icons.more_vert_rounded,
-                        color: Colors.white70,
-                        size: 22,
-                      ),
-                      onPressed: () {
-                        HapticFeedback.selectionClick();
-                        _showMoreOptions();
-                      },
-                      tooltip: 'More options',
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
+  void _showAudioTracks() {
+    final player = _player;
+    if (player == null) return;
+    final audioTracks = player.state.tracks.audio;
+    if (audioTracks.length <= 1) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No other audio tracks'),
+          backgroundColor: AppColors.surface,
         ),
-        Positioned(
-          left: 10,
-          top: 0,
-          bottom: 0,
-          child: Center(
-            child: Container(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.38),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: _isMuted ? 'Unmute' : 'Mute',
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _isMuted = !_isMuted);
-                      _player?.setVolume(_isMuted ? 0 : 100);
-                    },
-                    icon: Icon(
-                      _isMuted
-                          ? Icons.volume_off_rounded
-                          : Icons.volume_up_rounded,
-                      color: Colors.white70,
-                      size: 23,
-                    ),
-                  ),
-                  IconButton(
-                    tooltip: 'Lock controls',
-                    onPressed: () {
-                      HapticFeedback.selectionClick();
-                      setState(() => _isLocked = true);
-                      _hideTimer?.cancel();
-                    },
-                    icon: const Icon(
-                      Icons.lock_open_rounded,
-                      color: Colors.white70,
-                      size: 23,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          right: 10,
-          top: 0,
-          bottom: 0,
-          child: Center(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.38),
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.08),
-                ),
-              ),
-              child: IconButton(
-                tooltip: 'Rotate screen',
-                onPressed: _toggleOrientation,
-                icon: const Icon(
-                  Icons.screen_rotation_rounded,
-                  color: Colors.white70,
-                  size: 23,
-                ),
-              ),
-            ),
-          ),
-        ),
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                colors: [Colors.transparent, Color(0xB8000000)],
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-              ),
-            ),
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          DurationFormatter.format(_position),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                        Expanded(
-                          child: SliderTheme(
-                            data: SliderThemeData(
-                              trackHeight: 3,
-                              activeTrackColor: AppColors.accent,
-                              inactiveTrackColor: Colors.white24,
-                              thumbColor: AppColors.accent,
-                              overlayColor:
-                                  AppColors.accent.withValues(alpha: 0.2),
-                              thumbShape: const RoundSliderThumbShape(
-                                enabledThumbRadius: 6,
-                              ),
-                            ),
-                            child: Slider(
-                              value: _position.inSeconds.toDouble().clamp(
-                                    0,
-                                    _duration.inSeconds
-                                        .toDouble()
-                                        .clamp(1, double.infinity),
-                                  ),
-                              max: _duration.inSeconds
-                                  .toDouble()
-                                  .clamp(1, double.infinity),
-                              onChangeStart: (_) =>
-                                  setState(() => _isSeeking = true),
-                              onChanged: (value) => setState(
-                                () => _position =
-                                    Duration(seconds: value.toInt()),
-                              ),
-                              onChangeEnd: (value) {
-                                _player?.seek(
-                                  Duration(seconds: value.toInt()),
-                                );
-                                setState(() => _isSeeking = false);
-                              },
-                            ),
-                          ),
-                        ),
-                        Text(
-                          DurationFormatter.format(_duration),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                            fontFamily: 'Inter',
-                          ),
-                        ),
-                      ],
-                    ),
-                    Row(
-                      children: [
-                        const Spacer(),
-                        IconButton(
-                          tooltip: 'Back 10 seconds',
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            final next =
-                                _position - const Duration(seconds: 10);
-                            final position =
-                                next < Duration.zero ? Duration.zero : next;
-                            _player?.seek(position);
-                            setState(() => _position = position);
-                          },
-                          icon: const Icon(
-                            Icons.replay_10_rounded,
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: 'Previous',
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            ref.read(queueProvider.notifier).previous();
-                            final previous = ref.read(queueProvider).current;
-                            if (previous != null && context.mounted) {
-                              _openQueuedVideo(previous);
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.skip_previous_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        Container(
-                          width: 56,
-                          height: 56,
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            shape: BoxShape.circle,
-                            boxShadow: [
-                              BoxShadow(
-                                color:
-                                    AppColors.accent.withValues(alpha: 0.24),
-                                blurRadius: 18,
-                              ),
-                            ],
-                          ),
-                          child: IconButton(
-                            tooltip: _isPlaying ? 'Pause' : 'Play',
-                            onPressed: () {
-                              HapticFeedback.mediumImpact();
-                              if (_isPlaying) {
-                                _player?.pause();
-                              } else {
-                                _player?.play();
-                              }
-                            },
-                            icon: Icon(
-                              _isPlaying
-                                  ? Icons.pause_rounded
-                                  : Icons.play_arrow_rounded,
-                              color: Colors.white,
-                              size: 34,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: 'Next',
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            ref.read(queueProvider.notifier).next();
-                            final next = ref.read(queueProvider).current;
-                            if (next != null && context.mounted) {
-                              _openQueuedVideo(next);
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.skip_next_rounded,
-                            color: Colors.white,
-                            size: 28,
-                          ),
-                        ),
-                        const SizedBox(width: 6),
-                        IconButton(
-                          tooltip: 'Forward 10 seconds',
-                          onPressed: () {
-                            HapticFeedback.lightImpact();
-                            final next =
-                                _position + const Duration(seconds: 10);
-                            final position =
-                                next > _duration ? _duration : next;
-                            _player?.seek(position);
-                            setState(() => _position = position);
-                          },
-                          icon: const Icon(
-                            Icons.forward_10_rounded,
-                            color: Colors.white,
-                            size: 30,
-                          ),
-                        ),
-                        const Spacer(),
-                      ],
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        TextButton(
-                          onPressed: _showSpeedPicker,
-                          style: TextButton.styleFrom(
-                            minimumSize: const Size(48, 44),
-                            padding: const EdgeInsets.symmetric(horizontal: 10),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.12),
-                            ),
-                            backgroundColor:
-                                Colors.black.withValues(alpha: 0.24),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                          ),
-                          child: Text(
-                            '${_playbackSpeed}x',
-                            style: const TextStyle(
-                              color: AppColors.textPrimary,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w700,
-                              fontFamily: 'Inter',
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        IconButton(
-                          tooltip: _aspectRatioLabels[_aspectRatioIndex],
-                          onPressed: () {
-                            HapticFeedback.selectionClick();
-                            setState(
-                              () => _aspectRatioIndex =
-                                  (_aspectRatioIndex + 1) %
-                                      _aspectRatioFits.length,
-                            );
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  _aspectRatioLabels[_aspectRatioIndex],
-                                ),
-                                backgroundColor: AppColors.surface,
-                                duration: const Duration(seconds: 1),
-                              ),
-                            );
-                          },
-                          icon: const Icon(
-                            Icons.aspect_ratio_rounded,
-                            color: Colors.white70,
-                            size: 22,
-                          ),
-                        ),
-                        IconButton(
-                          tooltip: 'Picture in picture',
-                          onPressed: () {
-                            HapticFeedback.selectionClick();
-                            if (_pipSupported) {
-                              PipService.instance.enterPip();
-                            } else {
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                const SnackBar(
-                                  content: Text('Pop-up not supported'),
-                                  backgroundColor: AppColors.surface,
-                                ),
-                              );
-                            }
-                          },
-                          icon: const Icon(
-                            Icons.picture_in_picture_alt_rounded,
-                            color: Colors.white70,
-                            size: 22,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
-      ],
+      );
+      return;
+    }
+    showModalBottomSheet(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (_) => VideoAudioTrackSheet(
+        tracks: audioTracks,
+        activeTrack: player.state.track.audio,
+        onSelect: player.setAudioTrack,
+      ),
     );
   }
 
-  Widget _buildLockOverlay() {
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: () {},
-      child: Center(
-        child: Semantics(
-          button: true,
-          label: 'Unlock video controls',
-          child: InkWell(
-            borderRadius: BorderRadius.circular(48),
-            onTap: () {
-              HapticFeedback.selectionClick();
-              setState(() => _isLocked = false);
-              _resetHideTimer();
-            },
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  constraints: const BoxConstraints(
-                    minWidth: 68,
-                    minHeight: 68,
-                  ),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    shape: BoxShape.circle,
-                    boxShadow: [
-                      BoxShadow(
-                        color: AppColors.accent.withValues(alpha: 0.32),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.lock_rounded,
-                    color: AppColors.accent,
-                    size: 36,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Tap to unlock',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                    fontFamily: 'Inter',
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
+  void _toggleMute() {
+    setState(() => _isMuted = !_isMuted);
+    _player?.setVolume(_isMuted ? 0 : 100);
+  }
+
+  void _lockControls() {
+    setState(() => _isLocked = true);
+    _hideTimer?.cancel();
+  }
+
+  void _seekStart(double _) {
+    setState(() => _isSeeking = true);
+  }
+
+  void _seekChanged(double value) {
+    setState(() => _position = Duration(seconds: value.toInt()));
+  }
+
+  void _seekEnd(double value) {
+    _player?.seek(Duration(seconds: value.toInt()));
+    setState(() => _isSeeking = false);
+  }
+
+  void _rewind() {
+    final next = _position - const Duration(seconds: 10);
+    final position = next < Duration.zero ? Duration.zero : next;
+    _player?.seek(position);
+    setState(() => _position = position);
+  }
+
+  void _previous() {
+    ref.read(queueProvider.notifier).previous();
+    final previous = ref.read(queueProvider).current;
+    if (previous != null && context.mounted) {
+      _openQueuedVideo(previous);
+    }
+  }
+
+  void _togglePlayback() {
+    if (_isPlaying) {
+      _player?.pause();
+    } else {
+      _player?.play();
+    }
+  }
+
+  void _next() {
+    ref.read(queueProvider.notifier).next();
+    final next = ref.read(queueProvider).current;
+    if (next != null && context.mounted) {
+      _openQueuedVideo(next);
+    }
+  }
+
+  void _forward() {
+    final next = _position + const Duration(seconds: 10);
+    final position = next > _duration ? _duration : next;
+    _player?.seek(position);
+    setState(() => _position = position);
+  }
+
+  void _cycleAspectRatio() {
+    HapticFeedback.selectionClick();
+    setState(
+      () => _aspectRatioIndex =
+          (_aspectRatioIndex + 1) % _aspectRatioFits.length,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_aspectRatioLabels[_aspectRatioIndex]),
+        backgroundColor: AppColors.surface,
+        duration: const Duration(seconds: 1),
       ),
     );
+  }
+
+  void _enterPip() {
+    HapticFeedback.selectionClick();
+    if (_pipSupported) {
+      PipService.instance.enterPip();
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pop-up not supported'),
+          backgroundColor: AppColors.surface,
+        ),
+      );
+    }
   }
 
   void _attachPlayer(Player player) {
@@ -993,131 +589,49 @@ class _VideoPlayerScreenState extends ConsumerState<VideoPlayerScreen>
                 child: GestureDetector(
                   behavior: HitTestBehavior.translucent,
                   onTap: _resetHideTimer,
-                  child: _buildControlsOverlay(),
+                  child: VideoPlayerControlsOverlay(
+                    title: widget.mediaItem.title,
+                    ccEnabled: _ccEnabled,
+                    isMuted: _isMuted,
+                    isPlaying: _isPlaying,
+                    position: _position,
+                    duration: _duration,
+                    playbackSpeed: _playbackSpeed,
+                    aspectRatioLabel: _aspectRatioLabels[_aspectRatioIndex],
+                    onBack: () {
+                      Navigator.of(context).pop();
+                    },
+                    onToggleSubtitles: _toggleSubtitles,
+                    onAudioTracks: _showAudioTracks,
+                    onEqualizer: () {
+                      context.push('/player/equalizer');
+                    },
+                    onMoreOptions: _showMoreOptions,
+                    onToggleMute: _toggleMute,
+                    onLock: _lockControls,
+                    onRotate: _toggleOrientation,
+                    onSeekStart: _seekStart,
+                    onSeekChanged: _seekChanged,
+                    onSeekEnd: _seekEnd,
+                    onRewind: _rewind,
+                    onPrevious: _previous,
+                    onPlayPause: _togglePlayback,
+                    onNext: _next,
+                    onForward: _forward,
+                    onSpeed: _showSpeedPicker,
+                    onAspectRatio: _cycleAspectRatio,
+                    onPip: _enterPip,
+                  ),
                 ),
               ),
             ),
-          if (_isLocked) _buildLockOverlay(),
-        ],
-      ),
-    );
-  }
-}
-
-class _InfoRow extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _InfoRow({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          SizedBox(
-            width: 72,
-            child: Text(
-              '$label:',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
-                fontSize: 12,
-                fontFamily: 'Inter',
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(
-                color: AppColors.textPrimary,
-                fontSize: 12,
-                fontFamily: 'Inter',
-              ),
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _AudioTrackSheet extends StatelessWidget {
-  final List<AudioTrack> tracks;
-  final AudioTrack activeTrack;
-  final void Function(AudioTrack) onSelect;
-
-  const _AudioTrackSheet({
-    required this.tracks,
-    required this.activeTrack,
-    required this.onSelect,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 16, 20, 40),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(
-            child: Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.border,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            'Audio Track',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-              fontFamily: 'Inter',
-            ),
-          ),
-          const SizedBox(height: 12),
-          ...tracks.map((track) {
-            final active = track.id == activeTrack.id;
-            final label = track.language?.isNotEmpty == true
-                ? track.language!
-                : track.title?.isNotEmpty == true
-                    ? track.title!
-                    : 'Track ${tracks.indexOf(track) + 1}';
-            return ListTile(
-              contentPadding: EdgeInsets.zero,
-              leading: Icon(
-                active
-                    ? Icons.radio_button_checked_rounded
-                    : Icons.radio_button_off_rounded,
-                color: active ? AppColors.accent : AppColors.textSecondary,
-                size: 20,
-              ),
-              title: Text(
-                label,
-                style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: active ? FontWeight.w700 : FontWeight.normal,
-                  color: active ? AppColors.accent : AppColors.textPrimary,
-                  fontFamily: 'Inter',
-                ),
-              ),
-              onTap: () {
-                Navigator.pop(context);
-                onSelect(track);
+          if (_isLocked)
+            VideoPlayerLockOverlay(
+              onUnlock: () {
+                setState(() => _isLocked = false);
+                _resetHideTimer();
               },
-            );
-          }),
+            ),
         ],
       ),
     );
