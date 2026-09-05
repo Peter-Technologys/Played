@@ -11,6 +11,7 @@ import '../../../core/services/update_service.dart';
 import '../../../core/widgets/rate_us_sheet.dart';
 import '../../../core/widgets/update_dialog.dart';
 import '../../../shared/widgets/otya_logo.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 
 /// Product information and support entry points that stay useful offline.
 class AboutScreen extends StatefulWidget {
@@ -38,8 +39,10 @@ class _AboutScreenState extends State<AboutScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return WallpaperScaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         title: const Text('About Otya'),
         leading: IconButton(
           tooltip: 'Back',
