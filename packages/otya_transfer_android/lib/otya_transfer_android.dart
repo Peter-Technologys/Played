@@ -59,7 +59,7 @@ class OtyaTransferAndroid {
 
   static Future<OtyaHotspotInfo> startLocalOnlyHotspot() async {
     if (!Platform.isAndroid) {
-      throw const PlatformException(
+      throw PlatformException(
         code: 'HOTSPOT_UNSUPPORTED',
         message: 'Offline hotspot is currently available on Android only.',
       );
@@ -70,7 +70,7 @@ class OtyaTransferAndroid {
     );
     final ssid = raw?['ssid']?.toString().trim() ?? '';
     if (ssid.isEmpty) {
-      throw const PlatformException(
+      throw PlatformException(
         code: 'HOTSPOT_FAILED',
         message: 'Android started a hotspot without usable connection details.',
       );
