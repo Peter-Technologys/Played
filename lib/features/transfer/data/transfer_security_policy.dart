@@ -37,12 +37,14 @@ bool isLoopbackTransferIpv4Host(String host) {
 }
 
 bool isAllowedTransferUri(Uri uri) {
-  final normalTransfer = uri.path == '/media';
-  final internalTogetherProxy =
-      uri.path == '/together-stream' && isLoopbackTransferIpv4Host(uri.host);
+  if (uri.path == '/together-stream') {
+    return _isAllowedTogetherLoopbackUri(uri);
+  }
 
+  // Keep the original Transfer boundary explicit. Nearby Transfer accepts only
+  // OTYA's authenticated /media endpoint on a private IPv4 host.
   if (uri.scheme != 'http' ||
-      (!normalTransfer && !internalTogetherProxy) ||
+      uri.path != '/media' ||
       uri.userInfo.isNotEmpty ||
       uri.fragment.isNotEmpty ||
       uri.port <= 0 ||
@@ -51,6 +53,24 @@ bool isAllowedTransferUri(Uri uri) {
     return false;
   }
 
+  return _hasValidTransferToken(uri);
+}
+
+bool _isAllowedTogetherLoopbackUri(Uri uri) {
+  if (uri.scheme != 'http' ||
+      uri.path != '/together-stream' ||
+      uri.userInfo.isNotEmpty ||
+      uri.fragment.isNotEmpty ||
+      uri.port <= 0 ||
+      uri.port > 65535 ||
+      !isLoopbackTransferIpv4Host(uri.host)) {
+    return false;
+  }
+
+  return _hasValidTransferToken(uri);
+}
+
+bool _hasValidTransferToken(Uri uri) {
   final tokenValues = uri.queryParametersAll['t'];
   if (tokenValues == null || tokenValues.length != 1) return false;
   return _transferTokenPattern.hasMatch(tokenValues.single);
