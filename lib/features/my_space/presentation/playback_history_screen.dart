@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
 import '../../../app/theme/app_colors.dart';
 import '../../../core/database/otya_database.dart';
 import '../../../core/models/media_item.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../player/presentation/queue_screen.dart';
 
 class PlaybackHistoryScreen extends ConsumerStatefulWidget {
@@ -82,10 +84,10 @@ class _PlaybackHistoryScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return WallpaperScaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_rounded,
@@ -139,8 +141,8 @@ class _PlaybackHistoryScreenState
                     width: 44, height: 44,
                     decoration: BoxDecoration(
                       color: item.isVideo
-                          ? AppColors.accent.withValues(alpha: 0.12)
-                          : AppColors.accentViolet.withValues(alpha: 0.12),
+                          ? AppColors.brandBlue.withValues(alpha: 0.12)
+                          : AppColors.brandCyan.withValues(alpha: 0.10),
                       borderRadius: BorderRadius.circular(10),
                     ),
                     child: Icon(
@@ -148,8 +150,8 @@ class _PlaybackHistoryScreenState
                           ? Icons.videocam_rounded
                           : Icons.music_note_rounded,
                       color: item.isVideo
-                          ? AppColors.accent
-                          : AppColors.accentViolet,
+                          ? AppColors.brandBlue
+                          : AppColors.brandCyan,
                       size: 20,
                     ),
                   ),
@@ -167,7 +169,7 @@ class _PlaybackHistoryScreenState
                         fontSize: 11, color: AppColors.textSecondary),
                   ),
                   trailing: const Icon(Icons.play_arrow_rounded,
-                      color: AppColors.textSecondary, size: 20),
+                      color: AppColors.brandCyan, size: 20),
                   onTap: () {
                     HapticFeedback.lightImpact();
                     ref
