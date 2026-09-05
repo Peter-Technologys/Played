@@ -8,6 +8,9 @@ void main() {
     final channels = File(
       'lib/core/services/shared_notification_plugin.dart',
     ).readAsStringSync();
+    final push = File(
+      'lib/core/services/push_notification_service.dart',
+    ).readAsStringSync();
 
     expect(
       mainSource,
@@ -19,6 +22,11 @@ void main() {
     expect(channels, contains("'Otya Tools — Progress'"));
     expect(channels, contains("'Otya Tools — Complete'"));
     expect(channels, contains("'Otya Tools — Errors'"));
+    expect(push, contains("'Otya — Updates'"));
+    expect(push, contains("contentTitle: 'Otya \$version is available'"));
+    expect(push, contains("'Otya — Announcements'"));
+    expect(push, contains("uri.scheme != 'https'"));
+    expect(push, contains("host.endsWith('.\$_officialHost')"));
     expect(mainSource, isNot(contains("androidNotificationChannelName: 'OTYA")));
   });
 
