@@ -7,6 +7,7 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../../../core/services/duplicate_detector_service.dart';
 import '../../../core/services/storage_analyzer_service.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../my_space/data/media_repository.dart';
 
 // Top-level function required by compute() — closures cannot cross isolate
@@ -128,10 +129,9 @@ class _State extends State<StorageAnalyzerScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
+    return WallpaperScaffold(
       appBar: AppBar(
-        backgroundColor: AppColors.background,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         surfaceTintColor: Colors.transparent,
         leading: IconButton(
@@ -165,7 +165,7 @@ class _State extends State<StorageAnalyzerScreen>
       ),
       body: _loading
           ? const Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
+              child: CircularProgressIndicator(color: AppColors.brandCyan),
             )
           : _buildBody(),
     );
@@ -230,8 +230,8 @@ class _State extends State<StorageAnalyzerScreen>
 
   Widget _legend(StorageReport r) {
     final items = [
-      ('Videos', r.videoBytes, const Color(0xFF00D4FF)),
-      ('Audio', r.audioBytes, const Color(0xFF7C3AED)),
+      ('Videos', r.videoBytes, AppColors.brandCyan),
+      ('Audio', r.audioBytes, AppColors.brandBlue),
       ('Cache', r.cacheBytes, const Color(0xFFF59E0B)),
       ('Other', r.otherBytes, const Color(0xFF5E7399)),
       ('Free', r.freeBytes, const Color(0xFF10B981)),
@@ -301,12 +301,12 @@ class _State extends State<StorageAnalyzerScreen>
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: AppColors.accent.withValues(alpha: .12),
+              color: AppColors.brandBlue.withValues(alpha: .12),
               borderRadius: BorderRadius.circular(14),
             ),
             child: const Icon(
               Icons.content_copy_rounded,
-              color: AppColors.accent,
+              color: AppColors.brandCyan,
               size: 24,
             ),
           ),
@@ -577,8 +577,8 @@ class _RingPainter extends CustomPainter {
   final StorageReport report;
   final double progress;
   static const _colors = [
-    Color(0xFF00D4FF),
-    Color(0xFF7C3AED),
+    AppColors.brandCyan,
+    AppColors.brandBlue,
     Color(0xFFF59E0B),
     Color(0xFF5E7399),
     Color(0xFF10B981),
