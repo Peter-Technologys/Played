@@ -68,10 +68,11 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
         child: Column(
           children: [
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              padding: const EdgeInsets.fromLTRB(8, 4, 8, 2),
               child: Row(
                 children: [
                   IconButton(
+                    tooltip: 'Back',
                     icon: Icon(
                       Icons.keyboard_arrow_down_rounded,
                       color: Theme.of(context).colorScheme.onSurface,
@@ -80,20 +81,36 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                     onPressed: onBack,
                   ),
                   const Spacer(),
-                  const Text(
-                    'NOW PLAYING',
-                    style: TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.textSecondary,
-                      letterSpacing: 1.5,
-                      fontFamily: 'Inter',
-                    ),
+                  const Column(
+                    children: [
+                      Text(
+                        'OTYA',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          color: AppColors.brandCyan,
+                          letterSpacing: 2.0,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'NOW PLAYING',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.textSecondary,
+                          letterSpacing: 1.35,
+                          fontFamily: 'Inter',
+                        ),
+                      ),
+                    ],
                   ),
                   const Spacer(),
                   SleepTimerButton(onExpire: onSleepExpire),
-                  const SizedBox(width: 4),
+                  const SizedBox(width: 2),
                   IconButton(
+                    tooltip: 'More options',
                     icon: const Icon(
                       Icons.more_vert_rounded,
                       color: AppColors.textSecondary,
@@ -110,75 +127,116 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                   horizontal: artPadding,
                   vertical: 8,
                 ),
-                child: _AlbumArt(
-                  albumArtPath: activeItem.albumArtPath,
-                  isPlaying: playerState.isPlaying,
-                  title: activeItem.title,
-                  onSwipeLeft: onSwipeNext,
-                  onSwipeRight: onSwipePrevious,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.brandBlue.withValues(alpha: .22),
+                        blurRadius: 30,
+                        spreadRadius: 2,
+                        offset: const Offset(0, 14),
+                      ),
+                      BoxShadow(
+                        color: AppColors.brandCyan.withValues(alpha: .08),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(30),
+                    child: _AlbumArt(
+                      albumArtPath: activeItem.albumArtPath,
+                      isPlaying: playerState.isPlaying,
+                      title: activeItem.title,
+                      onSwipeLeft: onSwipeNext,
+                      onSwipeRight: onSwipePrevious,
+                    ),
+                  ),
                 ),
               ),
             ),
             SizedBox(height: spacing),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 28),
-              child: Row(
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 18),
+              padding: const EdgeInsets.fromLTRB(16, 14, 16, 12),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [
+                    AppColors.surfaceElevated.withValues(alpha: .92),
+                    AppColors.surface.withValues(alpha: .82),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: AppColors.brandBlue.withValues(alpha: .16),
+                ),
+              ),
+              child: Column(
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          activeItem.title,
-                          style: TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.w700,
-                            color: Theme.of(context).colorScheme.onSurface,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              activeItem.title,
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.w800,
+                                color: Theme.of(context).colorScheme.onSurface,
+                                fontFamily: 'Inter',
+                                height: 1.15,
+                              ),
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                            const SizedBox(height: 5),
+                            Text(
+                              activeItem.artist ?? 'Unknown Artist',
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppColors.textSecondary,
+                                fontFamily: 'Inter',
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          activeItem.artist ?? 'Unknown Artist',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: AppColors.textSecondary,
-                            fontFamily: 'Inter',
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ],
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: onFavorite,
-                    child: AnimatedSwitcher(
-                      duration: const Duration(milliseconds: 250),
-                      child: Icon(
-                        playerState.isFavorite
-                            ? Icons.favorite_rounded
-                            : Icons.favorite_border_rounded,
-                        key: ValueKey(playerState.isFavorite),
-                        color: playerState.isFavorite
-                            ? AppColors.brandRed
-                            : AppColors.textSecondary,
-                        size: 26,
                       ),
-                    ),
+                      IconButton(
+                        tooltip: playerState.isFavorite
+                            ? 'Remove from favorites'
+                            : 'Add to favorites',
+                        onPressed: onFavorite,
+                        icon: AnimatedSwitcher(
+                          duration: const Duration(milliseconds: 250),
+                          child: Icon(
+                            playerState.isFavorite
+                                ? Icons.favorite_rounded
+                                : Icons.favorite_border_rounded,
+                            key: ValueKey(playerState.isFavorite),
+                            color: playerState.isFavorite
+                                ? AppColors.brandRed
+                                : AppColors.textSecondary,
+                            size: 27,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _SeekBar(
+                    position: playerState.position,
+                    duration: playerState.duration,
+                    onSeek: onSeek,
                   ),
                 ],
-              ),
-            ),
-            SizedBox(height: spacing),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: _SeekBar(
-                position: playerState.position,
-                duration: playerState.duration,
-                onSeek: onSeek,
               ),
             ),
             SizedBox(height: spacing / 2),
@@ -195,21 +253,22 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                   GestureDetector(
                     onTap: onSpeed,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 5,
-                      ),
+                      constraints: const BoxConstraints(minHeight: 44),
+                      padding: const EdgeInsets.symmetric(horizontal: 13),
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surface,
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: AppColors.borderOf(context)),
+                        color: AppColors.surfaceElevated.withValues(alpha: .86),
+                        borderRadius: BorderRadius.circular(13),
+                        border: Border.all(
+                          color: AppColors.brandBlue.withValues(alpha: .18),
+                        ),
                       ),
                       child: Text(
                         speedLabel,
                         style: const TextStyle(
                           fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.accent,
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.brandCyan,
                           fontFamily: 'Inter',
                         ),
                       ),
@@ -224,12 +283,13 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
             ),
             SizedBox(height: spacing / 2),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   IconButton(
+                    tooltip: 'Previous',
                     icon: Icon(
                       Icons.skip_previous_rounded,
                       color: Theme.of(context).colorScheme.onSurface,
@@ -241,6 +301,7 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                     },
                   ),
                   IconButton(
+                    tooltip: 'Back 10 seconds',
                     icon: Icon(
                       Icons.replay_10_rounded,
                       color: Theme.of(context).colorScheme.onSurface,
@@ -259,13 +320,20 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                       height: playButtonSize,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: AppColors.accent,
+                        gradient: AppColors.accentGradientDiag,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: .22),
+                        ),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.accent.withValues(alpha: 0.24),
-                            blurRadius: 18,
+                            color: AppColors.brandBlue.withValues(alpha: .34),
+                            blurRadius: 24,
                             spreadRadius: 1,
                             offset: const Offset(0, 8),
+                          ),
+                          BoxShadow(
+                            color: AppColors.brandCyan.withValues(alpha: .18),
+                            blurRadius: 14,
                           ),
                         ],
                       ),
@@ -296,6 +364,7 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                     ),
                   ),
                   IconButton(
+                    tooltip: 'Forward 10 seconds',
                     icon: Icon(
                       Icons.forward_10_rounded,
                       color: Theme.of(context).colorScheme.onSurface,
@@ -307,6 +376,7 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
                     },
                   ),
                   IconButton(
+                    tooltip: 'Next',
                     icon: Icon(
                       Icons.skip_next_rounded,
                       color: Theme.of(context).colorScheme.onSurface,
@@ -322,7 +392,7 @@ class _AudioPlayerNowPlayingView extends StatelessWidget {
             ),
             SizedBox(height: spacing),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 18),
               child: FittedBox(
                 fit: BoxFit.scaleDown,
                 child: Row(
