@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 
 import '../application/nearby_together_runtime.dart';
+import '../domain/together_session.dart';
 import 'together_surface.dart';
 
 /// Live Nearby Together room surface.
@@ -37,17 +38,33 @@ Future<void> showNearbyTogetherLiveRoomSurface({
           if (session == null || localId == null || !session.isActive) {
             return const _TogetherEndedView();
           }
-          return TogetherRoomContent(
-            session: session,
-            messages: runtime.state.messages,
-            localParticipantId: localId,
-            onSendMessage: (text) => unawaited(runtime.sendChat(text)),
-            onMomentTap: onMomentTap,
-            onInvite: onInvite,
-            onLeave: onLeave,
-            onReplay: onReplay,
-            onChooseNext: onChooseNext,
-            onClose: () => Navigator.of(surfaceContext).pop(),
+          return Column(
+            children: [
+              Expanded(
+                child: MediaQuery.removePadding(
+                  context: context,
+                  removeBottom: true,
+                  child: TogetherRoomContent(
+                    session: session,
+                    messages: runtime.state.messages,
+                    localParticipantId: localId,
+                    onSendMessage: (text) => unawaited(runtime.sendChat(text)),
+                    onMomentTap: onMomentTap,
+                    onInvite: onInvite,
+                    onLeave: onLeave,
+                    onReplay: onReplay,
+                    onChooseNext: onChooseNext,
+                    onClose: () => Navigator.of(surfaceContext).pop(),
+                  ),
+                ),
+              ),
+              _TogetherQuickActions(
+                momentEnabled: session.phase == TogetherSessionPhase.watching,
+                onMoment: () => unawaited(runtime.sendCurrentMoment()),
+                onReaction: (reaction) =>
+                    unawaited(runtime.sendReaction(reaction)),
+              ),
+            ],
           );
         },
       );
@@ -111,6 +128,93 @@ Future<void> showNearbyTogetherLiveRoomSurface({
     );
   }
   runtime.markConversationRead();
+}
+
+class _TogetherQuickActions extends StatelessWidget {
+  final bool momentEnabled;
+  final VoidCallback onMoment;
+  final ValueChanged<String> onReaction;
+
+  const _TogetherQuickActions({
+    required this.momentEnabled,
+    required this.onMoment,
+    required this.onReaction,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        border: Border(
+          top: BorderSide(
+            color: theme.colorScheme.outlineVariant.withValues(alpha: .45),
+          ),
+        ),
+      ),
+      child: SafeArea(
+        top: false,
+        minimum: const EdgeInsets.fromLTRB(8, 4, 8, 5),
+        child: Row(
+          children: [
+            Tooltip(
+              message: 'Share this playback position',
+              child: TextButton.icon(
+                onPressed: momentEnabled ? onMoment : null,
+                icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                label: const Text('Moment'),
+                style: TextButton.styleFrom(
+                  minimumSize: const Size(44, 44),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ),
+            ),
+            const Spacer(),
+            for (final reaction in NearbyTogetherRuntime.supportedReactions)
+              _ReactionButton(
+                reaction: reaction,
+                onPressed: () => onReaction(reaction),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ReactionButton extends StatelessWidget {
+  final String reaction;
+  final VoidCallback onPressed;
+
+  const _ReactionButton({
+    required this.reaction,
+    required this.onPressed,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Semantics(
+      button: true,
+      label: 'React $reaction',
+      child: Tooltip(
+        message: 'React $reaction',
+        child: InkResponse(
+          onTap: onPressed,
+          radius: 24,
+          child: SizedBox(
+            width: 42,
+            height: 44,
+            child: Center(
+              child: Text(
+                reaction,
+                style: const TextStyle(fontSize: 20),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class _TogetherEndedView extends StatelessWidget {
