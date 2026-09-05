@@ -2,11 +2,14 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// Canonical Next identity: three equal balls in an equilateral triangle.
+import '../../app/theme/app_colors.dart';
+import 'otya_logo_v2.dart';
+
+/// Next is part of the Otya product identity, not a second brand.
 ///
-/// Idle: blue upper-left, red upper-right, yellow lower-center.
-/// Thinking: the whole triangle rotates as one formation, so the three balls
-/// stay equally spaced instead of chasing each other in a line.
+/// The idle state uses the exact same approved Otya mark as the rest of the
+/// app. Thinking adds a lightweight cyan/blue activity arc around the static
+/// mark so the identity remains recognisable while work is in progress.
 class OtyaAiMark extends StatelessWidget {
   const OtyaAiMark({super.key, this.size = 52});
 
@@ -16,10 +19,7 @@ class OtyaAiMark extends StatelessWidget {
   Widget build(BuildContext context) => Semantics(
         label: 'Next',
         image: true,
-        child: SizedBox.square(
-          dimension: size,
-          child: const CustomPaint(painter: _NextPainter()),
-        ),
+        child: OtyaMark(size: size),
       );
 }
 
@@ -54,24 +54,24 @@ class _OtyaThinkingMarkState extends State<OtyaThinkingMark>
   void didUpdateWidget(covariant OtyaThinkingMark oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.duration != widget.duration) _controller.duration = widget.duration;
-    if (widget.thinking && !_controller.isAnimating) {
-      _controller.repeat();
-    } else if (!widget.thinking && _controller.isAnimating) {
-      _controller
-        ..stop()
-        ..value = 0;
-    }
+    _syncMotion();
   }
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (MediaQuery.disableAnimationsOf(context)) {
+    _syncMotion();
+  }
+
+  void _syncMotion() {
+    final reduceMotion = MediaQuery.maybeOf(context)?.disableAnimations ?? false;
+    final shouldAnimate = widget.thinking && !reduceMotion;
+    if (shouldAnimate && !_controller.isAnimating) {
+      _controller.repeat();
+    } else if (!shouldAnimate && _controller.isAnimating) {
       _controller
         ..stop()
         ..value = 0;
-    } else if (widget.thinking && !_controller.isAnimating) {
-      _controller.repeat();
     }
   }
 
@@ -82,74 +82,75 @@ class _OtyaThinkingMarkState extends State<OtyaThinkingMark>
   }
 
   @override
-  Widget build(BuildContext context) => Semantics(
-        label: widget.thinking ? 'Next is thinking' : 'Next',
-        image: true,
-        child: SizedBox.square(
-          dimension: widget.size,
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (_, __) => CustomPaint(
-              painter: _NextPainter(
-                progress: widget.thinking ? _controller.value : null,
+  Widget build(BuildContext context) {
+    final markSize = widget.size * .78;
+    return Semantics(
+      label: widget.thinking ? 'Next is thinking' : 'Next',
+      image: true,
+      child: SizedBox.square(
+        dimension: widget.size,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            OtyaMark(size: markSize),
+            if (widget.thinking)
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (_, __) => CustomPaint(
+                      painter: _ThinkingArcPainter(progress: _controller.value),
+                    ),
+                  ),
+                ),
               ),
-            ),
-          ),
+          ],
         ),
-      );
+      ),
+    );
+  }
 }
 
-class _NextPainter extends CustomPainter {
-  const _NextPainter({this.progress});
+class _ThinkingArcPainter extends CustomPainter {
+  const _ThinkingArcPainter({required this.progress});
 
-  final double? progress;
-
-  static const _blue = Color(0xFF2979FF);
-  static const _red = Color(0xFFFF3B30);
-  static const _yellow = Color(0xFFFFD60A);
+  final double progress;
 
   @override
   void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
-    final ballRadius = size.shortestSide * .115;
-    final orbit = size.shortestSide * .255;
-    final rotation = progress == null ? 0.0 : progress! * math.pi * 2;
-
-    // Exact 120-degree spacing: an equilateral triangle at every frame.
-    const baseAngles = <double>[
-      -5 * math.pi / 6,
-      -math.pi / 6,
-      math.pi / 2,
-    ];
-    const colors = [_blue, _red, _yellow];
-
-    for (var i = 0; i < 3; i++) {
-      final angle = baseAngles[i] + rotation;
-      final point = Offset(
-        center.dx + math.cos(angle) * orbit,
-        center.dy + math.sin(angle) * orbit,
-      );
-      _ball(canvas, point, ballRadius, colors[i]);
-    }
-  }
-
-  void _ball(Canvas canvas, Offset center, double radius, Color color) {
-    canvas.drawCircle(
-      center.translate(0, radius * .20),
-      radius * 1.04,
-      Paint()
-        ..color = Colors.black.withValues(alpha: .16)
-        ..maskFilter = MaskFilter.blur(BlurStyle.normal, radius * .34),
+    final stroke = math.max(2.0, size.shortestSide * .055);
+    final inset = stroke * .8;
+    final rect = Rect.fromLTWH(
+      inset,
+      inset,
+      size.width - inset * 2,
+      size.height - inset * 2,
     );
-    canvas.drawCircle(center, radius, Paint()..color = color);
-    canvas.drawCircle(
-      center.translate(-radius * .28, -radius * .30),
-      radius * .22,
-      Paint()..color = Colors.white.withValues(alpha: .34),
-    );
+    final start = progress * math.pi * 2 - math.pi / 2;
+
+    final track = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..color = AppColors.brandBlue.withValues(alpha: .14);
+    canvas.drawArc(rect, 0, math.pi * 2, false, track);
+
+    final active = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = stroke
+      ..strokeCap = StrokeCap.round
+      ..shader = const SweepGradient(
+        colors: [
+          AppColors.brandCyan,
+          AppColors.brandBlue,
+          AppColors.brandDeepBlue,
+          AppColors.brandCyan,
+        ],
+      ).createShader(rect);
+    canvas.drawArc(rect, start, math.pi * .72, false, active);
   }
 
   @override
-  bool shouldRepaint(covariant _NextPainter oldDelegate) =>
+  bool shouldRepaint(covariant _ThinkingArcPainter oldDelegate) =>
       oldDelegate.progress != progress;
 }
