@@ -9,6 +9,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 
 import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
+import '../../../shared/widgets/wallpaper_scaffold.dart';
 import '../../air_drop/data/media_receiver.dart';
 import '../../air_drop/data/media_sender.dart';
 import '../../my_space/data/media_repository.dart';
@@ -167,8 +168,10 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
   @override
   Widget build(BuildContext context) {
     final library = ref.watch(mediaLibraryProvider).valueOrNull ?? const <MediaItem>[];
-    return Scaffold(
+    return WallpaperScaffold(
       appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         title: const Text('OTYA Transfer'),
         actions: [
           if (_shareUrl != null)
@@ -182,6 +185,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         ],
       ),
       body: SafeArea(
+        top: false,
         child: Column(
           children: [
             Padding(
@@ -233,6 +237,13 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brandBlue.withValues(alpha: .18),
+                    blurRadius: 30,
+                    offset: const Offset(0, 12),
+                  ),
+                ],
               ),
               child: QrImageView(
                 data: _shareUrl!,
@@ -316,10 +327,12 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
                 decoration: BoxDecoration(
                   color: AppColors.cardOf(context),
                   borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: AppColors.borderOf(context)),
                 ),
                 child: Icon(
                   item.isVideo ? Icons.movie_outlined : Icons.music_note_rounded,
                   size: 21,
+                  color: AppColors.brandCyan,
                 ),
               ),
               title: Text(
@@ -368,7 +381,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         padding: const EdgeInsets.all(24),
         children: [
           const SizedBox(height: 70),
-          const Icon(Icons.downloading_rounded, size: 64, color: AppColors.accent),
+          const Icon(Icons.downloading_rounded, size: 64, color: AppColors.brandCyan),
           const SizedBox(height: 22),
           const Text('Receiving…', textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.w800)),
           const SizedBox(height: 22),
@@ -419,22 +432,34 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
           const SizedBox(height: 12),
         ],
         Center(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(24),
-            child: SizedBox(
-              width: 280,
-              height: 280,
-              child: MobileScanner(
-                controller: _scanner,
-                fit: BoxFit.cover,
-                onDetect: (capture) {
-                  if (_scanLocked || capture.barcodes.isEmpty) return;
-                  final value = capture.barcodes.first.rawValue ??
-                      capture.barcodes.first.displayValue;
-                  if (value == null || !value.startsWith('http://')) return;
-                  _scanLocked = true;
-                  _receive(value);
-                },
+          child: Container(
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(26),
+              border: Border.all(color: AppColors.brandCyan.withValues(alpha: .34)),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.brandBlue.withValues(alpha: .16),
+                  blurRadius: 28,
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(24),
+              child: SizedBox(
+                width: 280,
+                height: 280,
+                child: MobileScanner(
+                  controller: _scanner,
+                  fit: BoxFit.cover,
+                  onDetect: (capture) {
+                    if (_scanLocked || capture.barcodes.isEmpty) return;
+                    final value = capture.barcodes.first.rawValue ??
+                        capture.barcodes.first.displayValue;
+                    if (value == null || !value.startsWith('http://')) return;
+                    _scanLocked = true;
+                    _receive(value);
+                  },
+                ),
               ),
             ),
           ),
@@ -443,7 +468,7 @@ class _TransferScreenState extends ConsumerState<TransferScreen> {
         const Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.wifi_rounded, size: 17, color: AppColors.textSecondary),
+            Icon(Icons.wifi_rounded, size: 17, color: AppColors.brandCyan),
             SizedBox(width: 7),
             Text('Local network only', style: TextStyle(fontSize: 12, color: AppColors.textSecondary)),
           ],
@@ -501,7 +526,8 @@ class _ModeButton extends StatelessWidget {
             duration: const Duration(milliseconds: 180),
             padding: const EdgeInsets.symmetric(vertical: 11),
             decoration: BoxDecoration(
-              color: active ? AppColors.accent : Colors.transparent,
+              gradient: active ? AppColors.accentGradient : null,
+              color: active ? null : Colors.transparent,
               borderRadius: BorderRadius.circular(14),
             ),
             child: Row(
