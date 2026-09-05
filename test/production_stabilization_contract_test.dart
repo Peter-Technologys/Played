@@ -100,6 +100,7 @@ void main() {
       'lib/features/my_space/presentation/widgets/media_card.dart',
       'lib/features/downloads/presentation/downloads_screen.dart',
       'lib/features/video/presentation/video_tab_screen.dart',
+      'lib/features/video/presentation/widgets/video_tab_widgets.dart',
       'lib/features/settings/presentation/theme_selection_screen.dart',
     ];
 
