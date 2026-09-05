@@ -21,7 +21,10 @@ void main() {
     expect(plugin, contains('startLocalOnlyHotspot'));
     expect(plugin, contains('LocalOnlyHotspotReservation'));
     expect(plugin, contains('splitSourceDirs'));
-    expect(plugin, contains('sharing only the base APK would create a broken installer'));
+    expect(
+      plugin,
+      contains('sharing only the base APK would create a broken installer'),
+    );
   });
 
   test('nearby hotspot QR is a standard Wi-Fi payload', () {
@@ -59,6 +62,9 @@ void main() {
     final hotspot = File(
       'lib/features/transfer/data/transfer_hotspot_service.dart',
     ).readAsStringSync();
+    final entry = File(
+      'lib/features/air_drop/presentation/air_drop_screen.dart',
+    ).readAsStringSync();
 
     expect(screen, contains('_TransferCategory.video'));
     expect(screen, contains('_TransferCategory.music'));
@@ -71,8 +77,14 @@ void main() {
     expect(screen, contains('isAllowedTransferUri(uri)'));
     expect(screen, isNot(contains('bool _isPrivateHost(')));
 
+    expect(hotspot, contains('ensureLocalNetworkAccess()'));
     expect(hotspot, contains('Permission.nearbyWifiDevices.request()'));
     expect(hotspot, contains('Permission.locationWhenInUse.request()'));
     expect(hotspot, contains('startLocalOnlyHotspot()'));
+    expect(
+      entry,
+      contains('TransferHotspotService.instance.ensureLocalNetworkAccess()'),
+    );
+    expect(entry, contains('const TransferScreen()'));
   });
 }
