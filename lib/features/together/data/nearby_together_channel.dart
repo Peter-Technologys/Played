@@ -46,8 +46,8 @@ class NearbyTogetherMessage {
 /// Shared control-message contract for offline Nearby Together.
 ///
 /// Movie bytes are not carried here. If the guest needs the host's media, the
-/// existing OTYA LAN Range sender URL is advertised in the initial hello and
-/// the player/transfer layer consumes that source independently.
+/// existing OTYA LAN Range sender URL is advertised independently and the
+/// player/transfer layer consumes that source.
 abstract final class NearbyTogetherProtocol {
   static const int version = 1;
   static const int maxMessageBytes = 8 * 1024;
@@ -56,6 +56,7 @@ abstract final class NearbyTogetherProtocol {
     'hello',
     'ready',
     'state',
+    'media',
     'chat',
     'moment',
     'reaction',
@@ -111,6 +112,10 @@ class NearbyTogetherHost {
   HttpServer? _server;
   WebSocket? _guest;
   String? _token;
+  String? _displayName;
+  String? _username;
+  OtyaMediaIdentity? _media;
+  Uri? _hostMediaUrl;
   final _messages = StreamController<NearbyTogetherMessage>.broadcast();
   final _connections = StreamController<bool>.broadcast();
 
@@ -126,31 +131,32 @@ class NearbyTogetherHost {
   }) async {
     await stop();
 
-    if (!hostMediaUrl.isScheme('http') ||
-        !isPrivateTransferIpv4Host(hostMediaUrl.host)) {
-      throw ArgumentError('Nearby Together requires an OTYA private-LAN media URL.');
-    }
+    _validateMediaUrl(hostMediaUrl);
 
+    final cleanDisplayName =
+        displayName.trim().isEmpty ? 'OTYA user' : displayName.trim();
+    final cleanUsername = username
+        ?.trim()
+        .replaceFirst(RegExp(r'^@+'), '')
+        .toLowerCase();
     final ip = await _getLocalIp();
     final token = _generateToken();
     final server = await HttpServer.bind(InternetAddress.anyIPv4, 0, shared: false);
 
     _server = server;
     _token = token;
+    _displayName = cleanDisplayName;
+    _username = cleanUsername;
+    _media = media;
+    _hostMediaUrl = hostMediaUrl;
     server.listen(
-      (request) => _handleRequest(
-        request,
-        displayName: displayName.trim().isEmpty ? 'OTYA user' : displayName.trim(),
-        username: username,
-        media: media,
-        hostMediaUrl: hostMediaUrl,
-      ),
+      _handleRequest,
       onError: (_) {},
       cancelOnError: false,
     );
 
     return NearbyTogetherInvite(
-      hostDisplayName: displayName,
+      hostDisplayName: cleanDisplayName,
       uri: Uri(
         scheme: 'ws',
         host: ip,
@@ -161,13 +167,19 @@ class NearbyTogetherHost {
     );
   }
 
-  Future<void> _handleRequest(
-    HttpRequest request, {
-    required String displayName,
-    required String? username,
+  /// Updates what a newly connected/reconnected guest receives in `hello`.
+  /// The WebSocket room itself remains alive while only the media advertisement
+  /// changes.
+  void updateMedia({
     required OtyaMediaIdentity media,
     required Uri hostMediaUrl,
-  }) async {
+  }) {
+    _validateMediaUrl(hostMediaUrl);
+    _media = media;
+    _hostMediaUrl = hostMediaUrl;
+  }
+
+  Future<void> _handleRequest(HttpRequest request) async {
     final remote = request.connectionInfo?.remoteAddress.address ?? '';
     final provided = request.uri.queryParameters['t'];
 
@@ -193,6 +205,18 @@ class NearbyTogetherHost {
       return;
     }
 
+    final displayName = _displayName;
+    final media = _media;
+    final hostMediaUrl = _hostMediaUrl;
+    if (displayName == null || media == null || hostMediaUrl == null) {
+      request.response
+        ..statusCode = HttpStatus.serviceUnavailable
+        ..headers.set(HttpHeaders.cacheControlHeader, 'no-store')
+        ..write('Together room is not ready');
+      await request.response.close();
+      return;
+    }
+
     WebSocket socket;
     try {
       socket = await WebSocketTransformer.upgrade(request);
@@ -206,14 +230,8 @@ class NearbyTogetherHost {
 
     await _sendSocket(socket, 'hello', {
       'display_name': displayName,
-      if (username != null && username.trim().isNotEmpty)
-        'username': username.trim().replaceFirst(RegExp(r'^@+'), '').toLowerCase(),
-      'media': {
-        'fingerprint': media.fingerprint,
-        'byte_length': media.byteLength,
-        if (media.duration != null) 'duration_ms': media.duration!.inMilliseconds,
-        if (media.mimeType != null) 'mime_type': media.mimeType,
-      },
+      if (_username != null && _username!.isNotEmpty) 'username': _username,
+      'media': _mediaJson(media),
       'media_url': hostMediaUrl.toString(),
     });
 
@@ -268,12 +286,30 @@ class NearbyTogetherHost {
     await _server?.close(force: true);
     _server = null;
     _token = null;
+    _displayName = null;
+    _username = null;
+    _media = null;
+    _hostMediaUrl = null;
   }
 
   Future<void> dispose() async {
     await stop();
     await _messages.close();
     await _connections.close();
+  }
+
+  static Map<String, dynamic> _mediaJson(OtyaMediaIdentity media) => {
+        'fingerprint': media.fingerprint,
+        'byte_length': media.byteLength,
+        if (media.duration != null) 'duration_ms': media.duration!.inMilliseconds,
+        if (media.mimeType != null) 'mime_type': media.mimeType,
+      };
+
+  static void _validateMediaUrl(Uri hostMediaUrl) {
+    if (!hostMediaUrl.isScheme('http') ||
+        !isPrivateTransferIpv4Host(hostMediaUrl.host)) {
+      throw ArgumentError('Nearby Together requires an OTYA private-LAN media URL.');
+    }
   }
 
   static String _generateToken() {
