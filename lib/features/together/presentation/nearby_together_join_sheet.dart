@@ -7,6 +7,8 @@ import '../../../app/theme/app_colors.dart';
 import '../../../core/models/media_item.dart';
 import '../application/nearby_together_runtime.dart';
 import '../application/nearby_together_session.dart';
+import '../application/together_guest_media_session.dart';
+import '../data/together_stream_cache_proxy.dart';
 
 Future<NearbyPlaybackPlan?> showNearbyTogetherJoinSheet({
   required BuildContext context,
@@ -52,6 +54,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
 
   bool _joining = false;
   bool _scanLocked = false;
+  bool _keepVideo = false;
   String? _error;
 
   @override
@@ -81,18 +84,26 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
     await _scanner.stop();
 
     try {
-      final plan = await NearbyTogetherRuntime.instance.joinGuest(
+      final joinedPlan = await NearbyTogetherRuntime.instance.joinGuest(
         inviteUri: uri,
         candidateMediaItem: widget.currentMediaItem,
         player: widget.player,
         displayName: widget.displayName,
       );
+      final playbackPlan = await TogetherGuestMediaSession.instance.prepare(
+        plan: joinedPlan,
+        mode: _keepVideo
+            ? TogetherStreamMode.streamAndSave
+            : TogetherStreamMode.streamOnly,
+      );
       if (!mounted) return;
-      Navigator.of(context).pop(plan);
+      Navigator.of(context).pop(playbackPlan);
     } catch (_) {
+      await NearbyTogetherRuntime.instance.stop();
       if (!mounted) return;
       setState(() {
         _error = NearbyTogetherRuntime.instance.lastError ??
+            TogetherGuestMediaSession.instance.lastError ??
             'OTYA could not join this Together session.';
         _joining = false;
         _scanLocked = false;
@@ -116,7 +127,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
   @override
   Widget build(BuildContext context) {
     return FractionallySizedBox(
-      heightFactor: .88,
+      heightFactor: .92,
       child: Padding(
         padding: const EdgeInsets.fromLTRB(18, 8, 18, 18),
         child: Column(
@@ -168,7 +179,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                 ),
               ],
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 14),
             if (_error != null) ...[
               Container(
                 padding: const EdgeInsets.all(12),
@@ -186,14 +197,14 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                   ],
                 ),
               ),
-              const SizedBox(height: 12),
+              const SizedBox(height: 10),
             ],
             Expanded(
               child: Stack(
                 children: [
                   Center(
                     child: Container(
-                      constraints: const BoxConstraints(maxWidth: 330, maxHeight: 330),
+                      constraints: const BoxConstraints(maxWidth: 300, maxHeight: 300),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(28),
                         border: Border.all(color: AppColors.accent.withValues(alpha: .35), width: 1.2),
@@ -243,7 +254,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
             const Row(
               children: [
                 Expanded(child: Divider()),
@@ -254,11 +265,11 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
                 Expanded(child: Divider()),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             TextField(
               controller: _inviteController,
               enabled: !_joining,
-              maxLines: 2,
+              maxLines: 1,
               autocorrect: false,
               enableSuggestions: false,
               keyboardType: TextInputType.url,
@@ -275,6 +286,33 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
               onSubmitted: _joining ? null : _join,
             ),
             const SizedBox(height: 10),
+            Container(
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: .45),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child: SwitchListTile.adaptive(
+                value: _keepVideo,
+                onChanged: _joining
+                    ? null
+                    : (value) => setState(() => _keepVideo = value),
+                secondary: Icon(
+                  _keepVideo ? Icons.download_done_rounded : Icons.memory_rounded,
+                  color: _keepVideo ? AppColors.accent : AppColors.textSecondary,
+                ),
+                title: const Text(
+                  'Keep video',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+                subtitle: Text(
+                  _keepVideo
+                      ? 'Reuse watched bytes, fill missing parts while connected, and keep partial progress for resume.'
+                      : 'Stream only. OTYA does not keep a movie copy after the party.',
+                  style: const TextStyle(fontSize: 11.5, height: 1.35),
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
             FilledButton.icon(
               onPressed: _joining
                   ? null
@@ -282,7 +320,7 @@ class _NearbyTogetherJoinSheetState extends State<_NearbyTogetherJoinSheet> {
               icon: const Icon(Icons.people_alt_rounded),
               label: const Text('Join'),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 7),
             const Text(
               'Nearby Together works on the same Wi-Fi or hotspot. The video is not uploaded to OTYA.',
               textAlign: TextAlign.center,
