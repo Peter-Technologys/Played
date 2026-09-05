@@ -6,6 +6,16 @@ import 'package:crypto/crypto.dart';
 
 import '../domain/media_identity.dart';
 
+class _DigestSink implements Sink<Digest> {
+  Digest? value;
+
+  @override
+  void add(Digest data) => value = data;
+
+  @override
+  void close() {}
+}
+
 /// Fast, privacy-conscious identity for peer media matching.
 ///
 /// Large files are not read end-to-end. OTYA hashes a small set of deterministic
@@ -53,21 +63,23 @@ class MediaFingerprintService {
   }
 
   Future<String> _hashWholeFile(File file, int byteLength) async {
-    final sink = AccumulatorSink<Digest>();
+    final sink = _DigestSink();
     final converter = sha256.startChunkedConversion(sink);
     converter.add(utf8.encode('OTYA_MEDIA|$_version|whole|$byteLength|'));
     await for (final chunk in file.openRead()) {
       converter.add(chunk);
     }
     converter.close();
-    return sink.events.single.toString();
+    final digest = sink.value;
+    if (digest == null) throw StateError('Could not fingerprint media file.');
+    return digest.toString();
   }
 
   Future<String> _hashSamples(File file, int byteLength) async {
     final starts = _sampleStarts(byteLength);
     final raf = await file.open(mode: FileMode.read);
     try {
-      final sink = AccumulatorSink<Digest>();
+      final sink = _DigestSink();
       final converter = sha256.startChunkedConversion(sink);
       converter.add(utf8.encode(
         'OTYA_MEDIA|$_version|sampled|$byteLength|${starts.length}|$_sampleBytes|',
@@ -87,7 +99,9 @@ class MediaFingerprintService {
       }
 
       converter.close();
-      return sink.events.single.toString();
+      final digest = sink.value;
+      if (digest == null) throw StateError('Could not fingerprint media file.');
+      return digest.toString();
     } finally {
       await raf.close();
     }
