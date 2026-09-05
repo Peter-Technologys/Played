@@ -17,6 +17,8 @@ void main() {
   final player = File(
     'lib/features/player/presentation/video_player_screen.dart',
   ).readAsStringSync();
+  final queue =
+      File('lib/features/player/presentation/queue_screen.dart').readAsStringSync();
 
   test('host rotates media without replacing the Together room socket', () {
     expect(sender.contains('Future<String> switchServing(String filePath)'), isTrue);
@@ -58,5 +60,11 @@ void main() {
       ),
       isFalse,
     );
+  });
+
+  test('failed handoff restores the exact queue index, including shuffle', () {
+    expect(queue.contains('void restoreCurrentIndex(int index)'), isTrue);
+    expect(player.contains('final beforeIndex = ref.read(queueProvider).currentIndex'), isTrue);
+    expect(player.contains('queue.restoreCurrentIndex(beforeIndex)'), isTrue);
   });
 }
