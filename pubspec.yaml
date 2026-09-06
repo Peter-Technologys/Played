@@ -1,7 +1,7 @@
 name: otya_player
 description: OTYA — a private, reliable Android media experience for video, music, transfer, files and local tools.
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.4.0 <4.0.0'
@@ -31,6 +31,12 @@ dependencies:
   otya_media_tools:
     path: packages/otya_media_tools
 
+  # Otya Send owns its optional local-only hotspot/APK bridge in a separate
+  # first-party package. It is loaded only when Send needs Android APIs that
+  # Dart sockets cannot provide; playback never depends on this bridge.
+  otya_transfer_android:
+    path: packages/otya_transfer_android
+
   # Local Database
   hive: ^2.2.3
   hive_flutter: ^1.1.0
@@ -41,7 +47,7 @@ dependencies:
   crypto: ^3.0.5
   local_auth: ^2.3.0
 
-  # OTYA Transfer — pure Dart/local-network transport.
+  # Otya Send/Transfer — direct local-network transport and nearby QR pairing.
   qr_flutter: ^4.1.0
   mobile_scanner: ^6.0.0
 
@@ -63,7 +69,7 @@ dependencies:
   # Google account + private Google Drive App Folder backup.
   google_sign_in: ^6.2.1
 
-  # Device info — used for ABI detection + update checker
+  # Device info — used for ABI/update checks and Android-scoped Send permissions.
   device_info_plus: ^10.1.0
   package_info_plus: ^8.1.0
 
@@ -85,8 +91,8 @@ dependencies:
   # Secure storage for Private/account secrets and local PIN/session state.
   flutter_secure_storage: ^9.2.4
 
-  # Connectivity state only. OTYA Transfer uses Dart sockets/NetworkInterface
-  # and does not scan Wi-Fi networks or require location/nearby permissions.
+  # Connectivity state only. Otya Send still moves bytes over direct local
+  # sockets; the first-party bridge can create a local-only hotspot when needed.
   connectivity_plus: ^6.1.4
 
   # Utilities

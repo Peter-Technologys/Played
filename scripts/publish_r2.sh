@@ -5,8 +5,13 @@ set -euo pipefail
 
 RAW_TAG="${RELEASE_TAG:-${CI_COMMIT_TAG:-${GITHUB_REF_NAME:-}}}"
 [ -n "$RAW_TAG" ] || { echo "ERROR: No release tag found"; exit 1; }
-[[ "$RAW_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "ERROR: Invalid release tag '$RAW_TAG'"; exit 1; }
-VERSION="${RAW_TAG#v}"
+[[ "$RAW_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+\+[1-9][0-9]*$ ]] || {
+  echo "ERROR: Invalid release tag '$RAW_TAG' (expected v<version>+<build>, for example v1.0.0+2)"
+  exit 1
+}
+TAG_VERSION="${RAW_TAG#v}"
+VERSION="${TAG_VERSION%%+*}"
+TAG_BUILD="${TAG_VERSION##*+}"
 
 PUBSPEC_VERSION=$(awk '/^version:/ {print $2; exit}' pubspec.yaml)
 [ -n "$PUBSPEC_VERSION" ] || { echo "ERROR: pubspec.yaml has no version"; exit 1; }
@@ -18,6 +23,10 @@ PUBSPEC_CODE="${PUBSPEC_VERSION##*+}"
 }
 [[ "$PUBSPEC_CODE" =~ ^[1-9][0-9]*$ ]] || {
   echo "ERROR: pubspec Android build number must be a positive integer"
+  exit 1
+}
+[ "$TAG_BUILD" = "$PUBSPEC_CODE" ] || {
+  echo "ERROR: release tag build $TAG_BUILD does not match pubspec build $PUBSPEC_CODE"
   exit 1
 }
 VERSION_CODE="$PUBSPEC_CODE"
