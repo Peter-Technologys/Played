@@ -1,17 +1,17 @@
 # Otya release pipeline
-# The first official product release remains Otya v1.0.0 while build numbers
-# may increase for fixes, polish, security and store delivery.
+# The public product version remains Otya 1.0.0 while every published build
+# receives its own immutable build-specific tag, for example v1.0.0+2.
 
 name: Release
 
 on:
   push:
     tags:
-      - 'v1.0.0'
+      - 'v1.0.0+*'
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Existing first-release tag to publish (v1.0.0 only)'
+        description: 'Existing immutable build tag to publish (for example v1.0.0+2)'
         required: true
         type: string
 
@@ -28,7 +28,7 @@ env:
 
 jobs:
   build_and_publish:
-    name: Build and publish Otya v1.0.0
+    name: Build and publish Otya 1.0.0
     runs-on: ubuntu-latest
     timeout-minutes: 60
     environment: production
@@ -46,8 +46,8 @@ jobs:
           else
             TAG='${{ github.ref_name }}'
           fi
-          test "$TAG" = 'v1.0.0' || {
-            echo "ERROR: Otya's first official release is locked to v1.0.0; refusing $TAG"
+          [[ "$TAG" =~ ^v1\.0\.0\+[1-9][0-9]*$ ]] || {
+            echo "ERROR: Otya release tags must be immutable build tags such as v1.0.0+2; refusing $TAG"
             exit 1
           }
           echo "tag=$TAG" >> "$GITHUB_OUTPUT"
@@ -112,13 +112,13 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && 'refs/heads/main' || github.ref }}
 
-      - name: Check immutable first-release identity
+      - name: Check immutable build release identity
         shell: bash
         env:
           RELEASE_TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          test "$RELEASE_TAG" = 'v1.0.0' || {
+          [[ "$RELEASE_TAG" =~ ^v1\.0\.0\+[1-9][0-9]*$ ]] || {
             echo "ERROR: unexpected release tag $RELEASE_TAG"
             exit 1
           }
@@ -138,7 +138,7 @@ jobs:
           }
           test "$TAG_SHA" = "$MAIN_SHA" || {
             echo "ERROR: refusing to publish because $RELEASE_TAG does not already point to current main; tag=$TAG_SHA main=$MAIN_SHA"
-            echo "Align the release tag explicitly before starting the publish workflow. The workflow will not move tags."
+            echo "Create the immutable build tag from the validated main commit before starting the publish workflow. The workflow will not move tags."
             exit 1
           }
 
@@ -148,14 +148,18 @@ jobs:
             exit 1
           }
           [[ "$APP_VERSION" =~ ^1\.0\.0\+[1-9][0-9]*$ ]] || {
-            echo "ERROR: Otya first-release builds must stay 1.0.0+<positive build>; found $APP_VERSION"
+            echo "ERROR: Otya 1.0.0 builds must use 1.0.0+<positive build>; found $APP_VERSION"
+            exit 1
+          }
+          EXPECTED_APP_VERSION="${RELEASE_TAG#v}"
+          test "$APP_VERSION" = "$EXPECTED_APP_VERSION" || {
+            echo "ERROR: release tag $RELEASE_TAG does not exactly match pubspec build $APP_VERSION"
             exit 1
           }
           VERSION_NAME="${APP_VERSION%%+*}"
           BUILD_NUMBER="${APP_VERSION##*+}"
-          EXPECTED_VERSION="${RELEASE_TAG#v}"
-          test "$VERSION_NAME" = "$EXPECTED_VERSION" || {
-            echo "ERROR: release tag $RELEASE_TAG does not match pubspec version $VERSION_NAME"
+          test "$VERSION_NAME" = '1.0.0' || {
+            echo "ERROR: public Otya version must remain 1.0.0 for this release line"
             exit 1
           }
           [[ "$BUILD_NUMBER" =~ ^[1-9][0-9]*$ ]] || {
