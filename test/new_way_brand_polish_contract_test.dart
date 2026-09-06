@@ -56,7 +56,7 @@ void main() {
     expect(source, contains('Otya reuses what you already watched'));
     expect(source, contains('The video stays between your phones.'));
     expect(source, isNot(contains("hintText: 'ws://")));
-    expect(source, isNot(contains('Reuse watched bytes'));
+    expect(source, isNot(contains('Reuse watched bytes')));
     expect(source, isNot(contains('OTYA reuses what you already watched')));
   });
 }
