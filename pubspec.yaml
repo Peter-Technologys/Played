@@ -18,81 +18,135 @@ dependencies:
   # the NativeCallable alive until mpv_terminate_destroy completes, preventing
   # the SIGABRT seen in OTYA's Samsung Android 16 bug report. Replace this pin
   # only after upstream ships an equivalent production fix.
-  media_kit: 1.2.6
-  media_kit_video: 1.3.1
-  media_kit_libs_android_video: 1.3.8
+  media_kit:
+    git:
+      url: https://github.com/Priyanshu-Mallick/media-kit.git
+      ref: 9e1706898f15bcee98c125a2f4a7b88a4374dda7
+      path: media_kit
+  media_kit_video: ^1.2.5
+  media_kit_libs_android_video: ^1.3.2
 
-  cupertino_icons: ^1.0.8
-  flutter_riverpod: ^2.6.1
-  riverpod_annotation: ^2.6.1
-  go_router: ^14.8.1
-  shared_preferences: ^2.5.3
+  # OTYA local media tools use a small first-party Android plugin so trim/audio
+  # muxing can evolve independently from the playback/PiP/activity bridge.
+  otya_media_tools:
+    path: packages/otya_media_tools
+
+  # Otya Send owns its optional local-only hotspot/APK bridge in a separate
+  # first-party package. It is loaded only when Send needs Android APIs that
+  # Dart sockets cannot provide; playback never depends on this bridge.
+  otya_transfer_android:
+    path: packages/otya_transfer_android
+
+  # Local Database
   hive: ^2.2.3
   hive_flutter: ^1.1.0
-  path_provider: ^2.1.5
-  permission_handler: ^11.4.0
-  device_info_plus: ^10.1.2
-  package_info_plus: ^8.3.1
-  connectivity_plus: ^6.1.5
-  file: ^7.0.1
-  http: ^1.6.0
-  crypto: ^3.0.7
-  uuid: ^4.6.0
-  mime: ^2.0.0
-  sqflite: ^2.4.2
-  safe_local_storage: ^2.0.6
-  image: ^4.9.2
-  cached_network_image: ^3.4.1
-  octo_image: ^2.1.0
-  shimmer: ^3.0.0
-  flutter_animate: ^4.5.2
-  share_plus: ^10.1.4
-  url_launcher: ^6.3.2
-  webview_flutter: ^4.9.0
-  image_picker: ^1.2.1
+
+  # Private media + local authentication. OTYA Private relies on Android's app
+  # sandbox/device storage encryption; crypto is used for local integrity/data
+  # helpers rather than claiming a second custom file-encryption layer.
+  crypto: ^3.0.5
   local_auth: ^2.3.0
-  audio_service: ^0.18.19
-  audio_session: ^0.2.4
-  volume_controller: ^3.4.4
-  wakelock_plus: ^1.3.3
-  screen_brightness_android: ^2.1.6
+
+  # Otya Send/Transfer — direct local-network transport and nearby QR pairing.
+  qr_flutter: ^4.1.0
+  mobile_scanner: ^6.0.0
+
+  # HTTP
+  http: ^1.2.2
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+  riverpod_annotation: ^2.4.0
+
+  # Navigation
+  go_router: ^14.6.0
+
+  # UI & Animations
+  flutter_animate: ^4.5.2
+  cached_network_image: ^3.4.1
+  shimmer: ^3.0.0
+
+  # Google account + private Google Drive App Folder backup.
+  google_sign_in: ^6.2.1
+
+  # Device info — used for ABI/update checks and Android-scoped Send permissions.
+  device_info_plus: ^10.1.0
+  package_info_plus: ^8.1.0
+
+  # File System
+  path_provider: ^2.1.5
+  permission_handler: ^11.3.1
+  image_picker: ^1.1.2
+
+  # Firebase Android services. Cloudflare remains the OTYA control plane and
+  # backend authority. These matched FlutterFire versions belong to the same
+  # firebase_core 3.15.2 generation already used by OTYA.
   flutter_local_notifications: ^18.0.1
   firebase_core: ^3.15.2
   firebase_messaging: ^15.2.10
   firebase_app_check: ^0.3.2+10
   firebase_analytics: ^11.6.0
   firebase_performance: ^0.10.1+10
-  google_sign_in: ^6.3.0
-  mobile_scanner: ^6.0.11
-  qr_flutter: ^4.1.0
-  otya_media_tools:
-    path: packages/otya_media_tools
-  otya_transfer_android:
-    path: packages/otya_transfer_android
 
-dev_dependencies:
-  flutter_test:
-    sdk: flutter
-  flutter_lints: ^5.0.0
-  build_runner: ^2.5.4
-  riverpod_generator: ^2.6.3
-  hive_generator: ^2.0.1
-  json_serializable: ^6.9.0
-  custom_lint_core: ^0.7.0
+  # Secure storage for Private/account secrets and local PIN/session state.
+  flutter_secure_storage: ^9.2.4
 
-flutter:
-  uses-material-design: true
-  generate: true
+  # Connectivity state only. Otya Send still moves bytes over direct local
+  # sockets; the first-party bridge can create a local-only hotspot when needed.
+  connectivity_plus: ^6.1.4
 
-  assets:
-    - assets/images/
-    - assets/branding/
-    - assets/animations/
-    - assets/strings/
+  # Utilities
+  uuid: ^4.5.1
+  json_annotation: ^4.9.0
+  cupertino_icons: ^1.0.8
 
+  # Sharing, external update/support links, PIN/preferences storage.
+  share_plus: ^10.1.4
+  url_launcher: ^6.3.1
+  shared_preferences: ^2.3.5
+
+  # Background audio + app-wide audio-focus policy. audio_session is declared
+  # directly because OTYA owns interruption/headphone routing behaviour rather
+  # than relying on transitive plugin defaults.
+  audio_service: ^0.18.15
+  audio_session: ^0.2.4
+
+  # In-app WebView
+  webview_flutter: 4.9.0
+  webview_flutter_android: 3.16.9
+
+# media_kit_video's published package declares media_kit from pub.dev. OTYA
+# intentionally uses the reviewed immutable Git revision above for the Android
+# disposal-order crash fix. Override transitive resolution to that exact same
+# revision so every MediaKit consumer uses one source/version graph.
 dependency_overrides:
   media_kit:
     git:
       url: https://github.com/Priyanshu-Mallick/media-kit.git
-      ref: 9e170689b3fbbe75f866b6e387c5745155527515
+      ref: 9e1706898f15bcee98c125a2f4a7b88a4374dda7
       path: media_kit
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  hive_generator: ^2.0.1
+  build_runner: ^2.4.13
+  json_serializable: ^6.8.0
+  riverpod_generator: ^2.4.0
+  flutter_lints: ^5.0.0
+
+flutter:
+  uses-material-design: true
+  generate: true
+  assets:
+    - assets/icons/
+    - assets/branding/
+    - assets/animations/
+    - assets/themes/
+    - assets/onboarding/
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/fonts/Inter-VariableFont_opsz,wght.ttf
+        - asset: assets/fonts/Inter-Italic-VariableFont_opsz,wght.ttf
+          style: italic
