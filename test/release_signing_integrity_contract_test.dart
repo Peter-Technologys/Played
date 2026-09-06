@@ -21,17 +21,17 @@ void main() {
     expect(source, isNot(contains(r'keytool -printcert -jarfile "$APK"')));
   });
 
-  test('production release tag must match pubspec version', () {
+  test('production release tag must exactly match pubspec build', () {
     final source = File('.github/workflows/release.yml').readAsStringSync();
 
-    expect(source, contains('Check immutable first-release identity'));
+    expect(source, contains('Check immutable build release identity'));
     expect(source, contains('APP_VERSION='));
     expect(source, contains('VERSION_NAME='));
     expect(source, contains('BUILD_NUMBER='));
-    expect(source, contains('EXPECTED_VERSION='));
+    expect(source, contains('EXPECTED_APP_VERSION='));
     expect(
       source,
-      contains('does not match pubspec version'),
+      contains('does not exactly match pubspec build'),
     );
     expect(
       source,
