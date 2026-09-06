@@ -45,7 +45,12 @@ void main() {
     );
     expect(adaptive, contains('@drawable/otya_launcher_foreground'));
     expect(adaptive, contains('@color/otya_launcher_background'));
-    expect(foreground, contains('@drawable/otya_launcher_foreground_bitmap'));
+    expect(foreground, contains('@drawable/otya_launcher_source'));
+    expect(
+      foreground,
+      isNot(contains('@drawable/otya_launcher_foreground_bitmap')),
+      reason: 'The launcher must not depend on the corrupt legacy PNG.',
+    );
     expect(
       foreground,
       isNot(contains('M160,98 L138,117 L116,146')),
