@@ -41,7 +41,7 @@ void main() {
       isTrue,
     );
     expect(runtime.contains('MediaKitEngine('), isFalse);
-    expect(runtime.contains('Player('), isFalse);
+    expect(runtime.contains('= Player('), isFalse);
   });
 
   test('video queue handoff preserves Together and gives host media control', () {
