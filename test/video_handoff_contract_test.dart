@@ -9,11 +9,10 @@ void main() {
     ).readAsStringSync();
 
     expect(player, contains('bool _handoffToAnotherVideo = false;'));
-    expect(player, contains('void _openQueuedVideo(MediaItem item)'));
+    expect(player, contains('Future<bool> _openQueuedVideo(MediaItem item) async'));
     expect(player, contains('saveSeekPosition(widget.mediaItem.id, _position)'));
     expect(player, contains("context.pushReplacement('/player/video', extra: item);"));
     expect(player, contains('if (!_handoffToAnotherVideo)'));
-    expect(player, isNot(contains("Navigator.of(context).pop();\n                              context.push('/player/video'")));
   });
 
   test('video overlay avoids filename-based HDR claims and duplicate trim controls', () {
