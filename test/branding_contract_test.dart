@@ -59,6 +59,11 @@ void main() {
     expect(colors, contains('colors: [brandCyan, brandBlue, brandDeepBlue]'));
 
     expect(File('assets/branding/otya_app_icon.webp').existsSync(), isTrue);
+    expect(
+      File('assets/branding/otya_mark_current.png').existsSync(),
+      isFalse,
+      reason: 'Malformed retired product marks must not remain as dormant assets.',
+    );
 
     expect(
       foreground,
